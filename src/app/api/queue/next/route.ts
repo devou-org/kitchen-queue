@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { advanceQueue } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
-import { sseManager } from '@/lib/sse';
+import { pusherServer } from '@/lib/pusher';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
 
     const state = await advanceQueue();
 
-    // Broadcast to all connected customers
-    sseManager.broadcast({
+    // Broadcast to all connected customers via Pusher
+    await pusherServer.trigger('queue-channel', 'queue_update', {
       type: 'queue_update',
       queue_number: state.current_queue_number,
       last_served_number: state.last_served_number,

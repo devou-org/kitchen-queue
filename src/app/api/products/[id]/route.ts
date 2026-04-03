@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getProductById, updateProduct, softDeleteProduct } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { calculateProductStatus } from '@/lib/validators';
-import { sseManager } from '@/lib/sse';
+import { pusherServer } from '@/lib/pusher';
 
 async function requireAdmin(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
@@ -46,8 +46,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const product = await updateProduct(id, body);
     if (!product) return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
 
-    // Broadcast to customers
-    sseManager.broadcast({
+    // Broadcast to customers via Pusher
+    await pusherServer.trigger('queue-channel', 'product_update', {
       type: 'product_update',
       product_id: id,
       product_status: product.status,

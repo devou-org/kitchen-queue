@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
+import { pusherClient } from '@/lib/pusher-client';
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -12,10 +13,9 @@ export default function AdminOrders() {
   const [currentTab, setCurrentTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
-  const esRef = useRef<EventSource | null>(null);
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const qs = new URLSearchParams({ page: page.toString(), per_page: '50' });
       if (statusFilter) qs.append('status', statusFilter);
@@ -29,47 +29,47 @@ export default function AdminOrders() {
     } catch {
       toast.error('Failed to load orders');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
+  // Base data fetch effect
   useEffect(() => {
     fetchOrders();
-
-    // Close any existing connection
-    if (esRef.current) {
-      esRef.current.close();
-    }
-
-    const es = new EventSource('/api/queue/stream');
-    esRef.current = es;
-
-    es.onmessage = (e) => {
-      try {
-        const event = JSON.parse(e.data);
-        if (event.type === 'new_order' || event.type === 'order_update') {
-          fetchOrders();
-          // Also update the selected order in the modal if it matches
-          if (event.type === 'order_update' && selectedOrder && event.order_id === selectedOrder.id) {
-            setSelectedOrder(prev => prev ? { ...prev, status: event.new_status } : null);
-          }
-        }
-      } catch {
-        // Ignore parse errors (heartbeats, etc.)
-      }
-    };
-
-    es.onerror = () => {
-      // EventSource will auto-reconnect
-      console.log('SSE connection error, will auto-reconnect...');
-    };
-
-    return () => {
-      es.close();
-      esRef.current = null;
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, statusFilter]);
+
+  // Real-time effect
+  useEffect(() => {
+    if (!pusherClient) return;
+    const channel = pusherClient.subscribe('queue-channel');
+
+    channel.bind('new_order', () => {
+      fetchOrders(true); // Silent refresh
+    });
+
+    channel.bind('order_update', (data: any) => {
+      fetchOrders(true); // Silent refresh
+      
+      // Update the order in the list immediately if it exists
+      setOrders(prev => prev.map(o => 
+        o.id === data.order_id ? { ...o, status: data.new_status } : o
+      ));
+      
+      // Update modal if needed (without triggering a full re-fetch of everything)
+      setSelectedOrder(prev => {
+        if (prev && data.order_id === prev.id) {
+          return { ...prev, status: data.new_status };
+        }
+        return prev;
+    });
+  });
+
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
+    };
+  }, [selectedOrder?.id]); // Only re-bind if selectedOrder identity changes for the modal logic
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     setModalLoading(true);
