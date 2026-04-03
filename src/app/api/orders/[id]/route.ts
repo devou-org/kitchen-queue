@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrderById, updateOrderStatus, setOrderPaymentStatus } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { STATUS_TRANSITIONS } from '@/lib/constants';
-import { sseManager } from '@/lib/sse';
+import { pusherServer } from '@/lib/pusher';
 
 async function requireAdmin(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
@@ -52,8 +52,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
       order = await updateOrderStatus(id, status);
 
-      // Broadcast to customers
-      sseManager.broadcast({
+      // Broadcast to customers via Pusher
+      await pusherServer.trigger('queue-channel', 'order_update', {
         type: 'order_update',
         order_id: id,
         ticket_number: existing.ticket_number,

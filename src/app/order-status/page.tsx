@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
 import BottomNav from '@/components/BottomNav';
+import { pusherClient } from '@/lib/pusher-client';
 
 type QueueState = {
   type: string;
@@ -30,7 +31,6 @@ export default function OrderStatusPage() {
   const [queueState, setQueueState] = useState<QueueState | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
 
   const fetchLatestOrder = async () => {
     try {
@@ -65,32 +65,33 @@ export default function OrderStatusPage() {
   useEffect(() => {
     fetchLatestOrder();
 
-    // SSE Connection
-    const es = new EventSource('/api/queue/stream');
-    eventSourceRef.current = es;
+    // Pusher Subscription
+    if (!pusherClient) return;
+    const channel = pusherClient.subscribe('queue-channel');
+    setIsLive(true);
 
-    es.onopen = () => setIsLive(true);
-    es.onerror = () => setIsLive(false);
-    es.onmessage = (e) => {
-      const event = JSON.parse(e.data);
-      if (event.type === 'queue_update') {
-        setQueueState(event);
-        setIsLive(true);
-      }
-      if (event.type === 'order_update') {
-        setOrder(prev => {
-          if (prev && prev.ticket_number === event.ticket_number) {
-            return { ...prev, status: event.new_status };
-          }
-          return prev;
-        });
-      }
-      if (event.type === 'new_order') {
-        fetchLatestOrder();
-      }
+    channel.bind('queue_update', (data: any) => {
+      setQueueState(data);
+      setIsLive(true);
+    });
+
+    channel.bind('order_update', (data: any) => {
+      setOrder(prev => {
+        if (prev && String(prev.ticket_number) === String(data.ticket_number)) {
+          return { ...prev, status: data.new_status };
+        }
+        return prev;
+      });
+    });
+
+    channel.bind('new_order', () => {
+      fetchLatestOrder();
+    });
+
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
     };
-
-    return () => es.close();
   }, []);
 
   if (loading) {

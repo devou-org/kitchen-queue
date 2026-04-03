@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
 import BottomNav from '@/components/BottomNav';
+import { pusherClient } from '@/lib/pusher-client';
 
 type QueueState = {
   type: string;
@@ -32,7 +33,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
-  const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -55,24 +55,26 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
     };
     fetchOrder();
 
-    // SSE Connection
-    const es = new EventSource('/api/queue/stream');
-    eventSourceRef.current = es;
+    // Pusher Subscription
+    if (!pusherClient) return;
+    const channel = pusherClient.subscribe('queue-channel');
+    setIsLive(true);
 
-    es.onopen = () => setIsLive(true);
-    es.onerror = () => setIsLive(false);
-    es.onmessage = (e) => {
-      const event = JSON.parse(e.data);
-      if (event.type === 'queue_update') {
-        setQueueState(event);
-        setIsLive(true);
+    channel.bind('queue_update', (data: any) => {
+      setQueueState(data);
+      setIsLive(true);
+    });
+
+    channel.bind('order_update', (data: any) => {
+      if (String(data.ticket_number) === String(ticket)) {
+        setOrder(prev => prev ? { ...prev, status: data.new_status } : prev);
       }
-      if (event.type === 'order_update' && event.ticket_number === parseInt(ticket)) {
-        setOrder(prev => prev ? { ...prev, status: event.new_status } : prev);
-      }
+    });
+
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
     };
-
-    return () => es.close();
   }, [ticket]);
 
   const renderHeader = () => (

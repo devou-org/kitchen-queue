@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
 import { Product, CartItem, ProductStatus } from '@/types';
 import BottomNav from '@/components/BottomNav';
+import { pusherClient } from '@/lib/pusher-client';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -120,18 +121,21 @@ export default function MenuPage() {
     fetchProducts();
   }, []);
 
-  // SSE for real-time updates
+  // Pusher for real-time updates
   useEffect(() => {
-    const es = new EventSource('/api/queue/stream');
-    es.onmessage = (e) => {
-      const event = JSON.parse(e.data);
-      if (event.type === 'product_update') {
-        setProducts(prev => prev.map(p =>
-          p.id === event.product_id ? { ...p, status: event.product_status } : p
-        ));
-      }
+    if (!pusherClient) return;
+    const channel = pusherClient.subscribe('queue-channel');
+    
+    channel.bind('product_update', (data: any) => {
+      setProducts(prev => prev.map(p =>
+        p.id === data.product_id ? { ...p, status: data.product_status } : p
+      ));
+    });
+
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
     };
-    return () => es.close();
   }, []);
 
   const handleUpdate = (id: string, delta: number) => {

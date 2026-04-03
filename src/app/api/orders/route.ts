@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrders, createOrder } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
-import { sseManager } from '@/lib/sse';
+import { pusherServer } from '@/lib/pusher';
 
 async function requireAdmin(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
@@ -65,13 +65,17 @@ export async function POST(request: NextRequest) {
       items,
     });
 
-    const sseData = {
-      type: 'new_order',
-      order_id: order.id,
-      ticket_number: order.ticket_number,
-      timestamp: new Date().toISOString()
-    };
-    sseManager.broadcast(sseData);
+    try {
+      const sseData = {
+        type: 'new_order',
+        order_id: order.id,
+        ticket_number: order.ticket_number,
+        timestamp: new Date().toISOString()
+      };
+      await pusherServer.trigger('queue-channel', 'new_order', sseData);
+    } catch (pushErr) {
+      console.error('Pusher trigger failed, but order was created:', pushErr);
+    }
 
     return NextResponse.json({
       success: true,
