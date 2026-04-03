@@ -157,7 +157,8 @@ export default function OrderStatusPage() {
         {orders.map((order, idx) => {
           const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
           const isReady = order.status === 'READY';
-          const pos = typeof order.queue_position === 'number' ? order.queue_position : 0;
+          const rawPos = Number(order.queue_position);
+          const pos = isNaN(rawPos) ? 0 : rawPos;
           const displayPos = pos || 1;
 
           return (
