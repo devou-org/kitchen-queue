@@ -5,6 +5,7 @@ import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import { pusherClient } from '@/lib/pusher-client';
+import { usePusher } from '@/context/PusherContext';
 
 type QueueState = {
   type: string;
@@ -28,9 +29,8 @@ function getStageIndex(status: string) {
 
 export default function OrderStatusPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [queueState, setQueueState] = useState<QueueState | null>(null);
+  const { isLive, channel } = usePusher();
   const [loading, setLoading] = useState(true);
-  const [isLive, setIsLive] = useState(false);
 
   const fetchOrders = async (silent = false) => {
     try {
@@ -64,45 +64,27 @@ export default function OrderStatusPage() {
 
   useEffect(() => {
     fetchOrders();
+  }, []);
 
-    // Pusher Subscription
-    if (!pusherClient) {
-      console.log('❌ Pusher client not available');
-      return;
-    }
+  useEffect(() => {
+    if (!channel) return;
 
-    const channel = pusherClient.subscribe('queue-channel');
-    setIsLive(true);
-
-    // ✅ HANDLE STATUS UPDATES
+    // ✅ HANDLE STATUS UPDATES using the global channel
     channel.bind('order_update', (data: any) => {
-      console.log('✅ Pusher event received: order_update', data);
-
-      // ALWAYS re-fetch if status changed to ensure ranks/payment/status are perfect
+      console.log('✅ Global connection update: order_update', data);
       fetchOrders(true);
     });
 
     channel.bind('new_order', () => {
-      // Re-fetch everything on any new order in the system to update positions
+      console.log('✅ Global connection update: new_order');
       fetchOrders(true);
     });
 
-    // ✅ CONNECTION STATUS
-    channel.bind('pusher:subscription_succeeded', () => {
-      console.log('✅ Successfully subscribed to queue-channel');
-      setIsLive(true);
-    });
-
-    channel.bind('pusher:subscription_error', (error: any) => {
-      console.error('❌ Pusher subscription error:', error);
-      setIsLive(false);
-    });
-
     return () => {
-      channel.unbind_all();
-      channel.unsubscribe();
+      channel.unbind('order_update');
+      channel.unbind('new_order');
     };
-  }, []);
+  }, [channel]);
 
   if (loading) {
     return (
@@ -137,7 +119,7 @@ export default function OrderStatusPage() {
   return (
     <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', paddingBottom: '100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>🍴</span><span style={{ fontWeight: 800, fontSize: '15px' }}>The Culinary Conductor</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>🍴</span><span style={{ fontWeight: 800, fontSize: '15px' }}>The Culinary Conductor</span></div>
       </div>
 
       {/* Live Status Banner */}
@@ -162,7 +144,7 @@ export default function OrderStatusPage() {
           const displayPos = pos || 1;
 
           return (
-            <div key={order.id} style={{ 
+            <div key={order.id} style={{
               background: 'white', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '20px', padding: '20px', marginBottom: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', opacity: isActive ? 1 : 0.7, transform: idx === 0 ? 'scale(1.02)' : 'none'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
