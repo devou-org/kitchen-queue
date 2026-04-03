@@ -1,0 +1,28 @@
+{
+  "rows": [
+    {
+      "id": "a7548d4a-7a93-4f92-9a88-a250073c1cd8",
+      "ticket_number": 35,
+      "status": "PENDING",
+      "status_raw": "--PENDING--"
+    },
+    {
+      "id": "598edbd2-56b4-4b22-b64a-7d7531a24b34",
+      "ticket_number": 33,
+      "status": "PENDING",
+      "status_raw": "--PENDING--"
+    }
+  ],
+  "ranking": [
+    {
+      "id": "598edbd2-56b4-4b22-b64a-7d7531a24b34",
+      "ticket_number": 33,
+      "pos": "1"
+    },
+    {
+      "id": "a7548d4a-7a93-4f92-9a88-a250073c1cd8",
+      "ticket_number": 35,
+      "pos": "2"
+    }
+  ]
+}

@@ -145,13 +145,13 @@ export async function getOrderById(id: string) {
 
 export async function getOrderByTicket(ticket_number: number) {
   const rows = await sql`
+    WITH active_ranks AS (
+       SELECT id, ROW_NUMBER() OVER (ORDER BY ticket_number ASC)::integer as pos
+       FROM orders
+       WHERE UPPER(status) IN ('PENDING', 'PREPARING', 'READY')
+    )
     SELECT o.*, 
-      (
-        SELECT COUNT(*) + 1 
-        FROM orders o2 
-        WHERE o2.status IN ('PENDING', 'PREPARING') 
-        AND o2.ticket_number < o.ticket_number
-      ) as queue_position,
+      COALESCE(ar.pos, 0) as queue_position,
       json_agg(json_build_object(
         'id', oi.id, 
         'product_id', oi.product_id,
@@ -161,10 +161,11 @@ export async function getOrderByTicket(ticket_number: number) {
         'product_image', p.image_url
       ) ORDER BY oi.id) as items
     FROM orders o
+    LEFT JOIN active_ranks ar ON ar.id = o.id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
     WHERE o.ticket_number = ${ticket_number}
-    GROUP BY o.id
+    GROUP BY o.id, ar.pos
     ORDER BY o.created_at DESC
     LIMIT 1
   `;
@@ -173,13 +174,13 @@ export async function getOrderByTicket(ticket_number: number) {
 
 export async function getOrdersByPhone(phone: string) {
   const rows = await sql`
+    WITH active_ranks AS (
+       SELECT id, ROW_NUMBER() OVER (ORDER BY ticket_number ASC)::integer as pos
+       FROM orders
+       WHERE UPPER(status) IN ('PENDING', 'PREPARING', 'READY')
+    )
     SELECT o.*, 
-      (
-        SELECT COUNT(*) + 1 
-        FROM orders o2 
-        WHERE o2.status IN ('PENDING', 'PREPARING') 
-        AND o2.ticket_number < o.ticket_number
-      ) as queue_position,
+      COALESCE(ar.pos, 0) as queue_position,
       json_agg(json_build_object(
         'id', oi.id, 
         'product_id', oi.product_id,
@@ -188,10 +189,11 @@ export async function getOrdersByPhone(phone: string) {
         'product_name', p.name
       ) ORDER BY oi.id) as items
     FROM orders o
+    LEFT JOIN active_ranks ar ON ar.id = o.id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
     WHERE o.phone = ${phone}
-    GROUP BY o.id
+    GROUP BY o.id, ar.pos
     ORDER BY o.created_at DESC
     LIMIT 20
   `;
