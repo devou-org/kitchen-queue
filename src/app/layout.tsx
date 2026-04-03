@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { PusherProvider } from '@/context/PusherContext';
+
 export default function RootLayout({
   children,
 }: {
@@ -21,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
+        <PusherProvider>
+          {children}
+        </PusherProvider>
         <Toaster
           position="top-right"
           toastOptions={{

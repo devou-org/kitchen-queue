@@ -5,6 +5,7 @@ import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import { pusherClient } from '@/lib/pusher-client';
+import { usePusher } from '@/context/PusherContext';
 
 type QueueState = {
   type: string;
@@ -29,52 +30,40 @@ function getStageIndex(status: string) {
 export default function OrderStatusTicketPage({ params }: { params: Promise<{ ticket: string }> }) {
   const { ticket } = use(params);
   const [order, setOrder] = useState<Order | null>(null);
-  const [queueState, setQueueState] = useState<QueueState | null>(null);
+  const { isLive, channel } = usePusher();
   const [loading, setLoading] = useState(true);
-  const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const fetchOrder = async (silent = false) => {
-      try {
-        // Cache-buster added
-        const res = await fetch(`/api/orders/ticket/${ticket}?t=${Date.now()}`);
-        const data = await res.json();
+  const fetchOrder = async (silent = false) => {
+    try {
+      // Cache-buster added
+      const res = await fetch(`/api/orders/ticket/${ticket}?t=${Date.now()}`);
+      const data = await res.json();
 
-        if (data.success && data.data) {
-          setOrder(data.data);
-        } else if (!silent) {
-          setError(data.error || 'Order not found');
-          setOrder(null);
-        }
-      } catch (err) {
-        console.error('Failed to fetch order:', err);
-        if (!silent) setError('Failed to load order');
-      } finally {
-        if (!silent) setLoading(false);
+      if (data.success && data.data) {
+        setOrder(data.data);
+      } else if (!silent) {
+        setError(data.error || 'Order not found');
+        setOrder(null);
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch order:', err);
+      if (!silent) setError('Failed to load order');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchOrder();
+  }, [ticket]);
 
-    if (!pusherClient) return;
+  useEffect(() => {
+    if (!channel) return;
 
-    const channel = pusherClient.subscribe('queue-channel');
-
-    // ✅ CONNECTION STATUS
-    channel.bind('pusher:subscription_succeeded', () => {
-      setIsLive(true);
-    });
-
-    channel.bind('pusher:subscription_error', () => {
-      setIsLive(false);
-    });
-
-    // ✅ RE-FETCH ON ANY EVENT THAT AFFECTS QUEUE
+    // ✅ RE-FETCH ON ANY EVENT THAT AFFECTS QUEUE Using Global Channel
     channel.bind('order_update', (data: any) => {
-      console.log('✅ Ticket Page received order_update:', data);
-      // We re-fetch for ANY update to ensure position is correct
-      // (Someone leaving queue, or our own order getting ready)
+      console.log('✅ Global connection: Ticket Page update:', data);
       fetchOrder(true);
     });
 
@@ -83,10 +72,10 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
     });
 
     return () => {
-      channel.unbind_all();
-      channel.unsubscribe();
+      channel.unbind('order_update');
+      channel.unbind('new_order');
     };
-  }, [ticket]);
+  }, [channel]);
 
   const renderHeader = () => (
     <div style={{
@@ -138,11 +127,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const isReady = order.status === 'READY';
   const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
 
-  // Use the precise database rank if available. If it's not present (e.g. order is cancelled or done), we treat as 0.
-  const position = typeof order.queue_position === 'number' ? order.queue_position : 0;
-
-  // The position variable is at least 1 thanks to the DB subquery (COUNT(*) + 1).
-  // If it's somehow 0, we show 1 as a safe default for active orders.
+  // Use the precise database rank if available. Handle BigInt string conversion if needed.
+  const rawPosition = Number(order.queue_position);
+  const position = isNaN(rawPosition) ? 0 : rawPosition;
   const displayPosition = position || 1;
 
   const getNearlyText = () => {
@@ -256,7 +243,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h3 style={{ fontWeight: 700, fontSize: '16px' }}>Queue Progress</h3>
-                <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600 }}>{getNearlyText()}</span>
               </div>
               <div className="progress-track" style={{ background: '#F3F4F6' }}>
                 <div className="progress-fill" style={{ width: `${Math.min(100, (stageIndex / 2) * 100)}%` }} />

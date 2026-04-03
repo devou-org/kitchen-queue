@@ -1,46 +1,57 @@
 [
   {
     "column_name": "updated_at",
-    "data_type": "timestamp with time zone"
+    "data_type": "timestamp with time zone",
+    "column_default": "CURRENT_TIMESTAMP"
   },
   {
     "column_name": "ticket_number",
-    "data_type": "integer"
+    "data_type": "integer",
+    "column_default": "nextval('orders_ticket_number_seq'::regclass)"
   },
   {
     "column_name": "is_paid",
-    "data_type": "boolean"
+    "data_type": "boolean",
+    "column_default": "false"
   },
   {
     "column_name": "party_size",
-    "data_type": "integer"
+    "data_type": "integer",
+    "column_default": "1"
   },
   {
     "column_name": "created_at",
-    "data_type": "timestamp with time zone"
+    "data_type": "timestamp with time zone",
+    "column_default": "CURRENT_TIMESTAMP"
   },
   {
     "column_name": "id",
-    "data_type": "uuid"
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()"
   },
   {
     "column_name": "total_price",
-    "data_type": "numeric"
+    "data_type": "numeric",
+    "column_default": null
   },
   {
     "column_name": "customer_name",
-    "data_type": "character varying"
+    "data_type": "character varying",
+    "column_default": null
   },
   {
     "column_name": "phone",
-    "data_type": "character varying"
+    "data_type": "character varying",
+    "column_default": null
   },
   {
     "column_name": "status",
-    "data_type": "character varying"
+    "data_type": "character varying",
+    "column_default": "'PENDING'::character varying"
   },
   {
     "column_name": "notes",
-    "data_type": "text"
+    "data_type": "text",
+    "column_default": null
   }
 ]

@@ -208,39 +208,46 @@ export async function createOrder(data: {
   party_size?: number;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
 }) {
-  const orderRows = await sql`
-    INSERT INTO orders (customer_name, phone, total_price, status, is_paid, notes, party_size)
-    VALUES (${data.customer_name}, ${data.phone}, ${data.total_price}, 'PENDING', false, ${data.notes || null}, ${data.party_size || 1})
-    RETURNING *
-  `;
-  const order = orderRows[0];
-
-  for (const item of data.items) {
-    await sql`
+  // Use a single atomic query to handle the order, items, and stock updates.
+  // This ensures that ticket_number assignment and product stock deductions are locked and consistent.
+  const itemsJson = JSON.stringify(data.items);
+  
+  const rows = await sql`
+    WITH new_order AS (
+      INSERT INTO orders (customer_name, phone, total_price, status, notes, party_size)
+      VALUES (${data.customer_name}, ${data.phone}, ${data.total_price}, 'PENDING', ${data.notes || null}, ${data.party_size || 1})
+      RETURNING *
+    ),
+    inserted_items AS (
       INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
-      VALUES (${order.id}, ${item.product_id}, ${item.quantity}, ${item.price_at_purchase})
-    `;
-    // Reduce stock
-    await sql`
-      UPDATE products 
-      SET stock_quantity = stock_quantity - ${item.quantity},
-          updated_at = NOW()
-      WHERE id = ${item.product_id}
-    `;
-    // Auto-update status
-    await sql`
-      UPDATE products 
-      SET status = CASE 
-        WHEN stock_quantity - ${item.quantity} <= 0 THEN 'OUT_OF_STOCK'
-        WHEN stock_quantity - ${item.quantity} <= buffer_quantity THEN 'LOW_STOCK'
-        ELSE 'AVAILABLE'
-      END,
-      updated_at = NOW()
-      WHERE id = ${item.product_id}
-    `;
-  }
+      SELECT (SELECT id FROM new_order), product_id, quantity, price_at_purchase
+      FROM json_to_recordset(${itemsJson}) AS x(product_id uuid, quantity int, price_at_purchase numeric)
+      RETURNING *
+    ),
+    stock_update AS (
+      UPDATE products p
+      SET stock_quantity = p.stock_quantity - x.quantity,
+          updated_at = NOW(),
+          status = CASE 
+            WHEN p.stock_quantity - x.quantity <= 0 THEN 'OUT_OF_STOCK'
+            WHEN p.stock_quantity - x.quantity <= p.buffer_quantity THEN 'LOW_STOCK'
+            ELSE 'AVAILABLE'
+          END
+      FROM json_to_recordset(${itemsJson}) AS x(product_id uuid, quantity int)
+      WHERE p.id = x.product_id
+      RETURNING p.id
+    )
+    SELECT o.*, 
+      (SELECT json_agg(json_build_object(
+        'id', ii.id, 
+        'product_id', ii.product_id, 
+        'quantity', ii.quantity, 
+        'price_at_purchase', ii.price_at_purchase
+      )) FROM inserted_items ii) as items
+    FROM new_order o
+  `;
 
-  return await getOrderById(order.id);
+  return rows[0];
 }
 
 export async function updateOrderStatus(id: string, status: string) {

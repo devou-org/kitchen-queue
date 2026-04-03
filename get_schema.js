@@ -5,9 +5,9 @@ const sql = neon(url);
 const fs = require('fs');
 async function f() {
   try {
-    const r = await sql`SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'orders'`;
+    const r = await sql`SELECT column_name, data_type, column_default FROM information_schema.columns WHERE table_name = 'orders'`;
     fs.writeFileSync('schema_output.json', JSON.stringify(r, null, 2));
-    console.log('Schema written to schema_output.json');
+    console.log('Schema with defaults written to schema_output.json');
   } catch (err) {
     console.error(err);
   }
