@@ -1,11 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { formatPrice, formatTime, getTimeAgo } from '@/lib/format';
+import { formatPrice, getTimeAgo } from '@/lib/format';
 import { DashboardStats, Order } from '@/types';
 
-
-function StatCard({ title, value, icon, wait }: { title: string, value: string | number, icon: string, wait?: boolean }) {
+function StatCard({ title, value, icon }: { title: string, value: string | number, icon: string }) {
   return (
     <div className="stat-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

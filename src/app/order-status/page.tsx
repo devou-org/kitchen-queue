@@ -27,65 +27,75 @@ function getStageIndex(status: string) {
 }
 
 export default function OrderStatusPage() {
-  const [order, setOrder] = useState<Order | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [queueState, setQueueState] = useState<QueueState | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
 
-  const fetchLatestOrder = async () => {
+  const fetchOrders = async (silent = false) => {
     try {
       const userStr = localStorage.getItem('user');
       if (!userStr) {
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
-      
+
       const user = JSON.parse(userStr);
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(user.phone)}`, {
+      // Added cache-buster to ensure we get fresh DB rank
+      const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(user.phone)}&t=${Date.now()}`, {
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         }
       });
       const data = await res.json();
-      
-      if (data.success && data.data && data.data.length > 0) {
-        // We look for ANY order. Usually the user wants to see the most recent one.
-        setOrder(data.data[0]);
-      } else {
-        setOrder(null);
+
+      if (data.success && data.data) {
+        setOrders(data.data);
+      } else if (!silent) {
+        setOrders([]);
       }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLatestOrder();
+    fetchOrders();
 
     // Pusher Subscription
-    if (!pusherClient) return;
+    if (!pusherClient) {
+      console.log('❌ Pusher client not available');
+      return;
+    }
+
     const channel = pusherClient.subscribe('queue-channel');
     setIsLive(true);
 
-    channel.bind('queue_update', (data: any) => {
-      setQueueState(data);
-      setIsLive(true);
-    });
-
+    // ✅ HANDLE STATUS UPDATES
     channel.bind('order_update', (data: any) => {
-      setOrder(prev => {
-        if (prev && String(prev.ticket_number) === String(data.ticket_number)) {
-          return { ...prev, status: data.new_status };
-        }
-        return prev;
-      });
+      console.log('✅ Pusher event received: order_update', data);
+
+      // ALWAYS re-fetch if status changed to ensure ranks/payment/status are perfect
+      fetchOrders(true);
     });
 
     channel.bind('new_order', () => {
-      fetchLatestOrder();
+      // Re-fetch everything on any new order in the system to update positions
+      fetchOrders(true);
+    });
+
+    // ✅ CONNECTION STATUS
+    channel.bind('pusher:subscription_succeeded', () => {
+      console.log('✅ Successfully subscribed to queue-channel');
+      setIsLive(true);
+    });
+
+    channel.bind('pusher:subscription_error', (error: any) => {
+      console.error('❌ Pusher subscription error:', error);
+      setIsLive(false);
     });
 
     return () => {
@@ -103,152 +113,94 @@ export default function OrderStatusPage() {
     );
   }
 
-  if (!order) {
+  // If they have active orders, show them all in a cleaner list or focused view
+  const activeOrders = orders.filter(o => ['PENDING', 'PREPARING', 'READY'].includes(o.status));
+  const hasMultiple = activeOrders.length > 1;
+
+  if (orders.length === 0) {
     return (
       <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', background: 'white',
-          borderBottom: '1px solid rgba(0,0,0,0.05)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px' }}>🍴</span>
-            <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>The Culinary Conductor</span>
-          </div>
-          <div style={{
-            width: '36px', height: '36px', borderRadius: '50%',
-            background: 'rgba(0,0,0,0.05)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '16px',
-          }}>👤</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>🍴</span><span style={{ fontWeight: 800, fontSize: '15px' }}>The Culinary Conductor</span></div>
         </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }} className="animate-fade-in">
-          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>🤷‍♂️</div>
-          <h2 style={{ fontWeight: 800, marginBottom: '8px', fontSize: '24px' }}>No Status for Orders</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🤷‍♂️</div>
+          <h2 style={{ fontWeight: 800, fontSize: '24px' }}>No Orders Found</h2>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>You haven't placed any orders yet.</p>
-          <Link href="/menu" className="btn btn-primary btn-lg" style={{ width: '100%', maxWidth: '300px' }}>
-            Browse Menu & Order →
-          </Link>
+          <Link href="/menu" className="btn btn-primary" style={{ width: '100%', maxWidth: '300px' }}>Order Now →</Link>
         </div>
-
         <BottomNav />
       </div>
     );
   }
 
-  const stageIndex = getStageIndex(order.status);
-  const isReady = order.status === 'READY';
-  const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
-  
-  // Use the precise database rank if available, otherwise fallback to simple subtraction
-  const position = order.queue_position ?? (order.ticket_number - (queueState?.queue_number || 1));
-
-  const getPositionText = () => {
-    if (isReady) return 'Ready for Pickup!';
-    if (position <= 1) return 'Your Turn is NEXT!';
-    return `${formatOrdinal(position)} IN LINE`;
-  };
-
-  const getNearlyText = () => {
-    if (isReady) return '🎉 Ready!';
-    if (position <= 1) return 'Almost there!';
-    if (position <= 3) return 'Nearly there!';
-    return `~${Math.ceil(position * 5)} min wait`;
-  };
-
   return (
-    <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 20px', background: 'white',
-        borderBottom: '1px solid rgba(0,0,0,0.05)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '18px' }}>🍴</span>
-          <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>The Culinary Conductor</span>
-        </div>
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '50%',
-          background: 'rgba(0,0,0,0.05)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '16px',
-        }}>👤</div>
+    <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', paddingBottom: '100px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>🍴</span><span style={{ fontWeight: 800, fontSize: '15px' }}>The Culinary Conductor</span></div>
       </div>
 
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: '8px', padding: '10px',
-        background: isLive ? 'rgba(6,167,125,0.08)' : 'rgba(255,165,0,0.08)',
-        borderBottom: '1px solid rgba(0,0,0,0.05)',
-      }}>
+      {/* Live Status Banner */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', background: isLive ? 'rgba(6,167,125,0.08)' : 'rgba(255,165,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
         <span className={isLive ? 'live-dot' : ''} style={{ background: isLive ? 'var(--success)' : 'var(--warning)' }} />
-        <span style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', color: isLive ? 'var(--success)' : 'var(--warning)', textTransform: 'uppercase' }}>
+        <span style={{ fontSize: '12px', fontWeight: 700, color: isLive ? 'var(--success)' : 'var(--warning)' }}>
           {isLive ? '● LIVE STATUS UPDATE' : '⚡ CONNECTING...'}
         </span>
       </div>
 
-      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px 100px' }} className="animate-fade-in">
+      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
+          Your Orders
+          <span style={{ background: 'var(--primary)', color: 'white', fontSize: '12px', padding: '2px 8px', borderRadius: '10px' }}>{orders.length}</span>
+        </h2>
 
-        {isActive ? (
-          <>
-            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '20px', padding: '28px 24px', textAlign: 'center', marginBottom: '20px', boxShadow: '0 8px 32px rgba(0,0,0,0.04)' }}>
-              <p style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '12px' }}>YOUR TICKET NUMBER</p>
-              <div style={{ fontSize: '72px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1, letterSpacing: '-2px', marginBottom: '16px' }}>#{String(order.ticket_number).padStart(3, '0')}</div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: isReady ? 'rgba(6,167,125,0.1)' : 'rgba(0,0,0,0.04)', color: isReady ? 'var(--success)' : 'var(--text-primary)', padding: '6px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: 700, border: `1px solid ${isReady ? 'rgba(6,167,125,0.2)' : 'rgba(0,0,0,0.05)'}`, marginBottom: '20px' }}>
-                {isReady ? '✓' : '●'} {isReady ? 'Confirmed & Ready!' : 'Confirmed & Active'}
-              </span>
-              {!isReady && (
-                <div style={{ background: '#F9FAFB', borderRadius: '14px', padding: '16px', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '140px', border: '1px solid rgba(0,0,0,0.03)' }}>
-                  <svg width="24" height="24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>Your position</p>
-                  <p style={{ fontWeight: 900, fontSize: '22px', lineHeight: 1 }}>{getPositionText()}</p>
+        {orders.map((order, idx) => {
+          const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
+          const isReady = order.status === 'READY';
+          const pos = typeof order.queue_position === 'number' ? order.queue_position : 0;
+          const displayPos = pos || 1;
+
+          return (
+            <div key={order.id} style={{ 
+              background: 'white', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '20px', padding: '20px', marginBottom: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', opacity: isActive ? 1 : 0.7, transform: idx === 0 ? 'scale(1.02)' : 'none'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div>
+                  <h3 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1 }}>#{String(order.ticket_number).padStart(3, '0')}</h3>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span>
+                  {order.is_paid && <div style={{ fontSize: '10px', color: 'var(--success)', fontWeight: 800, marginTop: '4px' }}>✓ PAID</div>}
+                </div>
+              </div>
+
+              {isActive && !isReady && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F9FAFB', padding: '12px', borderRadius: '12px', marginBottom: '12px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)' }}>QUEUE POSITION</p>
+                    <p style={{ fontSize: '32px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1 }}>{displayPos}</p>
+                  </div>
+                  <div style={{ borderLeft: '1px solid rgba(0,0,0,0.1)', height: '40px' }} />
+                  <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {pos <= 1 ? 'You are next in line!' : `${pos - 1} orders ahead of you`}
+                  </p>
                 </div>
               )}
+
               {isReady && (
-                <div style={{ background: 'rgba(6,167,125,0.1)', border: '1px solid rgba(6,167,125,0.2)', borderRadius: '14px', padding: '16px', fontSize: '16px', fontWeight: 700, color: 'var(--success)' }}>🎉 Your order is ready for pickup!</div>
+                <div style={{ background: 'rgba(6,167,125,0.1)', color: 'var(--success)', padding: '12px', borderRadius: '12px', textAlign: 'center', fontWeight: 900, marginBottom: '12px', animation: 'pulse 2s infinite' }}>
+                  🍽️ READY FOR PICKUP!
+                </div>
               )}
-            </div>
 
-            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '20px', padding: '20px', marginBottom: '20px', boxShadow: '0 8px 32px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}><h3 style={{ fontWeight: 700, fontSize: '16px' }}>Queue Progress</h3><span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600 }}>{getNearlyText()}</span></div>
-              <div className="progress-track" style={{ background: '#F3F4F6' }}><div className="progress-fill" style={{ width: `${Math.min(100, (stageIndex / 2) * 100)}%` }} /></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
-                {STAGES.map((stage, i) => (
-                  <div key={stage.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: stageIndex >= i ? 'var(--primary)' : '#F3F4F6', color: stageIndex >= i ? 'white' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', boxShadow: stageIndex >= i ? '0 4px 12px rgba(255,107,53,0.3)' : 'none' }}>{stageIndex > i ? '✓' : stage.icon}</div>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: stageIndex >= i ? 'var(--primary)' : 'var(--text-secondary)' }}>{stage.label}</span>
-                  </div>
-                ))}
-              </div>
+              <Link href={`/order-status/${order.ticket_number}`} style={{ display: 'block', textAlign: 'center', fontSize: '13px', fontWeight: 700, color: 'var(--primary)', background: 'rgba(255,107,53,0.05)', padding: '8px', borderRadius: '10px' }}>
+                View Full Details →
+              </Link>
             </div>
-          </>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '32px 24px', background: 'white', borderRadius: '20px', marginBottom: '20px', boxShadow: '0 8px 32px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.05)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🍽️</div>
-            <h2 style={{ fontWeight: 800, fontSize: '20px', marginBottom: '4px' }}>No Status for Orders</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>Ticket #{String(order.ticket_number).padStart(3, '0')} is already {order.status.toLowerCase()}.</p>
-          </div>
-        )}
-
-        <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '20px', padding: '20px', boxShadow: '0 8px 32px rgba(0,0,0,0.04)' }}>
-          <h3 style={{ fontWeight: 700, marginBottom: '14px' }}>Order Details</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {(order.items || []).map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>{item.product_name} × {item.quantity}</span>
-                <span style={{ fontWeight: 600 }}>{formatPrice(item.price_at_purchase * item.quantity)}</span>
-              </div>
-            ))}
-            <hr style={{ border: 'none', borderTop: '1px dashed rgba(0,0,0,0.1)', margin: '8px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}><span>Total</span><span style={{ color: 'var(--primary)' }}>{formatPrice(order.total_price)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '4px', color: 'var(--text-secondary)' }}><span>Status</span><span style={{ fontWeight: 700, color: order.status === 'COMPLETED' ? 'var(--success)' : 'var(--primary)' }}>{order.status}</span></div>
-          </div>
-        </div>
+          );
+        })}
       </div>
-
       <BottomNav />
     </div>
   );

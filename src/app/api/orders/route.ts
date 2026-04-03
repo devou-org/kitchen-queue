@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
         ticket_number: order.ticket_number,
         timestamp: new Date().toISOString()
       };
+      console.log('🚀 About to trigger new_order event...');
       await pusherServer.trigger('queue-channel', 'new_order', sseData);
     } catch (pushErr) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
