@@ -28,6 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ num
         created_at: order.created_at,
         party_size: order.party_size,
         notes: order.notes,
+        queue_position: order.queue_position,
       },
     });
   } catch (error) {

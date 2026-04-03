@@ -35,40 +35,51 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchOrder = async () => {
+    const fetchOrder = async (silent = false) => {
       try {
-        const res = await fetch(`/api/orders/ticket/${ticket}`);
+        // Cache-buster added
+        const res = await fetch(`/api/orders/ticket/${ticket}?t=${Date.now()}`);
         const data = await res.json();
-        
+
         if (data.success && data.data) {
           setOrder(data.data);
-        } else {
+        } else if (!silent) {
           setError(data.error || 'Order not found');
           setOrder(null);
         }
       } catch (err) {
         console.error('Failed to fetch order:', err);
-        setError('Failed to load order');
+        if (!silent) setError('Failed to load order');
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     };
+
     fetchOrder();
 
-    // Pusher Subscription
     if (!pusherClient) return;
-    const channel = pusherClient.subscribe('queue-channel');
-    setIsLive(true);
 
-    channel.bind('queue_update', (data: any) => {
-      setQueueState(data);
+    const channel = pusherClient.subscribe('queue-channel');
+
+    // ✅ CONNECTION STATUS
+    channel.bind('pusher:subscription_succeeded', () => {
       setIsLive(true);
     });
 
+    channel.bind('pusher:subscription_error', () => {
+      setIsLive(false);
+    });
+
+    // ✅ RE-FETCH ON ANY EVENT THAT AFFECTS QUEUE
     channel.bind('order_update', (data: any) => {
-      if (String(data.ticket_number) === String(ticket)) {
-        setOrder(prev => prev ? { ...prev, status: data.new_status } : prev);
-      }
+      console.log('✅ Ticket Page received order_update:', data);
+      // We re-fetch for ANY update to ensure position is correct
+      // (Someone leaving queue, or our own order getting ready)
+      fetchOrder(true);
+    });
+
+    channel.bind('new_order', () => {
+      fetchOrder(true);
     });
 
     return () => {
@@ -126,15 +137,13 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const stageIndex = getStageIndex(order.status);
   const isReady = order.status === 'READY';
   const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
-  
-  // Use the precise database rank if available, otherwise fallback to simple subtraction
-  const position = order.queue_position ?? (order.ticket_number - (queueState?.queue_number || 1));
 
-  const getPositionText = () => {
-    if (isReady) return 'Ready for Pickup!';
-    if (position <= 1) return 'Your Turn is NEXT!';
-    return `${formatOrdinal(position)} IN LINE`;
-  };
+  // Use the precise database rank if available. If it's not present (e.g. order is cancelled or done), we treat as 0.
+  const position = typeof order.queue_position === 'number' ? order.queue_position : 0;
+
+  // The position variable is at least 1 thanks to the DB subquery (COUNT(*) + 1).
+  // If it's somehow 0, we show 1 as a safe default for active orders.
+  const displayPosition = position || 1;
 
   const getNearlyText = () => {
     if (isReady) return '🎉 Ready!';
@@ -165,7 +174,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
       </div>
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px 100px' }} className="animate-fade-in">
-        
+
         {isActive ? (
           <>
             {/* Ticket Card */}
@@ -210,11 +219,15 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                   border: '1px solid rgba(0,0,0,0.03)',
                 }}>
                   <svg width="24" height="24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" viewBox="0 0 24 24">
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
                   </svg>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>Your position</p>
-                  <p style={{ fontWeight: 900, fontSize: '22px', lineHeight: 1 }}>{getPositionText()}</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    CURRENT QUEUE POSITION
+                  </p>
+                  <p style={{ fontWeight: 900, fontSize: '48px', color: 'var(--primary)', lineHeight: 1 }}>
+                    {displayPosition}
+                  </p>
                 </div>
               )}
 
@@ -224,9 +237,10 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                   border: '1px solid rgba(6,167,125,0.2)',
                   borderRadius: '14px',
                   padding: '16px',
-                  fontSize: '16px', fontWeight: 700, color: 'var(--success)',
+                  fontSize: '20px', fontWeight: 900, color: 'var(--success)',
+                  textTransform: 'uppercase'
                 }}>
-                  🎉 Your order is ready for pickup!
+                  READY FOR PICKUP
                 </div>
               )}
             </div>
@@ -266,12 +280,12 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
             </div>
           </>
         ) : (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '32px 24px', 
-            background: 'white', 
-            borderRadius: '20px', 
-            marginBottom: '20px', 
+          <div style={{
+            textAlign: 'center',
+            padding: '32px 24px',
+            background: 'white',
+            borderRadius: '20px',
+            marginBottom: '20px',
             boxShadow: '0 8px 32px rgba(0,0,0,0.04)',
             border: '1px solid rgba(0,0,0,0.05)'
           }}>

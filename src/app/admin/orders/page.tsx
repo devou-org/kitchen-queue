@@ -19,7 +19,7 @@ export default function AdminOrders() {
     try {
       const qs = new URLSearchParams({ page: page.toString(), per_page: '50' });
       if (statusFilter) qs.append('status', statusFilter);
-      
+
       const ordersRes = await fetch(`/api/orders?${qs.toString()}`);
       const ordersData = await ordersRes.json();
 
@@ -36,40 +36,87 @@ export default function AdminOrders() {
   // Base data fetch effect
   useEffect(() => {
     fetchOrders();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, statusFilter]);
 
   // Real-time effect
   useEffect(() => {
-    if (!pusherClient) return;
+    if (!pusherClient) {
+      console.log('❌ Pusher client not available');
+      return;
+    }
+
     const channel = pusherClient.subscribe('queue-channel');
 
-    channel.bind('new_order', () => {
+    // ✅ NEW ORDER EVENT
+    channel.bind('new_order', (data: any) => {
+      console.log('✅ Pusher event received: new_order', data);
+      toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
       fetchOrders(true); // Silent refresh
     });
 
+    // ✅ ORDER UPDATE EVENT (Status or Payment)
     channel.bind('order_update', (data: any) => {
-      fetchOrders(true); // Silent refresh
-      
-      // Update the order in the list immediately if it exists
-      setOrders(prev => prev.map(o => 
-        o.id === data.order_id ? { ...o, status: data.new_status } : o
-      ));
-      
-      // Update modal if needed (without triggering a full re-fetch of everything)
+      console.log('✅ Pusher event received: order_update', data);
+
+      // Update the order in the list immediately
+      setOrders(prev => prev.map(o => {
+        if (o.id === data.order_id) {
+          const updated = { ...o };
+          // Update status if present
+          if (data.new_status) {
+            updated.status = data.new_status;
+          }
+          // Update payment if present
+          if (typeof data.is_paid === 'boolean') {
+            updated.is_paid = data.is_paid;
+          }
+          return updated;
+        }
+        return o;
+      }));
+
+      // Update modal if the selected order is the one being updated
       setSelectedOrder(prev => {
-        if (prev && data.order_id === prev.id) {
-          return { ...prev, status: data.new_status };
+        if (prev && prev.id === data.order_id) {
+          const updated = { ...prev };
+          if (data.new_status) {
+            updated.status = data.new_status;
+          }
+          if (typeof data.is_paid === 'boolean') {
+            updated.is_paid = data.is_paid;
+          }
+          return updated;
         }
         return prev;
+      });
+
+      // Show toast notification based on update type
+      if (data.new_status) {
+        toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
+      }
+      if (typeof data.is_paid === 'boolean') {
+        toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} payment: ${data.is_paid ? 'PAID' : 'PENDING'}`);
+      }
+
+      // Silent refresh to keep data in sync
+      fetchOrders(true);
     });
-  });
+
+    // ✅ CONNECTION STATUS
+    channel.bind('pusher:subscription_succeeded', () => {
+      console.log('✅ Successfully subscribed to queue-channel');
+    });
+
+    channel.bind('pusher:subscription_error', (error: any) => {
+      console.error('❌ Pusher subscription error:', error);
+    });
 
     return () => {
       channel.unbind_all();
       channel.unsubscribe();
     };
-  }, [selectedOrder?.id]); // Only re-bind if selectedOrder identity changes for the modal logic
+  }, []); // Only bind once on mount
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     setModalLoading(true);
@@ -84,7 +131,7 @@ export default function AdminOrders() {
         toast.success(`Order status updated to ${newStatus}`);
         // Update the selected order in modal
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
-        fetchOrders();
+        // Note: Pusher will also update the UI, so we don't need to fetchOrders here
       } else {
         toast.error(data.error || 'Failed to update');
       }
@@ -107,7 +154,7 @@ export default function AdminOrders() {
       if (data.success) {
         toast.success(isPaid ? 'Marked as Paid' : 'Marked as Unpaid');
         setSelectedOrder(prev => prev ? { ...prev, is_paid: isPaid } : null);
-        fetchOrders();
+        // Note: Pusher will also update the UI
       } else {
         toast.error(data.error || 'Failed to update payment');
       }
@@ -130,12 +177,12 @@ export default function AdminOrders() {
       order.status,
       `"${formatDateTime(order.created_at)}"`
     ]);
-    
+
     const csvContent = headers.join(',') + "\n" + rows.map(e => e.join(',')).join("\n");
-      
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement("a");
     link.setAttribute("href", url);
     link.setAttribute("download", `Order_Statements_${new Date().toISOString().split('T')[0]}.csv`);
@@ -147,7 +194,7 @@ export default function AdminOrders() {
   const allStatuses = ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];
 
   // Filter based on Tab
-  const tabStatuses = currentTab === 'ACTIVE' 
+  const tabStatuses = currentTab === 'ACTIVE'
     ? ['PENDING', 'PREPARING', 'READY']
     : ['COMPLETED', 'CANCELLED'];
 
@@ -173,14 +220,14 @@ export default function AdminOrders() {
       </div>
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-        <button 
+        <button
           className={`btn ${currentTab === 'ACTIVE' ? 'btn-primary' : ''}`}
           style={currentTab !== 'ACTIVE' ? { background: 'var(--bg)', color: 'var(--text-primary)' } : {}}
           onClick={() => { setCurrentTab('ACTIVE'); setStatusFilter(''); setPage(1); }}
         >
           ● Active Orders
         </button>
-        <button 
+        <button
           className={`btn ${currentTab === 'HISTORY' ? 'btn-primary' : ''}`}
           style={currentTab !== 'HISTORY' ? { background: 'var(--bg)', color: 'var(--text-primary)' } : {}}
           onClick={() => { setCurrentTab('HISTORY'); setStatusFilter(''); setPage(1); }}
@@ -191,16 +238,16 @@ export default function AdminOrders() {
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <select 
-            className="select" 
-            value={statusFilter} 
+          <select
+            className="select"
+            value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
             style={{ maxWidth: '200px' }}
           >
             <option value="">All in {currentTab}</option>
             {tabStatuses.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          
+
           {currentTab === 'HISTORY' && (
             <button className="btn" style={{ background: '#059669', color: 'white' }} onClick={exportStatementsCSV}>
               📥 Download Statement (CSV)
@@ -210,7 +257,7 @@ export default function AdminOrders() {
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', minHeight: '400px' }}>
           {loading ? (
-            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader"/></div>
+            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : (
             <table>
               <thead>
@@ -225,8 +272,8 @@ export default function AdminOrders() {
               </thead>
               <tbody>
                 {filteredOrders.map(order => (
-                  <tr 
-                    key={order.id} 
+                  <tr
+                    key={order.id}
                     onClick={() => openOrderModal(order)}
                     style={{ cursor: 'pointer' }}
                   >
@@ -276,18 +323,18 @@ export default function AdminOrders() {
             </table>
           )}
         </div>
-        
+
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
             Showing {filteredOrders.length} records
           </span>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              className="btn btn-secondary btn-sm" 
+            <button
+              className="btn btn-secondary btn-sm"
               disabled={page === 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
             >← Prev</button>
-            <button 
+            <button
               className="btn btn-secondary btn-sm"
               disabled={orders.length < 50}
               onClick={() => setPage(p => p + 1)}

@@ -42,6 +42,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     let order = existing;
 
+    // ✅ UPDATE STATUS
     if (status) {
       const validTransitions = STATUS_TRANSITIONS[existing.status] || [];
       if (!validTransitions.includes(status)) {
@@ -52,23 +53,49 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
       order = await updateOrderStatus(id, status);
 
-      // Broadcast to customers via Pusher
-      await pusherServer.trigger('queue-channel', 'order_update', {
-        type: 'order_update',
-        order_id: id,
-        ticket_number: existing.ticket_number,
-        new_status: status,
-        timestamp: new Date().toISOString(),
-      });
+      console.log(`✅ Status updated: Order #${existing.ticket_number} → ${status}`);
+
+      // 🔔 BROADCAST STATUS CHANGE TO ALL CLIENTS
+      try {
+        await pusherServer.trigger('queue-channel', 'order_update', {
+          type: 'order_update',
+          order_id: id,
+          ticket_number: existing.ticket_number,
+          new_status: status,
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`📤 Pusher event sent: order_update for ticket #${existing.ticket_number}`);
+      } catch (pushErr) {
+        console.error('❌ Pusher trigger failed (status update):', pushErr);
+        // Continue anyway - order was updated in DB
+      }
     }
 
+    // ✅ UPDATE PAYMENT STATUS
     if (typeof is_paid === 'boolean') {
       order = await setOrderPaymentStatus(id, is_paid);
+
+      console.log(`✅ Payment updated: Order #${existing.ticket_number} → is_paid: ${is_paid}`);
+
+      // 🔔 BROADCAST PAYMENT CHANGE
+      try {
+        await pusherServer.trigger('queue-channel', 'order_update', {
+          type: 'payment_update',
+          order_id: id,
+          ticket_number: existing.ticket_number,
+          is_paid: is_paid,
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`📤 Pusher event sent: payment_update for ticket #${existing.ticket_number}`);
+      } catch (pushErr) {
+        console.error('❌ Pusher trigger failed (payment update):', pushErr);
+        // Continue anyway - order was updated in DB
+      }
     }
 
     return NextResponse.json({ success: true, data: order, message: 'Order updated' });
   } catch (error) {
-    console.error("Order Update Runtime Error:", error);
+    console.error("❌ Order Update Runtime Error:", error);
     return NextResponse.json({ success: false, error: 'Failed to update order' }, { status: 500 });
   }
 }
