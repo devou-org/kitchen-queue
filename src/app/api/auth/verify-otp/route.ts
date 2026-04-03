@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       phone: user.phone,
       isAdmin: user.is_admin || false,
-    }, '7d');
+    }, '30d');
 
     const response = NextResponse.json({
       success: true,
@@ -50,12 +50,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Set httpOnly cookie
+    // Set cookie
     response.cookies.set('auth_token', token, {
-      httpOnly: true,
+      httpOnly: false, // Set to false so client-side can check it or just rely on localStorage
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 30 * 24 * 60 * 60, // 30 days
       path: '/',
     });
 

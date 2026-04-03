@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
 import { CartItem } from '@/types';
 import { TAX_RATE } from '@/lib/constants';
+import BottomNav from '@/components/BottomNav';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -180,9 +181,10 @@ export default function CheckoutPage() {
 
       {/* Fixed Bottom */}
       <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
+        position: 'fixed', bottom: 64, left: 0, right: 0,
         background: 'white', borderTop: '1px solid var(--border)',
         padding: '16px',
+        boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
       }}>
         <button
           className="btn btn-primary btn-lg"
@@ -197,6 +199,8 @@ export default function CheckoutPage() {
           )}
         </button>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

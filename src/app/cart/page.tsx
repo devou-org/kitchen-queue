@@ -115,9 +115,10 @@ export default function CartPage() {
 
       {/* Fixed Bottom */}
       <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
+        position: 'fixed', bottom: 64, left: 0, right: 0,
         background: 'white', borderTop: '1px solid var(--border)',
         padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
+        boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
       }}>
         <Link href="/checkout" className="btn btn-primary btn-lg" style={{ width: '100%' }}>
           Continue to Checkout →

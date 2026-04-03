@@ -41,7 +41,12 @@ export default function OrderStatusPage() {
       }
       
       const user = JSON.parse(userStr);
-      const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(user.phone)}`);
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(user.phone)}`, {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
       const data = await res.json();
       
       if (data.success && data.data && data.data.length > 0) {
@@ -132,15 +137,16 @@ export default function OrderStatusPage() {
     );
   }
 
-  const currentQueueNum = queueState?.queue_number || 1;
-  const position = order.ticket_number - currentQueueNum;
   const stageIndex = getStageIndex(order.status);
   const isReady = order.status === 'READY';
   const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
+  
+  // Use the precise database rank if available, otherwise fallback to simple subtraction
+  const position = order.queue_position ?? (order.ticket_number - (queueState?.queue_number || 1));
 
   const getPositionText = () => {
     if (isReady) return 'Ready for Pickup!';
-    if (position <= 0) return 'Your Turn is NEXT!';
+    if (position <= 1) return 'Your Turn is NEXT!';
     return `${formatOrdinal(position)} IN LINE`;
   };
 

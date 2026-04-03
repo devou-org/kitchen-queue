@@ -17,7 +17,12 @@ export default function HistoryPage() {
 
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(phone)}`);
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(phone)}`, {
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
         const data = await res.json();
         if (data.success) setOrders(data.data);
       } catch {}

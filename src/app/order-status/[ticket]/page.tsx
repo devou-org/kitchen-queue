@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, use } from 'react';
 import Link from 'next/link';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
+import BottomNav from '@/components/BottomNav';
 
 type QueueState = {
   type: string;
@@ -74,52 +75,24 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
     return () => es.close();
   }, [ticket]);
 
-  const renderNavAndHeader = () => (
-    <>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 20px',
-        background: 'white',
-        borderBottom: '1px solid rgba(0,0,0,0.05)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '18px' }}>🍴</span>
-          <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>The Culinary Conductor</span>
-        </div>
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '50%',
-          background: 'rgba(0,0,0,0.05)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '16px',
-        }}>👤</div>
+  const renderHeader = () => (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '16px 20px',
+      background: 'white',
+      borderBottom: '1px solid rgba(0,0,0,0.05)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontSize: '18px' }}>🍴</span>
+        <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>The Culinary Conductor</span>
       </div>
-
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: 'white', borderTop: '1px solid rgba(0,0,0,0.05)',
-        height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.03)',
-        zIndex: 10
-      }}>
-        <Link href="/order-status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', color: 'var(--primary)' }}>
-          <div style={{
-            width: '44px', height: '44px', borderRadius: '50%',
-            background: 'var(--primary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
-            boxShadow: '0 4px 12px rgba(255,107,53,0.3)',
-          }}>⏱</div>
-          <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em' }}>STATUS</span>
-        </Link>
-        <Link href="/menu" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', color: 'var(--text-secondary)' }}>
-          <span style={{ fontSize: '20px' }}>🍴</span>
-          <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em' }}>MENU</span>
-        </Link>
-        <Link href="/history" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', color: 'var(--text-secondary)' }}>
-          <span style={{ fontSize: '20px' }}>👤</span>
-          <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em' }}>PROFILE</span>
-        </Link>
-      </nav>
-    </>
+      <div style={{
+        width: '36px', height: '36px', borderRadius: '50%',
+        background: 'rgba(0,0,0,0.05)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '16px',
+      }}>👤</div>
+    </div>
   );
 
   if (loading) {
@@ -134,7 +107,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   if (error || !order) {
     return (
       <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
-        {renderNavAndHeader()}
+        {renderHeader()}
+        <BottomNav />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }} className="animate-fade-in">
           <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>🔍</div>
           <h2 style={{ fontWeight: 800, marginBottom: '8px', fontSize: '24px' }}>Ticket Not Found</h2>
@@ -147,15 +121,16 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
     );
   }
 
-  const currentQueueNum = queueState?.queue_number || 1;
-  const position = order.ticket_number - currentQueueNum;
   const stageIndex = getStageIndex(order.status);
   const isReady = order.status === 'READY';
   const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
+  
+  // Use the precise database rank if available, otherwise fallback to simple subtraction
+  const position = order.queue_position ?? (order.ticket_number - (queueState?.queue_number || 1));
 
   const getPositionText = () => {
     if (isReady) return 'Ready for Pickup!';
-    if (position <= 0) return 'Your Turn is NEXT!';
+    if (position <= 1) return 'Your Turn is NEXT!';
     return `${formatOrdinal(position)} IN LINE`;
   };
 
@@ -168,7 +143,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
   return (
     <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
-      {renderNavAndHeader()}
+      {renderHeader()}
 
       {/* Live Status Banner */}
       <div style={{
@@ -334,6 +309,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
           </div>
         </div>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

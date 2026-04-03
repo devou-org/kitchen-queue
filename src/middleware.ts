@@ -12,17 +12,15 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Protect customer routes (optional, could also redirect to /login)
-  const customerProtectedPaths = ['/menu', '/cart', '/checkout', '/history'];
+  // Protect customer routes
+  const customerProtectedPaths = ['/menu', '/cart', '/checkout', '/history', '/order-status'];
   if (customerProtectedPaths.some(p => path.startsWith(p))) {
-    const defaultHeaders = new Headers(request.headers);
-    // You could do token checking here if using httpOnly cookies for customers, 
-    // but right now customer tokens are in localStorage. We will just pass it through.
-    return NextResponse.next({
-      request: {
-        headers: defaultHeaders,
-      },
-    });
+    const authToken = request.cookies.get('auth_token')?.value;
+    // We also check for a bypass header or if the client will handle it via localStorage
+    // But for Next.js SSR/Middleware, cookies are the best way to pre-redirect
+    if (!authToken && path !== '/login') {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
   }
 
   return NextResponse.next();

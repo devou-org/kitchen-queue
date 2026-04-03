@@ -22,6 +22,15 @@ export default function LoginPage() {
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
+    // Check if user is already logged in (skip OTP)
+    const token = localStorage.getItem('auth_token');
+    const user = localStorage.getItem('user');
+    if (token && user) {
+      router.push('/menu');
+    }
+  }, [router]);
+
+  useEffect(() => {
     if (cooldown > 0) {
       const t = setTimeout(() => setCooldown(c => c - 1), 1000);
       return () => clearTimeout(t);
