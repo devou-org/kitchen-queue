@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { formatPrice, formatDateTime } from '@/lib/format';
 import { Order } from '@/types';
 import { STATUS_BG } from '@/lib/constants';
+import BottomNav from '@/components/BottomNav';
 
 export default function HistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -70,21 +71,7 @@ export default function HistoryPage() {
         )}
       </div>
 
-      {/* Bottom Nav */}
-      <nav className="bottom-nav">
-        <Link href="/order-status" className="bottom-nav-item">
-          <span style={{ fontSize: '18px' }}>⏱</span>
-          STATUS
-        </Link>
-        <Link href="/menu" className="bottom-nav-center">
-          <span style={{ fontSize: '20px' }}>🍴</span>
-          <span style={{ fontSize: '9px' }}>MENU</span>
-        </Link>
-        <Link href="/history" className="bottom-nav-item active">
-          <span style={{ fontSize: '18px' }}>👤</span>
-          PROFILE
-        </Link>
-      </nav>
+      <BottomNav />
     </div>
   );
 }

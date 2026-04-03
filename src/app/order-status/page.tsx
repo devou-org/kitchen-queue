@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
+import BottomNav from '@/components/BottomNav';
 
 type QueueState = {
   type: string;
@@ -96,58 +97,27 @@ export default function OrderStatusPage() {
     );
   }
 
-  const renderNav = () => (
-    <>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 20px',
-        background: 'white',
-        borderBottom: '1px solid rgba(0,0,0,0.05)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '18px' }}>🍴</span>
-          <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>The Culinary Conductor</span>
-        </div>
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '50%',
-          background: 'rgba(0,0,0,0.05)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '16px',
-        }}>👤</div>
-      </div>
-
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: 'white', borderTop: '1px solid rgba(0,0,0,0.05)',
-        height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.03)',
-        zIndex: 10
-      }}>
-        <Link href="/order-status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', color: 'var(--primary)' }}>
-          <div style={{
-            width: '44px', height: '44px', borderRadius: '50%',
-            background: 'var(--primary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
-            boxShadow: '0 4px 12px rgba(255,107,53,0.3)',
-          }}>⏱</div>
-          <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em' }}>STATUS</span>
-        </Link>
-        <Link href="/menu" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', color: 'var(--text-secondary)' }}>
-          <span style={{ fontSize: '20px' }}>🍴</span>
-          <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em' }}>MENU</span>
-        </Link>
-        <Link href="/history" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none', color: 'var(--text-secondary)' }}>
-          <span style={{ fontSize: '20px' }}>👤</span>
-          <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em' }}>PROFILE</span>
-        </Link>
-      </nav>
-    </>
-  );
-
   if (!order) {
     return (
       <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
-        {renderNav()}
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px', background: 'white',
+          borderBottom: '1px solid rgba(0,0,0,0.05)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>🍴</span>
+            <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>The Culinary Conductor</span>
+          </div>
+          <div style={{
+            width: '36px', height: '36px', borderRadius: '50%',
+            background: 'rgba(0,0,0,0.05)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '16px',
+          }}>👤</div>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }} className="animate-fade-in">
           <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>🤷‍♂️</div>
           <h2 style={{ fontWeight: 800, marginBottom: '8px', fontSize: '24px' }}>No Status for Orders</h2>
@@ -156,6 +126,8 @@ export default function OrderStatusPage() {
             Browse Menu & Order →
           </Link>
         </div>
+
+        <BottomNav />
       </div>
     );
   }
@@ -181,7 +153,23 @@ export default function OrderStatusPage() {
 
   return (
     <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
-      {renderNav()}
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 20px', background: 'white',
+        borderBottom: '1px solid rgba(0,0,0,0.05)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '18px' }}>🍴</span>
+          <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>The Culinary Conductor</span>
+        </div>
+        <div style={{
+          width: '36px', height: '36px', borderRadius: '50%',
+          background: 'rgba(0,0,0,0.05)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '16px',
+        }}>👤</div>
+      </div>
 
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -253,6 +241,8 @@ export default function OrderStatusPage() {
           </div>
         </div>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

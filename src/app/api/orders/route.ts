@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrders, createOrder } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { sseManager } from '@/lib/sse';
 
 async function requireAdmin(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
@@ -64,11 +65,13 @@ export async function POST(request: NextRequest) {
       items,
     });
 
-    const sseManager = require('@/lib/sse').sseManager;
-    sseManager.broadcast({
+    const sseData = {
       type: 'new_order',
+      order_id: order.id,
+      ticket_number: order.ticket_number,
       timestamp: new Date().toISOString()
-    });
+    };
+    sseManager.broadcast(sseData);
 
     return NextResponse.json({
       success: true,

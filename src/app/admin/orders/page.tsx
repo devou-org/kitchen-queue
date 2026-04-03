@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
@@ -10,6 +10,9 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [currentTab, setCurrentTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const esRef = useRef<EventSource | null>(null);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -33,17 +36,43 @@ export default function AdminOrders() {
   useEffect(() => {
     fetchOrders();
 
+    // Close any existing connection
+    if (esRef.current) {
+      esRef.current.close();
+    }
+
     const es = new EventSource('/api/queue/stream');
+    esRef.current = es;
+
     es.onmessage = (e) => {
-      const event = JSON.parse(e.data);
-      if (event.type === 'new_order' || event.type === 'order_update') {
-        fetchOrders();
+      try {
+        const event = JSON.parse(e.data);
+        if (event.type === 'new_order' || event.type === 'order_update') {
+          fetchOrders();
+          // Also update the selected order in the modal if it matches
+          if (event.type === 'order_update' && selectedOrder && event.order_id === selectedOrder.id) {
+            setSelectedOrder(prev => prev ? { ...prev, status: event.new_status } : null);
+          }
+        }
+      } catch {
+        // Ignore parse errors (heartbeats, etc.)
       }
     };
-    return () => es.close();
+
+    es.onerror = () => {
+      // EventSource will auto-reconnect
+      console.log('SSE connection error, will auto-reconnect...');
+    };
+
+    return () => {
+      es.close();
+      esRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, statusFilter]);
 
   const handleStatusChange = async (id: string, newStatus: string) => {
+    setModalLoading(true);
     try {
       const res = await fetch(`/api/orders/${id}`, {
         method: 'PUT',
@@ -53,16 +82,21 @@ export default function AdminOrders() {
       const data = await res.json();
       if (data.success) {
         toast.success(`Order status updated to ${newStatus}`);
+        // Update the selected order in modal
+        setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
         fetchOrders();
       } else {
         toast.error(data.error || 'Failed to update');
       }
     } catch {
       toast.error('Network error');
+    } finally {
+      setModalLoading(false);
     }
   };
 
   const handlePaidToggle = async (id: string, isPaid: boolean) => {
+    setModalLoading(true);
     try {
       const res = await fetch(`/api/orders/${id}`, {
         method: 'PUT',
@@ -72,12 +106,15 @@ export default function AdminOrders() {
       const data = await res.json();
       if (data.success) {
         toast.success(isPaid ? 'Marked as Paid' : 'Marked as Unpaid');
+        setSelectedOrder(prev => prev ? { ...prev, is_paid: isPaid } : null);
         fetchOrders();
       } else {
         toast.error(data.error || 'Failed to update payment');
       }
     } catch {
       toast.error('Network error');
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -117,6 +154,14 @@ export default function AdminOrders() {
   const filteredOrders = orders.filter(
     order => tabStatuses.includes(order.status) && (!statusFilter || order.status === statusFilter)
   );
+
+  const openOrderModal = (order: Order) => {
+    setSelectedOrder(order);
+  };
+
+  const closeModal = () => {
+    setSelectedOrder(null);
+  };
 
   return (
     <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
@@ -180,7 +225,11 @@ export default function AdminOrders() {
               </thead>
               <tbody>
                 {filteredOrders.map(order => (
-                  <tr key={order.id}>
+                  <tr 
+                    key={order.id} 
+                    onClick={() => openOrderModal(order)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <td>
                       <strong style={{ color: 'var(--primary)', fontSize: '16px' }}>
                         #{String(order.ticket_number).padStart(3, '0')}
@@ -194,15 +243,15 @@ export default function AdminOrders() {
                     </td>
                     <td style={{ fontWeight: 600 }}>{formatPrice(order.total_price)}</td>
                     <td>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: order.is_paid ? '#059669' : 'var(--text-secondary)' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={order.is_paid} 
-                          onChange={(e) => handlePaidToggle(order.id, e.target.checked)}
-                          style={{ accentColor: '#059669', width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        {order.is_paid ? 'PAID' : 'PENDING'}
-                      </label>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        fontSize: '12px', fontWeight: 700,
+                        color: order.is_paid ? '#059669' : 'var(--warning)',
+                        background: order.is_paid ? 'rgba(5,150,105,0.1)' : 'rgba(255,165,0,0.1)',
+                        padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                      }}>
+                        {order.is_paid ? '✓ PAID' : '⏳ PENDING'}
+                      </span>
                     </td>
                     <td>
                       <span className={`badge badge-${order.status.toLowerCase()}`}>
@@ -210,14 +259,13 @@ export default function AdminOrders() {
                       </span>
                     </td>
                     <td>
-                      <select 
-                        className="select" 
-                        style={{ height: '32px', padding: '0 10px', fontSize: '13px', minWidth: '130px' }}
-                        value={order.status}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={(e) => { e.stopPropagation(); openOrderModal(order); }}
+                        style={{ minWidth: 'auto', fontSize: '12px', color: 'var(--primary)' }}
                       >
-                        {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                        View →
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -247,6 +295,172 @@ export default function AdminOrders() {
           </div>
         </div>
       </div>
+
+      {/* ======== ORDER DETAIL MODAL / POPUP ======== */}
+      {selectedOrder && (
+        <div
+          className="modal-backdrop"
+          onClick={closeModal}
+          style={{ alignItems: 'center' }}
+        >
+          <div
+            className="modal-desktop"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '520px' }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>
+                    #{String(selectedOrder.ticket_number).padStart(3, '0')}
+                  </h2>
+                  <span className={`badge badge-${selectedOrder.status.toLowerCase()}`}>
+                    {selectedOrder.status}
+                  </span>
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  {formatDateTime(selectedOrder.created_at)}
+                </p>
+              </div>
+              <button
+                onClick={closeModal}
+                style={{
+                  background: 'rgba(0,0,0,0.05)', border: 'none', cursor: 'pointer',
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '16px', color: 'var(--text-secondary)',
+                  transition: 'background 0.2s',
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.1)')}
+                onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.05)')}
+              >✕</button>
+            </div>
+
+            {/* Customer Info */}
+            <div style={{
+              background: '#F9FAFB', borderRadius: 'var(--radius-sm)',
+              padding: '14px 16px', marginBottom: '20px',
+              border: '1px solid var(--border)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '2px' }}>CUSTOMER</p>
+                  <p style={{ fontWeight: 700 }}>{selectedOrder.customer_name}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '2px' }}>PHONE</p>
+                  <p style={{ fontWeight: 600 }}>{selectedOrder.phone}</p>
+                </div>
+              </div>
+              {(selectedOrder.party_size || 1) > 1 && (
+                <p style={{ fontSize: '13px', color: 'var(--info)', fontWeight: 600 }}>
+                  👥 Party of {selectedOrder.party_size}
+                </p>
+              )}
+              {selectedOrder.notes && (
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', fontStyle: 'italic' }}>
+                  📝 {selectedOrder.notes}
+                </p>
+              )}
+            </div>
+
+            {/* Order Items */}
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                ORDER ITEMS
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(selectedOrder.items || []).map((item, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 12px', background: 'white', borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{
+                        width: '28px', height: '28px', borderRadius: '50%',
+                        background: 'rgba(255,107,53,0.1)', color: 'var(--primary)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '12px', fontWeight: 800,
+                      }}>{item.quantity}</span>
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>
+                        {item.product_name || 'Item'}
+                      </span>
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: '14px' }}>
+                      {formatPrice(item.price_at_purchase * item.quantity)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '12px 0', marginTop: '8px',
+                borderTop: '2px dashed var(--border)',
+                fontWeight: 800, fontSize: '16px',
+              }}>
+                <span>Total</span>
+                <span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
+              </div>
+            </div>
+
+            {/* ===== ACTION CONTROLS ===== */}
+            <div style={{
+              background: '#F9FAFB', borderRadius: 'var(--radius-sm)',
+              padding: '16px', border: '1px solid var(--border)',
+            }}>
+              {/* Mark as Paid */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '2px' }}>Payment Status</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    {selectedOrder.is_paid ? 'This order has been paid' : 'Payment pending from customer'}
+                  </p>
+                </div>
+                <button
+                  className="btn btn-sm"
+                  disabled={modalLoading}
+                  onClick={() => handlePaidToggle(selectedOrder.id, !selectedOrder.is_paid)}
+                  style={{
+                    background: selectedOrder.is_paid ? 'rgba(5,150,105,0.1)' : 'var(--primary)',
+                    color: selectedOrder.is_paid ? '#059669' : 'white',
+                    border: selectedOrder.is_paid ? '1.5px solid #059669' : 'none',
+                    fontWeight: 700, fontSize: '13px',
+                    minWidth: '120px',
+                  }}
+                >
+                  {selectedOrder.is_paid ? '✓ Paid' : '💰 Mark as Paid'}
+                </button>
+              </div>
+
+              {/* Status Dropdown */}
+              <div>
+                <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Order Status</p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="select"
+                    style={{ flex: 1, height: '40px', fontSize: '14px' }}
+                    value={selectedOrder.status}
+                    disabled={modalLoading}
+                    onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
+                  >
+                    {allStatuses.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {modalLoading && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+                <div className="loader" style={{ width: 20, height: 20, borderWidth: 2 }} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

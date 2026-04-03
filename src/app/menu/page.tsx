@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
 import { Product, CartItem, ProductStatus } from '@/types';
+import BottomNav from '@/components/BottomNav';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -264,27 +265,7 @@ export default function MenuPage() {
         </Link>
       )}
 
-      {/* Bottom Nav */}
-      <nav className="bottom-nav">
-        <Link href="/order-status" className="bottom-nav-item">
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-          </svg>
-          STATUS
-        </Link>
-        <Link href="/menu" className="bottom-nav-center">
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M3 3h18v18H3z M9 3v18M15 3v18M3 9h18M3 15h18"/>
-          </svg>
-          <span style={{ fontSize: '9px', letterSpacing: '0.05em' }}>MENU</span>
-        </Link>
-        <Link href="/history" className="bottom-nav-item">
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-          </svg>
-          PROFILE
-        </Link>
-      </nav>
+      <BottomNav />
     </div>
   );
 }
