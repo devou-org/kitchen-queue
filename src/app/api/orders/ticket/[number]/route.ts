@@ -15,7 +15,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ num
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
 
-    // Return safe fields only
     return NextResponse.json({
       success: true,
       data: {
