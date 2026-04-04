@@ -173,16 +173,16 @@ export default function MenuPage() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {/* Header */}
-      <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '20px' }}>🍴</span>
-          <span style={{ fontWeight: 800, fontSize: '16px' }}>Culinary Conductor</span>
-        </div>
-        <button
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '20px' }}
-          onClick={() => toast('Notifications coming soon', { icon: '🔔' })}
-        >🔔</button>
-      </div>
+  <div className="page-header">
+    <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+      <img 
+        src="/logo.jpeg" 
+        alt="Renjz Kitchen" 
+        style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} 
+      />
+      <span style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text-primary)' }}>Renjz Kitchen</span>
+    </Link>
+  </div>
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '0' }}>
         {/* Hero Section */}

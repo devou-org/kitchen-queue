@@ -119,9 +119,16 @@ export default function OrderStatusPage() {
 
   if (activeOrders.length === 0) {
     return (
-      <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #FDF9FA 0%, #F8EDF0 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>🍴</span><span style={{ fontWeight: 800, fontSize: '15px' }}>The Culinary Conductor</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img 
+              src="/logo.jpeg" 
+              alt="Renjz Kitchen" 
+              style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover' }} 
+            />
+            <span style={{ fontWeight: 800, fontSize: '15px' }}>Renjz Kitchen</span>
+          </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '64px', marginBottom: '16px' }}>🍽️</div>
@@ -135,9 +142,16 @@ export default function OrderStatusPage() {
   }
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', paddingBottom: '100px' }}>
+    <div style={{ background: 'linear-gradient(135deg, #FDF9FA 0%, #F8EDF0 100%)', minHeight: '100vh', paddingBottom: '100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>🍴</span><span style={{ fontWeight: 800, fontSize: '15px' }}>The Culinary Conductor</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img 
+              src="/logo.jpeg" 
+              alt="Renjz Kitchen" 
+              style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover' }} 
+            />
+            <span style={{ fontWeight: 800, fontSize: '15px' }}>Renjz Kitchen</span>
+          </div>
       </div>
 
       {/* Live Status Banner */}
@@ -188,11 +202,11 @@ export default function OrderStatusPage() {
                       <span style={{ 
                         fontSize: '10px', 
                         fontWeight: 800, 
-                        background: 'rgba(255,107,53,0.08)',
+                        background: 'rgba(151,19,69,0.08)',
                         color: 'var(--primary)',
                         padding: '2px 8px',
                         borderRadius: '99px',
-                        border: '1px solid rgba(255,107,53,0.1)'
+                        border: '1px solid rgba(151,19,69,0.1)'
                       }}>
                         Pos: {formatOrdinal(displayPos)}
                       </span>
@@ -213,7 +227,7 @@ export default function OrderStatusPage() {
                 </div>
               )}
 
-              <Link href={`/order-status/${order.ticket_number}`} style={{ display: 'block', textAlign: 'center', fontSize: '13px', fontWeight: 700, color: 'var(--primary)', background: 'rgba(255,107,53,0.05)', padding: '8px', borderRadius: '10px' }}>
+              <Link href={`/order-status/${order.ticket_number}`} style={{ display: 'block', textAlign: 'center', fontSize: '13px', fontWeight: 700, color: 'var(--primary)', background: 'rgba(151,19,69,0.05)', padding: '8px', borderRadius: '10px' }}>
                 View Full Details →
               </Link>
             </div>

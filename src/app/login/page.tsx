@@ -98,7 +98,7 @@ export default function LoginPage() {
         // Store token in localStorage too
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        toast.success('Welcome to Culinary Conductor!');
+        toast.success('Welcome to Renjz Kitchen!');
         router.push('/menu');
       } else {
         toast.error(data.error || 'Invalid OTP');
@@ -113,7 +113,7 @@ export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)',
+      background: 'linear-gradient(135deg, #FDF9FA 0%, #F8EDF0 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -122,21 +122,28 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: '400px' }} className="animate-fade-in">
         
         {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
           <div style={{
-            width: '64px', height: '64px',
-            background: 'var(--primary)',
-            borderRadius: '20px',
+            width: '90px', height: '90px',
+            background: 'white',
+            borderRadius: '24px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px',
-            boxShadow: '0 8px 24px rgba(255,107,53,0.35)',
-            fontSize: '28px',
-          }}>🍴</div>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '6px' }}>
-            The Culinary Conductor
+            margin: '0 auto 20px',
+            boxShadow: '0 8px 32px rgba(151,19,69,0.2)',
+            overflow: 'hidden',
+            border: '2px solid white'
+          }}>
+            <img 
+              src="/logo.jpeg" 
+              alt="Renjz Kitchen" 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
+          </div>
+          <h1 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '8px', letterSpacing: '-0.5px' }}>
+            Renjz Kitchen
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Welcome back to the kitchen. Sign in to manage your floor.
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', fontWeight: 500 }}>
+            Taste of Home in every bite.
           </p>
         </div>
 
@@ -229,7 +236,7 @@ export default function LoginPage() {
               disabled={loading || step === 'phone' || otp.some(d => !d)}
             >
               {loading && step === 'otp' ? (
-                <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2, borderColor: 'rgba(255,107,53,0.3)', borderTopColor: 'var(--primary)' }} /> Verifying...</>
+                <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2, borderColor: 'rgba(151,19,69,0.3)', borderTopColor: 'var(--primary)' }} /> Verifying...</>
               ) : 'Verify & Login'}
             </button>
             <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '12px' }}>

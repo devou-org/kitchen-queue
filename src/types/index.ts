@@ -1,5 +1,5 @@
 // ============================================
-// CULINARY CONDUCTOR - TypeScript Types
+// RENJZ KITCHEN - TypeScript Types
 // ============================================
 
 export type ProductStatus = 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK';

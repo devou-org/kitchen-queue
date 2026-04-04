@@ -90,27 +90,25 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
   const renderHeader = () => (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      display: 'flex', alignItems: 'center',
       padding: '16px 20px',
       background: 'white',
       borderBottom: '1px solid rgba(0,0,0,0.05)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontSize: '18px' }}>🍴</span>
-        <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>The Culinary Conductor</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <img 
+          src="/logo.jpeg" 
+          alt="Renjz Kitchen" 
+          style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover' }} 
+        />
+        <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>Renjz Kitchen</span>
       </div>
-      <div style={{
-        width: '36px', height: '36px', borderRadius: '50%',
-        background: 'rgba(0,0,0,0.05)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '16px',
-      }}>👤</div>
     </div>
   );
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', background: 'linear-gradient(135deg, #FDF9FA 0%, #F8EDF0 100%)' }}>
         <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
         <p style={{ color: 'var(--text-secondary)' }}>Fetching ticket #{ticket}...</p>
       </div>
@@ -119,7 +117,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
   if (error || !order) {
     return (
-      <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #FDF9FA 0%, #F8EDF0 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
         {renderHeader()}
         <BottomNav />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }} className="animate-fade-in">
@@ -151,7 +149,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   };
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
+    <div style={{ background: 'linear-gradient(135deg, #FDF9FA 0%, #F8EDF0 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
       {renderHeader()}
 
       {/* Live Status Banner */}
@@ -196,9 +194,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 <div style={{ 
                   margin: '12px 0 20px',
                   padding: '12px',
-                  background: 'rgba(255,107,53,0.03)',
+                  background: 'rgba(151,19,69,0.03)',
                   borderRadius: '16px',
-                  border: '1px solid rgba(255,107,53,0.08)'
+                  border: '1px solid rgba(151,19,69,0.08)'
                 }}>
                   <p style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                     Current Position
@@ -261,7 +259,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                       background: stageIndex >= i ? 'var(--primary)' : '#F3F4F6',
                       color: stageIndex >= i ? 'white' : 'var(--text-secondary)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
-                      boxShadow: stageIndex >= i ? '0 4px 12px rgba(255,107,53,0.3)' : 'none',
+                      boxShadow: stageIndex >= i ? '0 4px 12px rgba(151,19,69,0.3)' : 'none',
                     }}>
                       {stageIndex > i ? '✓' : stage.icon}
                     </div>

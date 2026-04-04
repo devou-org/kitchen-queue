@@ -65,8 +65,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: 32, height: 32, background: 'var(--primary)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>C</div>
-          <h2 style={{ fontSize: '18px', fontWeight: 800 }}>Admin Panel</h2>
+          <img 
+            src="/logo.jpeg" 
+            alt="Renjz Kitchen" 
+            style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} 
+          />
+          <h2 style={{ fontSize: '18px', fontWeight: 800 }}>Renjz Admin</h2>
         </div>
         <nav className="sidebar-nav">
           {navLinks.map((link) => {

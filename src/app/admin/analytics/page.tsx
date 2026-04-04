@@ -79,7 +79,7 @@ export default function AdminAnalytics() {
                   <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} tickFormatter={(h) => `${h}:00`} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
                   <Tooltip 
-                    cursor={{ fill: 'rgba(255,107,53,0.05)' }}
+                    cursor={{ fill: 'rgba(151,19,69,0.05)' }}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
                     formatter={(value: any) => [value, 'Orders']}
                     labelFormatter={(label) => `Time: ${label}:00`}

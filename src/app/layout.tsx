@@ -3,11 +3,14 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: "Culinary Conductor | aimiys kitchen",
+  title: "Renjz Kitchen | Taste of Home in every bite",
   description: 'Real-time restaurant queue management system. Browse menu, order online, track your queue position live.',
-  keywords: 'restaurant, queue, order, food, menu, tracking',
+  keywords: 'restaurant, queue, order, food, menu, tracking, Renjz Kitchen',
+  icons: {
+    icon: '/logo.jpeg',
+  },
   openGraph: {
-    title: 'Culinary Conductor – aimiys kitchen',
+    title: 'Renjz Kitchen – Authentic Coastal Flavors',
     description: 'Order food and track your queue in real-time',
     type: 'website',
   },

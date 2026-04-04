@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     const userEmail = email.trim();
     
-    const expectedEmail = process.env.ADMIN_EMAIL || "admin@aimiyskitchen.com";
+    const expectedEmail = process.env.ADMIN_EMAIL || "admin@renjzkitchen.com";
     if (userEmail !== expectedEmail) {
       return NextResponse.json({ success: false, error: 'Invalid credentials (E)' }, { status: 401 });
     }

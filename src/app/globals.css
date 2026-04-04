@@ -2,18 +2,18 @@
 @import "tailwindcss";
 
 :root {
-  --primary: #FF6B35;
-  --primary-dark: #e55b28;
-  --primary-light: #ff8a5b;
-  --secondary: #C1272D;
+  --primary: #971345;
+  --primary-dark: #981150;
+  --primary-light: #E66D62;
+  --secondary: #EC7951;
   --success: #06A77D;
   --warning: #FFA500;
   --info: #3B82F6;
-  --bg: #F9FAFB;
+  --bg: #FDF9FA;
   --card: #FFFFFF;
-  --text-primary: #1F2937;
-  --text-secondary: #6B7280;
-  --border: #E5E7EB;
+  --text-primary: #33322F;
+  --text-secondary: #6B6667;
+  --border: #EFE9EB;
   --shadow: 0 1px 3px rgba(0,0,0,0.1);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
   --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
@@ -78,7 +78,7 @@ body {
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-dark);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255,107,53,0.4);
+  box-shadow: 0 4px 12px rgba(151,19,69,0.4);
 }
 
 .btn-secondary {
@@ -88,7 +88,7 @@ body {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: rgba(255,107,53,0.05);
+  background: rgba(151,19,69,0.05);
 }
 
 .btn-danger {
@@ -175,7 +175,7 @@ body {
 
 .input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255,107,53,0.15);
+  box-shadow: 0 0 0 3px rgba(151,19,69,0.15);
 }
 
 .input::placeholder {
@@ -203,7 +203,7 @@ body {
 
 .textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255,107,53,0.15);
+  box-shadow: 0 0 0 3px rgba(151,19,69,0.15);
 }
 
 .label {
@@ -236,7 +236,7 @@ body {
 
 .select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255,107,53,0.15);
+  box-shadow: 0 0 0 3px rgba(151,19,69,0.15);
 }
 
 /* ===================== STATUS BADGES ===================== */
@@ -280,7 +280,7 @@ body {
 
 .qty-btn:hover {
   border-color: var(--primary);
-  background: rgba(255,107,53,0.08);
+  background: rgba(151,19,69,0.08);
 }
 
 .qty-btn:disabled {
@@ -455,7 +455,7 @@ tr:hover td {
   font-size: 10px;
   font-weight: 700;
   gap: 1px;
-  box-shadow: 0 4px 12px rgba(255,107,53,0.4);
+  box-shadow: 0 4px 12px rgba(151,19,69,0.4);
   cursor: pointer;
   text-decoration: none;
 }
@@ -534,7 +534,7 @@ tr:hover td {
 
 .sidebar-link.active {
   color: white;
-  background: rgba(255,107,53,0.2);
+  background: rgba(151,19,69,0.2);
   border-right: 3px solid var(--primary);
 }
 
@@ -601,7 +601,7 @@ tr:hover td {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(255,107,53,0.4);
+  box-shadow: 0 8px 20px rgba(151,19,69,0.4);
   z-index: 30;
   border: none;
   text-decoration: none;
@@ -611,7 +611,7 @@ tr:hover td {
 
 .cart-btn:hover {
   transform: translateX(-50%) translateY(-2px);
-  box-shadow: 0 12px 24px rgba(255,107,53,0.5);
+  box-shadow: 0 12px 24px rgba(151,19,69,0.5);
 }
 
 /* ===================== OTP INPUTS ===================== */
@@ -631,14 +631,14 @@ tr:hover td {
 
 .otp-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255,107,53,0.15);
+  box-shadow: 0 0 0 3px rgba(151,19,69,0.15);
 }
 
 /* ===================== LOADER ===================== */
 .loader {
   width: 24px;
   height: 24px;
-  border: 3px solid rgba(255,107,53,0.2);
+  border: 3px solid rgba(151,19,69,0.2);
   border-top: 3px solid var(--primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;

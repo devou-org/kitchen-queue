@@ -432,7 +432,7 @@ export default function AdminOrders() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{
                         width: '28px', height: '28px', borderRadius: '50%',
-                        background: 'rgba(255,107,53,0.1)', color: 'var(--primary)',
+                        background: 'rgba(151,19,69,0.1)', color: 'var(--primary)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: '12px', fontWeight: 800,
                       }}>{item.quantity}</span>

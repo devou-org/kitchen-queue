@@ -39,9 +39,24 @@ export default function AdminLogin() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '10px' }}>🛡️</div>
-          <h2 style={{ fontSize: '24px', fontWeight: 800 }}>Admin Portal</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>Sign in to manage the kitchen</p>
+          <div style={{
+            width: '80px', height: '80px',
+            background: 'white',
+            borderRadius: '20px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 16px',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+            overflow: 'hidden',
+            border: '2px solid white'
+          }}>
+            <img 
+              src="/logo.jpeg" 
+              alt="Renjz Kitchen" 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
+          </div>
+          <h2 style={{ fontSize: '24px', fontWeight: 900 }}>Renjz Admin</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Sign in to manage your kitchen</p>
         </div>
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -52,7 +67,7 @@ export default function AdminLogin() {
               className="input" 
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="admin@aimiyskitchen.com"
+              placeholder="admin@renjzkitchen.com"
             />
           </div>
           <div>
