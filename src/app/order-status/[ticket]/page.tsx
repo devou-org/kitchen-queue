@@ -188,9 +188,26 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
               <p style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '12px' }}>
                 YOUR TICKET NUMBER
               </p>
-              <div style={{ fontSize: '72px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1, letterSpacing: '-2px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '72px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1, letterSpacing: '-2px', marginBottom: '8px' }}>
                 #{String(order.ticket_number).padStart(3, '0')}
               </div>
+
+              {isActive && !isReady && (
+                <div style={{ 
+                  margin: '12px 0 20px',
+                  padding: '12px',
+                  background: 'rgba(255,107,53,0.03)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(255,107,53,0.08)'
+                }}>
+                  <p style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+                    Current Position
+                  </p>
+                  <div style={{ fontSize: '32px', fontWeight: 900, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '20px' }}>📍</span> {formatOrdinal(displayPosition)}
+                  </div>
+                </div>
+              )}
 
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px',

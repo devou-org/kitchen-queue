@@ -182,7 +182,22 @@ export default function OrderStatusPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div>
                   <h3 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1 }}>#{String(order.ticket_number).padStart(3, '0')}</h3>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    {isActive && !isReady && (
+                      <span style={{ 
+                        fontSize: '10px', 
+                        fontWeight: 800, 
+                        background: 'rgba(255,107,53,0.08)',
+                        color: 'var(--primary)',
+                        padding: '2px 8px',
+                        borderRadius: '99px',
+                        border: '1px solid rgba(255,107,53,0.1)'
+                      }}>
+                        Pos: {formatOrdinal(displayPos)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span>
