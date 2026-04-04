@@ -117,17 +117,17 @@ export default function OrderStatusPage() {
   const activeOrders = orders.filter(o => ['PENDING', 'PREPARING', 'READY'].includes(o.status));
   const hasMultiple = activeOrders.length > 1;
 
-  if (orders.length === 0) {
+  if (activeOrders.length === 0) {
     return (
       <div style={{ background: 'linear-gradient(135deg, #FFF7F4 0%, #FFF0E8 100%)', minHeight: '100vh', color: 'var(--text-primary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>🍴</span><span style={{ fontWeight: 800, fontSize: '15px' }}>The Culinary Conductor</span></div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🤷‍♂️</div>
-          <h2 style={{ fontWeight: 800, fontSize: '24px' }}>No Orders Found</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>You haven't placed any orders yet.</p>
-          <Link href="/menu" className="btn btn-primary" style={{ width: '100%', maxWidth: '300px' }}>Order Now →</Link>
+          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🍽️</div>
+          <h2 style={{ fontWeight: 800, fontSize: '24px' }}>No Active Orders</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>Your orders have been served or none are currently in progress.</p>
+          <Link href="/menu" className="btn btn-primary" style={{ width: '100%', maxWidth: '300px' }}>Order More →</Link>
         </div>
         <BottomNav />
       </div>
@@ -150,12 +150,12 @@ export default function OrderStatusPage() {
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
-          Your Orders
-          <span style={{ background: 'var(--primary)', color: 'white', fontSize: '12px', padding: '2px 8px', borderRadius: '10px' }}>{orders.length}</span>
+          Active Orders
+          <span style={{ background: 'var(--primary)', color: 'white', fontSize: '12px', padding: '2px 8px', borderRadius: '10px' }}>{activeOrders.length}</span>
         </h2>
 
-        {orders.map((order, idx) => {
-          const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
+        {activeOrders.map((order, idx) => {
+          const isActive = true; // They are already filtered
           const isReady = order.status === 'READY';
           const rawPos = Number(order.queue_position);
           const pos = isNaN(rawPos) ? 0 : rawPos;

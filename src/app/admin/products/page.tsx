@@ -109,10 +109,10 @@ export default function AdminProducts() {
                     <td style={{ fontWeight: 600 }}>{formatPrice(p.price)}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button className="qty-btn" style={{ width: 24, height: 24, fontSize: 14 }} onClick={() => handleStockUpdate(p.id, p.stock_quantity - 1, p.buffer_quantity)}>−</button>
-                        <span style={{ width: '30px', textAlign: 'center', fontWeight: 700 }}>{p.stock_quantity}</span>
-                        <button className="qty-btn" style={{ width: 24, height: 24, fontSize: 14 }} onClick={() => handleStockUpdate(p.id, p.stock_quantity + 1, p.buffer_quantity)}>+</button>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>/ {p.buffer_quantity}</span>
+                        <span style={{ fontWeight: 800, fontSize: '15px', color: p.stock_quantity <= p.buffer_quantity ? 'var(--warning)' : 'inherit' }}>
+                          {Math.max(0, p.stock_quantity)}
+                        </span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/ {p.buffer_quantity}</span>
                       </div>
                     </td>
                     <td>

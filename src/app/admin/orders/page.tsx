@@ -10,15 +10,22 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [currentTab, setCurrentTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
+  const [currentTab, setCurrentTab] = useState<'ACTIVE' | 'REPORTS'>('ACTIVE');
+  const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
+  const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const qs = new URLSearchParams({ page: page.toString(), per_page: '50' });
+      const qs = new URLSearchParams({ page: page.toString(), per_page: '100' });
       if (statusFilter) qs.append('status', statusFilter);
+      
+      if (currentTab === 'REPORTS') {
+        qs.append('date_from', dateFrom);
+        qs.append('date_to', dateTo);
+      }
 
       const ordersRes = await fetch(`/api/orders?${qs.toString()}`);
       const ordersData = await ordersRes.json();
@@ -37,7 +44,7 @@ export default function AdminOrders() {
   useEffect(() => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, statusFilter]);
+  }, [page, statusFilter, currentTab, dateFrom, dateTo]);
 
   // Real-time effect
   useEffect(() => {
@@ -52,7 +59,7 @@ export default function AdminOrders() {
     channel.bind('new_order', (data: any) => {
       console.log('✅ Pusher event received: new_order', data);
       toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
-      fetchOrders(true); // Silent refresh
+      if (currentTab === 'ACTIVE') fetchOrders(true); // Silent refresh for active tab
     });
 
     // ✅ ORDER UPDATE EVENT (Status or Payment)
@@ -63,14 +70,8 @@ export default function AdminOrders() {
       setOrders(prev => prev.map(o => {
         if (o.id === data.order_id) {
           const updated = { ...o };
-          // Update status if present
-          if (data.new_status) {
-            updated.status = data.new_status;
-          }
-          // Update payment if present
-          if (typeof data.is_paid === 'boolean') {
-            updated.is_paid = data.is_paid;
-          }
+          if (data.new_status) updated.status = data.new_status;
+          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
           return updated;
         }
         return o;
@@ -80,43 +81,25 @@ export default function AdminOrders() {
       setSelectedOrder(prev => {
         if (prev && prev.id === data.order_id) {
           const updated = { ...prev };
-          if (data.new_status) {
-            updated.status = data.new_status;
-          }
-          if (typeof data.is_paid === 'boolean') {
-            updated.is_paid = data.is_paid;
-          }
+          if (data.new_status) updated.status = data.new_status;
+          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
           return updated;
         }
         return prev;
       });
 
-      // Show toast notification based on update type
-      if (data.new_status) {
-        toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
-      }
-      if (typeof data.is_paid === 'boolean') {
-        toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} payment: ${data.is_paid ? 'PAID' : 'PENDING'}`);
-      }
+      // Show toast notification
+      if (data.new_status) toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
 
-      // Silent refresh to keep data in sync
+      // Silent refresh
       fetchOrders(true);
-    });
-
-    // ✅ CONNECTION STATUS
-    channel.bind('pusher:subscription_succeeded', () => {
-      console.log('✅ Successfully subscribed to queue-channel');
-    });
-
-    channel.bind('pusher:subscription_error', (error: any) => {
-      console.error('❌ Pusher subscription error:', error);
     });
 
     return () => {
       channel.unbind_all();
       channel.unsubscribe();
     };
-  }, []); // Only bind once on mount
+  }, [currentTab]); // Reset on tab change to ensures correct fetch logic
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     setModalLoading(true);
@@ -129,9 +112,7 @@ export default function AdminOrders() {
       const data = await res.json();
       if (data.success) {
         toast.success(`Order status updated to ${newStatus}`);
-        // Update the selected order in modal
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
-        // Note: Pusher will also update the UI, so we don't need to fetchOrders here
       } else {
         toast.error(data.error || 'Failed to update');
       }
@@ -154,7 +135,6 @@ export default function AdminOrders() {
       if (data.success) {
         toast.success(isPaid ? 'Marked as Paid' : 'Marked as Unpaid');
         setSelectedOrder(prev => prev ? { ...prev, is_paid: isPaid } : null);
-        // Note: Pusher will also update the UI
       } else {
         toast.error(data.error || 'Failed to update payment');
       }
@@ -166,12 +146,16 @@ export default function AdminOrders() {
   };
 
   const exportStatementsCSV = () => {
+    if (orders.length === 0) {
+      toast.error('No data to export for these dates');
+      return;
+    }
     const headers = ['Ticket', 'Customer', 'Phone', 'Items', 'Total', 'Paid', 'Status', 'Date'];
-    const rows = filteredOrders.map(order => [
+    const rows = orders.map(order => [
       `#${String(order.ticket_number).padStart(3, '0')}`,
       `"${order.customer_name}"`,
       `"${order.phone}"`,
-      order.items?.length || 0,
+      `"${(order.items || []).map(i => `${i.product_name} (x${i.quantity})`).join('; ')}"`,
       order.total_price,
       order.is_paid ? 'PAID' : 'PENDING',
       order.status,
@@ -179,28 +163,23 @@ export default function AdminOrders() {
     ]);
 
     const csvContent = headers.join(',') + "\n" + rows.map(e => e.join(',')).join("\n");
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Order_Statements_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Statements_${dateFrom}_to_${dateTo}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const activeStatuses = ['PENDING', 'PREPARING', 'READY'];
   const allStatuses = ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];
 
-  // Filter based on Tab
-  const tabStatuses = currentTab === 'ACTIVE'
-    ? ['PENDING', 'PREPARING', 'READY']
-    : ['COMPLETED', 'CANCELLED'];
-
-  const filteredOrders = orders.filter(
-    order => tabStatuses.includes(order.status) && (!statusFilter || order.status === statusFilter)
-  );
+  // Filter logic: ACTIVE tab only shows pending/prep/ready. REPORTS tab shows all results from API (which are already date filtered)
+  const filteredOrders = currentTab === 'ACTIVE' 
+    ? orders.filter(o => activeStatuses.includes(o.status))
+    : orders;
 
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
@@ -215,7 +194,7 @@ export default function AdminOrders() {
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Orders Command Center</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Manage live fulfillment, filter transactions, and download monthly statements.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Manage live fulfillment and download date-filtered financial statements.</p>
         </div>
       </div>
 
@@ -228,31 +207,57 @@ export default function AdminOrders() {
           ● Active Orders
         </button>
         <button
-          className={`btn ${currentTab === 'HISTORY' ? 'btn-primary' : ''}`}
-          style={currentTab !== 'HISTORY' ? { background: 'var(--bg)', color: 'var(--text-primary)' } : {}}
-          onClick={() => { setCurrentTab('HISTORY'); setStatusFilter(''); setPage(1); }}
+          className={`btn ${currentTab === 'REPORTS' ? 'btn-primary' : ''}`}
+          style={currentTab !== 'REPORTS' ? { background: 'var(--bg)', color: 'var(--text-primary)' } : {}}
+          onClick={() => { setCurrentTab('REPORTS'); setStatusFilter(''); setPage(1); }}
         >
-          🕒 History & Statements
+          📅 Export Statements
         </button>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <select
-            className="select"
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            style={{ maxWidth: '200px' }}
-          >
-            <option value="">All in {currentTab}</option>
-            {tabStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-
-          {currentTab === 'HISTORY' && (
-            <button className="btn" style={{ background: '#059669', color: 'white' }} onClick={exportStatementsCSV}>
-              📥 Download Statement (CSV)
-            </button>
-          )}
+        <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
+            {currentTab === 'ACTIVE' ? (
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Filter Active Status</label>
+                <select 
+                  className="input" 
+                  value={statusFilter} 
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  style={{ height: '42px' }}
+                >
+                  <option value="">All Active Orders</option>
+                  {activeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end', width: '100%' }}>
+                <div style={{ flex: '1', minWidth: '140px' }}>
+                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>From Date</label>
+                  <input type="date" className="input" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ height: '42px' }} />
+                </div>
+                <div style={{ flex: '1', minWidth: '140px' }}>
+                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>To Date</label>
+                  <input type="date" className="input" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ height: '42px' }} />
+                </div>
+                <div style={{ flex: '1', minWidth: '140px' }}>
+                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Status</label>
+                  <select className="input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ height: '42px' }}>
+                    <option value="">All Statuses</option>
+                    {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <button 
+                  className="btn" 
+                  onClick={exportStatementsCSV}
+                  style={{ height: '42px', background: '#059669', color: 'white', padding: '0 24px' }}
+                >
+                  📥 Export Statements (CSV)
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', minHeight: '400px' }}>

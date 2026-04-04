@@ -91,35 +91,99 @@ export async function getOrders(filters: {
   const { page = 1, per_page = 50 } = filters;
   const offset = (page - 1) * per_page;
 
-  let rows;
-  if (filters.status && filters.phone) {
-    rows = await sql`
-      SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
-      FROM orders o
-      LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN products p ON p.id = oi.product_id
-      WHERE o.status = ${filters.status} AND o.phone ILIKE ${'%' + filters.phone + '%'}
-      GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
-    `;
-  } else if (filters.status) {
-    rows = await sql`
+  // Build the WHERE clause dynamically
+  let query = `
+    SELECT o.*, 
+      json_agg(json_build_object(
+        'id', oi.id, 
+        'product_id', oi.product_id, 
+        'quantity', oi.quantity, 
+        'price_at_purchase', oi.price_at_purchase, 
+        'product_name', p.name
+      ) ORDER BY oi.id) as items
+    FROM orders o
+    LEFT JOIN order_items oi ON oi.order_id = o.id
+    LEFT JOIN products p ON p.id = oi.product_id
+    WHERE 1=1
+  `;
+
+  const params: any[] = [];
+  let paramIdx = 1;
+
+  if (filters.status) {
+    query += ` AND o.status = $${paramIdx++}`;
+    params.push(filters.status);
+  }
+
+  if (filters.phone) {
+    query += ` AND o.phone ILIKE $${paramIdx++}`;
+    params.push(`%${filters.phone}%`);
+  }
+
+  if (filters.date_from) {
+    query += ` AND o.created_at >= $${paramIdx++}`;
+    params.push(`${filters.date_from} 00:00:00`);
+  }
+
+  if (filters.date_to) {
+    query += ` AND o.created_at <= $${paramIdx++}`;
+    params.push(`${filters.date_to} 23:59:59`);
+  }
+
+  query += ` GROUP BY o.id ORDER BY o.created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+  params.push(per_page, offset);
+
+  // Execute using the raw sql(query, params) pattern or similar if supported, 
+  // but neon's sql tag is usually used for static. 
+  // Let's use the standard tagged approach since we already have the vars.
+  
+  // Actually, neon-serverless sql tag DOES NOT support dynamic names. 
+  // We should just use the tagged approach with conditionals for now.
+  
+  if (filters.date_from && filters.date_to) {
+     if (filters.status) {
+       return await sql`
+         SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         LEFT JOIN products p ON p.id = oi.product_id
+         WHERE o.status = ${filters.status} 
+           AND o.created_at >= ${filters.date_from + ' 00:00:00'}
+           AND o.created_at <= ${filters.date_to + ' 23:59:59'}
+         GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+       `;
+     } else {
+       return await sql`
+         SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         LEFT JOIN products p ON p.id = oi.product_id
+         WHERE o.created_at >= ${filters.date_from + ' 00:00:00'}
+           AND o.created_at <= ${filters.date_to + ' 23:59:59'}
+         GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+       `;
+     }
+  }
+
+  // Fallback to original logic if no date filters
+  if (filters.status) {
+    return await sql`
       SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
       LEFT JOIN products p ON p.id = oi.product_id
       WHERE o.status = ${filters.status}
-      GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
-    `;
-  } else {
-    rows = await sql`
-      SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
-      FROM orders o
-      LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN products p ON p.id = oi.product_id
-      GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
+      GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
     `;
   }
-  return rows;
+  
+  return await sql`
+    SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
+    FROM orders o
+    LEFT JOIN order_items oi ON oi.order_id = o.id
+    LEFT JOIN products p ON p.id = oi.product_id
+    GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+  `;
 }
 
 export async function getOrderById(id: string) {
@@ -208,6 +272,18 @@ export async function createOrder(data: {
   party_size?: number;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
 }) {
+  // 1. Check stock for all items first
+  for (const item of data.items) {
+    const product = await getProductById(item.product_id);
+    if (!product) {
+      throw new Error(`Product not found`);
+    }
+    if (product.stock_quantity < item.quantity) {
+      throw new Error(`Insufficient stock for ${product.name}. Only ${product.stock_quantity} remaining.`);
+    }
+  }
+
+  // 2. Create the order
   const orderRows = await sql`
     INSERT INTO orders (customer_name, phone, total_price, status, is_paid, notes, party_size)
     VALUES (${data.customer_name}, ${data.phone}, ${data.total_price}, 'PENDING', false, ${data.notes || null}, ${data.party_size || 1})
