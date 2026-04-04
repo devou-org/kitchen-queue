@@ -151,7 +151,21 @@ export default function OrderStatusPage() {
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
           Active Orders
-          <span style={{ background: 'var(--primary)', color: 'white', fontSize: '12px', padding: '2px 8px', borderRadius: '10px' }}>{activeOrders.length}</span>
+          <span style={{ 
+            background: 'var(--primary)', 
+            color: 'white', 
+            fontSize: '11px', 
+            fontWeight: 800,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '22px',
+            height: '22px',
+            borderRadius: '50%',
+            transform: 'translateY(-2px)'
+          }}>
+            {activeOrders.length}
+          </span>
         </h2>
 
         {activeOrders.map((order, idx) => {
@@ -176,18 +190,7 @@ export default function OrderStatusPage() {
                 </div>
               </div>
 
-              {isActive && !isReady && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F9FAFB', padding: '12px', borderRadius: '12px', marginBottom: '12px' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)' }}>QUEUE POSITION</p>
-                    <p style={{ fontSize: '32px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1 }}>{displayPos}</p>
-                  </div>
-                  <div style={{ borderLeft: '1px solid rgba(0,0,0,0.1)', height: '40px' }} />
-                  <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    {pos <= 1 ? 'You are next in line!' : `${pos - 1} orders ahead of you`}
-                  </p>
-                </div>
-              )}
+
 
               {isReady && (
                 <div style={{ background: 'rgba(6,167,125,0.1)', color: 'var(--success)', padding: '12px', borderRadius: '12px', textAlign: 'center', fontWeight: 900, marginBottom: '12px', animation: 'pulse 2s infinite' }}>

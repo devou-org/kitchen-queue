@@ -147,9 +147,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
   const getNearlyText = () => {
     if (isReady) return '🎉 Ready!';
-    if (position <= 1) return 'Almost there!';
-    if (position <= 3) return 'Nearly there!';
-    return `~${Math.ceil(position * 5)} min wait`;
+    return '👨‍🍳 Processing your order...';
   };
 
   return (
@@ -206,30 +204,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 {isReady ? '✓' : '●'} {isReady ? 'Confirmed & Ready!' : 'Confirmed & Active'}
               </span>
 
-              {!isReady && (
-                <div style={{
-                  background: '#F9FAFB',
-                  borderRadius: '14px',
-                  padding: '16px',
-                  display: 'inline-flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  minWidth: '140px',
-                  border: '1px solid rgba(0,0,0,0.03)',
-                }}>
-                  <svg width="24" height="24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" viewBox="0 0 24 24">
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-                  </svg>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    CURRENT QUEUE POSITION
-                  </p>
-                  <p style={{ fontWeight: 900, fontSize: '48px', color: 'var(--primary)', lineHeight: 1 }}>
-                    {displayPosition}
-                  </p>
-                </div>
-              )}
+
 
               {isReady && (
                 <div style={{

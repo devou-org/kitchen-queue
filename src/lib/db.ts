@@ -150,7 +150,7 @@ export async function getOrders(filters: {
          WHERE o.status = ${filters.status} 
            AND o.created_at >= ${filters.date_from + ' 00:00:00'}
            AND o.created_at <= ${filters.date_to + ' 23:59:59'}
-         GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+         GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
        `;
      } else {
        return await sql`
@@ -160,7 +160,7 @@ export async function getOrders(filters: {
          LEFT JOIN products p ON p.id = oi.product_id
          WHERE o.created_at >= ${filters.date_from + ' 00:00:00'}
            AND o.created_at <= ${filters.date_to + ' 23:59:59'}
-         GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+         GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
        `;
      }
   }
@@ -173,7 +173,7 @@ export async function getOrders(filters: {
       LEFT JOIN order_items oi ON oi.order_id = o.id
       LEFT JOIN products p ON p.id = oi.product_id
       WHERE o.status = ${filters.status}
-      GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
     `;
   }
   
@@ -182,7 +182,7 @@ export async function getOrders(filters: {
     FROM orders o
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
-    GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+    GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
   `;
 }
 
