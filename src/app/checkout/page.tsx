@@ -36,8 +36,7 @@ export default function CheckoutPage() {
 
   const items = Array.from(cart.values());
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const total = subtotal + tax;
+  const total = subtotal;
 
   const handleSubmit = async () => {
     if (!form.customer_name.trim() || form.customer_name.length < 2) {
@@ -115,7 +114,7 @@ export default function CheckoutPage() {
               <span>Subtotal</span><span>{formatPrice(subtotal)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
-              <span>Tax (10%)</span><span>{formatPrice(tax)}</span>
+              <span>Order Details</span><span>{items.length} unique items</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px', paddingTop: '8px', borderTop: '2px solid var(--border)' }}>
               <span>Total</span>

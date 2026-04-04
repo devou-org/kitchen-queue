@@ -15,14 +15,12 @@ type QueueState = {
 
 const STAGES = [
   { key: 'PENDING', label: 'CHECK-IN', icon: '✓' },
-  { key: 'PREPARING', label: 'PREPARING', icon: '🍴' },
   { key: 'READY', label: 'READY', icon: '🍽️' },
 ];
 
 function getStageIndex(status: string) {
   if (status === 'PENDING') return 0;
-  if (status === 'PREPARING') return 1;
-  if (status === 'READY') return 2;
+  if (status === 'READY') return 1;
   return -1; // completed or cancelled
 }
 
@@ -134,7 +132,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
   const stageIndex = getStageIndex(order.status);
   const isReady = order.status === 'READY';
-  const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
+  const isActive = ['PENDING', 'READY'].includes(order.status);
 
   // Use the precise database rank if available. If it's not present (e.g. order is cancelled or done), we treat as 0.
   const position = typeof order.queue_position === 'number' ? order.queue_position : 0;
@@ -249,7 +247,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600 }}>{getNearlyText()}</span>
               </div>
               <div className="progress-track" style={{ background: '#F3F4F6' }}>
-                <div className="progress-fill" style={{ width: `${Math.min(100, (stageIndex / 2) * 100)}%` }} />
+                <div className="progress-fill" style={{ width: `${Math.min(100, (stageIndex / (STAGES.length - 1)) * 100)}%` }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
                 {STAGES.map((stage, i) => (

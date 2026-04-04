@@ -38,8 +38,7 @@ export default function CartPage() {
 
   const items = Array.from(cart.values());
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const total = subtotal + tax;
+  const total = subtotal;
   const totalItems = items.reduce((s, i) => s + i.quantity, 0);
 
   if (items.length === 0) {
@@ -101,8 +100,8 @@ export default function CartPage() {
               <span>{formatPrice(subtotal)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Tax (10%)</span>
-              <span>{formatPrice(tax)}</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Total Items</span>
+              <span>{totalItems}</span>
             </div>
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px' }}>

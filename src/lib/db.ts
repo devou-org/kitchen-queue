@@ -81,108 +81,63 @@ export async function softDeleteProduct(id: string) {
 
 export async function getOrders(filters: {
   status?: string;
+  status_in?: string; // Support comma-separated statuses
   date_from?: string;
   date_to?: string;
   phone?: string;
   search?: string;
+  sort?: 'ASC' | 'DESC';
   page?: number;
   per_page?: number;
 } = {}) {
-  const { page = 1, per_page = 50 } = filters;
+  const { page = 1, per_page = 50, sort = 'ASC' } = filters;
   const offset = (page - 1) * per_page;
 
-  // Build the WHERE clause dynamically
-  let query = `
-    SELECT o.*, 
-      json_agg(json_build_object(
-        'id', oi.id, 
-        'product_id', oi.product_id, 
-        'quantity', oi.quantity, 
-        'price_at_purchase', oi.price_at_purchase, 
-        'product_name', p.name
-      ) ORDER BY oi.id) as items
-    FROM orders o
-    LEFT JOIN order_items oi ON oi.order_id = o.id
-    LEFT JOIN products p ON p.id = oi.product_id
-    WHERE 1=1
-  `;
-
-  const params: any[] = [];
-  let paramIdx = 1;
-
-  if (filters.status) {
-    query += ` AND o.status = $${paramIdx++}`;
-    params.push(filters.status);
-  }
-
-  if (filters.phone) {
-    query += ` AND o.phone ILIKE $${paramIdx++}`;
-    params.push(`%${filters.phone}%`);
-  }
-
-  if (filters.date_from) {
-    query += ` AND o.created_at >= $${paramIdx++}`;
-    params.push(`${filters.date_from} 00:00:00`);
-  }
-
-  if (filters.date_to) {
-    query += ` AND o.created_at <= $${paramIdx++}`;
-    params.push(`${filters.date_to} 23:59:59`);
-  }
-
-  query += ` GROUP BY o.id ORDER BY o.created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
-  params.push(per_page, offset);
-
-  // Execute using the raw sql(query, params) pattern or similar if supported, 
-  // but neon's sql tag is usually used for static. 
-  // Let's use the standard tagged approach since we already have the vars.
-  
-  // Actually, neon-serverless sql tag DOES NOT support dynamic names. 
-  // We should just use the tagged approach with conditionals for now.
-  
+  // Correlated subquery for items to optimize performance (fixes the reported 8.4s lag)
   if (filters.date_from && filters.date_to) {
-     if (filters.status) {
-       return await sql`
-         SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
-         FROM orders o
-         LEFT JOIN order_items oi ON oi.order_id = o.id
-         LEFT JOIN products p ON p.id = oi.product_id
-         WHERE o.status = ${filters.status} 
-           AND o.created_at >= ${filters.date_from + ' 00:00:00'}
-           AND o.created_at <= ${filters.date_to + ' 23:59:59'}
-         GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
-       `;
-     } else {
-       return await sql`
-         SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
-         FROM orders o
-         LEFT JOIN order_items oi ON oi.order_id = o.id
-         LEFT JOIN products p ON p.id = oi.product_id
-         WHERE o.created_at >= ${filters.date_from + ' 00:00:00'}
-           AND o.created_at <= ${filters.date_to + ' 23:59:59'}
-         GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
-       `;
-     }
+    if (filters.status) {
+      return await sql`
+        SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        FROM orders o
+        WHERE o.status = ${filters.status} 
+          AND o.created_at >= ${filters.date_from + ' 00:00:00'}
+          AND o.created_at <= ${filters.date_to + ' 23:59:59'}
+        ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+      `;
+    } else {
+      return await sql`
+        SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        FROM orders o
+        WHERE o.created_at >= ${filters.date_from + ' 00:00:00'}
+          AND o.created_at <= ${filters.date_to + ' 23:59:59'}
+        ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+      `;
+    }
   }
 
-  // Fallback to original logic if no date filters
   if (filters.status) {
     return await sql`
-      SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
+      SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
       FROM orders o
-      LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN products p ON p.id = oi.product_id
       WHERE o.status = ${filters.status}
-      GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
+      ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+    `;
+  }
+  
+  if (filters.status_in) {
+    const statuses = filters.status_in.split(',');
+    return await sql`
+      SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+      FROM orders o
+      WHERE o.status = ANY(${statuses})
+      ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
     `;
   }
   
   return await sql`
-    SELECT o.*, json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) as items
+    SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
     FROM orders o
-    LEFT JOIN order_items oi ON oi.order_id = o.id
-    LEFT JOIN products p ON p.id = oi.product_id
-    GROUP BY o.id ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
+    ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
   `;
 }
 
@@ -212,7 +167,7 @@ export async function getOrderByTicket(ticket_number: number) {
     WITH active_ranks AS (
        SELECT id, ROW_NUMBER() OVER (ORDER BY ticket_number ASC)::integer as pos
        FROM orders
-       WHERE UPPER(status) IN ('PENDING', 'PREPARING', 'READY')
+       WHERE UPPER(status) IN ('PENDING', 'READY')
     )
     SELECT o.*, 
       COALESCE(ar.pos, 0) as queue_position,
@@ -241,7 +196,7 @@ export async function getOrdersByPhone(phone: string) {
     WITH active_ranks AS (
        SELECT id, ROW_NUMBER() OVER (ORDER BY ticket_number ASC)::integer as pos
        FROM orders
-       WHERE UPPER(status) IN ('PENDING', 'PREPARING', 'READY')
+       WHERE UPPER(status) IN ('PENDING', 'READY')
     )
     SELECT o.*, 
       COALESCE(ar.pos, 0) as queue_position,
@@ -402,7 +357,7 @@ export async function getPendingQueueOrders() {
     FROM orders o
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
-    WHERE o.status IN ('PENDING', 'PREPARING')
+    WHERE o.status IN ('PENDING')
     GROUP BY o.id
     ORDER BY o.ticket_number ASC
   `;

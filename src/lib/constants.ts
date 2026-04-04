@@ -4,7 +4,6 @@
 
 export const ORDER_STATUSES = {
   PENDING: 'PENDING',
-  PREPARING: 'PREPARING',
   READY: 'READY',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
@@ -17,14 +16,13 @@ export const PRODUCT_STATUSES = {
 } as const;
 
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
-  PENDING: ['PREPARING', 'READY', 'COMPLETED', 'CANCELLED'],
-  PREPARING: ['READY', 'COMPLETED', 'CANCELLED', 'PENDING'],
-  READY: ['COMPLETED', 'CANCELLED', 'PENDING', 'PREPARING'],
+  PENDING: ['READY', 'COMPLETED', 'CANCELLED'],
+  READY: ['COMPLETED', 'CANCELLED', 'PENDING'],
   COMPLETED: ['PENDING'],
   CANCELLED: ['PENDING'],
 };
 
-export const TAX_RATE = 0.10; // 10%
+export const TAX_RATE = 0; // Tax removed
 
 export const ITEMS_PER_PAGE = 20;
 export const ORDERS_PER_PAGE = 50;
@@ -40,7 +38,6 @@ export const CURRENCY_SYMBOL = '₹';
 
 export const STATUS_COLORS: Record<string, string> = {
   PENDING: '#FFA500',
-  PREPARING: '#FF8C00',
   READY: '#06A77D',
   COMPLETED: '#6B7280',
   CANCELLED: '#C1272D',
@@ -51,7 +48,6 @@ export const STATUS_COLORS: Record<string, string> = {
 
 export const STATUS_BG: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-800',
-  PREPARING: 'bg-orange-100 text-orange-800',
   READY: 'bg-green-100 text-green-800',
   COMPLETED: 'bg-gray-100 text-gray-600',
   CANCELLED: 'bg-red-100 text-red-800',

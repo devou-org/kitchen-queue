@@ -21,9 +21,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const filters = {
       status: searchParams.get('status') || undefined,
+      status_in: searchParams.get('status_in') || undefined,
       date_from: searchParams.get('date_from') || undefined,
       date_to: searchParams.get('date_to') || undefined,
       phone: searchParams.get('phone') || undefined,
+      sort: (searchParams.get('sort') as 'ASC' | 'DESC') || undefined,
       page: parseInt(searchParams.get('page') || '1'),
       per_page: parseInt(searchParams.get('per_page') || '50'),
     };
@@ -48,13 +50,12 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Calculate total
+    // Calculate total (Tax is 0 as per requirements)
     let total_price = 0;
     for (const item of items) {
       total_price += item.price_at_purchase * item.quantity;
     }
-    // Add 10% tax
-    total_price = Math.round(total_price * 1.10 * 100) / 100;
+    total_price = Math.round(total_price * 100) / 100;
 
     const order = await createOrder({
       customer_name: customer_name.trim(),
