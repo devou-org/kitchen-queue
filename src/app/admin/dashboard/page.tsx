@@ -103,8 +103,8 @@ export default function AdminDashboard() {
                   <td>
                     <span style={{ 
                       padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                      background: order.status === 'READY' ? '#D1FAE5' : order.status === 'PREPARING' ? '#FEF3C7' : '#F3F4F6',
-                      color: order.status === 'READY' ? '#065F46' : order.status === 'PREPARING' ? '#92400E' : '#374151'
+                      background: order.status === 'READY' ? '#D1FAE5' : order.status === 'PENDING' ? '#FFEDD5' : '#F3F4F6',
+                      color: order.status === 'READY' ? '#065F46' : order.status === 'PENDING' ? '#9A3412' : '#374151'
                     }}>
                       {order.status}
                     </span>

@@ -15,15 +15,13 @@ type QueueState = {
 
 const STAGES = [
   { key: 'PENDING', label: 'CHECK-IN', icon: '✓' },
-  { key: 'PREPARING', label: 'PREPARING', icon: '🍴' },
   { key: 'READY', label: 'READY', icon: '🍽️' },
 ];
 
 function getStageIndex(status: string) {
   if (status === 'PENDING') return 0;
-  if (status === 'PREPARING') return 1;
-  if (status === 'READY') return 2;
-  return -1; // completed or cancelled
+  if (status === 'READY') return 1;
+  return -1; // paid or cancelled
 }
 
 export default function OrderStatusPage() {
@@ -114,7 +112,7 @@ export default function OrderStatusPage() {
   }
 
   // If they have active orders, show them all in a cleaner list or focused view
-  const activeOrders = orders.filter(o => ['PENDING', 'PREPARING', 'READY'].includes(o.status));
+  const activeOrders = orders.filter(o => ['PENDING', 'READY'].includes(o.status));
   const hasMultiple = activeOrders.length > 1;
 
   if (activeOrders.length === 0) {
