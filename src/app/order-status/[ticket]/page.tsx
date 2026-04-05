@@ -74,25 +74,24 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
     // ✅ CONNECTION STATUS
     channel.bind('pusher:subscription_succeeded', () => {
       setIsLive(true);
-      console.log('📡 Pusher: Subscribed to queue-channel');
     });
 
     channel.bind('pusher:subscription_error', () => {
       setIsLive(false);
-      console.error('📡 Pusher: Subscription error');
+
     });
 
     // ✅ RE-FETCH ON ANY EVENT THAT AFFECTS QUEUE
     channel.bind('order_update', (data: any) => {
       console.log('🔔 Ticket Page received order_update:', data);
-      
+
       const currentTicketInt = parseInt(ticket);
       const currentOrder = orderRef.current;
       const isOurOrder = data.ticket_number === currentTicketInt || (currentOrder?.id && data.order_id === currentOrder.id);
 
       if (isOurOrder) {
         console.log('✨ This update is for US! Patching state...');
-        
+
         // 📢 NOTIFICATION SOUND: When status becomes READY
         if (data.new_status === 'READY' && currentOrder?.status !== 'READY') {
           try {
@@ -139,10 +138,10 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
       borderBottom: '1px solid rgba(0,0,0,0.05)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <img 
-          src="/logo.jpeg" 
-          alt="Renjz Kitchen" 
-          style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover' }} 
+        <img
+          src="/logo.jpeg"
+          alt="Renjz Kitchen"
+          style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover' }}
         />
         <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>Renjz Kitchen</span>
       </div>
@@ -234,7 +233,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
               </div>
 
               {isActive && !isReady && (
-                <div style={{ 
+                <div style={{
                   margin: '12px 0 20px',
                   padding: '12px',
                   background: 'rgba(151,19,69,0.03)',
