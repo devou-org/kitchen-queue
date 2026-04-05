@@ -96,7 +96,9 @@ export default function AdminOrders() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Order status updated to ${newStatus}`);
+        // Success feedback handled by Pusher event to avoid duplicates
+        // Update local state instantly for UI responsiveness
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'] } : o));
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
       } else {
         toast.error(data.error || 'Failed to update');
@@ -108,30 +110,8 @@ export default function AdminOrders() {
     }
   };
 
-  const handlePaidToggle = async (id: string, isPaid: boolean) => {
-    setModalLoading(true);
-    try {
-      const res = await fetch(`/api/orders/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_paid: isPaid })
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(isPaid ? 'Marked as Paid' : 'Marked as Unpaid');
-        setSelectedOrder(prev => prev ? { ...prev, is_paid: isPaid } : null);
-      } else {
-        toast.error(data.error || 'Failed to update payment');
-      }
-    } catch {
-      toast.error('Network error');
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
   const activeStatuses = ['PENDING', 'READY'];
-  const allStatuses = ['PENDING', 'READY', 'COMPLETED', 'CANCELLED'];
+  const allStatuses = ['PENDING', 'READY', 'PAID', 'CANCELLED'];
 
   const openOrderModal = (order: Order) => setSelectedOrder(order);
   const closeModal = () => setSelectedOrder(null);
@@ -262,17 +242,6 @@ export default function AdminOrders() {
             </div>
 
             <div style={{ background: '#F9FAFB', padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div><p style={{ fontWeight: 700, fontSize: '14px' }}>Payment Status</p></div>
-                <button
-                  className="btn btn-sm"
-                  disabled={modalLoading}
-                  onClick={() => handlePaidToggle(selectedOrder.id, !selectedOrder.is_paid)}
-                  style={{ background: selectedOrder.is_paid ? 'rgba(5,150,105,0.1)' : 'var(--primary)', color: selectedOrder.is_paid ? '#059669' : 'white', border: selectedOrder.is_paid ? '1.5px solid #059669' : 'none', minWidth: '120px' }}
-                >
-                  {selectedOrder.is_paid ? '✓ Paid' : '💰 Mark as Paid'}
-                </button>
-              </div>
               <div>
                 <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Order Status</p>
                 <select className="select" style={{ width: '100%' }} value={selectedOrder.status} disabled={modalLoading} onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}>

@@ -53,6 +53,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
       order = await updateOrderStatus(id, status);
 
+      // ✅ AUTO-MARK AS PAID: If status is 'PAID', ensure is_paid is true
+      if (status === 'PAID') {
+        order = await setOrderPaymentStatus(id, true);
+        console.log(`💰 Auto-marked Order #${existing.ticket_number} as PAID due to status change.`);
+      }
+
       console.log(`✅ Status updated: Order #${existing.ticket_number} → ${status}`);
 
       // 🔔 BROADCAST STATUS CHANGE TO ALL CLIENTS
@@ -62,6 +68,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: status,
+          is_paid: status === 'PAID' ? true : existing.is_paid,
           timestamp: new Date().toISOString(),
         });
         console.log(`📤 Pusher event sent: order_update for ticket #${existing.ticket_number}`);

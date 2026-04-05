@@ -16,12 +16,14 @@ type QueueState = {
 const STAGES = [
   { key: 'PENDING', label: 'CHECK-IN', icon: '✓' },
   { key: 'READY', label: 'READY', icon: '🍽️' },
+  { key: 'PAID', label: 'PAID', icon: '💰' },
 ];
 
 function getStageIndex(status: string) {
   if (status === 'PENDING') return 0;
   if (status === 'READY') return 1;
-  return -1; // completed or cancelled
+  if (status === 'PAID') return 2;
+  return -1; // cancelled
 }
 
 export default function OrderStatusTicketPage({ params }: { params: Promise<{ ticket: string }> }) {
@@ -32,21 +34,31 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
 
+  const orderRef = useRef<Order | null>(null);
+  useEffect(() => { orderRef.current = order; }, [order]);
+
   useEffect(() => {
     const fetchOrder = async (silent = false) => {
       try {
-        // Cache-buster added
-        const res = await fetch(`/api/orders/ticket/${ticket}?t=${Date.now()}`);
+        // Cache-buster and no-store added for guaranteed fresh data
+        const res = await fetch(`/api/orders/ticket/${ticket}?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         const data = await res.json();
 
         if (data.success && data.data) {
           setOrder(data.data);
+          if (!silent) console.log('✅ Order fetched:', data.data.status);
         } else if (!silent) {
           setError(data.error || 'Order not found');
           setOrder(null);
         }
       } catch (err) {
-        console.error('Failed to fetch order:', err);
+        console.error('❌ Failed to fetch order:', err);
         if (!silent) setError('Failed to load order');
       } finally {
         if (!silent) setLoading(false);
@@ -62,27 +74,60 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
     // ✅ CONNECTION STATUS
     channel.bind('pusher:subscription_succeeded', () => {
       setIsLive(true);
+      console.log('📡 Pusher: Subscribed to queue-channel');
     });
 
     channel.bind('pusher:subscription_error', () => {
       setIsLive(false);
+      console.error('📡 Pusher: Subscription error');
     });
 
     // ✅ RE-FETCH ON ANY EVENT THAT AFFECTS QUEUE
     channel.bind('order_update', (data: any) => {
-      console.log('✅ Ticket Page received order_update:', data);
+      console.log('🔔 Ticket Page received order_update:', data);
+      
+      const currentTicketInt = parseInt(ticket);
+      const currentOrder = orderRef.current;
+      const isOurOrder = data.ticket_number === currentTicketInt || (currentOrder?.id && data.order_id === currentOrder.id);
+
+      if (isOurOrder) {
+        console.log('✨ This update is for US! Patching state...');
+        
+        // 📢 NOTIFICATION SOUND: When status becomes READY
+        if (data.new_status === 'READY' && currentOrder?.status !== 'READY') {
+          try {
+            // Use a built-in browser sound or a high-quality notification sound URL
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.play().catch(() => {
+              console.log('Audio autoplay blocked. User must interact first.');
+            });
+          } catch (err) {
+            console.error('Failed to play sound:', err);
+          }
+        }
+
+        setOrder(prev => {
+          if (!prev) return null;
+          const updated = { ...prev };
+          if (data.new_status) updated.status = data.new_status;
+          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
+          return updated;
+        });
+      }
+
       // We re-fetch for ANY update to ensure position is correct
-      // (Someone leaving queue, or our own order getting ready)
       fetchOrder(true);
     });
 
     channel.bind('new_order', () => {
+      console.log('🔔 Ticket Page received new_order');
       fetchOrder(true);
     });
 
     return () => {
+      console.log('🚿 Cleaning up Pusher subscription');
       channel.unbind_all();
-      channel.unsubscribe();
+      if (pusherClient) pusherClient.unsubscribe('queue-channel');
     };
   }, [ticket]);
 
@@ -308,7 +353,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '4px', color: 'var(--text-secondary)' }}>
               <span>Status</span>
-              <span style={{ fontWeight: 700, color: order.status === 'COMPLETED' ? 'var(--success)' : 'var(--primary)' }}>{order.status}</span>
+              <span style={{ fontWeight: 700, color: order.status === 'PAID' ? 'var(--success)' : 'var(--primary)' }}>{order.status}</span>
             </div>
           </div>
         </div>

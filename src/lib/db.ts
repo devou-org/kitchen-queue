@@ -124,15 +124,15 @@ export async function getOrders(filters: {
     `;
   }
   
-  if (filters.status_in) {
-    const statuses = filters.status_in.split(',');
-    return await sql`
-      SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-      FROM orders o
-      WHERE o.status = ANY(${statuses})
-      ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
-    `;
-  }
+    if (filters.status_in) {
+      const statuses = filters.status_in.split(',');
+      return await sql`
+        SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        FROM orders o
+        WHERE o.status = ANY(${statuses})
+        ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+      `;
+    }
   
   return await sql`
     SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
@@ -167,7 +167,7 @@ export async function getOrderByTicket(ticket_number: number) {
     WITH active_ranks AS (
        SELECT id, ROW_NUMBER() OVER (ORDER BY ticket_number ASC)::integer as pos
        FROM orders
-       WHERE UPPER(status) IN ('PENDING', 'READY')
+       WHERE UPPER(status) = 'PENDING'
     )
     SELECT o.*, 
       COALESCE(ar.pos, 0) as queue_position,
@@ -196,7 +196,7 @@ export async function getOrdersByPhone(phone: string) {
     WITH active_ranks AS (
        SELECT id, ROW_NUMBER() OVER (ORDER BY ticket_number ASC)::integer as pos
        FROM orders
-       WHERE UPPER(status) IN ('PENDING', 'READY')
+       WHERE UPPER(status) = 'PENDING'
     )
     SELECT o.*, 
       COALESCE(ar.pos, 0) as queue_position,

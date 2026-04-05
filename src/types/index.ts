@@ -3,7 +3,7 @@
 // ============================================
 
 export type ProductStatus = 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK';
-export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+export type OrderStatus = 'PENDING' | 'READY' | 'PAID' | 'CANCELLED';
 
 export interface User {
   id: string;

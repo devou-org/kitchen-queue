@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
+import { pusherClient } from '@/lib/pusher-client';
 
 export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -44,6 +45,44 @@ export default function AdminStatements() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, statusFilter, page]);
 
+  useEffect(() => {
+    if (!pusherClient) return;
+    const channel = pusherClient.subscribe('queue-channel');
+
+    channel.bind('order_update', (data: any) => {
+      // Sync local list if the updated order exists here
+      setOrders(prev => prev.map(o => {
+        if (o.id === data.order_id) {
+          const updated = { ...o };
+          if (data.new_status) updated.status = data.new_status;
+          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
+          return updated;
+        }
+        return o;
+      }));
+
+      // Sync modal if open
+      if (selectedOrder?.id === data.order_id) {
+        setSelectedOrder(prev => {
+          if (!prev) return null;
+          const updated = { ...prev };
+          if (data.new_status) updated.status = data.new_status;
+          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
+          return updated;
+        });
+      }
+
+      if (data.new_status) {
+        toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
+      }
+    });
+
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
+    };
+  }, [selectedOrder?.id]);
+
   const exportCSV = () => {
     if (orders.length === 0) {
       toast.error('No data to export');
@@ -82,34 +121,12 @@ export default function AdminStatements() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Order status updated to ${newStatus}`);
+        // Success feedback handled by fetchOrders(true) or Pusher if we add one here
+        // Update the order in the list accurately
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'] } : o));
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
-        fetchOrders(true); // Sync with background list
       } else {
         toast.error(data.error || 'Failed to update');
-      }
-    } catch {
-      toast.error('Network error');
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  const handlePaidToggle = async (id: string, isPaid: boolean) => {
-    setModalLoading(true);
-    try {
-      const res = await fetch(`/api/orders/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_paid: isPaid })
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(isPaid ? 'Marked as Paid' : 'Marked as Unpaid');
-        setSelectedOrder(prev => prev ? { ...prev, is_paid: isPaid } : null);
-        fetchOrders(true); // Sync with background list
-      } else {
-        toast.error(data.error || 'Failed to update payment');
       }
     } catch {
       toast.error('Network error');
@@ -127,8 +144,8 @@ export default function AdminStatements() {
     .reduce((sum, o) => sum + Number(o.total_price), 0);
 
   const orderCount = orders.length;
-  const completedCount = orders.filter(o => o.status === 'COMPLETED').length;
-  const allStatuses = ['PENDING', 'READY', 'COMPLETED', 'CANCELLED'];
+  const paidCount = orders.filter(o => o.status === 'PAID').length;
+  const allStatuses = ['PENDING', 'READY', 'PAID', 'CANCELLED'];
 
   return (
     <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
@@ -156,8 +173,8 @@ export default function AdminStatements() {
         </div>
         <div className="card" style={{ padding: '24px', borderLeft: '4px solid #6366F1' }}>
           <p className="label" style={{ marginBottom: '8px' }}>Fulfillment</p>
-          <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#6366F1' }}>{completedCount}</h2>
-          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Completed status</p>
+          <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#6366F1' }}>{paidCount}</h2>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Paid status</p>
         </div>
       </div>
 
@@ -276,17 +293,6 @@ export default function AdminStatements() {
             </div>
 
             <div style={{ background: '#F9FAFB', padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <p style={{ fontWeight: 700 }}>Payment Status</p>
-                <button
-                  className="btn btn-sm"
-                  disabled={modalLoading}
-                  onClick={() => handlePaidToggle(selectedOrder.id, !selectedOrder.is_paid)}
-                  style={{ background: selectedOrder.is_paid ? 'rgba(5,150,105,0.1)' : 'var(--primary)', color: selectedOrder.is_paid ? '#059669' : 'white', border: selectedOrder.is_paid ? '1.5px solid #059669' : 'none', minWidth: '120px' }}
-                >
-                  {selectedOrder.is_paid ? '✓ Paid' : '💰 Mark as Paid'}
-                </button>
-              </div>
               <div>
                 <p style={{ fontWeight: 700, marginBottom: '8px' }}>Update Status</p>
                 <select className="select" style={{ width: '100%' }} value={selectedOrder.status} disabled={modalLoading} onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}>

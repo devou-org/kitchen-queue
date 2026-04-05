@@ -5,7 +5,7 @@
 export const ORDER_STATUSES = {
   PENDING: 'PENDING',
   READY: 'READY',
-  COMPLETED: 'COMPLETED',
+  PAID: 'PAID',
   CANCELLED: 'CANCELLED',
 } as const;
 
@@ -16,9 +16,9 @@ export const PRODUCT_STATUSES = {
 } as const;
 
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
-  PENDING: ['READY', 'COMPLETED', 'CANCELLED'],
-  READY: ['COMPLETED', 'CANCELLED', 'PENDING'],
-  COMPLETED: ['PENDING'],
+  PENDING: ['READY', 'PAID', 'CANCELLED'],
+  READY: ['PAID', 'CANCELLED', 'PENDING'],
+  PAID: ['PENDING', 'CANCELLED'],
   CANCELLED: ['PENDING'],
 };
 
@@ -39,7 +39,7 @@ export const CURRENCY_SYMBOL = '₹';
 export const STATUS_COLORS: Record<string, string> = {
   PENDING: '#FFA500',
   READY: '#06A77D',
-  COMPLETED: '#6B7280',
+  PAID: '#6B7280',
   CANCELLED: '#C1272D',
   AVAILABLE: '#06A77D',
   LOW_STOCK: '#FFA500',
@@ -49,6 +49,6 @@ export const STATUS_COLORS: Record<string, string> = {
 export const STATUS_BG: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-800',
   READY: 'bg-green-100 text-green-800',
-  COMPLETED: 'bg-gray-100 text-gray-600',
+  PAID: 'bg-gray-100 text-gray-600',
   CANCELLED: 'bg-red-100 text-red-800',
 };
