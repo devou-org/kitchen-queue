@@ -16,16 +16,16 @@ export default function AdminOrders() {
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const qs = new URLSearchParams({ 
-        page: page.toString(), 
+      const qs = new URLSearchParams({
+        page: page.toString(),
         per_page: '100',
-        sort: 'ASC' 
+        sort: 'ASC'
       });
       if (statusFilter) {
         qs.append('status', statusFilter);
       } else {
-        // Strictly only show active queue items by default
-        qs.append('status_in', 'PENDING,READY');
+        // Strictly only show PENDING items by default as requested
+        qs.append('status_in', 'PENDING');
       }
 
       const ordersRes = await fetch(`/api/orders?${qs.toString()}`);
@@ -43,7 +43,7 @@ export default function AdminOrders() {
 
   useEffect(() => {
     fetchOrders();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, statusFilter]);
 
   useEffect(() => {
@@ -56,15 +56,28 @@ export default function AdminOrders() {
     });
 
     channel.bind('order_update', (data: any) => {
-      setOrders(prev => prev.map(o => {
-        if (o.id === data.order_id) {
-          const updated = { ...o };
-          if (data.new_status) updated.status = data.new_status;
-          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
-          return updated;
-        }
-        return o;
-      }));
+      // If order is updated to READY or PAID, it should be removed from the local state list if 
+      // we are in the default view (no status filter)
+      setOrders(prev => {
+        const isDefaultView = !statusFilter;
+        return prev.map(o => {
+          if (o.id === data.order_id) {
+            const updated = { ...o };
+            if (data.new_status) updated.status = data.new_status;
+            if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
+            return updated;
+          }
+          return o;
+        }).filter(o => {
+          if (isDefaultView) {
+            return o.status === 'PENDING';
+          }
+          if (statusFilter) {
+            return o.status === statusFilter;
+          }
+          return true;
+        });
+      });
 
       setSelectedOrder(prev => {
         if (prev && prev.id === data.order_id) {
@@ -77,14 +90,15 @@ export default function AdminOrders() {
       });
 
       if (data.new_status) toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
-      fetchOrders(true);
+      // Refresh after a small delay to ensure DB sync if needed, though local state is updated
+      setTimeout(() => fetchOrders(true), 500);
     });
 
     return () => {
       channel.unbind_all();
       channel.unsubscribe();
     };
-  }, []);
+  }, [statusFilter]); // Depend on statusFilter to correctly remove orders in pusher handler
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     setModalLoading(true);
@@ -98,8 +112,21 @@ export default function AdminOrders() {
       if (data.success) {
         // Success feedback handled by Pusher event to avoid duplicates
         // Update local state instantly for UI responsiveness
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'] } : o));
+        setOrders(prev => {
+          const isDefaultView = !statusFilter;
+          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'] } : o)
+            .filter(o => {
+              if (isDefaultView) return o.status === 'PENDING';
+              if (statusFilter) return o.status === statusFilter;
+              return true;
+            });
+        });
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
+
+        // If it was removed from view, close modal
+        if (!statusFilter && newStatus !== 'PENDING') {
+          setTimeout(closeModal, 500);
+        }
       } else {
         toast.error(data.error || 'Failed to update');
       }
@@ -110,7 +137,7 @@ export default function AdminOrders() {
     }
   };
 
-  const activeStatuses = ['PENDING', 'READY'];
+  const activeStatuses = ['READY', 'PAID', 'CANCELLED']; // Exclude PENDING as it's the default
   const allStatuses = ['PENDING', 'READY', 'PAID', 'CANCELLED'];
 
   const openOrderModal = (order: Order) => setSelectedOrder(order);
@@ -120,21 +147,21 @@ export default function AdminOrders() {
     <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Active Order Queue</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING and READY orders.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING orders. (READY orders are moved to pickup)</p>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Filter Active Status</label>
-              <select 
-                className="input" 
-                value={statusFilter} 
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Filter Status</label>
+              <select
+                className="input"
+                value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
                 style={{ height: '42px' }}
               >
-                <option value="">All Active Orders</option>
+                <option value="">PENDING</option>
                 {activeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>

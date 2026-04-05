@@ -24,7 +24,7 @@ export default function AdminLogin() {
       if (data.success) {
         localStorage.setItem('admin_token', data.token);
         toast.success('Welcome back, Admin!');
-        router.push('/admin/dashboard');
+        router.push('/admin/orders');
       } else {
         toast.error(data.error || 'Invalid credentials');
       }
