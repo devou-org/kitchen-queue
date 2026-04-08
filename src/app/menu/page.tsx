@@ -46,6 +46,20 @@ function ProductCard({ product, quantity, onUpdate }: {
       {/* Info */}
       <div style={{ padding: '12px' }}>
         <h3 style={{ fontWeight: 700, fontSize: '15px', marginBottom: '2px' }}>{product.name}</h3>
+        {product.description && (
+          <p style={{ 
+            fontSize: '11px', 
+            color: 'var(--text-secondary)', 
+            marginBottom: '6px',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            minHeight: '28px'
+          }}>
+            {product.description}
+          </p>
+        )}
         <p style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '15px', marginBottom: '10px' }}>
           {formatPrice(product.price)}
         </p>

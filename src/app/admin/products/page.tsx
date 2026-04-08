@@ -102,7 +102,12 @@ export default function AdminProducts() {
                           alt={p.name} 
                           style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} 
                         />
-                        <strong style={{ fontWeight: 600 }}>{p.name}</strong>
+                        <div>
+                          <strong style={{ fontWeight: 600, display: 'block' }}>{p.name}</strong>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.description}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td>{p.category}</td>

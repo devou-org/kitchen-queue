@@ -57,6 +57,7 @@ export async function updateProduct(id: string, data: Partial<{
   const rows = await sql`
     UPDATE products SET
       name = COALESCE(${data.name ?? null}, name),
+      description = COALESCE(${data.description ?? null}, description),
       price = COALESCE(${data.price ?? null}, price),
       image_url = COALESCE(${data.image_url ?? null}, image_url),
       stock_quantity = COALESCE(${data.stock_quantity ?? null}, stock_quantity),
@@ -441,6 +442,24 @@ export async function getDashboardStats() {
     current_queue_number: queueRows[0]?.current_queue_number || 1,
     peak_hour: '1-2 PM',
   };
+}
+
+// ============================================
+// CATEGORY QUERIES
+// ============================================
+
+export async function getCategories() {
+  const rows = await sql`SELECT * FROM categories ORDER BY name ASC`;
+  return rows;
+}
+
+export async function createCategory(name: string) {
+  const rows = await sql`
+    INSERT INTO categories (name) VALUES (${name})
+    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+    RETURNING *
+  `;
+  return rows[0];
 }
 
 // ============================================
