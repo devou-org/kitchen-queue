@@ -12,6 +12,7 @@ export default function AdminOrders() {
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [isLive, setIsLive] = useState(false);
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -19,7 +20,7 @@ export default function AdminOrders() {
       const qs = new URLSearchParams({
         page: page.toString(),
         per_page: '100',
-        sort: 'ASC'
+        sort: 'DESC'
       });
       if (statusFilter) {
         qs.append('status', statusFilter);
@@ -50,7 +51,11 @@ export default function AdminOrders() {
     if (!pusherClient) return;
     const channel = pusherClient.subscribe('queue-channel');
 
+    channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
+    channel.bind('pusher:subscription_error', () => setIsLive(false));
+
     channel.bind('new_order', (data: any) => {
+      console.log('🔔 New order received via Pusher:', data);
       toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
       fetchOrders(true);
     });
@@ -145,9 +150,21 @@ export default function AdminOrders() {
 
   return (
     <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Active Order Queue</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING orders. (READY orders are moved to pickup)</p>
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Active Order Queue</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING orders.</p>
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px',
+          background: isLive ? 'rgba(6,167,125,0.08)' : 'rgba(255,165,0,0.08)',
+          borderRadius: 'var(--radius-full)', border: `1px solid ${isLive ? 'rgba(6,167,125,0.1)' : 'rgba(255,165,0,0.1)'}`
+        }}>
+          <span className={isLive ? 'live-dot' : ''} style={{ background: isLive ? 'var(--success)' : 'var(--warning)', width: 8, height: 8 }} />
+          <span style={{ fontSize: '11px', fontWeight: 700, color: isLive ? 'var(--success)' : 'var(--warning)', textTransform: 'uppercase' }}>
+            {isLive ? 'Live Status Active' : 'Connecting Real-time...'}
+          </span>
+        </div>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

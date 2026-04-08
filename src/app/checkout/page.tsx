@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
@@ -17,6 +17,8 @@ export default function CheckoutPage() {
     party_size: '1',
     notes: '',
   });
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('cart');
@@ -33,6 +35,35 @@ export default function CheckoutPage() {
       }));
     }
   }, []);
+
+  // Autofill lookup when name changes
+  useEffect(() => {
+    if (form.customer_name.length < 3) return;
+    
+    // Don't lookup if phone is already semi-filled or changed manually in this session
+    // This is a bit tricky, but let's try a simple debounce lookup
+    if (lookupTimeoutRef.current) clearTimeout(lookupTimeoutRef.current);
+
+    lookupTimeoutRef.current = setTimeout(async () => {
+      if (!form.phone) { // Only lookup if phone is empty
+        setIsLookingUp(true);
+        try {
+          const res = await fetch(`/api/users/lookup?name=${encodeURIComponent(form.customer_name.trim())}`);
+          const data = await res.json();
+          if (data.success && data.data) {
+            setForm(f => ({ ...f, phone: data.data.phone }));
+            toast.success(`Welcome back, ${data.data.name}!`, { icon: '👋', duration: 2000 });
+          }
+        } catch (err) {
+          console.error('Lookup failed', err);
+        } finally {
+          setIsLookingUp(false);
+        }
+      }
+    }, 800);
+
+    return () => { if (lookupTimeoutRef.current) clearTimeout(lookupTimeoutRef.current); };
+  }, [form.customer_name]);
 
   const items = Array.from(cart.values());
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -74,6 +105,8 @@ export default function CheckoutPage() {
 
       const data = await res.json();
       if (data.success) {
+        // Update local storage user info
+        localStorage.setItem('user', JSON.stringify({ name: form.customer_name.trim(), phone: form.phone }));
         localStorage.removeItem('cart');
         toast.success('Order placed successfully! 🎉');
         router.push(`/order-status/${data.data.ticket_number}`);
@@ -128,7 +161,7 @@ export default function CheckoutPage() {
           <h3 style={{ fontWeight: 700, marginBottom: '18px', fontSize: '16px' }}>👤 Your Details</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label className="label">Full Name *</label>
+              <label className="label">Full Name * {isLookingUp && <span style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 400 }}>Searching...</span>}</label>
               <input
                 type="text"
                 className="input"
@@ -180,10 +213,11 @@ export default function CheckoutPage() {
 
       {/* Fixed Bottom */}
       <div style={{
-        position: 'fixed', bottom: 64, left: 0, right: 0,
+        position: 'fixed', bottom: 0, left: 0, right: 0,
         background: 'white', borderTop: '1px solid var(--border)',
-        padding: '16px',
+        padding: '16px', paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)',
         boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
+        zIndex: 100
       }}>
         <button
           className="btn btn-primary btn-lg"
@@ -199,7 +233,7 @@ export default function CheckoutPage() {
         </button>
       </div>
 
-      <BottomNav />
+      <div style={{ height: 140 }} />
     </div>
   );
 }

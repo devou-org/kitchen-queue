@@ -61,43 +61,32 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       console.log(`✅ Status updated: Order #${existing.ticket_number} → ${status}`);
 
-      // 🔔 BROADCAST STATUS CHANGE TO ALL CLIENTS
-      try {
-        await pusherServer.trigger('queue-channel', 'order_update', {
-          type: 'order_update',
-          order_id: id,
-          ticket_number: existing.ticket_number,
-          new_status: status,
-          is_paid: status === 'PAID' ? true : existing.is_paid,
-          timestamp: new Date().toISOString(),
-        });
-        console.log(`📤 Pusher event sent: order_update for ticket #${existing.ticket_number}`);
-      } catch (pushErr) {
-        console.error('❌ Pusher trigger failed (status update):', pushErr);
-        // Continue anyway - order was updated in DB
-      }
+      // 🔔 Send Pusher notification (non-blocking)
+      pusherServer.trigger('queue-channel', 'order_update', {
+        type: 'order_update',
+        order_id: id,
+        ticket_number: existing.ticket_number,
+        new_status: status,
+        is_paid: status === 'PAID' ? true : existing.is_paid,
+        timestamp: new Date().toISOString(),
+      }).catch(err => console.error('❌ Pusher status update failed:', err));
+      
+      console.log(`📤 Pusher event dispatched: order_update (#${existing.ticket_number})`);
     }
 
-    // ✅ UPDATE PAYMENT STATUS
     if (typeof is_paid === 'boolean') {
       order = await setOrderPaymentStatus(id, is_paid);
+      
+      // 🔔 Send Pusher notification (non-blocking)
+      pusherServer.trigger('queue-channel', 'order_update', {
+        type: 'payment_update',
+        order_id: id,
+        ticket_number: existing.ticket_number,
+        is_paid: is_paid,
+        timestamp: new Date().toISOString(),
+      }).catch(err => console.error('❌ Pusher payment update failed:', err));
 
-      console.log(`✅ Payment updated: Order #${existing.ticket_number} → is_paid: ${is_paid}`);
-
-      // 🔔 BROADCAST PAYMENT CHANGE
-      try {
-        await pusherServer.trigger('queue-channel', 'order_update', {
-          type: 'payment_update',
-          order_id: id,
-          ticket_number: existing.ticket_number,
-          is_paid: is_paid,
-          timestamp: new Date().toISOString(),
-        });
-        console.log(`📤 Pusher event sent: payment_update for ticket #${existing.ticket_number}`);
-      } catch (pushErr) {
-        console.error('❌ Pusher trigger failed (payment update):', pushErr);
-        // Continue anyway - order was updated in DB
-      }
+      console.log(`📤 Pusher event dispatched: payment_update (#${existing.ticket_number})`);
     }
 
     return NextResponse.json({ success: true, data: order, message: 'Order updated' });
