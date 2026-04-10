@@ -95,10 +95,15 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (data.success) {
-        // Store token in localStorage too
+        // Store in localStorage for client-side access
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        toast.success('Welcome to Renjz Kitchen!');
+
+        // Also set as a cookie so the Next.js middleware can see it on navigation
+        const maxAge = 30 * 24 * 60 * 60; // 30 days in seconds
+        document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+        toast.success('Welcome to Renjz Kitchen! 🎉');
         router.push('/menu');
       } else {
         toast.error(data.error || 'Invalid OTP');
