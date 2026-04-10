@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrders, createOrder } from '@/lib/db';
+import { getOrders, createOrder, createUser } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
 
@@ -65,6 +65,13 @@ export async function POST(request: NextRequest) {
       party_size: party_size || 1,
       items,
     });
+
+    // Persist the customer name back to the users table so checkout can auto-fill it next time
+    try {
+      await createUser(phone, customer_name.trim());
+    } catch {
+      // Non-critical — don't fail the order if this upsert fails
+    }
 
     try {
       const sseData = {

@@ -23,14 +23,34 @@ export default function CheckoutPage() {
     if (saved) {
       try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch {}
     }
+
     const user = localStorage.getItem('user');
+    const token = localStorage.getItem('auth_token');
+
     if (user) {
       const u = JSON.parse(user);
-      setForm(f => ({
-        ...f,
-        phone: u.phone || '',
-        customer_name: u.name || '',
-      }));
+      const localName = u.name || '';
+      const localPhone = u.phone || '';
+
+      // Set whatever we have from localStorage immediately
+      setForm(f => ({ ...f, phone: localPhone, customer_name: localName }));
+
+      // If we have a token but no stored name, fetch it from DB
+      if (token && !localName && localPhone) {
+        fetch('/api/users/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success && data.user?.name) {
+              setForm(f => ({ ...f, customer_name: data.user.name }));
+              // Update localStorage so next load is instant
+              const updated = { ...u, name: data.user.name };
+              localStorage.setItem('user', JSON.stringify(updated));
+            }
+          })
+          .catch(() => {}); // silently ignore
+      }
     }
   }, []);
 
@@ -74,6 +94,15 @@ export default function CheckoutPage() {
 
       const data = await res.json();
       if (data.success) {
+        // Persist name to localStorage so checkout auto-fills it next time
+        const existing = localStorage.getItem('user');
+        if (existing) {
+          try {
+            const u = JSON.parse(existing);
+            localStorage.setItem('user', JSON.stringify({ ...u, name: form.customer_name.trim() }));
+          } catch {}
+        }
+
         localStorage.removeItem('cart');
         toast.success('Order placed successfully! 🎉');
         router.push(`/order-status/${data.data.ticket_number}`);

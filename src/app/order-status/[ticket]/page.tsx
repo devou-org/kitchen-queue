@@ -186,8 +186,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const displayPosition = position || 1;
 
   const getNearlyText = () => {
-    if (isReady) return '🎉 Ready!';
-    return '👨‍🍳 Processing your order...';
+    if (isReady) return '🎉 Ready to get in!';
+    return '👨‍🍳 Being prepared...';
   };
 
   return (
@@ -265,14 +265,19 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
               {isReady && (
                 <div style={{
-                  background: 'rgba(6,167,125,0.1)',
-                  border: '1px solid rgba(6,167,125,0.2)',
+                  background: 'linear-gradient(135deg, rgba(6,167,125,0.12), rgba(6,167,125,0.06))',
+                  border: '1px solid rgba(6,167,125,0.25)',
                   borderRadius: '14px',
                   padding: '16px',
-                  fontSize: '20px', fontWeight: 900, color: 'var(--success)',
-                  textTransform: 'uppercase'
+                  textAlign: 'center',
+                  animation: 'pulse 2s infinite',
                 }}>
-                  READY FOR PICKUP
+                  <p style={{ fontSize: '22px', fontWeight: 900, color: 'var(--success)', letterSpacing: '0.02em' }}>
+                    🎉 READY TO GET IN!
+                  </p>
+                  <p style={{ fontSize: '13px', color: 'var(--success)', opacity: 0.8, marginTop: '6px', fontWeight: 600 }}>
+                    Please head to the counter now
+                  </p>
                 </div>
               )}
             </div>

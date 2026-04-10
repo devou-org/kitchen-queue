@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
@@ -13,7 +13,7 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
 
-  const fetchOrders = async (silent = false) => {
+  const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const qs = new URLSearchParams({
@@ -39,12 +39,11 @@ export default function AdminOrders() {
     } finally {
       if (!silent) setLoading(false);
     }
-  };
+  }, [page, statusFilter]);
 
   useEffect(() => {
     fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, statusFilter]);
+  }, [fetchOrders]);
 
   useEffect(() => {
     if (!pusherClient) return;
@@ -56,8 +55,6 @@ export default function AdminOrders() {
     });
 
     channel.bind('order_update', (data: any) => {
-      // If order is updated to READY or PAID, it should be removed from the local state list if 
-      // we are in the default view (no status filter)
       setOrders(prev => {
         const isDefaultView = !statusFilter;
         return prev.map(o => {
@@ -69,12 +66,8 @@ export default function AdminOrders() {
           }
           return o;
         }).filter(o => {
-          if (isDefaultView) {
-            return o.status === 'PENDING';
-          }
-          if (statusFilter) {
-            return o.status === statusFilter;
-          }
+          if (isDefaultView) return o.status === 'PENDING';
+          if (statusFilter) return o.status === statusFilter;
           return true;
         });
       });
@@ -90,7 +83,6 @@ export default function AdminOrders() {
       });
 
       if (data.new_status) toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
-      // Refresh after a small delay to ensure DB sync if needed, though local state is updated
       setTimeout(() => fetchOrders(true), 500);
     });
 
@@ -98,7 +90,7 @@ export default function AdminOrders() {
       channel.unbind_all();
       channel.unsubscribe();
     };
-  }, [statusFilter]); // Depend on statusFilter to correctly remove orders in pusher handler
+  }, [fetchOrders, statusFilter]); // fetchOrders is stable via useCallback — no stale closure
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     setModalLoading(true);

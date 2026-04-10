@@ -228,61 +228,88 @@ export async function createOrder(data: {
   party_size?: number;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
 }) {
-  // 1. Check stock for all items first
+  const productIds = data.items.map((i) => i.product_id);
+  const quantities  = data.items.map((i) => i.quantity);
+
+  // 1. Batch-validate stock for all items in a single query
+  const stockRows = await sql`
+    SELECT id, name, stock_quantity
+    FROM products
+    WHERE id = ANY(${productIds})
+  `;
+
+  if (stockRows.length !== data.items.length) {
+    throw new Error('One or more products not found.');
+  }
+
+  const stockMap = new Map(stockRows.map((r) => [r.id, r]));
   for (const item of data.items) {
-    const product = await getProductById(item.product_id);
-    if (!product) {
-      throw new Error(`Product not found`);
-    }
+    const product = stockMap.get(item.product_id);
+    if (!product) throw new Error('Product not found.');
     if (product.stock_quantity < item.quantity) {
-      throw new Error(`Insufficient stock for ${product.name}. Only ${product.stock_quantity} remaining.`);
+      throw new Error(
+        `Insufficient stock for ${product.name}. Only ${product.stock_quantity} remaining.`
+      );
     }
   }
 
-  // 2. Create the order
+  // 2. Create the order header
   const orderRows = await sql`
     INSERT INTO orders (customer_name, phone, total_price, status, is_paid, notes, party_size)
-    VALUES (${data.customer_name}, ${data.phone}, ${data.total_price}, 'PENDING', false, ${data.notes || null}, ${data.party_size || 1})
+    VALUES (
+      ${data.customer_name}, ${data.phone}, ${data.total_price},
+      'PENDING', false, ${data.notes || null}, ${data.party_size || 1}
+    )
     RETURNING *
   `;
   const order = orderRows[0];
 
-  for (const item of data.items) {
-    await sql`
-      INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
-      VALUES (${order.id}, ${item.product_id}, ${item.quantity}, ${item.price_at_purchase})
-    `;
-    // Reduce stock
-    await sql`
-      UPDATE products 
-      SET stock_quantity = stock_quantity - ${item.quantity},
-          updated_at = NOW()
-      WHERE id = ${item.product_id}
-    `;
-    // Auto-update status
-    await sql`
-      UPDATE products 
-      SET status = CASE 
-        WHEN stock_quantity - ${item.quantity} <= 0 THEN 'OUT_OF_STOCK'
-        WHEN stock_quantity - ${item.quantity} <= buffer_quantity THEN 'LOW_STOCK'
+  // 3. Batch-insert all order_items in one round-trip via unnest
+  const prices = data.items.map((i) => i.price_at_purchase);
+  await sql`
+    INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
+    SELECT ${order.id}, pid, qty, price
+    FROM unnest(
+      ${productIds}::uuid[],
+      ${quantities}::int[],
+      ${prices}::numeric[]
+    ) AS t(pid, qty, price)
+  `;
+
+  // 4. Deduct stock and recalculate status in one batch UPDATE
+  //    Uses a VALUES list joined to products so a single pass handles all items.
+  await sql`
+    UPDATE products p
+    SET
+      stock_quantity = p.stock_quantity - v.qty,
+      status = CASE
+        WHEN p.stock_quantity - v.qty <= 0              THEN 'OUT_OF_STOCK'
+        WHEN p.stock_quantity - v.qty <= p.buffer_quantity THEN 'LOW_STOCK'
         ELSE 'AVAILABLE'
       END,
       updated_at = NOW()
-      WHERE id = ${item.product_id}
-    `;
-  }
+    FROM (
+      SELECT pid, qty
+      FROM unnest(
+        ${productIds}::uuid[],
+        ${quantities}::int[]
+      ) AS t(pid, qty)
+    ) AS v
+    WHERE p.id = v.pid
+  `;
 
   return await getOrderById(order.id);
 }
 
 export async function updateOrderStatus(id: string, status: string) {
   const rows = await sql`
-    UPDATE orders 
-    SET status = ${status}, 
+    UPDATE orders
+    SET status    = ${status},
         updated_at = NOW()
-    WHERE id = ${id} 
-    RETURNING *
+    WHERE id = ${id}
+    RETURNING id, status, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at
   `;
+  if (!rows[0]) throw new Error(`Order ${id} not found.`);
   return rows[0];
 }
 
