@@ -49,10 +49,10 @@ export default function AdminLogin() {
             overflow: 'hidden',
             border: '2px solid white'
           }}>
-            <img 
-              src="/logo.jpeg" 
-              alt="Renjz Kitchen" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            <img
+              src="/logo.jpeg"
+              alt="Renjz Kitchen"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
           <h2 style={{ fontSize: '24px', fontWeight: 900 }}>Renjz Admin</h2>
@@ -62,19 +62,19 @@ export default function AdminLogin() {
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <label className="label">Email Address</label>
-            <input 
-              type="email" 
-              className="input" 
+            <input
+              type="email"
+              className="input"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="admin@renjzkitchen.com"
+              placeholder="Your Email"
             />
           </div>
           <div>
             <label className="label">Password</label>
-            <input 
-              type="password" 
-              className="input" 
+            <input
+              type="password"
+              className="input"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
