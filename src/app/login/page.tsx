@@ -252,7 +252,6 @@ export default function LoginPage() {
                   ref={(el) => { otpRefs.current[i] = el; }}
                   type="text"
                   inputMode="numeric"
-                  maxLength={1}
                   autoComplete="one-time-code"
                   className="otp-input"
                   value={digit}
