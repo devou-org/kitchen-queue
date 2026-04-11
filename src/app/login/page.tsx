@@ -62,6 +62,23 @@ export default function LoginPage() {
   };
 
   const handleOTPChange = (index: number, value: string) => {
+    // Strip non-digits
+    const digits = value.replace(/\D/g, '');
+
+    // Handle multi-digit input (Android keyboard or browser autofill)
+    if (digits.length > 1) {
+      const newOtp = [...otp];
+      digits.split('').slice(0, 6 - index).forEach((d, i) => {
+        newOtp[index + i] = d;
+      });
+      setOtp(newOtp);
+      const lastFill = Math.min(index + digits.length - 1, 5);
+      otpRefs.current[lastFill]?.focus();
+      if (newOtp.every(d => d !== '')) handleVerify(newOtp.join(''));
+      return;
+    }
+
+    // Single digit — normal flow
     if (!/^\d?$/.test(value)) return;
     const newOtp = [...otp];
     newOtp[index] = value;
@@ -71,6 +88,22 @@ export default function LoginPage() {
     }
     if (newOtp.every(d => d !== '')) {
       handleVerify(newOtp.join(''));
+    }
+  };
+
+  const handleOTPPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+    const newOtp = [...otp];
+    pasted.split('').forEach((digit, i) => { newOtp[i] = digit; });
+    setOtp(newOtp);
+    // Focus last filled box
+    const lastIndex = Math.min(pasted.length - 1, 5);
+    otpRefs.current[lastIndex]?.focus();
+    // Auto-verify if full OTP pasted
+    if (pasted.length === 6) {
+      handleVerify(pasted);
     }
   };
 
@@ -220,10 +253,12 @@ export default function LoginPage() {
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
+                  autoComplete="one-time-code"
                   className="otp-input"
                   value={digit}
                   onChange={(e) => handleOTPChange(i, e.target.value)}
                   onKeyDown={(e) => handleOTPKeyDown(i, e)}
+                  onPaste={handleOTPPaste}
                   disabled={step === 'phone'}
                   style={{
                     opacity: step === 'phone' ? 0.4 : 1,
