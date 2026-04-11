@@ -25,17 +25,6 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
-        <footer className="devou-footer">
-          <span>Crafted with ♥ by</span>
-          <a
-            href="https://devou.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Visit Devou website"
-          >
-            Devou
-          </a>
-        </footer>
         <Toaster
           position="top-right"
           toastOptions={{

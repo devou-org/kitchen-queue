@@ -586,7 +586,7 @@ tr:hover td {
 /* ===================== CART BADGE ===================== */
 .cart-btn {
   position: fixed;
-  bottom: 80px;
+  bottom: 160px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--primary);

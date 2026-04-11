@@ -89,7 +89,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             );
           })}
         </nav>
-        <div style={{ position: 'absolute', bottom: 32, left: 20, right: 20 }}>
+        <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
           <button 
             className="btn btn-ghost" 
             style={{ width: '100%', color: 'rgba(255,255,255,0.7)', justifyContent: 'flex-start' }}
@@ -97,6 +97,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             Log Out →
           </button>
+          <div style={{
+            marginTop: '16px',
+            textAlign: 'center',
+            fontSize: '10px',
+            color: 'rgba(255,255,255,0.35)',
+            letterSpacing: '0.04em',
+            fontWeight: 500,
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+            paddingTop: '12px',
+          }}>
+            Crafted with ♥ by{' '}
+            <a
+              href="https://devou.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: 'rgba(255,255,255,0.65)',
+                fontWeight: 700,
+                textDecoration: 'none',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Devou
+            </a>
+          </div>
         </div>
       </aside>
 

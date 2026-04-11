@@ -256,7 +256,7 @@ export default function MenuPage() {
         </div>
 
         {/* Product Grid */}
-        <div style={{ padding: '0 16px 140px' }}>
+        <div style={{ padding: '0 16px 320px' }}>
           {loading ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {[1, 2, 3, 4].map(i => (
