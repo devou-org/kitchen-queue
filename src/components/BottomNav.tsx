@@ -8,9 +8,9 @@ export default function BottomNav() {
   const isActive = (path: string) => pathname === path;
 
   return (
-    <nav className="bottom-nav" style={{ flexDirection: 'column', height: 'auto', paddingBottom: '10px' }}>
+    <nav className="bottom-nav">
       {/* Nav Icons Row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%', paddingTop: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%' }}>
         <Link
           href="/order-status"
           className={`bottom-nav-item ${isActive('/order-status') ? 'active' : ''}`}
@@ -38,7 +38,7 @@ export default function BottomNav() {
       </div>
 
       {/* Devou Credit — below nav icons */}
-      <div style={{
+      {/* <div style={{
         width: '100%',
         textAlign: 'center',
         fontSize: '10px',
@@ -63,7 +63,7 @@ export default function BottomNav() {
         >
           Devou
         </a>
-      </div>
+      </div> */}
     </nav>
   );
 }

@@ -97,7 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             Log Out →
           </button>
-          <div style={{
+          {/* <div style={{
             marginTop: '16px',
             textAlign: 'center',
             fontSize: '10px',
@@ -121,7 +121,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               Devou
             </a>
-          </div>
+          </div> */}
         </div>
       </aside>
 
