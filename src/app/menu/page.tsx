@@ -27,11 +27,25 @@ function ProductCard({ product, quantity, onUpdate }: {
       transition: 'transform 0.2s ease, box-shadow 0.2s ease',
     }}>
       {/* Image */}
-      <div style={{ position: 'relative', height: '140px', overflow: 'hidden' }}>
+      <div style={{
+        position: 'relative',
+        height: '165px',
+        background: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '14px 8px 6px 8px',
+      }}>
         <img
           src={product.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
           alt={product.name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          style={{
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center',
+            display: 'block',
+          }}
           onError={(e) => {
             (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
           }}
@@ -47,9 +61,9 @@ function ProductCard({ product, quantity, onUpdate }: {
       <div style={{ padding: '12px' }}>
         <h3 style={{ fontWeight: 700, fontSize: '15px', marginBottom: '2px' }}>{product.name}</h3>
         {product.description && (
-          <p style={{ 
-            fontSize: '11px', 
-            color: 'var(--text-secondary)', 
+          <p style={{
+            fontSize: '11px',
+            color: 'var(--text-secondary)',
             marginBottom: '6px',
             display: '-webkit-box',
             WebkitLineClamp: 2,
@@ -103,7 +117,7 @@ export default function MenuPage() {
       try {
         const parsed = JSON.parse(saved);
         setCart(new Map(Object.entries(parsed)));
-      } catch {}
+      } catch { }
     }
   }, []);
 
@@ -139,7 +153,7 @@ export default function MenuPage() {
   useEffect(() => {
     if (!pusherClient) return;
     const channel = pusherClient.subscribe('queue-channel');
-    
+
     channel.bind('product_update', (data: any) => {
       setProducts(prev => prev.map(p =>
         p.id === data.product_id ? { ...p, status: data.product_status } : p
@@ -187,16 +201,16 @@ export default function MenuPage() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {/* Header */}
-  <div className="page-header">
-    <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-      <img 
-        src="/logo.jpeg" 
-        alt="Renjz Kitchen" 
-        style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} 
-      />
-      <span style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text-primary)' }}>Renjz Kitchen</span>
-    </Link>
-  </div>
+      <div className="page-header">
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+          <img
+            src="/logo.jpeg"
+            alt="Renjz Kitchen"
+            style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }}
+          />
+          <span style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text-primary)' }}>Renjz Kitchen</span>
+        </Link>
+      </div>
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '0' }}>
         {/* Hero Section */}
@@ -245,7 +259,7 @@ export default function MenuPage() {
         <div style={{ padding: '0 16px 140px' }}>
           {loading ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {[1,2,3,4].map(i => (
+              {[1, 2, 3, 4].map(i => (
                 <div key={i} style={{ height: '220px', background: '#F3F4F6', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
               ))}
             </div>

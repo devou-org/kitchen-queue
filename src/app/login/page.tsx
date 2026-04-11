@@ -5,10 +5,7 @@ import toast from 'react-hot-toast';
 
 const COUNTRY_CODES = [
   { code: '+91', label: '🇮🇳 +91', country: 'India' },
-  { code: '+1', label: '🇺🇸 +1', country: 'USA' },
-  { code: '+44', label: '🇬🇧 +44', country: 'UK' },
-  { code: '+971', label: '🇦🇪 +971', country: 'UAE' },
-  { code: '+65', label: '🇸🇬 +65', country: 'Singapore' },
+
 ];
 
 export default function LoginPage() {
@@ -125,7 +122,7 @@ export default function LoginPage() {
       padding: '20px',
     }}>
       <div style={{ width: '100%', maxWidth: '400px' }} className="animate-fade-in">
-        
+
         {/* Brand Header */}
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
           <div style={{
@@ -138,10 +135,10 @@ export default function LoginPage() {
             overflow: 'hidden',
             border: '2px solid white'
           }}>
-            <img 
-              src="/logo.jpeg" 
-              alt="Renjz Kitchen" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            <img
+              src="/logo.jpeg"
+              alt="Renjz Kitchen"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
           <h1 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '8px', letterSpacing: '-0.5px' }}>
@@ -154,7 +151,7 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="card" style={{ borderRadius: '20px', padding: '28px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
-          
+
           {/* Phone Step */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
@@ -259,13 +256,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Admin login link */}
-        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-          Are you an admin?{' '}
-          <a href="/admin/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-            Admin Login →
-          </a>
-        </p>
+
       </div>
     </div>
   );

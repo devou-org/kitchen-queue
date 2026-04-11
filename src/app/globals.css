@@ -709,3 +709,35 @@ tr:hover td {
     margin-left: 0;
   }
 }
+
+/* ===================== DEVOU FOOTER ===================== */
+.devou-footer {
+  width: 100%;
+  padding: 14px 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  font-weight: 500;
+  user-select: none;
+}
+
+.devou-footer a {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: 0.03em;
+  transition: opacity 0.15s ease;
+}
+
+.devou-footer a:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
