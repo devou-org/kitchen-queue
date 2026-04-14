@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateOTP, storeOTP, canSendOTP, sendOTPviaSMS } from '@/lib/auth';
-import { createUser } from '@/lib/db';
 import { validatePhone } from '@/lib/validators';
 
 export async function POST(request: NextRequest) {
@@ -29,14 +28,8 @@ export async function POST(request: NextRequest) {
 
     // Try sending SMS, if fails, log the OTP in dev mode
     const smsSent = await sendOTPviaSMS(phone, otp);
-    
-    if (!smsSent) {
-      // In development, log the OTP
-      console.log(`[DEV] OTP for ${phone}: ${otp}`);
-    }
 
-    // Also create/retrieve user
-    await createUser(phone);
+
 
     return NextResponse.json({
       success: true,

@@ -1,0 +1,46 @@
+[
+  {
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone"
+  },
+  {
+    "column_name": "ticket_number",
+    "data_type": "integer"
+  },
+  {
+    "column_name": "is_paid",
+    "data_type": "boolean"
+  },
+  {
+    "column_name": "party_size",
+    "data_type": "integer"
+  },
+  {
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone"
+  },
+  {
+    "column_name": "id",
+    "data_type": "uuid"
+  },
+  {
+    "column_name": "total_price",
+    "data_type": "numeric"
+  },
+  {
+    "column_name": "customer_name",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "phone",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "status",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "notes",
+    "data_type": "text"
+  }
+]

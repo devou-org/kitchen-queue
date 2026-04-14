@@ -37,7 +37,17 @@ export default function LoginPage() {
   const fullPhone = `${countryCode}${phone.replace(/\D/g, '')}`;
 
   const handleSendOTP = async () => {
-    if (!phone.trim()) return toast.error('Enter your phone number');
+    const cleaned = phone.replace(/\D/g, '');
+    if (!cleaned) return toast.error('Please enter your phone number');
+    
+    if (countryCode === '+91' && cleaned.length !== 10) {
+      return toast.error('Please enter a valid 10-digit phone number');
+    }
+    
+    if (cleaned.length < 7 || cleaned.length > 15) {
+      return toast.error('Please enter a valid phone number');
+    }
+
     setLoading(true);
     try {
       const res = await fetch('/api/auth/send-otp', {
@@ -130,7 +140,7 @@ export default function LoginPage() {
         localStorage.setItem('user', JSON.stringify(data.user));
 
         // Also set as a cookie so the Next.js middleware can see it on navigation
-        const maxAge = 30 * 24 * 60 * 60; // 30 days in seconds
+        const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds
         document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
         toast.success('Welcome to Renjz Kitchen! 🎉');
@@ -203,9 +213,9 @@ export default function LoginPage() {
                 <input
                   type="tel"
                   className="input"
-                  placeholder="000 000 0000"
+                  placeholder="9xxxxxxxxx"
                   value={phone}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPhone(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendOTP()}
                   style={{ flex: 1 }}
                 />

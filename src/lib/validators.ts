@@ -1,6 +1,15 @@
 export function validatePhone(phone: string): { valid: boolean; message?: string } {
-  const cleaned = phone.replace(/\s|-|\(|\)/g, '');
-  const regex = /^\+?[1-9]\d{1,14}$/;
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // If it starts with 91 and is 12 digits, it's likely a +91 number
+  if (phone.startsWith('+91') || (phone.startsWith('91') && phone.length === 12)) {
+    const localPart = phone.startsWith('+91') ? cleaned.slice(2) : cleaned.slice(2);
+    if (localPart.length !== 10) {
+      return { valid: false, message: 'Indian phone numbers must be 10 digits' };
+    }
+  }
+
+  const regex = /^\d{7,15}$/;
   if (!regex.test(cleaned)) {
     return { valid: false, message: 'Invalid phone number format' };
   }

@@ -58,11 +58,14 @@ export default function CheckoutPage() {
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const total = subtotal;
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!form.customer_name.trim() || form.customer_name.length < 2) {
       return toast.error('Please enter your name (min 2 characters)');
     }
-    if (!form.phone.trim()) return toast.error('Phone number is required');
+    const cleanedPhone = form.phone.replace(/\D/g, '');
+    if (!cleanedPhone) return toast.error('Phone number is required');
+    if (cleanedPhone.length < 10) return toast.error('Please enter a valid 10-digit phone number');
     if (!form.party_size || parseInt(form.party_size) < 1) {
       return toast.error('Please select number of persons');
     }
@@ -120,12 +123,12 @@ export default function CheckoutPage() {
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {/* Header */}
       <div className="page-header">
-        <button className="btn btn-ghost btn-sm" onClick={() => router.back()} style={{ minWidth: 'auto' }}>← Back</button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => router.back()} style={{ minWidth: 'auto' }}>← Back</button>
         <h1 style={{ fontWeight: 800, fontSize: '18px' }}>Checkout</h1>
         <div />
       </div>
 
-      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '16px', paddingBottom: '140px' }}>
+      <form onSubmit={handleSubmit} style={{ maxWidth: '480px', margin: '0 auto', padding: '16px', paddingBottom: '140px' }}>
         {/* Order Summary */}
         <div className="card" style={{ marginBottom: '16px' }}>
           <h3 style={{ fontWeight: 700, marginBottom: '14px', fontSize: '16px' }}>📋 Order Summary</h3>
@@ -165,6 +168,7 @@ export default function CheckoutPage() {
                 value={form.customer_name}
                 onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
                 maxLength={50}
+                required
               />
             </div>
             <div>
@@ -175,6 +179,7 @@ export default function CheckoutPage() {
                 placeholder="+91 9xxxxxxxxx"
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                required
               />
             </div>
             <div>
@@ -183,6 +188,7 @@ export default function CheckoutPage() {
                 className="select"
                 value={form.party_size}
                 onChange={e => setForm(f => ({ ...f, party_size: e.target.value }))}
+                required
               >
                 {[1,2,3,4,5,6,7,8,9,10].map(n => (
                   <option key={n} value={n}>{n} person{n > 1 ? 's' : ''}</option>
@@ -205,28 +211,29 @@ export default function CheckoutPage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Fixed Bottom */}
-      <div style={{
-        position: 'fixed', bottom: 64, left: 0, right: 0,
-        background: 'white', borderTop: '1px solid var(--border)',
-        padding: '16px',
-        boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
-      }}>
-        <button
-          className="btn btn-primary btn-lg"
-          style={{ width: '100%' }}
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Placing Order...</>
-          ) : (
-            <>🎉 Place Order – {formatPrice(total)}</>
-          )}
-        </button>
-      </div>
+        {/* Fixed Bottom */}
+        <div style={{
+          position: 'fixed', bottom: 64, left: 0, right: 0,
+          background: 'white', borderTop: '1px solid var(--border)',
+          padding: '16px',
+          boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
+          zIndex: 100,
+        }}>
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg"
+            style={{ width: '100%' }}
+            disabled={loading}
+          >
+            {loading ? (
+              <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Placing Order...</>
+            ) : (
+              <>🎉 Place Order – {formatPrice(total)}</>
+            )}
+          </button>
+        </div>
+      </form>
 
       <BottomNav />
     </div>

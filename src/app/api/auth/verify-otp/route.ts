@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       phone: user.phone,
       isAdmin: user.is_admin || false,
-    }, '30d');
+    }, '7d');
 
     const response = NextResponse.json({
       success: true,
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       httpOnly: false, // Set to false so client-side can check it or just rely on localStorage
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',
     });
 
