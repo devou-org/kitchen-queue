@@ -67,10 +67,10 @@ export default function AdminProducts() {
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
-          <input 
-            type="search" 
-            className="input" 
-            placeholder="Search products by name or category..." 
+          <input
+            type="search"
+            className="input"
+            placeholder="Search products by name or category..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ maxWidth: '400px' }}
@@ -79,7 +79,7 @@ export default function AdminProducts() {
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
           {loading ? (
-            <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader"/></div>
+            <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : (
             <table>
               <thead>
@@ -97,10 +97,10 @@ export default function AdminProducts() {
                   <tr key={p.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <img 
-                          src={p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'} 
-                          alt={p.name} 
-                          style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} 
+                        <img
+                          src={p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
+                          alt={p.name}
+                          style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }}
                         />
                         <div>
                           <strong style={{ fontWeight: 600, display: 'block' }}>{p.name}</strong>

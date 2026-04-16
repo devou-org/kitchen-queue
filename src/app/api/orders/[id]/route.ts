@@ -54,6 +54,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
       }
 
+      // ✅ STOCK RESTORATION: If transitioning TO 'CANCELLED' from anything else
+      if (status === 'CANCELLED' && existing.status !== 'CANCELLED') {
+        try {
+          // 1. Get database instance (import sql from lib/db) or use a helper
+          // Actually, let's use a helper in db.ts to keep this clean
+          const { restoreOrderStock } = await import('@/lib/db');
+          await restoreOrderStock(id);
+          console.log(`📦 Restored stock for Cancelled Order #${existing.ticket_number}`);
+        } catch (stockErr) {
+          console.error("❌ Failed to restore stock during cancellation:", stockErr);
+          // We don't fail the status update, but we log the error
+        }
+      }
+
       // Update in DB
       order = await updateOrderStatus(id, status || existing.status, table_number);
 

@@ -17,16 +17,19 @@ export default function AdminOrders() {
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
+      const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
       const qs = new URLSearchParams({
         page: page.toString(),
         per_page: '100',
-        sort: 'ASC'
+        sort: 'ASC',
+        date_from: today,
+        date_to: today
       });
       if (statusFilter) {
         qs.append('status', statusFilter);
       } else {
-        // Show PENDING and PREPARING items by default
-        qs.append('status_in', 'PENDING,PREPARING');
+        // Default to showing only PENDING items
+        qs.append('status', 'PENDING');
       }
 
       const ordersRes = await fetch(`/api/orders?${qs.toString()}`);
@@ -67,9 +70,8 @@ export default function AdminOrders() {
           }
           return o;
         }).filter(o => {
-          if (isDefaultView) return o.status === 'PENDING' || o.status === 'PREPARING';
           if (statusFilter) return o.status === statusFilter;
-          return true;
+          return o.status === 'PENDING';
         });
       });
 
@@ -99,9 +101,9 @@ export default function AdminOrders() {
       const res = await fetch(`/api/orders/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           status: newStatus,
-          table_number: tableNumber 
+          table_number: tableNumber
         })
       });
       const data = await res.json();
@@ -112,17 +114,14 @@ export default function AdminOrders() {
           const isDefaultView = !statusFilter;
           return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number } : o)
             .filter(o => {
-              if (isDefaultView) return o.status === 'PENDING' || o.status === 'PREPARING';
               if (statusFilter) return o.status === statusFilter;
-              return true;
+              return o.status === 'PENDING';
             });
         });
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number } : null);
 
-        // If it was removed from view, close modal
-        if (!statusFilter && newStatus !== 'PENDING' && newStatus !== 'PREPARING') {
-          setTimeout(closeModal, 500);
-        }
+        // Always close modal after successful update to streamline workflow
+        setTimeout(closeModal, 400);
       } else {
         toast.error(data.error || 'Failed to update');
       }
@@ -196,12 +195,12 @@ export default function AdminOrders() {
                       <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.phone}</div>
                       {order.table_number && (
-                        <div style={{ 
-                          fontSize: '11px', 
-                          color: 'white', 
-                          background: 'var(--primary)', 
-                          display: 'inline-block', 
-                          padding: '2px 6px', 
+                        <div style={{
+                          fontSize: '11px',
+                          color: 'white',
+                          background: 'var(--primary)',
+                          display: 'inline-block',
+                          padding: '2px 6px',
                           borderRadius: '4px',
                           marginTop: '4px',
                           fontWeight: 700
@@ -252,13 +251,13 @@ export default function AdminOrders() {
                   <h2 style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h2>
                   <span className={`badge badge-${selectedOrder.status.toLowerCase()}`}>{selectedOrder.status}</span>
                   {selectedOrder.table_number && (
-                    <span style={{ 
-                      fontSize: '12px', 
-                      fontWeight: 800, 
-                      color: 'white', 
-                      background: 'var(--primary)', 
-                      padding: '4px 8px', 
-                      borderRadius: 'var(--radius-sm)' 
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      color: 'white',
+                      background: 'var(--primary)',
+                      padding: '4px 8px',
+                      borderRadius: 'var(--radius-sm)'
                     }}>
                       🪑 TABLE {selectedOrder.table_number}
                     </span>
@@ -299,11 +298,11 @@ export default function AdminOrders() {
             <div style={{ background: '#F9FAFB', padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
               <div>
                 <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Order Status</p>
-                <select 
-                  className="select" 
-                  style={{ width: '100%' }} 
-                  value={selectedOrder.status} 
-                  disabled={modalLoading} 
+                <select
+                  className="select"
+                  style={{ width: '100%' }}
+                  value={selectedOrder.status}
+                  disabled={modalLoading}
                   onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value, tempTableNumber)}
                 >
                   {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
@@ -322,9 +321,12 @@ export default function AdminOrders() {
                       onChange={(e) => setTempTableNumber(e.target.value)}
                       style={{ flex: 1 }}
                     />
-                    <button 
+                    <button
                       className="btn btn-primary btn-sm"
-                      onClick={() => handleStatusChange(selectedOrder.id, selectedOrder.status, tempTableNumber)}
+                      onClick={() => {
+                        const nextStatus = selectedOrder.status === 'PENDING' ? 'PREPARING' : selectedOrder.status;
+                        handleStatusChange(selectedOrder.id, nextStatus, tempTableNumber);
+                      }}
                       disabled={modalLoading || !tempTableNumber}
                     >
                       Update Table

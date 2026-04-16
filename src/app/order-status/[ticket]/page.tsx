@@ -185,9 +185,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const displayPosition = position || 1;
 
   const getNearlyText = () => {
-    if (isReady) return '🎉 Ready to get in!';
-    if (order.status === 'PREPARING') return '👩‍🍳 Your order is being prepared!';
-    return '👨‍🍳 Waiting in queue...';
+    if (isReady) return '🎉 Your food is ready!';
+    if (order.status === 'PREPARING') return '🛋️ Seated & Preparing';
+    return '👋 Please see counter for table';
   };
 
   return (
@@ -207,7 +207,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
           color: isLive ? 'var(--success)' : 'var(--warning)',
           textTransform: 'uppercase',
         }}>
-          {isLive ? '● LIVE STATUS UPDATE' : '⚡ CONNECTING...'}
+          {isLive ? 'LIVE STATUS UPDATE' : '⚡ CONNECTING...'}
         </span>
       </div>
 
@@ -232,7 +232,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 #{String(order.ticket_number).padStart(3, '0')}
               </div>
 
-              {isActive && !isReady && (
+              {order.status === 'PENDING' && (
                 <div style={{
                   margin: '12px 0 20px',
                   padding: '12px',
@@ -241,7 +241,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                   border: '1px solid rgba(151,19,69,0.08)'
                 }}>
                   <p style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
-                    Current Position
+                    Queue Position
                   </p>
                   <div style={{ fontSize: '32px', fontWeight: 900, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '20px' }}>📍</span> {formatOrdinal(displayPosition)}
@@ -249,17 +249,34 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 </div>
               )}
 
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                background: isReady ? 'rgba(6,167,125,0.1)' : 'rgba(0,0,0,0.04)',
-                color: isReady ? 'var(--success)' : 'var(--text-primary)',
-                padding: '6px 16px', borderRadius: '999px',
-                fontSize: '13px', fontWeight: 700,
-                border: `1px solid ${isReady ? 'rgba(6,167,125,0.2)' : 'rgba(0,0,0,0.05)'}`,
-                marginBottom: '20px',
-              }}>
-                {isReady ? '✓' : '●'} {isReady ? 'Confirmed & Ready!' : (order.status === 'PREPARING' ? 'Now Preparing' : 'Confirmed & Active')}
-              </span>
+              {order.status === 'PENDING' && (
+                <div style={{
+                  marginBottom: '20px',
+                  padding: '14px',
+                  background: 'rgba(59,130,246,0.05)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(59,130,246,0.15)',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ fontSize: '14px', color: '#1E40AF', fontWeight: 600 }}>
+                    Please approach the counter to receive your table assignment. 🛎️
+                  </p>
+                </div>
+              )}
+
+              {order.status !== 'PENDING' && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  background: isReady ? 'rgba(6,167,125,0.1)' : 'rgba(37,99,235,0.1)',
+                  color: isReady ? 'var(--success)' : 'var(--primary)',
+                  padding: '6px 16px', borderRadius: '999px',
+                  fontSize: '13px', fontWeight: 700,
+                  border: `1px solid ${isReady ? 'rgba(6,167,125,0.2)' : 'rgba(37,99,235,0.2)'}`,
+                  marginBottom: '20px',
+                }}>
+                  {isReady ? '✓' : '●'} {isReady ? 'Order Ready!' : (order.status === 'PREPARING' ? 'Seated & Preparing' : 'Order Active')}
+                </span>
+              )}
 
               {order.table_number && (
                 <div style={{
@@ -280,8 +297,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 </div>
               )}
 
-
-
               {isReady && (
                 <div style={{
                   background: 'linear-gradient(135deg, rgba(6,167,125,0.12), rgba(6,167,125,0.06))',
@@ -292,10 +307,10 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                   animation: 'pulse 2s infinite',
                 }}>
                   <p style={{ fontSize: '22px', fontWeight: 900, color: 'var(--success)', letterSpacing: '0.02em' }}>
-                    🎉 READY TO GET IN!
+                    🎉 YOUR FOOD IS READY!
                   </p>
                   <p style={{ fontSize: '13px', color: 'var(--success)', opacity: 0.8, marginTop: '6px', fontWeight: 600 }}>
-                    Please head to the counter now
+                    Please enjoy your meal!
                   </p>
                 </div>
               )}

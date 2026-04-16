@@ -124,17 +124,17 @@ export async function getOrders(filters: {
       ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
     `;
   }
-  
-    if (filters.status_in) {
-      const statuses = filters.status_in.split(',');
-      return await sql`
+
+  if (filters.status_in) {
+    const statuses = filters.status_in.split(',');
+    return await sql`
         SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o
         WHERE o.status = ANY(${statuses})
         ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
       `;
-    }
-  
+  }
+
   return await sql`
     SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
     FROM orders o
@@ -229,7 +229,7 @@ export async function createOrder(data: {
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
 }) {
   const productIds = data.items.map((i) => i.product_id);
-  const quantities  = data.items.map((i) => i.quantity);
+  const quantities = data.items.map((i) => i.quantity);
 
   // 1. Batch-validate stock for all items in a single query
   const stockRows = await sql`
@@ -314,6 +314,25 @@ export async function updateOrderStatus(id: string, status: string, tableNumber?
   return rows[0];
 }
 
+export async function restoreOrderStock(orderId: string) {
+  // 1. Get items of the order
+  const items = await sql`
+    SELECT product_id, quantity FROM order_items WHERE order_id = ${orderId}
+  `;
+
+  if (items.length === 0) return;
+
+  // 2. Add quantities back to products
+  for (const item of items) {
+    await sql`
+      UPDATE products 
+      SET stock_quantity = stock_quantity + ${item.quantity},
+          updated_at = NOW()
+      WHERE id = ${item.product_id}
+    `;
+  }
+}
+
 export async function setOrderPaymentStatus(id: string, isPaid: boolean) {
   const rows = await sql`
     UPDATE orders SET is_paid = ${isPaid}, updated_at = NOW() WHERE id = ${id} RETURNING *
@@ -356,7 +375,7 @@ export async function advanceQueue() {
     WHERE id = 1
     RETURNING *
   `;
-  
+
   await sql`
     INSERT INTO queue_history (action, queue_number, details_json)
     VALUES ('ADVANCE', ${rows[0].current_queue_number}, '{"source": "admin"}')
