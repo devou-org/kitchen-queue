@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect, useRef, use } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
@@ -30,7 +29,6 @@ function getStageIndex(status: string) {
 }
 
 export default function OrderStatusTicketPage({ params }: { params: Promise<{ ticket: string }> }) {
-  const router = useRouter();
   const { ticket } = use(params);
   const [order, setOrder] = useState<Order | null>(null);
   const [queueState, setQueueState] = useState<QueueState | null>(null);
@@ -44,23 +42,14 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   useEffect(() => {
     const fetchOrder = async (silent = false) => {
       try {
-        const token = localStorage.getItem('auth_token');
-
         // Cache-buster and no-store added for guaranteed fresh data
         const res = await fetch(`/api/orders/ticket/${ticket}?t=${Date.now()}`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            'Pragma': 'no-cache'
           }
         });
-
-        if (res.status === 401 || res.status === 403) {
-          router.push(`/login?returnUrl=/order-status/${ticket}`);
-          return;
-        }
-
         const data = await res.json();
 
         if (data.success && data.data) {
@@ -270,7 +259,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                   textAlign: 'center'
                 }}>
                   <p style={{ fontSize: '14px', color: '#1E40AF', fontWeight: 600 }}>
-                    Please approach the counter to receive your table. 🛎️
+                    Please approach the counter to receive your table assignment. 🛎️
                   </p>
                 </div>
               )}

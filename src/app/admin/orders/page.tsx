@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
@@ -9,7 +10,9 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [readySearch, setReadySearch] = useState('');
   const [page, setPage] = useState(1);
+  const [mounted, setMounted] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [tempTableNumber, setTempTableNumber] = useState('');
@@ -48,6 +51,10 @@ export default function AdminOrders() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!pusherClient) return;
@@ -135,6 +142,20 @@ export default function AdminOrders() {
   const activeStatuses = ['PREPARING', 'READY', 'PAID', 'CANCELLED']; // Exclude PENDING as it's the default
   const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
 
+  const readySearchTerm = readySearch.trim().toLowerCase();
+  const displayedOrders = statusFilter === 'READY' && readySearchTerm
+    ? orders.filter(order => {
+      const ticket = String(order.ticket_number).padStart(3, '0').toLowerCase();
+      const customer = (order.customer_name || '').toLowerCase();
+      const phone = (order.phone || '').toLowerCase();
+      const table = (order.table_number || '').toLowerCase();
+      return ticket.includes(readySearchTerm)
+        || customer.includes(readySearchTerm)
+        || phone.includes(readySearchTerm)
+        || table.includes(readySearchTerm);
+    })
+    : orders;
+
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
     setTempTableNumber(order.table_number || '');
@@ -159,13 +180,30 @@ export default function AdminOrders() {
               <select
                 className="input"
                 value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setReadySearch('');
+                  setPage(1);
+                }}
                 style={{ height: '42px' }}
               >
                 <option value="">PENDING</option>
                 {activeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            {statusFilter === 'READY' && (
+              <div style={{ flex: 1, minWidth: '220px' }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Search Ready Orders</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Search ticket, customer, phone, table"
+                  value={readySearch}
+                  onChange={(e) => setReadySearch(e.target.value)}
+                  style={{ height: '42px' }}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -185,7 +223,7 @@ export default function AdminOrders() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map(order => (
+                {displayedOrders.map(order => (
                   <tr key={order.id} onClick={() => openOrderModal(order)} style={{ cursor: 'pointer' }}>
                     <td>
                       <strong style={{ color: 'var(--primary)', fontSize: '16px' }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
@@ -222,7 +260,7 @@ export default function AdminOrders() {
                     <td><button className="btn btn-ghost btn-sm" style={{ color: 'var(--primary)' }}>View →</button></td>
                   </tr>
                 ))}
-                {orders.length === 0 && (
+                {displayedOrders.length === 0 && (
                   <tr><td colSpan={6} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>No active orders found</td></tr>
                 )}
               </tbody>
@@ -231,7 +269,7 @@ export default function AdminOrders() {
         </div>
 
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{orders.length} orders found</span>
+          <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{displayedOrders.length} orders found</span>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Prev</button>
             <button className="btn btn-secondary btn-sm" disabled={orders.length < 100} onClick={() => setPage(p => p + 1)}>Next →</button>
@@ -239,7 +277,7 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {selectedOrder && (
+      {mounted && selectedOrder && createPortal(
         <div className="modal-backdrop" onClick={closeModal} style={{ alignItems: 'center' }}>
           <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -333,7 +371,8 @@ export default function AdminOrders() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
