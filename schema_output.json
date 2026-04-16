@@ -1,11 +1,15 @@
 [
   {
-    "column_name": "updated_at",
-    "data_type": "timestamp with time zone"
+    "column_name": "id",
+    "data_type": "uuid"
   },
   {
     "column_name": "ticket_number",
     "data_type": "integer"
+  },
+  {
+    "column_name": "total_price",
+    "data_type": "numeric"
   },
   {
     "column_name": "is_paid",
@@ -20,12 +24,8 @@
     "data_type": "timestamp with time zone"
   },
   {
-    "column_name": "id",
-    "data_type": "uuid"
-  },
-  {
-    "column_name": "total_price",
-    "data_type": "numeric"
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone"
   },
   {
     "column_name": "customer_name",
@@ -37,6 +37,10 @@
   },
   {
     "column_name": "status",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "table_number",
     "data_type": "character varying"
   },
   {

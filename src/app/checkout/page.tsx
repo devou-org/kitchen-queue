@@ -14,7 +14,7 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     customer_name: '',
     phone: '',
-    party_size: '1',
+    party_size: '',
     notes: '',
   });
 
@@ -190,8 +190,9 @@ export default function CheckoutPage() {
                 onChange={e => setForm(f => ({ ...f, party_size: e.target.value }))}
                 required
               >
+                <option value="" disabled>Select persons</option>
                 {[1,2,3,4,5,6,7,8,9,10].map(n => (
-                  <option key={n} value={n}>{n} person{n > 1 ? 's' : ''}</option>
+                  <option key={n} value={n}>{n} Party</option>
                 ))}
               </select>
             </div>

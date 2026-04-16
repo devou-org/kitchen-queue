@@ -179,7 +179,7 @@ export default function AdminOrders() {
                   <th>Ticket</th>
                   <th>Customer</th>
                   <th>Subtotal</th>
-                  <th>Paid</th>
+                  <th>Persons</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
@@ -212,13 +212,10 @@ export default function AdminOrders() {
                     <td style={{ fontWeight: 600 }}>{formatPrice(order.total_price)}</td>
                     <td>
                       <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '4px',
-                        fontSize: '12px', fontWeight: 700,
-                        color: order.is_paid ? '#059669' : 'var(--warning)',
-                        background: order.is_paid ? 'rgba(5,150,105,0.1)' : 'rgba(255,165,0,0.1)',
-                        padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                        fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)',
+                        background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '4px'
                       }}>
-                        {order.is_paid ? '✓ PAID' : '⏳ PENDING'}
+                        👤 {order.party_size || 1} Party
                       </span>
                     </td>
                     <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>
@@ -244,8 +241,8 @@ export default function AdminOrders() {
 
       {selectedOrder && (
         <div className="modal-backdrop" onClick={closeModal} style={{ alignItems: 'center' }}>
-          <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+          <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h2>
@@ -268,16 +265,16 @@ export default function AdminOrders() {
               <button onClick={closeModal} className="modal-close-btn">✕</button>
             </div>
 
-            <div className="card" style={{ background: '#F9FAFB', padding: '14px 16px', marginBottom: '20px', border: '1px solid var(--border)' }}>
+            <div className="card" style={{ background: '#F9FAFB', padding: '12px 16px', marginBottom: '16px', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div><p className="label">CUSTOMER</p><p style={{ fontWeight: 700 }}>{selectedOrder.customer_name}</p></div>
                 <div style={{ textAlign: 'right' }}><p className="label">PHONE</p><p style={{ fontWeight: 600 }}>{selectedOrder.phone}</p></div>
               </div>
-              {(selectedOrder.party_size || 1) > 1 && <p style={{ fontSize: '13px', color: 'var(--info)', fontWeight: 600 }}>👥 Party of {selectedOrder.party_size}</p>}
+              <p style={{ fontSize: '13px', color: 'var(--info)', fontWeight: 600 }}>👥 {selectedOrder.party_size || 1} Party</p>
               {selectedOrder.notes && <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', fontStyle: 'italic' }}>📝 {selectedOrder.notes}</p>}
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
               <p className="label">ORDER ITEMS</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {(selectedOrder.items || []).map((item, idx) => (
@@ -295,7 +292,7 @@ export default function AdminOrders() {
               </div>
             </div>
 
-            <div style={{ background: '#F9FAFB', padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ background: '#F9FAFB', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
               <div>
                 <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Order Status</p>
                 <select
