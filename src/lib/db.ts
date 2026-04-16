@@ -301,13 +301,14 @@ export async function createOrder(data: {
   return await getOrderById(order.id);
 }
 
-export async function updateOrderStatus(id: string, status: string) {
+export async function updateOrderStatus(id: string, status: string, tableNumber?: string) {
   const rows = await sql`
     UPDATE orders
     SET status    = ${status},
+        table_number = ${tableNumber || null},
         updated_at = NOW()
     WHERE id = ${id}
-    RETURNING id, status, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at
+    RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at
   `;
   if (!rows[0]) throw new Error(`Order ${id} not found.`);
   return rows[0];

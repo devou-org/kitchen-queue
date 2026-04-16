@@ -41,6 +41,7 @@ export async function GET() {
         total_price DECIMAL(10,2) NOT NULL,
         is_paid BOOLEAN DEFAULT FALSE,
         party_size INTEGER DEFAULT 1,
+        table_number VARCHAR(20),
         notes TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

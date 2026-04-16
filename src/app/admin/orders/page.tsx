@@ -12,6 +12,7 @@ export default function AdminOrders() {
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [tempTableNumber, setTempTableNumber] = useState('');
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -24,8 +25,8 @@ export default function AdminOrders() {
       if (statusFilter) {
         qs.append('status', statusFilter);
       } else {
-        // Strictly only show PENDING items by default as requested
-        qs.append('status_in', 'PENDING');
+        // Show PENDING and PREPARING items by default
+        qs.append('status_in', 'PENDING,PREPARING');
       }
 
       const ordersRes = await fetch(`/api/orders?${qs.toString()}`);
@@ -66,7 +67,7 @@ export default function AdminOrders() {
           }
           return o;
         }).filter(o => {
-          if (isDefaultView) return o.status === 'PENDING';
+          if (isDefaultView) return o.status === 'PENDING' || o.status === 'PREPARING';
           if (statusFilter) return o.status === statusFilter;
           return true;
         });
@@ -92,13 +93,16 @@ export default function AdminOrders() {
     };
   }, [fetchOrders, statusFilter]); // fetchOrders is stable via useCallback — no stale closure
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
+  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string) => {
     setModalLoading(true);
     try {
       const res = await fetch(`/api/orders/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ 
+          status: newStatus,
+          table_number: tableNumber 
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -106,17 +110,17 @@ export default function AdminOrders() {
         // Update local state instantly for UI responsiveness
         setOrders(prev => {
           const isDefaultView = !statusFilter;
-          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'] } : o)
+          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number } : o)
             .filter(o => {
-              if (isDefaultView) return o.status === 'PENDING';
+              if (isDefaultView) return o.status === 'PENDING' || o.status === 'PREPARING';
               if (statusFilter) return o.status === statusFilter;
               return true;
             });
         });
-        setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
+        setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number } : null);
 
         // If it was removed from view, close modal
-        if (!statusFilter && newStatus !== 'PENDING') {
+        if (!statusFilter && newStatus !== 'PENDING' && newStatus !== 'PREPARING') {
           setTimeout(closeModal, 500);
         }
       } else {
@@ -129,17 +133,23 @@ export default function AdminOrders() {
     }
   };
 
-  const activeStatuses = ['READY', 'PAID', 'CANCELLED']; // Exclude PENDING as it's the default
-  const allStatuses = ['PENDING', 'READY', 'PAID', 'CANCELLED'];
+  const activeStatuses = ['PREPARING', 'READY', 'PAID', 'CANCELLED']; // Exclude PENDING as it's the default
+  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
 
-  const openOrderModal = (order: Order) => setSelectedOrder(order);
-  const closeModal = () => setSelectedOrder(null);
+  const openOrderModal = (order: Order) => {
+    setSelectedOrder(order);
+    setTempTableNumber(order.table_number || '');
+  };
+  const closeModal = () => {
+    setSelectedOrder(null);
+    setTempTableNumber('');
+  };
 
   return (
     <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Active Order Queue</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING orders. (READY orders are moved to pickup)</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)</p>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -185,6 +195,20 @@ export default function AdminOrders() {
                     <td>
                       <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.phone}</div>
+                      {order.table_number && (
+                        <div style={{ 
+                          fontSize: '11px', 
+                          color: 'white', 
+                          background: 'var(--primary)', 
+                          display: 'inline-block', 
+                          padding: '2px 6px', 
+                          borderRadius: '4px',
+                          marginTop: '4px',
+                          fontWeight: 700
+                        }}>
+                          🪑 TABLE {order.table_number}
+                        </div>
+                      )}
                     </td>
                     <td style={{ fontWeight: 600 }}>{formatPrice(order.total_price)}</td>
                     <td>
@@ -227,6 +251,18 @@ export default function AdminOrders() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h2>
                   <span className={`badge badge-${selectedOrder.status.toLowerCase()}`}>{selectedOrder.status}</span>
+                  {selectedOrder.table_number && (
+                    <span style={{ 
+                      fontSize: '12px', 
+                      fontWeight: 800, 
+                      color: 'white', 
+                      background: 'var(--primary)', 
+                      padding: '4px 8px', 
+                      borderRadius: 'var(--radius-sm)' 
+                    }}>
+                      🪑 TABLE {selectedOrder.table_number}
+                    </span>
+                  )}
                 </div>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatDateTime(selectedOrder.created_at)}</p>
               </div>
@@ -263,10 +299,39 @@ export default function AdminOrders() {
             <div style={{ background: '#F9FAFB', padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
               <div>
                 <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Order Status</p>
-                <select className="select" style={{ width: '100%' }} value={selectedOrder.status} disabled={modalLoading} onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}>
+                <select 
+                  className="select" 
+                  style={{ width: '100%' }} 
+                  value={selectedOrder.status} 
+                  disabled={modalLoading} 
+                  onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value, tempTableNumber)}
+                >
                   {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+
+              {(selectedOrder.status === 'PREPARING' || selectedOrder.status === 'PENDING') && (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+                  <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Assign Table Number</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g. T-01, VIP-2"
+                      value={tempTableNumber}
+                      onChange={(e) => setTempTableNumber(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleStatusChange(selectedOrder.id, selectedOrder.status, tempTableNumber)}
+                      disabled={modalLoading || !tempTableNumber}
+                    >
+                      Update Table
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

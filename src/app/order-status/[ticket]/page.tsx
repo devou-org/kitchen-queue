@@ -15,14 +15,16 @@ type QueueState = {
 
 const STAGES = [
   { key: 'PENDING', label: 'CHECK-IN', icon: '✓' },
+  { key: 'PREPARING', label: 'PREPARING', icon: '👨‍🍳' },
   { key: 'READY', label: 'READY', icon: '🍽️' },
   { key: 'PAID', label: 'PAID', icon: '💰' },
 ];
 
 function getStageIndex(status: string) {
   if (status === 'PENDING') return 0;
-  if (status === 'READY') return 1;
-  if (status === 'PAID') return 2;
+  if (status === 'PREPARING') return 1;
+  if (status === 'READY') return 2;
+  if (status === 'PAID') return 3;
   return -1; // cancelled
 }
 
@@ -176,18 +178,16 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
   const stageIndex = getStageIndex(order.status);
   const isReady = order.status === 'READY';
-  const isActive = ['PENDING', 'READY'].includes(order.status);
+  const isActive = ['PENDING', 'PREPARING', 'READY'].includes(order.status);
 
   // Use the precise database rank if available. If it's not present (e.g. order is cancelled or done), we treat as 0.
   const position = typeof order.queue_position === 'number' ? order.queue_position : 0;
-
-  // The position variable is at least 1 thanks to the DB subquery (COUNT(*) + 1).
-  // If it's somehow 0, we show 1 as a safe default for active orders.
   const displayPosition = position || 1;
 
   const getNearlyText = () => {
     if (isReady) return '🎉 Ready to get in!';
-    return '👨‍🍳 Being prepared...';
+    if (order.status === 'PREPARING') return '👩‍🍳 Your order is being prepared!';
+    return '👨‍🍳 Waiting in queue...';
   };
 
   return (
@@ -258,8 +258,27 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 border: `1px solid ${isReady ? 'rgba(6,167,125,0.2)' : 'rgba(0,0,0,0.05)'}`,
                 marginBottom: '20px',
               }}>
-                {isReady ? '✓' : '●'} {isReady ? 'Confirmed & Ready!' : 'Confirmed & Active'}
+                {isReady ? '✓' : '●'} {isReady ? 'Confirmed & Ready!' : (order.status === 'PREPARING' ? 'Now Preparing' : 'Confirmed & Active')}
               </span>
+
+              {order.table_number && (
+                <div style={{
+                  marginBottom: '20px',
+                  padding: '16px',
+                  background: 'var(--primary)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  fontWeight: 800,
+                  fontSize: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 8px 16px rgba(151,19,69,0.2)'
+                }}>
+                  <span style={{ fontSize: '24px' }}>🪑</span> TABLE {order.table_number}
+                </div>
+              )}
 
 
 

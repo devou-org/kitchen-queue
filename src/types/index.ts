@@ -3,7 +3,7 @@
 // ============================================
 
 export type ProductStatus = 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK';
-export type OrderStatus = 'PENDING' | 'READY' | 'PAID' | 'CANCELLED';
+export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'PAID' | 'CANCELLED';
 
 export interface User {
   id: string;
@@ -49,6 +49,7 @@ export interface Order {
   is_paid: boolean;
   notes?: string;
   party_size?: number;
+  table_number?: string;
   created_at: string;
   completed_at: string | null;
   updated_at: string;
