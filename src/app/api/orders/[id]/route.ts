@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrderById, updateOrderStatus, setOrderPaymentStatus } from '@/lib/db';
+import { getOrderById, updateOrderStatus, setOrderPaymentStatus, updateOrderDetails } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { STATUS_TRANSITIONS } from '@/lib/constants';
 import { pusherServer } from '@/lib/pusher';
+import { validatePhone } from '@/lib/validators';
 
 async function requireAdmin(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
@@ -35,12 +36,78 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const { status, is_paid, table_number } = body;
+    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items } = body;
 
     const existing = await getOrderById(id);
     if (!existing) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
     let order = existing;
+
+    const shouldUpdateDetails =
+      typeof customer_name === 'string'
+      || typeof phone === 'string'
+      || typeof notes === 'string'
+      || notes === null
+      || typeof party_size === 'number'
+      || Array.isArray(items);
+
+    if (shouldUpdateDetails) {
+      const payload: {
+        customer_name?: string;
+        phone?: string;
+        notes?: string | null;
+        party_size?: number;
+        table_number?: string | null;
+        items?: { product_id: string; quantity: number }[];
+      } = {};
+
+      if (typeof customer_name === 'string') {
+        const nextName = customer_name.trim();
+        if (!nextName) {
+          return NextResponse.json({ success: false, error: 'Customer name cannot be empty' }, { status: 400 });
+        }
+        payload.customer_name = nextName;
+      }
+
+      if (typeof phone === 'string') {
+        const phoneValidation = validatePhone(phone);
+        if (!phoneValidation.valid) {
+          return NextResponse.json({ success: false, error: phoneValidation.message || 'Invalid phone number' }, { status: 400 });
+        }
+        payload.phone = phone.trim();
+      }
+
+      if (typeof notes === 'string' || notes === null) {
+        payload.notes = notes;
+      }
+
+      if (typeof party_size === 'number') {
+        if (!Number.isInteger(party_size) || party_size <= 0) {
+          return NextResponse.json({ success: false, error: 'Party size must be a positive whole number' }, { status: 400 });
+        }
+        payload.party_size = party_size;
+      }
+
+      if (Array.isArray(items)) {
+        payload.items = items;
+      }
+
+      order = await updateOrderDetails(id, payload);
+
+      try {
+        await pusherServer.trigger('queue-channel', 'order_update', {
+          type: 'order_update',
+          order_id: id,
+          ticket_number: existing.ticket_number,
+          new_status: order.status,
+          table_number: order.table_number,
+          is_paid: order.is_paid,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (pushErr) {
+        console.error('❌ Pusher trigger failed (order details update):', pushErr);
+      }
+    }
 
     // ✅ UPDATE STATUS & TABLE NUMBER
     if (status || table_number) {

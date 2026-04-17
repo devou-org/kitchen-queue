@@ -115,7 +115,7 @@ export default function AdminStatements() {
     .reduce((sum, o) => sum + Number(o.total_price), 0);
   
   const totalPaidRevenue = orders
-    .filter(o => o.is_paid && o.status !== 'CANCELLED')
+    .filter(o => o.status=="PAID")
     .reduce((sum, o) => sum + Number(o.total_price), 0);
 
   const orderCount = orders.length;
@@ -207,11 +207,11 @@ export default function AdminStatements() {
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: '4px',
                           fontSize: '11px', fontWeight: 700,
-                          color: order.is_paid ? '#059669' : 'var(--warning)',
-                          background: order.is_paid ? 'rgba(5,150,105,0.1)' : 'rgba(255,165,0,0.1)',
+                          color: order.status=="PAID"  ? '#059669' : 'var(--warning)',
+                          background: order.status=="PAID"  ? 'rgba(5,150,105,0.1)' : 'rgba(255,165,0,0.1)',
                           padding: '2px 8px', borderRadius: 'var(--radius-full)',
                         }}>
-                          {order.is_paid ? '✓ PAID' : '⏳ PENDING'}
+                          {order.status=="PAID" ? '✓ PAID' : '⏳ PENDING'}
                         </span>
                       </td>
                       <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>

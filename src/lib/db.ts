@@ -166,7 +166,12 @@ export async function getOrderById(id: string) {
 export async function getOrderByTicket(ticket_number: number) {
   const rows = await sql`
     WITH active_ranks AS (
-       SELECT id, ROW_NUMBER() OVER (ORDER BY ticket_number ASC)::integer as pos
+       SELECT
+         id,
+         ROW_NUMBER() OVER (
+           PARTITION BY DATE(created_at)
+           ORDER BY ticket_number ASC
+         )::integer as pos
        FROM orders
        WHERE UPPER(status) = 'PENDING'
     )
@@ -195,7 +200,12 @@ export async function getOrderByTicket(ticket_number: number) {
 export async function getOrdersByPhone(phone: string) {
   const rows = await sql`
     WITH active_ranks AS (
-       SELECT id, ROW_NUMBER() OVER (ORDER BY ticket_number ASC)::integer as pos
+       SELECT
+         id,
+         ROW_NUMBER() OVER (
+           PARTITION BY DATE(created_at)
+           ORDER BY ticket_number ASC
+         )::integer as pos
        FROM orders
        WHERE UPPER(status) = 'PENDING'
     )
@@ -305,13 +315,179 @@ export async function updateOrderStatus(id: string, status: string, tableNumber?
   const rows = await sql`
     UPDATE orders
     SET status    = ${status},
-        table_number = ${tableNumber || null},
+        table_number = COALESCE(${tableNumber ?? null}, table_number),
         updated_at = NOW()
     WHERE id = ${id}
     RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at
   `;
   if (!rows[0]) throw new Error(`Order ${id} not found.`);
   return rows[0];
+}
+
+export async function updateOrderDetails(id: string, data: {
+  customer_name?: string;
+  phone?: string;
+  notes?: string | null;
+  party_size?: number;
+  table_number?: string | null;
+  items?: { product_id: string; quantity: number }[];
+}) {
+  const existingOrder = await getOrderById(id);
+  if (!existingOrder) {
+    throw new Error('Order not found');
+  }
+
+  let nextTotalPrice = Number(existingOrder.total_price || 0);
+
+  if (Array.isArray(data.items)) {
+    if (data.items.length === 0) {
+      throw new Error('At least one item is required');
+    }
+
+    const normalizedMap = new Map<string, number>();
+    for (const item of data.items) {
+      const quantity = Number(item.quantity);
+      if (!item.product_id || !Number.isInteger(quantity) || quantity <= 0) {
+        throw new Error('Each order item must include a valid product and quantity');
+      }
+      normalizedMap.set(item.product_id, (normalizedMap.get(item.product_id) || 0) + quantity);
+    }
+
+    const nextItems = Array.from(normalizedMap.entries()).map(([product_id, quantity]) => ({ product_id, quantity }));
+
+    const existingItemRows = await sql`
+      SELECT product_id, quantity
+      FROM order_items
+      WHERE order_id = ${id}
+    `;
+
+    const currentQtyByProduct = new Map<string, number>();
+    for (const row of existingItemRows) {
+      currentQtyByProduct.set(row.product_id, (currentQtyByProduct.get(row.product_id) || 0) + Number(row.quantity));
+    }
+
+    const targetProductIds = nextItems.map((item) => item.product_id);
+    const productRows = await sql`
+      SELECT id, name, price, stock_quantity, buffer_quantity
+      FROM products
+      WHERE id = ANY(${targetProductIds})
+    `;
+
+    if (productRows.length !== targetProductIds.length) {
+      throw new Error('One or more selected products do not exist');
+    }
+
+    const productById = new Map<string, {
+      id: string;
+      name: string;
+      price: number;
+      stock_quantity: number;
+      buffer_quantity: number;
+    }>();
+
+    for (const row of productRows) {
+      productById.set(row.id, {
+        id: row.id,
+        name: row.name,
+        price: Number(row.price),
+        stock_quantity: Number(row.stock_quantity),
+        buffer_quantity: Number(row.buffer_quantity),
+      });
+    }
+
+    const unionProductIds = new Set<string>([
+      ...Array.from(currentQtyByProduct.keys()),
+      ...targetProductIds,
+    ]);
+
+    for (const productId of unionProductIds) {
+      const previousQty = currentQtyByProduct.get(productId) || 0;
+      const nextQty = normalizedMap.get(productId) || 0;
+      const delta = nextQty - previousQty;
+      if (delta <= 0) continue;
+
+      const product = productById.get(productId);
+      if (!product) {
+        throw new Error('A selected product is invalid');
+      }
+      if (product.stock_quantity < delta) {
+        throw new Error(`Insufficient stock for ${product.name}. Need ${delta}, available ${product.stock_quantity}.`);
+      }
+    }
+
+    for (const productId of unionProductIds) {
+      const previousQty = currentQtyByProduct.get(productId) || 0;
+      const nextQty = normalizedMap.get(productId) || 0;
+      const delta = nextQty - previousQty;
+      if (delta === 0) continue;
+
+      const product = productById.get(productId);
+      if (!product) continue;
+
+      const newStock = product.stock_quantity - delta;
+      let status = 'AVAILABLE';
+      if (newStock <= 0) status = 'OUT_OF_STOCK';
+      else if (newStock <= product.buffer_quantity) status = 'LOW_STOCK';
+
+      await sql`
+        UPDATE products
+        SET stock_quantity = ${newStock},
+            status = ${status},
+            updated_at = NOW()
+        WHERE id = ${productId}
+      `;
+    }
+
+    await sql`DELETE FROM order_items WHERE order_id = ${id}`;
+
+    const insertItems = nextItems.map((item) => {
+      const product = productById.get(item.product_id);
+      if (!product) {
+        throw new Error('A selected product is invalid');
+      }
+      return {
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price_at_purchase: product.price,
+      };
+    });
+
+    const productIds = insertItems.map((i) => i.product_id);
+    const quantities = insertItems.map((i) => i.quantity);
+    const prices = insertItems.map((i) => i.price_at_purchase);
+
+    await sql`
+      INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
+      SELECT ${id}, pid, qty, price
+      FROM unnest(
+        ${productIds}::uuid[],
+        ${quantities}::int[],
+        ${prices}::numeric[]
+      ) AS t(pid, qty, price)
+    `;
+
+    nextTotalPrice = insertItems.reduce((acc, item) => acc + (item.price_at_purchase * item.quantity), 0);
+    nextTotalPrice = Math.round(nextTotalPrice * 100) / 100;
+  }
+
+  const rows = await sql`
+    UPDATE orders
+    SET customer_name = COALESCE(${data.customer_name ?? null}, customer_name),
+        phone = COALESCE(${data.phone ?? null}, phone),
+        notes = COALESCE(${data.notes ?? null}, notes),
+        party_size = COALESCE(${data.party_size ?? null}, party_size),
+        table_number = COALESCE(${data.table_number ?? null}, table_number),
+        total_price = ${nextTotalPrice},
+        updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
+
+  if (!rows[0]) {
+    throw new Error('Order not found');
+  }
+
+  return await getOrderById(id);
 }
 
 export async function restoreOrderStock(orderId: string) {

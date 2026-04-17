@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
@@ -257,7 +258,7 @@ export default function AdminOrders() {
                       </span>
                     </td>
                     <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>
-                    <td><button className="btn btn-ghost btn-sm" style={{ color: 'var(--primary)' }}>View →</button></td>
+                    <td><button className="btn btn-ghost btn-sm" style={{ color: 'var(--primary)' }}>View / Edit →</button></td>
                   </tr>
                 ))}
                 {displayedOrders.length === 0 && (
@@ -300,7 +301,24 @@ export default function AdminOrders() {
                 </div>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatDateTime(selectedOrder.created_at)}</p>
               </div>
-              <button onClick={closeModal} className="modal-close-btn">✕</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+                <Link
+                  href={`/admin/orders/${selectedOrder.id}/edit`}
+                  className="btn btn-secondary btn-sm"
+                  onClick={closeModal}
+                  style={{
+                    minHeight: '30px',
+                    padding: '0 20px',
+                    margin:"0 20px ",
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    letterSpacing: '0.02em'
+                  }}
+                >
+                  EDIT ORDER
+                </Link>
+                <button onClick={closeModal} className="modal-close-btn">✕</button>
+              </div>
             </div>
 
             <div className="card" style={{ background: '#F9FAFB', padding: '12px 16px', marginBottom: '16px', border: '1px solid var(--border)' }}>
@@ -353,8 +371,8 @@ export default function AdminOrders() {
                       className="input"
                       placeholder="e.g. T-01, VIP-2"
                       value={tempTableNumber}
-                      onChange={(e) => setTempTableNumber(e.target.value)}
-                      style={{ flex: 1 }}
+                      onChange={(e) => setTempTableNumber(e.target.value.toUpperCase())}
+                      style={{ flex: 1, textTransform: 'uppercase' }}
                     />
                     <button
                       className="btn btn-primary btn-sm"
