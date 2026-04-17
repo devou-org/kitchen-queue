@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   keywords: 'restaurant, queue, order, food, menu, tracking, Renjz Kitchen',
   icons: {
     icon: '/logo.jpeg',
+    shortcut: '/logo.jpeg',
+    apple: '/logo.jpeg',
   },
   openGraph: {
     title: 'Renjz Kitchen – Authentic Coastal Flavors',
