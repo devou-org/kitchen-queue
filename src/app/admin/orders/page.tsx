@@ -281,8 +281,8 @@ export default function AdminOrders() {
       {mounted && selectedOrder && createPortal(
         <div className="modal-backdrop" onClick={closeModal} style={{ alignItems: 'center' }}>
           <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-              <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h2>
                   <span className={`badge badge-${selectedOrder.status.toLowerCase()}`}>{selectedOrder.status}</span>
@@ -301,15 +301,14 @@ export default function AdminOrders() {
                 </div>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatDateTime(selectedOrder.created_at)}</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                 <Link
                   href={`/admin/orders/${selectedOrder.id}/edit`}
                   className="btn btn-secondary btn-sm"
                   onClick={closeModal}
                   style={{
                     minHeight: '30px',
-                    padding: '0 20px',
-                    margin:"0 20px ",
+                    padding: '0 14px',
                     fontSize: '10px',
                     fontWeight: 800,
                     letterSpacing: '0.02em'
