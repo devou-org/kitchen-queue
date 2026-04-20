@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
-import { pusherClient } from '@/lib/pusher-client';
 
 export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -43,44 +42,6 @@ export default function AdminStatements() {
     fetchOrders();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, statusFilter, page]);
-
-  useEffect(() => {
-    if (!pusherClient) return;
-    const channel = pusherClient.subscribe('queue-channel');
-
-    channel.bind('order_update', (data: any) => {
-      // Sync local list if the updated order exists here
-      setOrders(prev => prev.map(o => {
-        if (o.id === data.order_id) {
-          const updated = { ...o };
-          if (data.new_status) updated.status = data.new_status;
-          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
-          return updated;
-        }
-        return o;
-      }));
-
-      // Sync modal if open
-      if (selectedOrder?.id === data.order_id) {
-        setSelectedOrder(prev => {
-          if (!prev) return null;
-          const updated = { ...prev };
-          if (data.new_status) updated.status = data.new_status;
-          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
-          return updated;
-        });
-      }
-
-      if (data.new_status) {
-        toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
-      }
-    });
-
-    return () => {
-      channel.unbind_all();
-      channel.unsubscribe();
-    };
-  }, [selectedOrder?.id]);
 
   const exportCSV = () => {
     if (orders.length === 0) {

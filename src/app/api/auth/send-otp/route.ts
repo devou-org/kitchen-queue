@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateOTP, storeOTP, canSendOTP, sendOTPviaSMS } from '@/lib/auth';
+import { generateOTP, generateOTPToken, sendOTPviaSMS } from '@/lib/auth';
 import { validatePhone } from '@/lib/validators';
 
 export async function POST(request: NextRequest) {
@@ -16,25 +16,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: validation.message }, { status: 400 });
     }
 
-    if (!canSendOTP(phone)) {
-      return NextResponse.json({
-        success: false,
-        error: 'Please wait 60 seconds before requesting another OTP'
-      }, { status: 429 });
-    }
-
     const otp = generateOTP();
-    storeOTP(phone, otp);
+    const otp_token = await generateOTPToken(phone, otp, '1m');
 
-    // Try sending SMS, if fails, log the OTP in dev mode
     const smsSent = await sendOTPviaSMS(phone, otp);
+    if (!smsSent) {
+      return NextResponse.json({ success: false, error: 'Failed to send OTP. Please try again.' }, { status: 502 });
+    }
 
 
 
     return NextResponse.json({
       success: true,
       message: 'OTP sent to your phone',
-      expires_in: 600,
+      otp_token,
+      expires_in: 300,
     });
   } catch (error) {
     console.error('Send OTP error:', error);

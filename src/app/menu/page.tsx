@@ -14,6 +14,12 @@ const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   OUT_OF_STOCK: { label: 'OUT OF STOCK', class: 'badge badge-out-of-stock' },
 };
 
+const STATUS_ORDER: Record<ProductStatus, number> = {
+  AVAILABLE: 1,
+  LOW_STOCK: 2,
+  OUT_OF_STOCK: 3,
+};
+
 function ProductCard({ product, quantity, onUpdate }: {
   product: Product;
   quantity: number;
@@ -83,7 +89,7 @@ function ProductCard({ product, quantity, onUpdate }: {
           <button
             className="qty-btn"
             onClick={() => onUpdate(product.id, -1)}
-            disabled={isOut || quantity === 0}
+            disabled={quantity === 0}
           >−</button>
           <span style={{
             flex: 1, textAlign: 'center', fontWeight: 700, fontSize: '15px',
@@ -150,25 +156,75 @@ export default function MenuPage() {
   }, []);
 
   // Pusher for real-time updates
+  // useEffect(() => {
+  //   if (!pusherClient) return;
+  //   const channel = pusherClient.subscribe('queue-channel');
+
+  //   channel.bind('product_update', (data: any) => {
+  //     setProducts(prev => prev.map(p =>
+  //       p.id === data.product_id ? { ...p, status: data.product_status } : p
+  //     ));
+  //   });
+
+  //   return () => {
+  //     channel.unbind_all();
+  //     channel.unsubscribe();
+  //   };
+  // }, []);
+
+  // Keep cart aligned with latest product availability and details.
   useEffect(() => {
-    if (!pusherClient) return;
-    const channel = pusherClient.subscribe('queue-channel');
+    if (products.length === 0 || cart.size === 0) return;
 
-    channel.bind('product_update', (data: any) => {
-      setProducts(prev => prev.map(p =>
-        p.id === data.product_id ? { ...p, status: data.product_status } : p
-      ));
-    });
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const newCart = new Map(cart);
+    const removedNames: string[] = [];
+    let changed = false;
 
-    return () => {
-      channel.unbind_all();
-      channel.unsubscribe();
-    };
-  }, []);
+    for (const [id, item] of cart.entries()) {
+      const product = byId.get(id);
+
+      if (!product || product.status === 'OUT_OF_STOCK') {
+        newCart.delete(id);
+        removedNames.push(item.name);
+        changed = true;
+        continue;
+      }
+
+      if (
+        item.status !== product.status ||
+        item.price !== product.price ||
+        item.name !== product.name ||
+        item.image_url !== product.image_url
+      ) {
+        newCart.set(id, {
+          ...item,
+          status: product.status,
+          price: product.price,
+          name: product.name,
+          image_url: product.image_url,
+        });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      saveCart(newCart);
+    }
+
+    if (removedNames.length > 0) {
+      toast.error(`${removedNames.join(', ')} removed from cart (out of stock)`);
+    }
+  }, [products, cart, saveCart]);
 
   const handleUpdate = (id: string, delta: number) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
+
+    if (delta > 0 && product.status === 'OUT_OF_STOCK') {
+      toast.error('This item is out of stock');
+      return;
+    }
 
     const newCart = new Map(cart);
     const existing = newCart.get(id);
@@ -192,11 +248,17 @@ export default function MenuPage() {
   const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
   const totalPrice = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
 
-  const filtered = products.filter(p => {
-    const matchCat = category === 'All' || p.category === category;
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
-  });
+  const filtered = products
+    .filter(p => {
+      const matchCat = category === 'All' || p.category === category;
+      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
+      return matchCat && matchSearch;
+    })
+    .sort((a, b) => {
+      const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+      if (statusDiff !== 0) return statusDiff;
+      return a.name.localeCompare(b.name);
+    });
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>

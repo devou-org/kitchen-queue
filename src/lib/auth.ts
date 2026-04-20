@@ -68,6 +68,39 @@ export function verifyOTPCode(phone: string, code: string): { valid: boolean; me
   return { valid: true, message: 'OTP verified successfully' };
 }
 
+interface OTPTokenPayload {
+  phone: string;
+  otp: string;
+  purpose: 'otp_verification';
+  iat?: number;
+  exp?: number;
+}
+
+export async function generateOTPToken(phone: string, otp: string, expiresIn = '5m'): Promise<string> {
+  return new SignJWT({
+    phone,
+    otp,
+    purpose: 'otp_verification',
+  } as Record<string, unknown>)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
+    .sign(JWT_SECRET);
+}
+
+export async function verifyOTPToken(token: string): Promise<OTPTokenPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const otpPayload = payload as unknown as OTPTokenPayload;
+    if (otpPayload.purpose !== 'otp_verification' || !otpPayload.phone || !otpPayload.otp) {
+      return null;
+    }
+    return otpPayload;
+  } catch {
+    return null;
+  }
+}
+
 // ============================================
 // JWT MANAGEMENT
 // ============================================

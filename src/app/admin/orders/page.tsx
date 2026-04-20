@@ -94,7 +94,6 @@ export default function AdminOrders() {
       });
 
       if (data.new_status) toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
-      setTimeout(() => fetchOrders(true), 500);
     });
 
     return () => {

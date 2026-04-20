@@ -47,12 +47,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!product) return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
 
     // Broadcast to customers via Pusher
-    await pusherServer.trigger('queue-channel', 'product_update', {
-      type: 'product_update',
-      product_id: id,
-      product_status: product.status,
-      timestamp: new Date().toISOString(),
-    });
+    // await pusherServer.trigger('queue-channel', 'product_update', {
+    //   type: 'product_update',
+    //   product_id: id,
+    //   product_status: product.status,
+    //   timestamp: new Date().toISOString(),
+    // });
 
     return NextResponse.json({ success: true, data: product, message: 'Product updated' });
   } catch (error) {

@@ -1,6 +1,7 @@
-import { neon } from '@neondatabase/serverless';
+import { neon, Pool } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export default sql;
 
@@ -12,7 +13,14 @@ export async function getProducts(activeOnly = true) {
   const rows = await sql`
     SELECT * FROM products 
     WHERE is_active = ${activeOnly}
-    ORDER BY created_at DESC
+    ORDER BY
+      CASE status
+        WHEN 'AVAILABLE' THEN 1
+        WHEN 'LOW_STOCK' THEN 2
+        WHEN 'OUT_OF_STOCK' THEN 3
+        ELSE 4
+      END ASC,
+      created_at DESC
   `;
   return rows;
 }
@@ -238,77 +246,115 @@ export async function createOrder(data: {
   party_size?: number;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
 }) {
-  const productIds = data.items.map((i) => i.product_id);
-  const quantities = data.items.map((i) => i.quantity);
+  const normalized = new Map<string, { quantity: number; price_at_purchase: number }>();
 
-  // 1. Batch-validate stock for all items in a single query
-  const stockRows = await sql`
-    SELECT id, name, stock_quantity
-    FROM products
-    WHERE id = ANY(${productIds})
-  `;
-
-  if (stockRows.length !== data.items.length) {
-    throw new Error('One or more products not found.');
-  }
-
-  const stockMap = new Map(stockRows.map((r) => [r.id, r]));
   for (const item of data.items) {
-    const product = stockMap.get(item.product_id);
-    if (!product) throw new Error('Product not found.');
-    if (product.stock_quantity < item.quantity) {
-      throw new Error(
-        `Insufficient stock for ${product.name}. Only ${product.stock_quantity} remaining.`
-      );
+    const qty = Number(item.quantity);
+    const price = Number(item.price_at_purchase);
+
+    if (!item.product_id || !Number.isInteger(qty) || qty <= 0) {
+      throw new Error('Each order item must include a valid product and quantity');
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      throw new Error('Each order item must include a valid price');
+    }
+
+    const existing = normalized.get(item.product_id);
+    if (existing) {
+      existing.quantity += qty;
+    } else {
+      normalized.set(item.product_id, { quantity: qty, price_at_purchase: price });
     }
   }
 
-  // 2. Create the order header
-  const orderRows = await sql`
-    INSERT INTO orders (customer_name, phone, total_price, status, is_paid, notes, party_size)
-    VALUES (
-      ${data.customer_name}, ${data.phone}, ${data.total_price},
-      'PENDING', false, ${data.notes || null}, ${data.party_size || 1}
-    )
-    RETURNING *
-  `;
-  const order = orderRows[0];
+  const normalizedItems = Array.from(normalized.entries()).map(([product_id, v]) => ({
+    product_id,
+    quantity: v.quantity,
+    price_at_purchase: v.price_at_purchase,
+  }));
 
-  // 3. Batch-insert all order_items in one round-trip via unnest
-  const prices = data.items.map((i) => i.price_at_purchase);
-  await sql`
-    INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
-    SELECT ${order.id}, pid, qty, price
-    FROM unnest(
-      ${productIds}::uuid[],
-      ${quantities}::int[],
-      ${prices}::numeric[]
-    ) AS t(pid, qty, price)
-  `;
+  if (normalizedItems.length === 0) {
+    throw new Error('At least one valid item is required.');
+  }
 
-  // 4. Deduct stock and recalculate status in one batch UPDATE
-  //    Uses a VALUES list joined to products so a single pass handles all items.
-  await sql`
-    UPDATE products p
-    SET
-      stock_quantity = p.stock_quantity - v.qty,
-      status = CASE
-        WHEN p.stock_quantity - v.qty <= 0              THEN 'OUT_OF_STOCK'
-        WHEN p.stock_quantity - v.qty <= p.buffer_quantity THEN 'LOW_STOCK'
-        ELSE 'AVAILABLE'
-      END,
-      updated_at = NOW()
-    FROM (
-      SELECT pid, qty
-      FROM unnest(
-        ${productIds}::uuid[],
-        ${quantities}::int[]
-      ) AS t(pid, qty)
-    ) AS v
-    WHERE p.id = v.pid
-  `;
+  const productIds = normalizedItems.map((i) => i.product_id);
+  const quantities = normalizedItems.map((i) => i.quantity);
+  const prices = normalizedItems.map((i) => i.price_at_purchase);
 
-  return await getOrderById(order.id);
+  const computedTotal = Math.round(
+    normalizedItems.reduce((sum, item) => sum + item.quantity * item.price_at_purchase, 0) * 100
+  ) / 100;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const reserveResult = await client.query(
+      `
+        WITH req AS (
+          SELECT pid::uuid AS product_id, qty::int AS qty
+          FROM unnest($1::uuid[], $2::int[]) AS t(pid, qty)
+        ),
+        updated AS (
+          UPDATE products p
+          SET
+            stock_quantity = p.stock_quantity - r.qty,
+            status = CASE
+              WHEN p.stock_quantity - r.qty <= 0 THEN 'OUT_OF_STOCK'
+              WHEN p.stock_quantity - r.qty <= p.buffer_quantity THEN 'LOW_STOCK'
+              ELSE 'AVAILABLE'
+            END,
+            updated_at = NOW()
+          FROM req r
+          WHERE p.id = r.product_id
+            AND p.stock_quantity >= r.qty
+          RETURNING p.id
+        )
+        SELECT
+          (SELECT COUNT(*)::int FROM req) AS requested_count,
+          (SELECT COUNT(*)::int FROM updated) AS updated_count
+      `,
+      [productIds, quantities]
+    );
+
+    const requestedCount = Number(reserveResult.rows[0]?.requested_count || 0);
+    const updatedCount = Number(reserveResult.rows[0]?.updated_count || 0);
+
+    if (updatedCount !== requestedCount) {
+      throw new Error('Insufficient stock for one or more items.');
+    }
+
+    const orderResult = await client.query(
+      `
+        INSERT INTO orders (customer_name, phone, total_price, status, is_paid, notes, party_size)
+        VALUES ($1, $2, $3, 'PENDING', false, $4, $5)
+        RETURNING id
+      `,
+      [data.customer_name, data.phone, computedTotal, data.notes || null, data.party_size || 1]
+    );
+
+    const orderId = orderResult.rows[0]?.id;
+    if (!orderId) {
+      throw new Error('Failed to create order.');
+    }
+
+    await client.query(
+      `
+        INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
+        SELECT $1::uuid, pid, qty, price
+        FROM unnest($2::uuid[], $3::int[], $4::numeric[]) AS t(pid, qty, price)
+      `,
+      [orderId, productIds, quantities, prices]
+    );
+
+    await client.query('COMMIT');
+    return await getOrderById(orderId);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateOrderStatus(id: string, status: string, tableNumber?: string) {
@@ -498,15 +544,37 @@ export async function restoreOrderStock(orderId: string) {
 
   if (items.length === 0) return;
 
-  // 2. Add quantities back to products
+  // 2. Add quantities back and recompute status from the new stock value.
+  const qtyByProduct = new Map<string, number>();
   for (const item of items) {
-    await sql`
-      UPDATE products 
-      SET stock_quantity = stock_quantity + ${item.quantity},
-          updated_at = NOW()
-      WHERE id = ${item.product_id}
-    `;
+    const productId = String(item.product_id);
+    const qty = Number(item.quantity);
+    qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + qty);
   }
+
+  const productIds = Array.from(qtyByProduct.keys());
+  const quantities = productIds.map((id) => qtyByProduct.get(id) || 0);
+
+  await sql`
+    UPDATE products p
+    SET
+      stock_quantity = p.stock_quantity + v.qty,
+      status = CASE
+        WHEN p.stock_quantity + v.qty <= 0 THEN 'OUT_OF_STOCK'
+        WHEN p.stock_quantity + v.qty <= p.buffer_quantity THEN 'LOW_STOCK'
+        ELSE 'AVAILABLE'
+      END,
+      updated_at = NOW()
+    FROM (
+      SELECT pid, SUM(qty)::int AS qty
+      FROM unnest(
+        ${productIds}::uuid[],
+        ${quantities}::int[]
+      ) AS t(pid, qty)
+      GROUP BY pid
+    ) AS v
+    WHERE p.id = v.pid
+  `;
 }
 
 export async function setOrderPaymentStatus(id: string, isPaid: boolean) {

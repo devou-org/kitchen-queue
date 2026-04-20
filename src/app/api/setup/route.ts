@@ -59,6 +59,11 @@ export async function GET() {
     `;
 
     await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_order_items_order_product
+      ON order_items(order_id, product_id);
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS queue_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         current_queue_number INTEGER DEFAULT 1,

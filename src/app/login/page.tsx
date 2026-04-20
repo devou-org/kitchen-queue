@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [countryCode, setCountryCode] = useState('+91');
   const [phone, setPhone] = useState('');
+  const [otpToken, setOtpToken] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -57,6 +58,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (data.success) {
+        setOtpToken(data.otp_token || '');
         setStep('otp');
         setCooldown(60);
         toast.success('OTP sent to your phone!');
@@ -126,12 +128,13 @@ export default function LoginPage() {
   const handleVerify = async (code?: string) => {
     const otpCode = code || otp.join('');
     if (otpCode.length !== 6) return toast.error('Enter complete 6-digit OTP');
+    if (!otpToken) return toast.error('OTP session expired. Please request a new OTP.');
     setLoading(true);
     try {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: fullPhone, code: otpCode }),
+        body: JSON.stringify({ code: otpCode, otp_token: otpToken }),
       });
       const data = await res.json();
       if (data.success) {

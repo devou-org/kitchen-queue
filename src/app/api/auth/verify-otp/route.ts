@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyOTPCode, generateToken } from '@/lib/auth';
+import { verifyOTPToken, generateToken } from '@/lib/auth';
 import { getUserByPhone, createUser } from '@/lib/db';
-import { validatePhone, validateOTP } from '@/lib/validators';
+import { validateOTP } from '@/lib/validators';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { phone, code } = body;
+    const { code, otp_token } = body;
 
-    if (!phone || !code) {
-      return NextResponse.json({ success: false, error: 'Phone and OTP code are required' }, { status: 400 });
-    }
-
-    const phoneValidation = validatePhone(phone);
-    if (!phoneValidation.valid) {
-      return NextResponse.json({ success: false, error: phoneValidation.message }, { status: 400 });
+    if (!otp_token || !code) {
+      return NextResponse.json({ success: false, error: 'OTP token and OTP code are required' }, { status: 400 });
     }
 
     const otpValidation = validateOTP(code);
@@ -22,10 +17,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: otpValidation.message }, { status: 400 });
     }
 
-    const result = verifyOTPCode(phone, code);
-    if (!result.valid) {
-      return NextResponse.json({ success: false, error: result.message }, { status: 401 });
+    const otpPayload = await verifyOTPToken(otp_token);
+    if (!otpPayload) {
+      return NextResponse.json({ success: false, error: 'OTP token is invalid or expired' }, { status: 401 });
     }
+
+    if (otpPayload.otp !== code) {
+      return NextResponse.json({ success: false, error: 'Invalid OTP' }, { status: 401 });
+    }
+
+    const phone = otpPayload.phone;
 
     // Get or create user
     let user = await getUserByPhone(phone);
