@@ -188,17 +188,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ success: true, data: order, message: 'Order updated' });
   } catch (error) {
     console.error("❌ Order Update Runtime Error:", error);
-
-    const message = error instanceof Error ? error.message : 'Failed to update order';
-
-    if (/insufficient stock/i.test(message)) {
-      return NextResponse.json({ success: false, error: message }, { status: 409 });
-    }
-
-    if (/at least one item|required|invalid|positive whole number|cannot be empty|do not exist/i.test(message)) {
-      return NextResponse.json({ success: false, error: message }, { status: 400 });
-    }
-
     return NextResponse.json({ success: false, error: 'Failed to update order' }, { status: 500 });
   }
 }

@@ -29,7 +29,6 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
     party_size: '1',
   });
   const [items, setItems] = useState<EditableItem[]>([]);
-  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -62,12 +61,6 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
           quantity: item.quantity,
         }));
         setItems(initialItems);
-        setQuantityDrafts(
-          initialItems.reduce<Record<string, string>>((acc, item) => {
-            acc[item.product_id] = String(item.quantity);
-            return acc;
-          }, {})
-        );
 
         if (productsData.success) {
           setProducts(productsData.data || []);
@@ -90,47 +83,21 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
     return map;
   }, [products]);
 
-  const getEffectiveQuantity = (item: EditableItem) => {
-    const draft = quantityDrafts[item.product_id];
-    if (draft === undefined || draft.trim() === '') return item.quantity;
-    const parsed = Number.parseInt(draft, 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) return item.quantity;
-    return parsed;
-  };
-
   const total = useMemo(() => {
     return items.reduce((sum, item) => {
       const product = productById.get(item.product_id);
-      return sum + ((product?.price || 0) * getEffectiveQuantity(item));
+      return sum + ((product?.price || 0) * item.quantity);
     }, 0);
-  }, [items, productById, quantityDrafts]);
+  }, [items, productById]);
 
   const updateItemQuantity = (productId: string, quantity: number) => {
-    if (!Number.isInteger(quantity)) return;
-    const safeQuantity = Math.max(1, quantity);
-    setItems((prev) => prev.map((item) => (
-      item.product_id === productId ? { ...item, quantity: safeQuantity } : item
-    )));
-    setQuantityDrafts((prev) => ({ ...prev, [productId]: String(safeQuantity) }));
-  };
-
-  const commitItemQuantityDraft = (productId: string) => {
-    const draft = quantityDrafts[productId];
-    const parsed = Number.parseInt((draft || '').trim(), 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      updateItemQuantity(productId, 1);
+    if (quantity <= 0) {
+      setItems((prev) => prev.filter((item) => item.product_id !== productId));
       return;
     }
-    updateItemQuantity(productId, parsed);
-  };
-
-  const removeItem = (productId: string) => {
-    setItems((prev) => prev.filter((item) => item.product_id !== productId));
-    setQuantityDrafts((prev) => {
-      const next = { ...prev };
-      delete next[productId];
-      return next;
-    });
+    setItems((prev) => prev.map((item) => (
+      item.product_id === productId ? { ...item, quantity } : item
+    )));
   };
 
   const addItem = () => {
@@ -140,7 +107,6 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
       return;
     }
     setItems((prev) => [...prev, { product_id: newProductId, quantity: 1 }]);
-    setQuantityDrafts((prev) => ({ ...prev, [newProductId]: '1' }));
     setNewProductId('');
   };
 
@@ -172,11 +138,6 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
       return;
     }
 
-    const itemsToSave = items.map((item) => ({
-      product_id: item.product_id,
-      quantity: getEffectiveQuantity(item),
-    }));
-
     setSaving(true);
     try {
       const res = await fetch(`/api/orders/${id}`, {
@@ -187,7 +148,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
           phone,
           notes: form.notes.trim(),
           party_size: partySize,
-          items: itemsToSave,
+          items,
         }),
       });
       const data = await res.json();
@@ -308,82 +269,45 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {items.map((item) => {
                 const product = productById.get(item.product_id);
-                const effectiveQty = getEffectiveQuantity(item);
                 return (
                   <div
                     key={item.product_id}
                     style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto auto',
+                      gap: '8px',
+                      alignItems: 'center',
                       border: '1px solid var(--border)',
                       borderRadius: 'var(--radius-sm)',
                       padding: '10px 12px',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{product?.name || 'Unknown Product'}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                          {formatPrice(product?.price || 0)} each
-                        </div>
-                      </div>
-                      <div style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        {formatPrice((product?.price || 0) * effectiveQty)}
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{product?.name || 'Unknown Product'}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {formatPrice(product?.price || 0)} each
                       </div>
                     </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => updateItemQuantity(item.product_id, effectiveQty - 1)}
-                          style={{ minWidth: '32px', width: '32px', height: '32px', padding: 0, borderRadius: '999px', border: '1px solid var(--border)' }}
-                          aria-label="Decrease quantity"
-                        >
-                          −
-                        </button>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          className="input"
-                          value={quantityDrafts[item.product_id] ?? String(item.quantity)}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            if (!/^\d*$/.test(raw)) return;
-                            setQuantityDrafts((prev) => ({ ...prev, [item.product_id]: raw }));
-                          }}
-                          onBlur={() => commitItemQuantityDraft(item.product_id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              commitItemQuantityDraft(item.product_id);
-                            }
-                          }}
-                          style={{ width: '64px', textAlign: 'center' }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => updateItemQuantity(item.product_id, effectiveQty + 1)}
-                          style={{ minWidth: '32px', width: '32px', height: '32px', padding: 0, borderRadius: '999px', border: '1px solid var(--border)' }}
-                          aria-label="Increase quantity"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => removeItem(item.product_id)}
-                        style={{ color: 'var(--text-secondary)', minWidth: 'auto', padding: '4px 6px' }}
-                      >
-                        Remove
-                      </button>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      className="input"
+                      value={item.quantity}
+                      onChange={(e) => updateItemQuantity(item.product_id, Number(e.target.value))}
+                      style={{ width: '90px' }}
+                    />
+                    <div style={{ width: '110px', textAlign: 'right', fontWeight: 700 }}>
+                      {formatPrice((product?.price || 0) * item.quantity)}
                     </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => updateItemQuantity(item.product_id, 0)}
+                      style={{ color: 'var(--danger)' }}
+                    >
+                      Remove
+                    </button>
                   </div>
                 );
               })}
