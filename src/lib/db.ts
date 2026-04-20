@@ -101,6 +101,7 @@ export async function getOrders(filters: {
 } = {}) {
   const { page = 1, per_page = 50, sort = 'ASC' } = filters;
   const offset = (page - 1) * per_page;
+  const localTimezone = 'Asia/Kolkata';
 
   // Correlated subquery for items to optimize performance (fixes the reported 8.4s lag)
   if (filters.date_from && filters.date_to) {
@@ -109,17 +110,36 @@ export async function getOrders(filters: {
         SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o
         WHERE o.status = ${filters.status} 
-          AND o.created_at >= ${filters.date_from + ' 00:00:00'}
-          AND o.created_at <= ${filters.date_to + ' 23:59:59'}
-        ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
+                 o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
+                 o.ticket_number ${sort === 'ASC' ? sql`ASC` : sql`DESC`}
+        LIMIT ${per_page} OFFSET ${offset}
+      `;
+    } else if (filters.status_in) {
+      const statuses = filters.status_in.split(',');
+      return await sql`
+        SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        FROM orders o
+        WHERE o.status = ANY(${statuses})
+          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
+                 o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
+                 o.ticket_number ${sort === 'ASC' ? sql`ASC` : sql`DESC`}
+        LIMIT ${per_page} OFFSET ${offset}
       `;
     } else {
       return await sql`
         SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o
-        WHERE o.created_at >= ${filters.date_from + ' 00:00:00'}
-          AND o.created_at <= ${filters.date_to + ' 23:59:59'}
-        ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+        WHERE DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
+                 o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
+                 o.ticket_number ${sort === 'ASC' ? sql`ASC` : sql`DESC`}
+        LIMIT ${per_page} OFFSET ${offset}
       `;
     }
   }
