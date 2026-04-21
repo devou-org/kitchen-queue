@@ -17,6 +17,8 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [tempTableNumber, setTempTableNumber] = useState('');
+  // Tracks order IDs that recently had items added — for green blink
+  const [flashedOrderIds, setFlashedOrderIds] = useState<Set<string>>(new Set());
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -67,6 +69,39 @@ export default function AdminOrders() {
     });
 
     channel.bind('order_update', (data: any) => {
+      if (data.items_updated) {
+        // Customer added items — re-fetch list
+        fetchOrders(true);
+
+        // Also refresh the open modal if it's showing this order
+        const adminToken = document.cookie
+          .split(';').map(c => c.trim())
+          .find(c => c.startsWith('admin_token='))?.split('=')[1];
+
+        fetch(`/api/orders/${data.order_id}`, {
+          headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {},
+        })
+          .then(r => r.json())
+          .then(res => {
+            if (res.success && res.data) {
+              setSelectedOrder(prev => prev && prev.id === data.order_id ? res.data : prev);
+            }
+          })
+          .catch(() => {});
+
+        // Flash the row green
+        setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+        setTimeout(() => {
+          setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
+        }, 2600);
+
+        toast(
+          `🛒 Customer added items to order #${String(data.ticket_number).padStart(3, '0')}`,
+          { icon: '🟢', duration: 5000, style: { fontWeight: 700 } }
+        );
+        return;
+      }
+
       setOrders(prev => {
         const isDefaultView = !statusFilter;
         return prev.map(o => {
@@ -224,7 +259,12 @@ export default function AdminOrders() {
               </thead>
               <tbody>
                 {displayedOrders.map(order => (
-                  <tr key={order.id} onClick={() => openOrderModal(order)} style={{ cursor: 'pointer' }}>
+                  <tr
+                    key={order.id}
+                    onClick={() => openOrderModal(order)}
+                    style={{ cursor: 'pointer' }}
+                    className={flashedOrderIds.has(order.id) ? 'row-items-updated' : ''}
+                  >
                     <td>
                       <strong style={{ color: 'var(--primary)', fontSize: '16px' }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDateTime(order.created_at)}</div>

@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 
-const URL = "http://localhost:3000/api/orders";
-const PRODUCT_ID = "69d6bd29-f4ba-42bb-8989-338ecfa093ab";
+const URL = "https://renjzkitchen.quickserve.devou.in/api/orders";
+const PRODUCT_ID = "7f41a2ad-fd99-4cb5-a7b5-bda6a53d1a37";
 
 const makeOrder = async () => {
   try {

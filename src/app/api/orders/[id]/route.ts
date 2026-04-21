@@ -5,6 +5,8 @@ import { STATUS_TRANSITIONS } from '@/lib/constants';
 import { pusherServer } from '@/lib/pusher';
 import { validatePhone } from '@/lib/validators';
 
+const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING'];
+
 async function requireAdmin(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
@@ -13,6 +15,17 @@ async function requireAdmin(request: NextRequest) {
   const payload = await verifyToken(token);
   if (!payload?.isAdmin) return null;
   return payload;
+}
+
+async function getAuthContext(request: NextRequest) {
+  const adminToken = request.cookies.get('admin_token')?.value;
+  const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
+  const token = adminToken || authHeader;
+  if (!token) return { admin: null, customer: null };
+  const payload = await verifyToken(token);
+  if (!payload) return { admin: null, customer: null };
+  if (payload.isAdmin) return { admin: payload, customer: null };
+  return { admin: null, customer: payload };
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -31,15 +44,40 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-
     const { id } = await params;
     const body = await request.json();
     const { status, is_paid, table_number, customer_name, phone, notes, party_size, items } = body;
 
     const existing = await getOrderById(id);
     if (!existing) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
+
+    // ── AUTH: check who is calling ──────────────────────────────
+    const { admin, customer } = await getAuthContext(request);
+
+    if (!admin && !customer) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Customer may ONLY update items, and only when order is PENDING/PREPARING
+    if (!admin && customer) {
+      // Customers can only touch `items`
+      if (status || typeof is_paid !== 'undefined' || table_number || customer_name || phone || notes !== undefined || party_size) {
+        return NextResponse.json({ success: false, error: 'Customers can only add items to an order' }, { status: 403 });
+      }
+      if (!Array.isArray(items)) {
+        return NextResponse.json({ success: false, error: 'No items provided' }, { status: 400 });
+      }
+      if (!CUSTOMER_ADDABLE_STATUSES.includes(existing.status)) {
+        return NextResponse.json({
+          success: false,
+          error: `Cannot add items to an order in ${existing.status} state`,
+        }, { status: 400 });
+      }
+      // Verify the order belongs to this customer (by phone)
+      if (customer.phone && existing.phone !== customer.phone) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     let order = existing;
 
@@ -97,6 +135,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       try {
         await pusherServer.trigger('queue-channel', 'order_update', {
           type: 'order_update',
+          items_updated: Array.isArray(payload.items), // flag for admin to know items changed
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: order.status,

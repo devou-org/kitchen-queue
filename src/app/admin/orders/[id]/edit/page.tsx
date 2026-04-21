@@ -90,14 +90,16 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
     }, 0);
   }, [items, productById]);
 
-  const updateItemQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      setItems((prev) => prev.filter((item) => item.product_id !== productId));
-      return;
-    }
-    setItems((prev) => prev.map((item) => (
-      item.product_id === productId ? { ...item, quantity } : item
-    )));
+  const updateItemQuantity = (productId: string, delta: number) => {
+    setItems((prev) => prev.map((item) =>
+      item.product_id === productId
+        ? { ...item, quantity: Math.max(1, Math.min(99, item.quantity + delta)) }
+        : item
+    ));
+  };
+
+  const removeItem = (productId: string) => {
+    setItems((prev) => prev.filter((item) => item.product_id !== productId));
   };
 
   const addItem = () => {
@@ -266,53 +268,102 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
               <button type="button" className="btn btn-secondary" onClick={addItem}>Add Item</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {items.map((item) => {
                 const product = productById.get(item.product_id);
                 return (
                   <div
                     key={item.product_id}
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto auto auto',
-                      gap: '8px',
-                      alignItems: 'center',
                       border: '1px solid var(--border)',
                       borderRadius: 'var(--radius-sm)',
-                      padding: '10px 12px',
+                      padding: '12px 14px',
+                      background: 'white',
                     }}
                   >
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{product?.name || 'Unknown Product'}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        {formatPrice(product?.price || 0)} each
+                    {/* Product name + price + remove */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '15px' }}>{product?.name || 'Unknown Product'}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          {formatPrice(product?.price || 0)} each
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.product_id)}
+                        style={{
+                          background: 'none', border: 'none',
+                          fontSize: '18px', cursor: 'pointer',
+                          color: '#EF4444', lineHeight: 1, padding: '2px 4px',
+                          flexShrink: 0,
+                        }}
+                        title="Remove item"
+                      >
+                        ×
+                      </button>
                     </div>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      className="input"
-                      value={item.quantity}
-                      onChange={(e) => updateItemQuantity(item.product_id, Number(e.target.value))}
-                      style={{ width: '90px' }}
-                    />
-                    <div style={{ width: '110px', textAlign: 'right', fontWeight: 700 }}>
-                      {formatPrice((product?.price || 0) * item.quantity)}
+
+                    {/* Stepper + subtotal */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+                        <button
+                          type="button"
+                          onClick={() => updateItemQuantity(item.product_id, -1)}
+                          disabled={item.quantity <= 1}
+                          style={{
+                            width: '40px', height: '40px',
+                            borderRadius: '10px 0 0 10px',
+                            border: '1.5px solid var(--border)',
+                            borderRight: 'none',
+                            background: item.quantity <= 1 ? '#f9fafb' : 'white',
+                            color: item.quantity <= 1 ? '#9CA3AF' : 'var(--primary)',
+                            fontSize: '20px', fontWeight: 700,
+                            cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                        >
+                          −
+                        </button>
+                        <span style={{
+                          width: '48px', height: '40px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          border: '1.5px solid var(--border)',
+                          fontWeight: 800, fontSize: '16px',
+                          color: 'var(--text-primary)',
+                          background: '#fafafa',
+                          userSelect: 'none',
+                        }}>
+                          {item.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateItemQuantity(item.product_id, 1)}
+                          disabled={item.quantity >= 99}
+                          style={{
+                            width: '40px', height: '40px',
+                            borderRadius: '0 10px 10px 0',
+                            border: '1.5px solid var(--border)',
+                            borderLeft: 'none',
+                            background: 'white',
+                            color: 'var(--primary)',
+                            fontSize: '20px', fontWeight: 700,
+                            cursor: item.quantity >= 99 ? 'not-allowed' : 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span style={{ fontWeight: 800, fontSize: '16px', color: 'var(--primary)' }}>
+                        {formatPrice((product?.price || 0) * item.quantity)}
+                      </span>
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => updateItemQuantity(item.product_id, 0)}
-                      style={{ color: 'var(--danger)' }}
-                    >
-                      Remove
-                    </button>
                   </div>
                 );
               })}
               {items.length === 0 && (
-                <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No items selected yet.</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', padding: '8px 0' }}>No items selected yet.</p>
               )}
             </div>
 
