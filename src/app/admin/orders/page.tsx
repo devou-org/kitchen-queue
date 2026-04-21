@@ -17,8 +17,10 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [tempTableNumber, setTempTableNumber] = useState('');
-  // Tracks order IDs that recently had items added — for green blink
+  // Controls the green row-blink animation (auto-clears after 2.6s)
   const [flashedOrderIds, setFlashedOrderIds] = useState<Set<string>>(new Set());
+  // Controls the persistent green ticket number (clears only when admin opens the modal)
+  const [greenTicketIds, setGreenTicketIds] = useState<Set<string>>(new Set());
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -87,13 +89,16 @@ export default function AdminOrders() {
               setSelectedOrder(prev => prev && prev.id === data.order_id ? res.data : prev);
             }
           })
-          .catch(() => {});
+          .catch(() => { });
 
-        // Flash the row green
+        // Flash the row green (auto-clears)
         setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
         setTimeout(() => {
           setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
         }, 2600);
+
+        // Keep ticket number green until admin acknowledges (opens the modal)
+        setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
 
         toast(
           `🛒 Customer added items to order #${String(data.ticket_number).padStart(3, '0')}`,
@@ -194,6 +199,8 @@ export default function AdminOrders() {
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
     setTempTableNumber(order.table_number || '');
+    // Acknowledge: clear the green ticket highlight for this order
+    setGreenTicketIds(prev => { const next = new Set(prev); next.delete(order.id); return next; });
   };
   const closeModal = () => {
     setSelectedOrder(null);
@@ -266,7 +273,11 @@ export default function AdminOrders() {
                     className={flashedOrderIds.has(order.id) ? 'row-items-updated' : ''}
                   >
                     <td>
-                      <strong style={{ color: 'var(--primary)', fontSize: '16px' }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
+                      <strong style={{
+                        color: greenTicketIds.has(order.id) ? '#16a34a' : 'var(--primary)',
+                        fontSize: '16px',
+                        transition: 'color 0.4s ease',
+                      }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDateTime(order.created_at)}</div>
                     </td>
                     <td>

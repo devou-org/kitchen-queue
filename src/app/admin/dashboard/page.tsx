@@ -36,7 +36,7 @@ export default function AdminDashboard() {
         ]);
         const statsData = await statsRes.json();
         const ordersData = await ordersRes.json();
-        
+
         if (statsData.success) setStats(statsData.data);
         if (ordersData.success) setRecentOrders(ordersData.data);
       } catch (error) {
@@ -48,7 +48,7 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
-  if (loading) return <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }}/></div>;
+  if (loading) return <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} /></div>;
 
   return (
     <div className="page-content-admin animate-fade-in">
@@ -101,14 +101,14 @@ export default function AdminDashboard() {
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.items?.length || 0} items</div>
                   </td>
                   <td>
-                    <span style={{ 
+                    <span style={{
                       padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                      background: order.status === 'READY' ? '#D1FAE5' : 
-                                 order.status === 'PENDING' ? '#FFEDD5' : 
-                                 order.status === 'PREPARING' ? '#DBEAFE' : '#F3F4F6',
-                      color: order.status === 'READY' ? '#065F46' : 
-                             order.status === 'PENDING' ? '#9A3412' : 
-                             order.status === 'PREPARING' ? '#1E40AF' : '#374151'
+                      background: order.status === 'READY' ? '#D1FAE5' :
+                        order.status === 'PENDING' ? '#FFEDD5' :
+                          order.status === 'PREPARING' ? '#DBEAFE' : '#F3F4F6',
+                      color: order.status === 'READY' ? '#065F46' :
+                        order.status === 'PENDING' ? '#9A3412' :
+                          order.status === 'PREPARING' ? '#1E40AF' : '#374151'
                     }}>
                       {order.status}
                     </span>

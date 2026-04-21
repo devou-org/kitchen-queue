@@ -27,7 +27,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const saved = localStorage.getItem('cart');
     if (saved) {
-      try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch {}
+      try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch { }
     }
 
     const user = localStorage.getItem('user');
@@ -49,7 +49,7 @@ export default function CheckoutPage() {
               localStorage.setItem('user', JSON.stringify(updated));
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }
 
       // Check if user has an active PENDING/PREPARING order
@@ -71,7 +71,7 @@ export default function CheckoutPage() {
               }
             }
           })
-          .catch(() => {})
+          .catch(() => { })
           .finally(() => setCheckingActive(false));
       } else {
         setCheckingActive(false);
@@ -128,7 +128,7 @@ export default function CheckoutPage() {
           try {
             const u = JSON.parse(existing);
             localStorage.setItem('user', JSON.stringify({ ...u, name: form.customer_name.trim() }));
-          } catch {}
+          } catch { }
         }
         localStorage.removeItem('cart');
         localStorage.removeItem('add_to_order');
@@ -256,7 +256,7 @@ export default function CheckoutPage() {
                   border: '1px dashed rgba(151,19,69,0.2)',
                 }}>
                   <p style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600 }}>
-                    + {(activeOrder.items || []).length} existing item(s) from order #{String(activeOrder.ticket_number).padStart(3,'0')}
+                    + {(activeOrder.items || []).length} existing item(s) from order #{String(activeOrder.ticket_number).padStart(3, '0')}
                   </p>
                 </div>
               )}
@@ -311,7 +311,7 @@ export default function CheckoutPage() {
                     required
                   >
                     <option value="" disabled>Select persons</option>
-                    {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                       <option key={n} value={n}>{n} Party</option>
                     ))}
                   </select>

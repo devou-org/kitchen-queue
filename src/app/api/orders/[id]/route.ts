@@ -225,8 +225,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     return NextResponse.json({ success: true, data: order, message: 'Order updated' });
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ Order Update Runtime Error:", error);
-    return NextResponse.json({ success: false, error: 'Failed to update order' }, { status: 500 });
+    const message = error?.message || 'Failed to update order';
+    // Business-logic errors (stock, invalid transition, validation) → 400
+    // Everything else (DB crash, etc.) → 500
+    const isBusinessError = typeof message === 'string' && (
+      message.startsWith('Insufficient stock') ||
+      message.startsWith('Cannot transition') ||
+      message.includes('required') ||
+      message.includes('invalid') ||
+      message.includes('not found') ||
+      message.includes('Forbidden')
+    );
+    return NextResponse.json({ success: false, error: message }, { status: isBusinessError ? 400 : 500 });
   }
 }
