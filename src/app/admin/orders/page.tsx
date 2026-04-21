@@ -91,14 +91,19 @@ export default function AdminOrders() {
           })
           .catch(() => { });
 
-        // Flash the row green (auto-clears)
-        setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-        setTimeout(() => {
-          setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
-        }, 2600);
+        // Flash the row green only when the admin is on a filter where item-updated
+        // orders are visible (PENDING or PREPARING). Customers can only add items to
+        // those statuses — so flashing on READY/PAID/CANCELLED would be a false positive.
+        const isAddableFilter = statusFilter === '' || statusFilter === 'PREPARING';
+        if (isAddableFilter) {
+          setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+          setTimeout(() => {
+            setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
+          }, 2600);
 
-        // Keep ticket number green until admin acknowledges (opens the modal)
-        setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+          // Keep ticket number green until admin acknowledges (opens the modal)
+          setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+        }
 
         toast(
           `🛒 Customer added items to order #${String(data.ticket_number).padStart(3, '0')}`,
