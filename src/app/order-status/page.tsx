@@ -66,7 +66,7 @@ export default function OrderStatusPage() {
     );
   }
 
-  const activeOrders = orders.filter(o => ['PENDING', 'READY'].includes(o.status));
+  const activeOrders = orders.filter(o => ['PENDING', 'PREPARING', 'READY'].includes(o.status));
 
   if (activeOrders.length === 0) {
     return (

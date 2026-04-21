@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
 import BottomNav from '@/components/BottomNav';
@@ -28,8 +29,11 @@ function getStageIndex(status: string) {
   return -1; // cancelled
 }
 
+const ADDABLE_STATUSES = ['PENDING', 'PREPARING'];
+
 export default function OrderStatusTicketPage({ params }: { params: Promise<{ ticket: string }> }) {
   const { ticket } = use(params);
+  const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [queueState, setQueueState] = useState<QueueState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -213,6 +217,51 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px 100px' }} className="animate-fade-in">
 
+        {/* Add More Items CTA — top of page */}
+        {ADDABLE_STATUSES.includes(order.status) ? (
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem('add_to_order', order.id);
+              router.push('/menu');
+            }}
+            style={{
+              width: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '14px',
+              marginBottom: '20px',
+              borderRadius: '14px',
+              border: '2px dashed rgba(151,19,69,0.3)',
+              background: 'rgba(151,19,69,0.04)',
+              color: 'var(--primary)',
+              fontWeight: 700, fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            ➕ Add More Items to This Order
+          </button>
+        ) : (
+          <Link
+            href="/menu"
+            onClick={() => localStorage.removeItem('add_to_order')}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '14px',
+              marginBottom: '20px',
+              borderRadius: '14px',
+              border: '1.5px solid rgba(0,0,0,0.08)',
+              background: 'rgba(0,0,0,0.02)',
+              color: 'var(--text-secondary)',
+              fontWeight: 600, fontSize: '13px',
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+            }}
+          >
+            🍽️ Order again? This will be a new order
+          </Link>
+        )}
+
         {isActive ? (
           <>
             {/* Ticket Card */}
@@ -395,6 +444,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
             </div>
           </div>
         </div>
+
+
       </div>
 
       <BottomNav />
