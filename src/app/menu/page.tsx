@@ -116,6 +116,8 @@ export default function MenuPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
+  const [isServiceActive, setIsServiceActive] = useState(true);
+  const [serviceMessage, setServiceMessage] = useState('');
 
   // Load cart from localStorage
   useEffect(() => {
@@ -136,15 +138,24 @@ export default function MenuPage() {
     setCart(new Map(newCart));
   }, []);
 
-  // Fetch products
+  // Fetch products & Service Status
   useEffect(() => {
-    const fetchProducts = async () => {
+    const initPage = async () => {
       try {
+        // Fetch products
         const res = await productService.getProducts();
         if (res.success && res.data) {
           setProducts(res.data);
           const cats = ['All', ...new Set<string>(res.data.map((p: Product) => p.category))];
           setCategories(cats);
+        }
+
+        // Fetch Service Status
+        const settingsRes = await fetch('/api/admin/settings');
+        const settingsData = await settingsRes.json();
+        if (settingsData.success) {
+          setIsServiceActive(settingsData.isServiceActive);
+          setServiceMessage(settingsData.serviceMessage || '');
         }
       } catch {
         toast.error('Failed to load menu');
@@ -152,7 +163,7 @@ export default function MenuPage() {
         setLoading(false);
       }
     };
-    fetchProducts();
+    initPage();
   }, []);
 
   // Pusher for real-time updates
@@ -283,6 +294,15 @@ export default function MenuPage() {
           </p>
         </div>
 
+        {!isServiceActive && (
+          <div className="service-closed-banner">
+            <h3 style={{ fontWeight: 800, fontSize: '16px', marginBottom: '4px' }}>🍽️ Service is Not Started</h3>
+            <p style={{ fontSize: '13px', opacity: 0.8 }}>
+              {serviceMessage || "We are currently not accepting new orders. Please check back later!"}
+            </p>
+          </div>
+        )}
+
         {/* Search */}
         <div style={{ padding: '0 16px 12px' }}>
           <input
@@ -337,7 +357,7 @@ export default function MenuPage() {
                   key={product.id}
                   product={product}
                   quantity={cart.get(product.id)?.quantity || 0}
-                  onUpdate={handleUpdate}
+                  onUpdate={isServiceActive ? handleUpdate : () => toast.error('Service is not started')}
                 />
               ))}
             </div>
@@ -346,7 +366,7 @@ export default function MenuPage() {
       </div>
 
       {/* Cart Button */}
-      {totalItems > 0 && (
+      {totalItems > 0 && isServiceActive && (
         <Link href="/cart" className="cart-btn">
           <span style={{
             background: 'rgba(255,255,255,0.25)',

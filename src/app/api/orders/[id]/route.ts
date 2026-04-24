@@ -71,6 +71,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Customer may ONLY update items, and only when order is PENDING/PREPARING
     if (!admin && customer) {
+      // 🛡️ CHECK SERVICE STATUS FOR CUSTOMERS
+      const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE id = 1 LIMIT 1` as {is_service_active: boolean, service_message: string}[];
+      if (settings[0] && !settings[0].is_service_active) {
+        return NextResponse.json({
+          success: false,
+          error: settings[0].service_message || 'Service is not started'
+        }, { status: 403 });
+      }
+
       // Customers can only touch `items`
       if (status || typeof is_paid !== 'undefined' || table_number || customer_name || phone || notes !== undefined || party_size) {
         return NextResponse.json({ success: false, error: 'Customers can only add items to an order' }, { status: 403 });
@@ -78,6 +87,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (!Array.isArray(items)) {
         return NextResponse.json({ success: false, error: 'No items provided' }, { status: 400 });
       }
+      
+      // ... rest of the customer logic
 
       // 🛡️ SECURITY FIX: Enforce that customers CANNOT remove items or decrease quantities.
       // E.g., someone intercepting the API request to delete items after the kitchen started cooking.

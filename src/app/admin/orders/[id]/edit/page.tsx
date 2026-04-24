@@ -184,12 +184,38 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
   }
 
   return (
-    <div className="page-content-admin animate-fade-in">
-      <div style={{ marginBottom: '24px' }}>
-        <Link href="/admin/orders" style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none' }}>
+    <div className="page-content-admin animate-fade-in" style={{ position: 'relative' }}>
+      {/* Top Right Close Button */}
+      <Link 
+        href="/admin/orders" 
+        style={{ 
+          position: 'absolute', 
+          top: '32px', 
+          right: '32px', 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '36px',
+          height: '36px',
+          borderRadius: '50%',
+          background: 'var(--card)',
+          boxShadow: 'var(--shadow)',
+          color: 'var(--text-secondary)',
+          textDecoration: 'none',
+          fontSize: '24px',
+          fontWeight: 300,
+          zIndex: 10
+        }}
+        title="Close and return to orders"
+      >
+        ×
+      </Link>
+
+      <div style={{ marginBottom: '24px', paddingTop: '8px' }}>
+        <Link href="/admin/orders" style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>
           ← Back to Orders
         </Link>
-        <h1 style={{ fontSize: '28px', fontWeight: 800, marginTop: '8px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 800 }}>
           Edit Order #{String(order.ticket_number).padStart(3, '0')}
         </h1>
       </div>

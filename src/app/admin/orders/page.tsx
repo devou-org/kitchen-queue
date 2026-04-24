@@ -117,22 +117,45 @@ export default function AdminOrders() {
     channel.bind('new_order', (data: any) => {
       toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
       fetchOrdersDebounced(true);
-
-      // Trigger blink for new orders
-      if (data.order_id) {
-        setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-        setTimeout(() => {
-          setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
-        }, 2600);
-        setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-      }
     });
 
     channel.bind('order_update', (data: any) => {
-      fetchOrdersDebounced(true);
+      // 1. PATCH LOCAL STATE (The "incremental" way)
+      // This makes the UI update INSTANTLY without a network request
+      setOrders(prev => {
+        const orderIndex = prev.findIndex(o => o.id === data.order_id);
+        if (orderIndex === -1) return prev; // Not in current filter, ignore
 
-      // Only log item additions to existing orders
+        return prev.map(o => {
+          if (o.id === data.order_id) {
+            return {
+              ...o,
+              status: data.new_status || o.status,
+              table_number: data.table_number || o.table_number,
+              is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : o.is_paid,
+            };
+          }
+          return o;
+        }).filter(o => {
+          if (statusFilter && statusFilter !== 'ALL') {
+             return o.status === statusFilter;
+          }
+          return true;
+        });
+      });
+
+      // 2. HIGHLIGHT & LOG ADDITIONS
+      // Only log and highlight if items were actually added to an existing order
       if (data.items_updated && data.added_items) {
+        // Trigger blink for item additions
+        if (data.order_id) {
+          setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+          setTimeout(() => {
+            setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
+          }, 2600);
+          setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+        }
+
         const newUpdate: OrderUpdateLog = {
           id: Math.random().toString(),
           order_id: data.order_id,
@@ -151,6 +174,12 @@ export default function AdminOrders() {
           `🛒 Customer added items to order #${String(data.ticket_number).padStart(3, '0')}`,
           { icon: '🟢', duration: 5000, style: { fontWeight: 700 } }
         );
+        
+        // Full background refresh to get accurate totals/item list
+        fetchOrdersDebounced(true);
+      } else if (!data.items_updated) {
+        // Just a status/payment change? Local patch above is enough, 
+        // no need to re-fetch unless you want absolute safety.
       }
 
       // Sync Modal if open

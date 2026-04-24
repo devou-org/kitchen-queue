@@ -40,6 +40,109 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/admin/login');
   };
 
+  const ServiceToggle = () => {
+    const [isActive, setIsActive] = useState(true);
+    const [message, setMessage] = useState('');
+    const [toggling, setToggling] = useState(false);
+    const [showSaved, setShowSaved] = useState(false);
+
+    useEffect(() => {
+      fetch('/api/admin/settings')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setIsActive(data.isServiceActive);
+            setMessage(data.serviceMessage || '');
+          }
+        });
+    }, []);
+
+    const updateService = async (newActive: boolean, newMessage?: string) => {
+      setToggling(true);
+      setShowSaved(false);
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: newActive, message: newMessage ?? message })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setIsActive(newActive);
+          if (newMessage !== undefined) {
+            setMessage(newMessage);
+            setShowSaved(true);
+            setTimeout(() => setShowSaved(false), 2000);
+          }
+        }
+      } catch {
+        // Fallback
+      } finally {
+        setToggling(false);
+      }
+    };
+
+    return (
+      <div style={{ marginBottom: '16px', marginTop: '-4px' }}>
+        <div className="status-toggle-wrapper" style={{ marginBottom: '12px' }}>
+          <div className="status-toggle-label">
+            <span className="status-label-primary">Service Status</span>
+            <span className="status-label-secondary" style={{ color: isActive ? 'var(--success)' : '#ef4444' }}>
+              {isActive ? 'Online' : 'Offline'}
+            </span>
+          </div>
+          <label className="switch">
+            <input type="checkbox" checked={isActive} onChange={(e) => updateService(e.target.checked)} disabled={toggling} />
+            <span className="slider"></span>
+          </label>
+        </div>
+        
+        {!isActive && (
+          <div className="animate-fade-in" style={{ padding: '0 4px' }}>
+            <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>
+              Offline Reason / Message
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input 
+                type="text" 
+                value={message} 
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="e.g. Kitchen Break"
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  color: 'white',
+                  fontSize: '13px'
+                }}
+              />
+              <button 
+                onClick={() => updateService(false, message)}
+                disabled={toggling}
+                style={{
+                  background: toggling ? 'rgba(255,255,255,0.1)' : 'var(--primary)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  color: 'white',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  textAlign: 'center'
+                }}
+              >
+                {toggling ? 'Saving...' : showSaved ? '✅ Saved!' : 'Update Message'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const navLinks = [
     { name: 'Orders', href: '/admin/orders', icon: <ClipboardList size={20} strokeWidth={2.5} /> },
     { name: 'Statements', href: '/admin/statements', icon: <Wallet size={20} strokeWidth={2.5} /> },
@@ -93,6 +196,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
         <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
+          <ServiceToggle />
           <button 
             className="btn btn-ghost" 
             style={{ width: '100%', color: 'rgba(255,255,255,0.7)', justifyContent: 'flex-start' }}

@@ -40,6 +40,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Check Service Status FIRST
+    const { default: sql } = await import('@/lib/db');
+    const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE id = 1 LIMIT 1` as {is_service_active: boolean, service_message: string}[];
+    
+    if (settings[0] && !settings[0].is_service_active) {
+      return NextResponse.json({
+        success: false,
+        error: settings[0].service_message || 'Service is not started'
+      }, { status: 403 });
+    }
+
     const body = await request.json();
     const { customer_name, phone, items, notes, party_size } = body;
 
