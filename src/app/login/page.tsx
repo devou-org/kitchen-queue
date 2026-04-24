@@ -140,6 +140,7 @@ export default function LoginPage() {
         router.push('/menu');
       } else {
         toast.error(data.error || 'Invalid OTP');
+        setCooldown(0); // Re-enable Send OTP button on wrong PIN
       }
     } catch {
       toast.error('Network error. Please try again.');
@@ -222,10 +223,12 @@ export default function LoginPage() {
               className="btn btn-primary btn-lg"
               style={{ width: '100%' }}
               onClick={handleSendOTP}
-              disabled={loading || !phone.trim()}
+              disabled={loading || !phone.trim() || cooldown > 0}
             >
               {loading && step === 'phone' ? (
                 <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Sending...</>
+              ) : cooldown > 0 ? (
+                <>Resend in {cooldown}s</>
               ) : (
                 <>Send OTP →</>
               )}
