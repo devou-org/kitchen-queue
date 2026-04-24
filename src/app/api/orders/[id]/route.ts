@@ -115,6 +115,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           error: `Cannot add items to an order in ${existing.status} state`,
         }, { status: 400 });
       }
+
+      // 🛡️ DATE CHECK: Customers can only add to orders created TODAY (Local Time)
+      const now = new Date();
+      const localTimezone = 'Asia/Kolkata';
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(now);
+      const orderDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date(existing.created_at));
+
+      if (orderDateStr !== todayStr) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'This order is from a previous day and cannot be updated. Please place a new order.' 
+        }, { status: 400 });
+      }
+
       // Verify the order belongs to this customer (by phone)
       if (customer.phone && existing.phone !== customer.phone) {
         return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
@@ -230,8 +244,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
       }
 
-      // ✅ STOCK RESTORATION: If transitioning TO 'CANCELLED' from anything else
-      if (status === 'CANCELLED' && existing.status !== 'CANCELLED') {
+      // ✅ STOCK RESTORATION: If transitioning TO 'CANCELLED' or 'EXPIRED'
+      if ((status === 'CANCELLED' || status === 'EXPIRED') && existing.status !== 'CANCELLED' && existing.status !== 'EXPIRED') {
         try {
           // 1. Get database instance (import sql from lib/db) or use a helper
           // Actually, let's use a helper in db.ts to keep this clean

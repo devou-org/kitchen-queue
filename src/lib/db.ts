@@ -681,7 +681,7 @@ export async function expireOldOrders() {
   let expiredCount = 0;
   for (const row of toExpire) {
     try {
-      await updateOrderStatus(row.id, 'CANCELLED');
+      await updateOrderStatus(row.id, 'EXPIRED');
       await restoreOrderStock(row.id);
       expiredCount++;
     } catch (err) {
@@ -882,10 +882,11 @@ export async function getCategories() {
     console.warn('⚠️ categories table fetch failed, falling back to products table categories:', err);
     // Fallback: Get unique categories from products table to satisfy the UI
     const fallbackRows = await sql`
-      SELECT DISTINCT category as name, gen_random_uuid() as id 
+      SELECT DISTINCT TRIM(category) as name, MIN(id::text) as id 
       FROM products 
       WHERE category IS NOT NULL AND category != ''
-      ORDER BY category ASC
+      GROUP BY TRIM(category)
+      ORDER BY name ASC
     `;
     return fallbackRows;
   }

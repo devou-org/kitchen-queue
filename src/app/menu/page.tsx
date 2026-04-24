@@ -146,8 +146,13 @@ export default function MenuPage() {
         const res = await productService.getProducts();
         if (res.success && res.data) {
           setProducts(res.data);
-          const cats = ['All', ...new Set<string>(res.data.map((p: Product) => p.category))];
-          setCategories(cats);
+          // Ensure categories are unique, trimmed, and "All" is not duplicated
+          const uniqueCats = Array.from(new Set(
+            res.data
+              .map((p: Product) => p.category?.trim())
+              .filter((cat: string) => cat && cat !== 'All')
+          ));
+          setCategories(['All', ...uniqueCats]);
         }
 
         // Fetch Service Status

@@ -137,8 +137,10 @@ export default function AdminOrders() {
           }
           return o;
         }).filter(o => {
-          if (statusFilter && statusFilter !== 'ALL') {
-             return o.status === statusFilter;
+          // If statusFilter is empty, we are in the default "PENDING" view
+          const currentFilter = statusFilter || 'PENDING';
+          if (currentFilter !== 'ALL') {
+             return o.status === currentFilter;
           }
           return true;
         });
@@ -191,19 +193,6 @@ export default function AdminOrders() {
           }
         }).catch(() => {});
       }
-
-      // Flash UI logic: Only for PENDING, PREPARING, and READY
-      const FLASHABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
-      const isFlashableStatus = FLASHABLE_STATUSES.includes(data.new_status);
-      const matchesCurrentFilter = statusFilter === '' || statusFilter === data.new_status;
-
-      if (isFlashableStatus && matchesCurrentFilter && data.order_id) {
-        setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-        setTimeout(() => {
-          setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
-        }, 2600);
-        setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-      }
     });
 
 
@@ -246,8 +235,8 @@ export default function AdminOrders() {
     }
   };
 
-  const activeStatuses = ['PREPARING', 'READY', 'PAID', 'CANCELLED']; // Exclude PENDING as it's the default
-  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
+  const activeStatuses = ['PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED']; // Exclude PENDING as it's the default
+  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED'];
 
   const readySearchTerm = readySearch.trim().toLowerCase();
   const displayedOrders = statusFilter === 'READY' && readySearchTerm

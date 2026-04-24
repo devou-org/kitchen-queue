@@ -8,6 +8,7 @@ export const ORDER_STATUSES = {
   READY: 'READY',
   PAID: 'PAID',
   CANCELLED: 'CANCELLED',
+  EXPIRED: 'EXPIRED',
 } as const;
 
 export const PRODUCT_STATUSES = {
@@ -17,11 +18,12 @@ export const PRODUCT_STATUSES = {
 } as const;
 
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
-  PENDING: ['PREPARING', 'READY', 'PAID', 'CANCELLED'],
-  PREPARING: ['READY', 'PAID', 'CANCELLED', 'PENDING'],
-  READY: ['PAID', 'CANCELLED', 'PENDING', 'PREPARING'],
-  PAID: ['PENDING', 'CANCELLED', 'PREPARING', 'READY'],
+  PENDING: ['PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED'],
+  PREPARING: ['READY', 'PAID', 'CANCELLED', 'PENDING', 'EXPIRED'],
+  READY: ['PAID', 'CANCELLED', 'PENDING', 'PREPARING', 'EXPIRED'],
+  PAID: ['PENDING', 'CANCELLED', 'PREPARING', 'READY', 'EXPIRED'],
   CANCELLED: ['PENDING'],
+  EXPIRED: ['PENDING'],
 };
 
 export const TAX_RATE = 0; // Tax removed
@@ -44,6 +46,7 @@ export const STATUS_COLORS: Record<string, string> = {
   READY: '#06A77D',
   PAID: '#6B7280',
   CANCELLED: '#C1272D',
+  EXPIRED: '#6B7280',
   AVAILABLE: '#06A77D',
   LOW_STOCK: '#FFA500',
   OUT_OF_STOCK: '#C1272D',
@@ -55,4 +58,5 @@ export const STATUS_BG: Record<string, string> = {
   READY: 'bg-green-100 text-green-800',
   PAID: 'bg-gray-100 text-gray-600',
   CANCELLED: 'bg-red-100 text-red-800',
+  EXPIRED: 'bg-gray-100 text-gray-600',
 };
