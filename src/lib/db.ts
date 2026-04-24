@@ -774,7 +774,7 @@ export async function getDailyAnalytics(dateFrom: string, dateTo: string) {
       DATE(created_at) as date,
       COUNT(*) as total_orders,
       SUM(total_price) as revenue,
-      AVG(EXTRACT(EPOCH FROM (COALESCE(completed_at, updated_at) - created_at))) as avg_wait_time,
+      AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as avg_wait_time,
       MODE() WITHIN GROUP (ORDER BY EXTRACT(HOUR FROM created_at)) as peak_hour
     FROM orders
     WHERE DATE(created_at) BETWEEN ${dateFrom} AND ${dateTo}

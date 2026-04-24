@@ -30,10 +30,6 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [tempTableNumber, setTempTableNumber] = useState('');
-  // Controls the green row-blink animation (auto-clears after 2.6s)
-  const [flashedOrderIds, setFlashedOrderIds] = useState<Set<string>>(new Set());
-  // Controls the persistent green ticket number (clears only when admin opens the modal)
-  const [greenTicketIds, setGreenTicketIds] = useState<Set<string>>(new Set());
   const ordersRef = useRef<Order[]>([]);
 
   // Kitchen Snapshot States
@@ -149,14 +145,6 @@ export default function AdminOrders() {
       // 2. HIGHLIGHT & LOG ADDITIONS
       // Only log and highlight if items were actually added to an existing order
       if (data.items_updated && data.added_items) {
-        // Trigger blink for item additions
-        if (data.order_id) {
-          setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-          setTimeout(() => {
-            setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
-          }, 2600);
-          setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-        }
 
         const newUpdate: OrderUpdateLog = {
           id: Math.random().toString(),
@@ -255,8 +243,6 @@ export default function AdminOrders() {
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
     setTempTableNumber(order.table_number || '');
-    // Acknowledge: clear the green ticket highlight for this order
-    setGreenTicketIds(prev => { const next = new Set(prev); next.delete(order.id); return next; });
   };
   const closeModal = () => {
     setSelectedOrder(null);
@@ -391,11 +377,10 @@ export default function AdminOrders() {
                     key={order.id}
                     onClick={() => openOrderModal(order)}
                     style={{ cursor: 'pointer' }}
-                    className={flashedOrderIds.has(order.id) ? 'row-items-updated' : ''}
                   >
                     <td>
                       <strong style={{
-                        color: greenTicketIds.has(order.id) ? '#16a34a' : 'var(--primary)',
+                        color: 'var(--primary)',
                         fontSize: '16px',
                         transition: 'color 0.4s ease',
                       }}>#{String(order.ticket_number).padStart(3, '0')}</strong>

@@ -41,13 +41,12 @@ export default function AdminInventorySummary() {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [page, setPage] = useState(1);
   const [dateFrom, setDateFrom] = useState(() =>
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(
-      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    )
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
   );
   const [dateTo, setDateTo] = useState(() =>
     new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
   );
+  const [orderCount, setOrderCount] = useState(0);
 
   const fetchData = useCallback(async (manualFrom?: string, manualTo?: string) => {
     setLoading(true);
@@ -55,13 +54,18 @@ export default function AdminInventorySummary() {
       const from = manualFrom || dateFrom;
       const to = manualTo || dateTo;
       
-      const [invRes, catRes] = await Promise.all([
+      const [invRes, catRes, dailyRes] = await Promise.all([
         inventoryService.getTopProducts({
           limit: 100,
           date_from: from,
           date_to: to,
         }),
-        inventoryService.getCategories()
+        inventoryService.getCategories(),
+        fetch(`/api/analytics?type=daily&date_from=${from}&date_to=${to}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('auth_token')}`
+          }
+        }).then(res => res.json())
       ]);
 
       if (invRes.success && invRes.data) setItems(invRes.data);
@@ -72,6 +76,13 @@ export default function AdminInventorySummary() {
             .filter((name: string) => name && name !== 'All')
         ));
         setCategories(['All', ...uniqueCats]);
+      }
+
+      if (dailyRes.success && dailyRes.data) {
+        const totalOrd = (dailyRes.data as any[]).reduce((sum, day) => sum + Number(day.total_orders || 0), 0);
+        setOrderCount(totalOrd);
+      } else {
+        setOrderCount(0);
       }
     } finally {
       setLoading(false);
@@ -97,6 +108,7 @@ export default function AdminInventorySummary() {
 
   const totalRevenue = filtered.reduce((s, i) => s + Number(i.total_revenue), 0);
   const totalUnits = filtered.reduce((s, i) => s + Number(i.total_quantity), 0);
+  const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
 
   return (
     <div className="page-content-admin animate-fade-in">
@@ -147,8 +159,8 @@ export default function AdminInventorySummary() {
           <h3 className="stat-value">{totalUnits.toLocaleString()}</h3>
         </div>
         <div className="stat-card">
-          <p className="stat-label">Unique Items</p>
-          <h3 className="stat-value">{filtered.length}</h3>
+          <p className="stat-label">Avg Order Value</p>
+          <h3 className="stat-value">{formatPrice(avgOrderValue)}</h3>
         </div>
       </div>
 
