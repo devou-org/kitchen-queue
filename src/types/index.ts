@@ -146,3 +146,14 @@ export interface DashboardStats {
   low_stock_items: number;
   peak_hour: string;
 }
+
+export interface OrderFilters {
+  status?: string;
+  status_in?: string;
+  date_from?: string;
+  date_to?: string;
+  phone?: string;
+  sort?: 'ASC' | 'DESC';
+  page?: number;
+  per_page?: number;
+}

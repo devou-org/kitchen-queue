@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
+import { inventoryService } from '@/app/services/inventory.api';
 
 interface Category {
   id: string;
@@ -34,10 +35,9 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/categories');
-      const data = await res.json();
-      if (data.success) {
-        setCategories(data.data);
+      const res = await inventoryService.getCategories();
+      if (res.success && res.data) {
+        setCategories(res.data);
       }
     } catch (err) {
       console.error('Failed to load categories', err);
@@ -50,8 +50,12 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
     try {
       const res = await fetch('/api/categories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('auth_token')}`
+        },
         body: JSON.stringify({ name: newCategoryName.trim() }),
+        cache: 'no-store'
       });
       const data = await res.json();
       if (data.success) {
@@ -77,15 +81,19 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
     }
 
     setLoading(true);
+    // Explicitly parse values to ensure type safety
+    const stockVal = parseInt(form.stock_quantity);
+    const bufferVal = parseInt(form.buffer_quantity);
+
     const payload = {
-      name: form.name,
-      description: form.description,
+      name: form.name.trim(),
+      description: form.description.trim(),
       category: form.category,
       price: parseFloat(form.price),
-      stock_quantity: parseInt(form.stock_quantity) || 0,
-      buffer_quantity: parseInt(form.buffer_quantity) || 0,
-      image_url: form.image_url,
-      status: parseInt(form.stock_quantity) > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK'
+      stock_quantity: isNaN(stockVal) ? 0 : stockVal,
+      buffer_quantity: isNaN(bufferVal) ? 0 : bufferVal,
+      image_url: form.image_url.trim(),
+      // status is deliberately removed to let server calculate based on stock/buffer
     };
 
     try {
@@ -96,6 +104,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        cache: 'no-store'
       });
 
       const data = await res.json();
@@ -143,6 +152,9 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
                 style={{ flex: 1 }}
               >
                 <option value="">Select Category</option>
+                {form.category && !categories.find(c => c.name === form.category) && (
+                  <option value={form.category}>{form.category}</option>
+                )}
                 {categories.map(cat => (
                   <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}

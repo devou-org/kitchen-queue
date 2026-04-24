@@ -6,6 +6,7 @@ import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import { pusherClient } from '@/lib/pusher-client';
+import { orderService } from '@/app/services/orders.api';
 
 type QueueState = {
   type: string;
@@ -29,7 +30,7 @@ function getStageIndex(status: string) {
   return -1; // cancelled
 }
 
-const ADDABLE_STATUSES = ['PENDING', 'PREPARING'];
+const ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
 
 export default function OrderStatusTicketPage({ params }: { params: Promise<{ ticket: string }> }) {
   const { ticket } = use(params);
@@ -43,18 +44,12 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const orderRef = useRef<Order | null>(null);
   useEffect(() => { orderRef.current = order; }, [order]);
 
+  const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     const fetchOrder = async (silent = false) => {
       try {
-        // Cache-buster and no-store added for guaranteed fresh data
-        const res = await fetch(`/api/orders/ticket/${ticket}?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        const data = await res.json();
+        const data = await orderService.getOrderByTicket(ticket);
 
         if (data.success && data.data) {
           setOrder(data.data);
@@ -71,6 +66,14 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
       }
     };
 
+    const fetchOrderDebounced = (silent = false) => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+      fetchDebounceRef.current = setTimeout(() => {
+        fetchOrder(silent);
+        fetchDebounceRef.current = null;
+      }, 400);
+    };
+
     fetchOrder();
 
     if (!pusherClient) return;
@@ -84,31 +87,21 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
     channel.bind('pusher:subscription_error', () => {
       setIsLive(false);
-
     });
 
-    // ✅ RE-FETCH ON ANY EVENT THAT AFFECTS QUEUE
     channel.bind('order_update', (data: any) => {
-      console.log('🔔 Ticket Page received order_update:', data);
-
       const currentTicketInt = parseInt(ticket);
       const currentOrder = orderRef.current;
-      const isOurOrder = data.ticket_number === currentTicketInt || (currentOrder?.id && data.order_id === currentOrder.id);
+      const isOurOrder = data.ticket_number === currentTicketInt ||
+        (currentOrder?.id && data.order_id === currentOrder.id);
 
       if (isOurOrder) {
-        console.log('✨ This update is for US! Patching state...');
-
         // 📢 NOTIFICATION SOUND: When status becomes READY
         if (data.new_status === 'READY' && currentOrder?.status !== 'READY') {
           try {
-            // Use a built-in browser sound or a high-quality notification sound URL
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.play().catch(() => {
-              console.log('Audio autoplay blocked. User must interact first.');
-            });
-          } catch (err) {
-            console.error('Failed to play sound:', err);
-          }
+            audio.play().catch(() => {});
+          } catch { }
         }
 
         setOrder(prev => {
@@ -118,19 +111,28 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
           if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
           return updated;
         });
+
+        // Re-fetch our own order to get updated data (items, table, etc.)
+        fetchOrderDebounced(true);
+        return;
       }
 
-      // We re-fetch for ANY update to ensure position is correct
-      fetchOrder(true);
+      // For other orders: only re-fetch if it was AHEAD of us in the queue
+      // (lower ticket number) AND it changed out of PENDING — that shifts our position.
+      const isAhead = data.ticket_number < currentTicketInt;
+      const removedFromQueue = data.new_status && data.new_status !== 'PENDING';
+      if (isAhead && removedFromQueue && currentOrder?.status === 'PENDING') {
+        fetchOrderDebounced(true);
+      }
     });
 
+    // new_order events always get HIGHER ticket numbers → never affect our position
     channel.bind('new_order', () => {
-      console.log('🔔 Ticket Page received new_order');
-      fetchOrder(true);
+      // intentional no-op
     });
 
     return () => {
-      console.log('🚿 Cleaning up Pusher subscription');
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       channel.unbind_all();
       if (pusherClient) pusherClient.unsubscribe('queue-channel');
     };

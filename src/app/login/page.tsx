@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { authService } from '@/app/services/auth.api';
 
 const COUNTRY_CODES = [
   { code: '+91', label: '🇮🇳 +91', country: 'India' },
@@ -22,7 +23,7 @@ export default function LoginPage() {
   useEffect(() => {
     // Check if user is already logged in (skip OTP)
     const token = localStorage.getItem('auth_token');
-    const user = localStorage.getItem('user');
+    const user = authService.getUser();
     if (token && user) {
       router.push('/menu');
     }
@@ -51,18 +52,12 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: fullPhone }),
-      });
-      const data = await res.json();
+      const data = await authService.sendOtp(fullPhone);
       if (data.success) {
         setOtpToken(data.otp_token || '');
         setStep('otp');
         setCooldown(60);
         toast.success('OTP sent to your phone!');
-
       } else {
         toast.error(data.error || 'Failed to send OTP');
       }
@@ -131,16 +126,11 @@ export default function LoginPage() {
     if (!otpToken) return toast.error('OTP session expired. Please request a new OTP.');
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: otpCode, otp_token: otpToken }),
-      });
-      const data = await res.json();
+      const data = await authService.verifyOtp(otpCode, otpToken);
       if (data.success) {
         // Store in localStorage for client-side access
-        localStorage.setItem('auth_token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.token) localStorage.setItem('auth_token', data.token);
+        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
 
         // Also set as a cookie so the Next.js middleware can see it on navigation
         const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds

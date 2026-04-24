@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Order, Product } from '@/types';
 import { formatPrice } from '@/lib/format';
 import { validatePhone } from '@/lib/validators';
+import { orderService } from '@/app/services/orders.api';
 
 type EditableItem = {
   product_id: string;
@@ -34,20 +35,19 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
     const fetchData = async () => {
       try {
         const [orderRes, productsRes] = await Promise.all([
-          fetch(`/api/orders/${id}`),
-          fetch('/api/products'),
+          orderService.getOrderById(id),
+          fetch('/api/products', { cache: 'no-store' }),
         ]);
 
-        const orderData = await orderRes.json();
         const productsData = await productsRes.json();
 
-        if (!orderData.success) {
-          toast.error(orderData.error || 'Order not found');
+        if (!orderRes.success || !orderRes.data) {
+          toast.error(orderRes.error || 'Order not found');
           setLoading(false);
           return;
         }
 
-        const loadedOrder: Order = orderData.data;
+        const loadedOrder: Order = orderRes.data;
         setOrder(loadedOrder);
         setForm({
           customer_name: loadedOrder.customer_name || '',
@@ -142,18 +142,13 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/orders/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_name: customerName,
-          phone,
-          notes: form.notes.trim(),
-          party_size: partySize,
-          items,
-        }),
+      const data = await orderService.updateOrder(id, {
+        customer_name: customerName,
+        phone,
+        notes: form.notes.trim(),
+        party_size: partySize,
+        items,
       });
-      const data = await res.json();
 
       if (!data.success) {
         toast.error(data.error || 'Failed to update order');

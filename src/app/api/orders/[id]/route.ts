@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrderById, updateOrderStatus, setOrderPaymentStatus, updateOrderDetails } from '@/lib/db';
+import sql, { getOrderById, updateOrderStatus, setOrderPaymentStatus, updateOrderDetails } from '@/lib/db';
+import { Order, OrderItem } from '@/types';
 import { verifyToken } from '@/lib/auth';
 import { STATUS_TRANSITIONS } from '@/lib/constants';
 import { pusherServer } from '@/lib/pusher';
 import { validatePhone } from '@/lib/validators';
 
-const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING'];
+const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
 
 async function requireAdmin(request: NextRequest) {
+  // --- TEST BYPASS (Development only) ---
+  if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
+    return { isAdmin: true, userId: 'test-admin' };
+  }
+
   const adminToken = request.cookies.get('admin_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
   const token = adminToken || authHeader;
@@ -18,6 +24,11 @@ async function requireAdmin(request: NextRequest) {
 }
 
 async function getAuthContext(request: NextRequest) {
+  // --- TEST BYPASS (Development only) ---
+  if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
+    return { admin: { isAdmin: true, userId: 'test-admin' }, customer: null };
+  }
+
   const adminToken = request.cookies.get('admin_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
   const token = adminToken || authHeader;
@@ -66,6 +77,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
       if (!Array.isArray(items)) {
         return NextResponse.json({ success: false, error: 'No items provided' }, { status: 400 });
+      }
+
+      // 🛡️ SECURITY FIX: Enforce that customers CANNOT remove items or decrease quantities.
+      // E.g., someone intercepting the API request to delete items after the kitchen started cooking.
+      const existingQtyMap = new Map<string, number>();
+      for (const item of (existing.items || [])) {
+        existingQtyMap.set(item.product_id, (existingQtyMap.get(item.product_id) || 0) + Number(item.quantity));
+      }
+      const newQtyMap = new Map<string, number>();
+      for (const item of items) {
+        newQtyMap.set(item.product_id, (newQtyMap.get(item.product_id) || 0) + Number(item.quantity || 0));
+      }
+      for (const [productId, oldQty] of existingQtyMap.entries()) {
+        const newQty = newQtyMap.get(productId) || 0;
+        if (newQty < oldQty) {
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Customers cannot remove items or decrease quantities once an order is placed.' 
+          }, { status: 403 });
+        }
       }
       if (!CUSTOMER_ADDABLE_STATUSES.includes(existing.status)) {
         return NextResponse.json({
@@ -132,10 +163,38 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       order = await updateOrderDetails(id, payload);
 
+      // 🔔 BROADCAST DETAILS UPDATE (With added items specific info)
       try {
+        let addedItemsList: { product_name: string; quantity: number }[] = [];
+        
+        if (Array.isArray(items)) {
+          const oldItemsMap = new Map((existing.items as OrderItem[] || []).map((i: OrderItem) => [i.product_id, i.quantity]));
+          const productIdsToFetch = new Set<string>();
+          
+          const deltas: { product_id: string; quantity: number }[] = [];
+          for (const item of items) {
+            const oldQty = oldItemsMap.get(item.product_id) || 0;
+            if (item.quantity > oldQty) {
+              deltas.push({ product_id: item.product_id, quantity: item.quantity - oldQty });
+              productIdsToFetch.add(item.product_id);
+            }
+          }
+
+          if (deltas.length > 0) {
+            const products = await sql`SELECT id, name FROM products WHERE id = ANY(${Array.from(productIdsToFetch)})` as {id: string, name: string}[];
+            const nameMap = new Map<string, string>((products || []).map((p: {id: string, name: string}) => [p.id, p.name]));
+            
+            addedItemsList = deltas.map(d => ({
+              product_name: (nameMap.get(d.product_id) || 'Unknown Item') as string,
+              quantity: d.quantity
+            }));
+          }
+        }
+
         await pusherServer.trigger('queue-channel', 'order_update', {
           type: 'order_update',
-          items_updated: Array.isArray(payload.items), // flag for admin to know items changed
+          items_updated: Array.isArray(payload.items),
+          added_items: addedItemsList.length > 0 ? addedItemsList : undefined,
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: order.status,

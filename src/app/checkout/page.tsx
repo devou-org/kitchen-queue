@@ -4,11 +4,13 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
 import { CartItem, Order } from '@/types';
+import { authService } from '@/app/services/auth.api';
+import { orderService } from '@/app/services/orders.api';
 import { TAX_RATE } from '@/lib/constants';
 import BottomNav from '@/components/BottomNav';
 
 // Statuses where adding to an existing order is allowed
-const ADDABLE_STATUSES = ['PENDING', 'PREPARING'];
+const ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -40,30 +42,29 @@ export default function CheckoutPage() {
       setForm(f => ({ ...f, phone: localPhone, customer_name: localName }));
 
       if (token && !localName && localPhone) {
-        fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } })
-          .then(r => r.json())
+        authService.me()
           .then(data => {
-            if (data.success && data.user?.name) {
-              setForm(f => ({ ...f, customer_name: data.user.name }));
-              const updated = { ...u, name: data.user.name };
+            if (data.success && data.user && data.user.name) {
+              const userName = data.user.name;
+              setForm(f => ({ ...f, customer_name: userName }));
+              const updated = { ...u, name: userName };
               localStorage.setItem('user', JSON.stringify(updated));
             }
           })
           .catch(() => { });
       }
 
-      // Check if user has an active PENDING/PREPARING order
+      // Check if user has an active PENDING/PREPARING order FROM TODAY
       if (localPhone) {
-        const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
-        fetch(`/api/orders/history?phone=${encodeURIComponent(localPhone)}&t=${Date.now()}`, {
-          headers: authHeader as HeadersInit,
-        })
-          .then(r => r.json())
+        orderService.getHistory(localPhone)
           .then(data => {
             if (data.success && data.data) {
-              const active = (data.data as Order[]).find(o =>
-                ADDABLE_STATUSES.includes(o.status)
-              );
+              const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+              const active = (data.data as Order[]).find(o => {
+                const orderDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(o.created_at));
+                return ADDABLE_STATUSES.includes(o.status) && orderDate === todayStr;
+              });
+              
               if (active) {
                 setActiveOrder(active);
                 // Always add to existing order automatically
@@ -99,30 +100,21 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
       const orderItems = items.map(i => ({
         product_id: i.product_id,
         quantity: i.quantity,
         price_at_purchase: i.price,
       }));
 
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          customer_name: form.customer_name.trim(),
-          phone: form.phone,
-          items: orderItems,
-          notes: form.notes.trim() || undefined,
-          party_size: parseInt(form.party_size),
-        }),
+      const data = await orderService.createOrder({
+        customer_name: form.customer_name.trim(),
+        phone: form.phone,
+        items: orderItems,
+        notes: form.notes.trim() || undefined,
+        party_size: parseInt(form.party_size),
       });
 
-      const data = await res.json();
-      if (data.success) {
+      if (data.success && data.data) {
         const existing = localStorage.getItem('user');
         if (existing) {
           try {
@@ -151,8 +143,6 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-
       // Merge existing order items + new cart items
       const existingItems: { product_id: string; quantity: number }[] = (activeOrder.items || []).map(
         (oi: any) => ({ product_id: oi.product_id, quantity: Number(oi.quantity) })
@@ -171,16 +161,8 @@ export default function CheckoutPage() {
         quantity,
       }));
 
-      const res = await fetch(`/api/orders/${activeOrder.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ items: mergedItems }),
-      });
+      const data = await orderService.updateOrder(activeOrder.id, { items: mergedItems });
 
-      const data = await res.json();
       if (data.success) {
         localStorage.removeItem('cart');
         localStorage.removeItem('add_to_order');

@@ -7,6 +7,7 @@ import { formatPrice } from '@/lib/format';
 import { Product, CartItem, ProductStatus } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import { pusherClient } from '@/lib/pusher-client';
+import { productService } from '@/app/services/products.api';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -139,11 +140,10 @@ export default function MenuPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch('/api/products');
-        const data = await res.json();
-        if (data.success) {
-          setProducts(data.data);
-          const cats = ['All', ...new Set<string>(data.data.map((p: Product) => p.category))];
+        const res = await productService.getProducts();
+        if (res.success && res.data) {
+          setProducts(res.data);
+          const cats = ['All', ...new Set<string>(res.data.map((p: Product) => p.category))];
           setCategories(cats);
         }
       } catch {

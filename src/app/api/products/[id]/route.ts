@@ -14,6 +14,8 @@ async function requireAdmin(request: NextRequest) {
   return payload;
 }
 
+
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -34,17 +36,27 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const body = await request.json();
 
+    // Re-verify existing product to handle atomic status calculation
+    const existing = await getProductById(id);
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
+    }
+
+    // Ensure numeric types for stock and buffer
+    if (body.stock_quantity !== undefined) body.stock_quantity = parseInt(body.stock_quantity.toString());
+    if (body.buffer_quantity !== undefined) body.buffer_quantity = parseInt(body.buffer_quantity.toString());
+    if (body.price !== undefined) body.price = parseFloat(body.price.toString());
+
+    // Recalculate status if stock or buffer changed
     if (body.stock_quantity !== undefined || body.buffer_quantity !== undefined) {
-      const existing = await getProductById(id);
-      if (existing) {
-        const stock = body.stock_quantity !== undefined ? parseInt(body.stock_quantity) : existing.stock_quantity;
-        const buffer = body.buffer_quantity !== undefined ? parseInt(body.buffer_quantity) : existing.buffer_quantity;
-        body.status = calculateProductStatus(stock, buffer);
-      }
+      const stock = body.stock_quantity ?? existing.stock_quantity;
+      const buffer = body.buffer_quantity ?? existing.buffer_quantity;
+      body.status = calculateProductStatus(stock, buffer);
     }
 
     const product = await updateProduct(id, body);
-    if (!product) return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
+    if (!product) return NextResponse.json({ success: false, error: 'Failed to update product record' }, { status: 500 });
+
 
     // Broadcast to customers via Pusher
     // await pusherServer.trigger('queue-channel', 'product_update', {

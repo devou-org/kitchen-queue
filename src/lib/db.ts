@@ -90,7 +90,7 @@ export async function softDeleteProduct(id: string) {
 
 export async function getOrders(filters: {
   status?: string;
-  status_in?: string; // Support comma-separated statuses
+  status_in?: string;
   date_from?: string;
   date_to?: string;
   phone?: string;
@@ -103,70 +103,130 @@ export async function getOrders(filters: {
   const offset = (page - 1) * per_page;
   const localTimezone = 'Asia/Kolkata';
 
-  // Correlated subquery for items to optimize performance (fixes the reported 8.4s lag)
   if (filters.date_from && filters.date_to) {
     if (filters.status) {
+      if (sort === 'DESC') {
+        return await sql`
+          SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          FROM orders o
+          WHERE o.status = ${filters.status} 
+            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+          ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) DESC,
+                   o.created_at DESC,
+                   o.ticket_number DESC
+          LIMIT ${per_page} OFFSET ${offset}
+        `;
+      }
       return await sql`
         SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o
         WHERE o.status = ${filters.status} 
           AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
           AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
-                 o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
-                 o.ticket_number ${sort === 'ASC' ? sql`ASC` : sql`DESC`}
+        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ASC,
+                 o.created_at ASC,
+                 o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
       `;
     } else if (filters.status_in) {
       const statuses = filters.status_in.split(',');
+      if (sort === 'DESC') {
+        return await sql`
+          SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          FROM orders o
+          WHERE o.status = ANY(${statuses})
+            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+          ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) DESC,
+                   o.created_at DESC,
+                   o.ticket_number DESC
+          LIMIT ${per_page} OFFSET ${offset}
+        `;
+      }
       return await sql`
         SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o
         WHERE o.status = ANY(${statuses})
           AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
           AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
-                 o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
-                 o.ticket_number ${sort === 'ASC' ? sql`ASC` : sql`DESC`}
+        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ASC,
+                 o.created_at ASC,
+                 o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
       `;
     } else {
+      if (sort === 'DESC') {
+        return await sql`
+          SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          FROM orders o
+          WHERE DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+          ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) DESC,
+                   o.created_at DESC,
+                   o.ticket_number DESC
+          LIMIT ${per_page} OFFSET ${offset}
+        `;
+      }
       return await sql`
         SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o
         WHERE DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
           AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
-                 o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`},
-                 o.ticket_number ${sort === 'ASC' ? sql`ASC` : sql`DESC`}
+        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ASC,
+                 o.created_at ASC,
+                 o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
       `;
     }
   }
 
   if (filters.status) {
+    if (sort === 'DESC') {
+      return await sql`
+        SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        FROM orders o
+        WHERE o.status = ${filters.status}
+        ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      `;
+    }
     return await sql`
       SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
       FROM orders o
       WHERE o.status = ${filters.status}
-      ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+      ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
     `;
   }
 
   if (filters.status_in) {
     const statuses = filters.status_in.split(',');
+    if (sort === 'DESC') {
+      return await sql`
+          SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          FROM orders o
+          WHERE o.status = ANY(${statuses})
+          ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+        `;
+    }
     return await sql`
         SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o
         WHERE o.status = ANY(${statuses})
-        ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+        ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
       `;
   }
 
+  if (sort === 'DESC') {
+    return await sql`
+      SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+      FROM orders o
+      ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+    `;
+  }
   return await sql`
     SELECT o.*, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
     FROM orders o
-    ORDER BY o.created_at ${sort === 'ASC' ? sql`ASC` : sql`DESC`} LIMIT ${per_page} OFFSET ${offset}
+    ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
   `;
 }
 
@@ -604,6 +664,34 @@ export async function setOrderPaymentStatus(id: string, isPaid: boolean) {
   return rows[0];
 }
 
+export async function expireOldOrders() {
+  const localTimezone = 'Asia/Kolkata';
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
+
+  // 1. Get IDs of orders to expire
+  const toExpire = await sql`
+    SELECT id FROM orders 
+    WHERE status IN ('PENDING', 'PREPARING')
+      AND DATE(created_at AT TIME ZONE ${localTimezone}) < ${today}::date
+  `;
+
+  if (toExpire.length === 0) return { expiredCount: 0 };
+
+  // 2. Cancel them and restore stock
+  let expiredCount = 0;
+  for (const row of toExpire) {
+    try {
+      await updateOrderStatus(row.id, 'CANCELLED');
+      await restoreOrderStock(row.id);
+      expiredCount++;
+    } catch (err) {
+      console.error(`Failed to expire order ${row.id}:`, err);
+    }
+  }
+
+  return { expiredCount };
+}
+
 // ============================================
 // QUEUE QUERIES
 // ============================================
@@ -690,7 +778,7 @@ export async function getDailyAnalytics(dateFrom: string, dateTo: string) {
       MODE() WITHIN GROUP (ORDER BY EXTRACT(HOUR FROM created_at)) as peak_hour
     FROM orders
     WHERE DATE(created_at) BETWEEN ${dateFrom} AND ${dateTo}
-      AND status != 'CANCELLED'
+      AND is_paid = true AND status = 'PAID'
     GROUP BY DATE(created_at)
     ORDER BY date ASC
   `;
@@ -705,7 +793,7 @@ export async function getPeakHours(dateFrom: string, dateTo: string) {
       SUM(total_price) as revenue
     FROM orders
     WHERE DATE(created_at) BETWEEN ${dateFrom} AND ${dateTo}
-      AND status != 'CANCELLED'
+      AND is_paid = true AND status = 'PAID'
     GROUP BY EXTRACT(HOUR FROM created_at)
     ORDER BY hour ASC
   `;
@@ -716,28 +804,31 @@ export async function getTopProducts(dateFrom: string, dateTo: string, limit = 1
   const rows = await sql`
     SELECT 
       p.id as product_id,
-      p.name,
-      SUM(oi.quantity) as total_units,
-      SUM(oi.quantity * oi.price_at_purchase) as revenue
+      p.name as product_name,
+      p.category,
+      p.price,
+      p.image_url,
+      SUM(oi.quantity) as total_quantity,
+      SUM(oi.quantity * oi.price_at_purchase) as total_revenue
     FROM order_items oi
     JOIN products p ON p.id = oi.product_id
     JOIN orders o ON o.id = oi.order_id
     WHERE DATE(o.created_at) BETWEEN ${dateFrom} AND ${dateTo}
-      AND o.status != 'CANCELLED'
-    GROUP BY p.id, p.name
-    ORDER BY total_units DESC
+      AND o.is_paid = true AND o.status = 'PAID'
+    GROUP BY p.id, p.name, p.category, p.price, p.image_url
+    ORDER BY total_quantity DESC
     LIMIT ${limit}
   `;
   return rows;
 }
 
 export async function getDashboardStats() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   const statsRows = await sql`
     SELECT 
-      COALESCE(SUM(total_price) FILTER (WHERE DATE(created_at) = ${today} AND status != 'CANCELLED' AND is_paid = true), 0) as revenue_today,
-      COUNT(*) FILTER (WHERE DATE(created_at) = ${today} AND status != 'CANCELLED') as orders_today,
-      COALESCE(AVG(total_price) FILTER (WHERE DATE(created_at) = ${today} AND status != 'CANCELLED' AND is_paid = true), 0) as avg_order_value,
+      COALESCE(SUM(total_price) FILTER (WHERE DATE(created_at) = ${today} AND is_paid = true AND status = 'PAID'), 0) as revenue_today,
+      COUNT(*) FILTER (WHERE DATE(created_at) = ${today} AND is_paid = true AND status = 'PAID') as orders_today,
+      COALESCE(AVG(total_price) FILTER (WHERE DATE(created_at) = ${today} AND is_paid = true AND status = 'PAID'), 0) as avg_order_value,
       COUNT(*) FILTER (WHERE status = 'PENDING') as pending_orders
     FROM orders
   `;
@@ -755,13 +846,49 @@ export async function getDashboardStats() {
   };
 }
 
+export async function getKitchenSnapshot() {
+  const localTimezone = 'Asia/Kolkata';
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
+
+  const rows = await sql`
+    SELECT
+      p.id as product_id,
+      p.name as product_name,
+      p.category,
+      p.image_url,
+      p.stock_quantity as current_stock,
+      COALESCE(SUM(oi.quantity) FILTER (WHERE UPPER(o.status) = 'PENDING'), 0) as pending_qty,
+      COALESCE(SUM(oi.quantity) FILTER (WHERE UPPER(o.status) = 'PREPARING'), 0) as preparing_qty
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.id
+    JOIN products p ON oi.product_id = p.id
+    WHERE DATE(o.created_at AT TIME ZONE ${localTimezone}) = ${today}::date
+      AND UPPER(o.status) IN ('PENDING', 'PREPARING')
+    GROUP BY p.id, p.name, p.category, p.image_url, p.stock_quantity
+    ORDER BY p.name ASC
+  `;
+  return rows;
+}
+
 // ============================================
 // CATEGORY QUERIES
 // ============================================
 
 export async function getCategories() {
-  const rows = await sql`SELECT * FROM categories ORDER BY name ASC`;
-  return rows;
+  try {
+    const rows = await sql`SELECT * FROM categories ORDER BY name ASC`;
+    return rows;
+  } catch (err) {
+    console.warn('⚠️ categories table fetch failed, falling back to products table categories:', err);
+    // Fallback: Get unique categories from products table to satisfy the UI
+    const fallbackRows = await sql`
+      SELECT DISTINCT category as name, gen_random_uuid() as id 
+      FROM products 
+      WHERE category IS NOT NULL AND category != ''
+      ORDER BY category ASC
+    `;
+    return fallbackRows;
+  }
 }
 
 export async function createCategory(name: string) {

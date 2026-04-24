@@ -13,7 +13,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const res = await fetch(`/api/products/${id}`);
+        const res = await fetch(`/api/products/${id}`, { cache: 'no-store' });
         const data = await res.json();
         if (data.success) {
           setProduct(data.data);
@@ -56,7 +56,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         </Link>
         <h1 style={{ fontSize: '28px', fontWeight: 800, marginTop: '8px' }}>Edit Product: {product.name}</h1>
       </div>
-      <AdminProductForm initialData={product} />
+      <AdminProductForm key={id} initialData={product} />
     </div>
   );
 }

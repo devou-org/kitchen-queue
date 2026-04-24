@@ -1,11 +1,24 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
+import { orderService } from '@/app/services/orders.api';
+import { adminService } from '@/app/services/admin.api';
+
+interface OrderUpdateLog {
+  id: string;
+  order_id: string;
+  ticket_number: number;
+  table_number?: string;
+  status: string;
+  timestamp: string;
+  message: string;
+  items?: { product_name: string; quantity: number }[];
+}
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -21,30 +34,54 @@ export default function AdminOrders() {
   const [flashedOrderIds, setFlashedOrderIds] = useState<Set<string>>(new Set());
   // Controls the persistent green ticket number (clears only when admin opens the modal)
   const [greenTicketIds, setGreenTicketIds] = useState<Set<string>>(new Set());
+  const ordersRef = useRef<Order[]>([]);
+
+  // Kitchen Snapshot States
+  const [showKitchenSnapshot, setShowKitchenSnapshot] = useState(false);
+  const [kitchenSnapshotLoading, setKitchenSnapshotLoading] = useState(false);
+  const [kitchenSnapshot, setKitchenSnapshot] = useState<any[]>([]);
+
+  // Live Updates Log
+  const [recentUpdates, setRecentUpdates] = useState<OrderUpdateLog[]>([]);
+
+  const dismissUpdate = (id: string) => {
+    setRecentUpdates(prev => prev.filter(u => u.id !== id));
+  };
+
+  const loadKitchenSnapshot = async () => {
+    setShowKitchenSnapshot(true);
+    setKitchenSnapshotLoading(true);
+    try {
+      const res = await adminService.getKitchenSnapshot();
+      if (res.success && res.data) {
+        setKitchenSnapshot(res.data);
+      } else {
+        toast.error('Failed to load kitchen snapshot');
+      }
+    } catch {
+      toast.error('Error loading kitchen snapshot');
+    } finally {
+      setKitchenSnapshotLoading(false);
+    }
+  };
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
-      const qs = new URLSearchParams({
-        page: page.toString(),
-        per_page: '100',
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      
+      const data = await orderService.getOrders({
+        page,
+        per_page: 100,
         sort: 'ASC',
         date_from: today,
-        date_to: today
+        date_to: today,
+        status: statusFilter || 'PENDING'
       });
-      if (statusFilter) {
-        qs.append('status', statusFilter);
-      } else {
-        // Default to showing only PENDING items
-        qs.append('status', 'PENDING');
-      }
 
-      const ordersRes = await fetch(`/api/orders?${qs.toString()}`);
-      const ordersData = await ordersRes.json();
-
-      if (ordersData.success) {
-        setOrders(ordersData.data);
+      if (data.success && data.data) {
+        setOrders(data.data);
+        ordersRef.current = data.data;
       }
     } catch {
       toast.error('Failed to load orders');
@@ -61,104 +98,100 @@ export default function AdminOrders() {
     setMounted(true);
   }, []);
 
+  const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchOrdersDebounced = useCallback((silent = false) => {
+    if (fetchDebounceRef.current) {
+      clearTimeout(fetchDebounceRef.current);
+    }
+    fetchDebounceRef.current = setTimeout(() => {
+      fetchOrders(silent);
+      fetchDebounceRef.current = null;
+    }, 400); // 400ms buffer to batch multiple updates
+  }, [fetchOrders]);
+
   useEffect(() => {
     if (!pusherClient) return;
     const channel = pusherClient.subscribe('queue-channel');
 
     channel.bind('new_order', (data: any) => {
       toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
-      fetchOrders(true);
+      fetchOrdersDebounced(true);
+
+      // Trigger blink for new orders
+      if (data.order_id) {
+        setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+        setTimeout(() => {
+          setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
+        }, 2600);
+        setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+      }
     });
 
     channel.bind('order_update', (data: any) => {
-      if (data.items_updated) {
-        // Customer added items — re-fetch list
-        fetchOrders(true);
+      fetchOrdersDebounced(true);
 
-        // Also refresh the open modal if it's showing this order
-        const adminToken = document.cookie
-          .split(';').map(c => c.trim())
-          .find(c => c.startsWith('admin_token='))?.split('=')[1];
-
-        fetch(`/api/orders/${data.order_id}`, {
-          headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {},
-        })
-          .then(r => r.json())
-          .then(res => {
-            if (res.success && res.data) {
-              setSelectedOrder(prev => prev && prev.id === data.order_id ? res.data : prev);
-            }
-          })
-          .catch(() => { });
-
-        // Flash the row green only when the admin is on a filter where item-updated
-        // orders are visible (PENDING or PREPARING). Customers can only add items to
-        // those statuses — so flashing on READY/PAID/CANCELLED would be a false positive.
-        const isAddableFilter = statusFilter === '' || statusFilter === 'PREPARING';
-        if (isAddableFilter) {
-          setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-          setTimeout(() => {
-            setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
-          }, 2600);
-
-          // Keep ticket number green until admin acknowledges (opens the modal)
-          setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
-        }
-
+      // Only log item additions to existing orders
+      if (data.items_updated && data.added_items) {
+        const newUpdate: OrderUpdateLog = {
+          id: Math.random().toString(),
+          order_id: data.order_id,
+          ticket_number: data.ticket_number,
+          table_number: data.table_number,
+          status: data.new_status || 'PREPARING',
+          timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          message: `New items added`,
+          items: data.added_items
+        };
+        
+        // FCFS: Add to the end, oldest stays at index 0
+        setRecentUpdates(up => [...up, newUpdate].slice(-10));
+        
         toast(
           `🛒 Customer added items to order #${String(data.ticket_number).padStart(3, '0')}`,
           { icon: '🟢', duration: 5000, style: { fontWeight: 700 } }
         );
-        return;
       }
 
-      setOrders(prev => {
-        const isDefaultView = !statusFilter;
-        return prev.map(o => {
-          if (o.id === data.order_id) {
-            const updated = { ...o };
-            if (data.new_status) updated.status = data.new_status;
-            if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
-            return updated;
+      // Sync Modal if open
+      if (data.order_id) {
+        orderService.getOrderById(data.order_id).then(res => {
+          if (res.success && res.data) {
+            const updated: Order = res.data;
+            setSelectedOrder(prev => (prev?.id === data.order_id) ? updated : prev);
           }
-          return o;
-        }).filter(o => {
-          if (statusFilter) return o.status === statusFilter;
-          return o.status === 'PENDING';
-        });
-      });
+        }).catch(() => {});
+      }
 
-      setSelectedOrder(prev => {
-        if (prev && prev.id === data.order_id) {
-          const updated = { ...prev };
-          if (data.new_status) updated.status = data.new_status;
-          if (typeof data.is_paid === 'boolean') updated.is_paid = data.is_paid;
-          return updated;
-        }
-        return prev;
-      });
+      // Flash UI logic: Only for PENDING, PREPARING, and READY
+      const FLASHABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
+      const isFlashableStatus = FLASHABLE_STATUSES.includes(data.new_status);
+      const matchesCurrentFilter = statusFilter === '' || statusFilter === data.new_status;
 
-      if (data.new_status) toast.success(`Order #${String(data.ticket_number).padStart(3, '0')} updated to ${data.new_status}`);
+      if (isFlashableStatus && matchesCurrentFilter && data.order_id) {
+        setFlashedOrderIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+        setTimeout(() => {
+          setFlashedOrderIds(prev => { const next = new Set(prev); next.delete(data.order_id); return next; });
+        }, 2600);
+        setGreenTicketIds(prev => { const next = new Set(prev); next.add(data.order_id); return next; });
+      }
     });
 
+
     return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       channel.unbind_all();
       channel.unsubscribe();
     };
-  }, [fetchOrders, statusFilter]); // fetchOrders is stable via useCallback — no stale closure
+  }, [fetchOrdersDebounced, statusFilter]);
 
   const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string) => {
     setModalLoading(true);
     try {
-      const res = await fetch(`/api/orders/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: newStatus,
-          table_number: tableNumber
-        })
+      const data = await orderService.updateOrder(id, {
+        status: newStatus,
+        table_number: tableNumber
       });
-      const data = await res.json();
       if (data.success) {
         // Success feedback handled by Pusher event to avoid duplicates
         // Update local state instantly for UI responsiveness
@@ -170,7 +203,7 @@ export default function AdminOrders() {
               return o.status === 'PENDING';
             });
         });
-        setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number } : null);
+        setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number } : null);
 
         // Always close modal after successful update to streamline workflow
         setTimeout(closeModal, 400);
@@ -214,10 +247,75 @@ export default function AdminOrders() {
 
   return (
     <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Active Order Queue</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)</p>
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Active Order Queue</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)</p>
+        </div>
+        <button className="btn btn-primary" onClick={loadKitchenSnapshot} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>🍳</span> Kitchen Snapshot
+        </button>
       </div>
+
+      {recentUpdates.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }}></span>
+            <h2 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Additions</h2>
+          </div>
+          <div className="live-updates-container">
+            {recentUpdates.map(update => (
+              <div 
+                key={update.id} 
+                className="card live-update-card animate-fade-in" 
+                style={{ 
+                  padding: '16px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  justifyContent: 'space-between', 
+                  borderLeft: '4px solid var(--success)', 
+                  position: 'relative'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>#{String(update.ticket_number).padStart(3, '0')}</div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <span className={`badge badge-${update.status.toLowerCase()}`}>{update.status}</span>
+                        {update.table_number && (
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: 'white', background: 'var(--primary)', padding: '2px 6px', borderRadius: '4px' }}>🪑 T-{update.table_number}</span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>{update.message}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => dismissUpdate(update.id)} 
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '18px', padding: '0 4px', lineHeight: 1 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {update.items && update.items.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
+                    {update.items.map((item, idx) => (
+                      <div key={idx} style={{ background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        <span style={{ color: 'var(--primary)' }}>{item.quantity}x</span> {item.product_name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(0,0,0,0.03)', paddingTop: '8px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 700 }}>{update.timestamp}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
@@ -442,6 +540,71 @@ export default function AdminOrders() {
                 </div>
               )}
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {mounted && showKitchenSnapshot && createPortal(
+        <div className="modal-backdrop" onClick={() => setShowKitchenSnapshot(false)} style={{ alignItems: 'center', zIndex: 1000 }}>
+          <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '95%', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '24px', background: 'rgba(151,19,69,0.1)', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px' }}>🍳</span>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.1 }}>Kitchen Snapshot <span style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 600 }}>(Live)</span></h2>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Today's consolidated demand vs available stock.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowKitchenSnapshot(false)} style={{ background: 'none', border: 'none', fontSize: '24px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}>✕</button>
+            </div>
+
+            {kitchenSnapshotLoading ? (
+              <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+            ) : (
+              <div style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ flex: 1, fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ITEM</span>
+                  <div style={{ display: 'flex', gap: '24px', textAlign: 'center', width: '220px' }}>
+                    <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: '#D97706', textTransform: 'uppercase' }}>Pending</span>
+                    <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: '#2563EB', textTransform: 'uppercase' }}>Preparing</span>
+                    <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Stock</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {kitchenSnapshot.map((item, idx) => {
+                    const pending = Number(item.pending_qty) || 0;
+                    const preparing = Number(item.preparing_qty) || 0;
+                    const stock = Number(item.current_stock) || 0;
+                    const isLowStock = stock < (pending + preparing);
+                    
+                    return (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 12px', borderBottom: '1px solid #F3F4F6' }}>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.product_name} style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: '#F3F4F6' }} />
+                          ) : (
+                            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🍽️</div>
+                          )}
+                          <div>
+                            <p style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)', lineHeight: 1.2 }}>{item.product_name}</p>
+                            {isLowStock && <p style={{ fontSize: '10px', color: '#DC2626', fontWeight: 700, marginTop: '2px' }}>⚠️ LOW</p>}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '24px', textAlign: 'center', width: '220px', alignItems: 'center' }}>
+                          <span style={{ flex: 1, fontSize: '18px', fontWeight: 900, color: pending > 0 ? '#D97706' : '#E5E7EB' }}>{pending}</span>
+                          <span style={{ flex: 1, fontSize: '18px', fontWeight: 900, color: '#2563EB' }}>{preparing}</span>
+                          <span style={{ flex: 1, fontSize: '16px', fontWeight: 700, color: isLowStock ? '#DC2626' : 'var(--text-secondary)' }}>{stock}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {kitchenSnapshot.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)', fontSize: '14px' }}>No active demand to display</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>,
         document.body

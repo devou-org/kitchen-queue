@@ -5,6 +5,7 @@ import { formatPrice, formatDateTime } from '@/lib/format';
 import { Order } from '@/types';
 import { STATUS_BG } from '@/lib/constants';
 import BottomNav from '@/components/BottomNav';
+import { orderService } from '@/app/services/orders.api';
 
 export default function HistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -17,14 +18,8 @@ export default function HistoryPage() {
 
     const fetchHistory = async () => {
       try {
-        const token = localStorage.getItem('auth_token');
-        const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(phone)}`, {
-          headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          }
-        });
-        const data = await res.json();
-        if (data.success) setOrders(data.data);
+        const data = await orderService.getHistory(phone);
+        if (data.success && data.data) setOrders(data.data);
       } catch {}
       finally { setLoading(false); }
     };

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
 import { formatPrice } from '@/lib/format';
+import { productService } from '@/app/services/products.api';
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -16,9 +17,8 @@ export default function AdminProducts() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('/api/products');
-      const data = await res.json();
-      if (data.success) setProducts(data.data);
+      const res = await productService.getAllProductsAdmin();
+      if (res.success && res.data) setProducts(res.data);
     } catch {
       toast.error('Failed to load products');
     } finally {
@@ -29,12 +29,8 @@ export default function AdminProducts() {
   const handleStockUpdate = async (id: string, newStock: number, buffer: number) => {
     if (newStock < 0) return;
     try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stock_quantity: newStock, buffer_quantity: buffer })
-      });
-      if (res.ok) fetchProducts();
+      const res = await productService.updateProduct(id, { stock_quantity: newStock, buffer_quantity: buffer });
+      if (res.success) fetchProducts();
     } catch {
       toast.error('Failed to update stock');
     }
@@ -43,8 +39,8 @@ export default function AdminProducts() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete ${name}?`)) return;
     try {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-      if (res.ok) {
+      const res = await productService.deleteProduct(id);
+      if (res.success) {
         toast.success('Product deleted');
         fetchProducts();
       }

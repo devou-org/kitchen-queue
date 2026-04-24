@@ -3,6 +3,8 @@ import { getProducts, createProduct } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { calculateProductStatus } from '@/lib/validators';
 
+
+
 export async function GET() {
   try {
     const products = await getProducts(true);

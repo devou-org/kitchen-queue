@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { authService } from '@/app/services/auth.api';
+import { ClipboardList, Wallet, UtensilsCrossed, Box } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -33,15 +35,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const handleLogout = () => {
+    authService.logout();
     localStorage.removeItem('admin_token');
-    document.cookie = 'admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     router.push('/admin/login');
   };
 
   const navLinks = [
-    { name: 'Orders', href: '/admin/orders', icon: '📋' },
-    { name: 'Statements', href: '/admin/statements', icon: '💰' },
-    { name: 'Products', href: '/admin/products', icon: '🍔' },
+    { name: 'Orders', href: '/admin/orders', icon: <ClipboardList size={20} strokeWidth={2.5} /> },
+    { name: 'Statements', href: '/admin/statements', icon: <Wallet size={20} strokeWidth={2.5} /> },
+    { name: 'Products', href: '/admin/products', icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
+    { name: 'Sales', href: '/admin/inventory', icon: <Box size={20} strokeWidth={2.5} /> },
   ];
 
   return (

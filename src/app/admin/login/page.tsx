@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { authService } from '@/app/services/auth.api';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -15,14 +16,9 @@ export default function AdminLogin() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/admin-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
+      const data = await authService.adminLogin(email, password);
       if (data.success) {
-        localStorage.setItem('admin_token', data.token);
+        if (data.token) localStorage.setItem('admin_token', data.token);
         toast.success('Welcome back, Admin!');
         router.push('/admin/orders');
       } else {

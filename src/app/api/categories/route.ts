@@ -12,6 +12,8 @@ async function requireAdmin(request: NextRequest) {
   return payload;
 }
 
+
+
 export async function GET(request: NextRequest) {
   try {
     const admin = await requireAdmin(request);
@@ -19,8 +21,9 @@ export async function GET(request: NextRequest) {
 
     const categories = await getCategories();
     return NextResponse.json({ success: true, data: categories });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Failed to fetch categories' }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ API Error (GET /api/categories):', error);
+    return NextResponse.json({ success: false, error: error?.message || 'Failed to fetch categories' }, { status: 500 });
   }
 }
 
@@ -34,7 +37,8 @@ export async function POST(request: NextRequest) {
 
     const category = await createCategory(name);
     return NextResponse.json({ success: true, data: category });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Failed to create category' }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ API Error (POST /api/categories):', error);
+    return NextResponse.json({ success: false, error: error?.message || 'Failed to create category' }, { status: 500 });
   }
 }
