@@ -186,7 +186,7 @@ export default function AdminInventorySummary() {
 
       {/* Table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
+        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto' }}>
           {loading ? (
             <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}>
               <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />

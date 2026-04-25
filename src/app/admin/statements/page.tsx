@@ -83,6 +83,27 @@ export default function AdminStatements() {
   const paidCount = orders.filter(o => o.status === 'PAID').length;
   const allStatuses = ['PENDING', 'READY', 'PAID', 'CANCELLED'];
 
+  const [expiring, setExpiring] = useState(false);
+  const handleExpireOldOrders = async () => {
+    if (!window.confirm('Are you sure you want to expire all unfulfilled orders from PREVIOUS days? This will restore their stock items back to inventory.')) return;
+    
+    setExpiring(true);
+    try {
+      const res = await fetch('/api/cron/expire-orders');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || 'Expired orders successfully');
+        fetchOrders(true);
+      } else {
+        toast.error(data.error || 'Failed to expire orders');
+      }
+    } catch {
+      toast.error('Network error while expiring orders');
+    } finally {
+      setExpiring(false);
+    }
+  };
+
   return (
     <>
       <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
@@ -135,7 +156,17 @@ export default function AdminStatements() {
                 {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 24px' }}>📥 Export Statements (CSV)</button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 24px' }}>📥 Export Statements (CSV)</button>
+              <button 
+                className="btn btn-secondary" 
+                onClick={handleExpireOldOrders} 
+                disabled={expiring}
+                style={{ height: '42px', padding: '0 20px', color: 'var(--warning)', borderColor: 'var(--warning)' }}
+              >
+                {expiring ? 'Expiring...' : '🕖 Expire Old Orders'}
+              </button>
+            </div>
           </div>
         </div>
 

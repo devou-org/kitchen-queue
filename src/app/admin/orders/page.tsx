@@ -143,8 +143,9 @@ export default function AdminOrders() {
       });
 
       // 2. HIGHLIGHT & LOG ADDITIONS
-      // Only log and highlight if items were actually added to an existing order
-      if (data.items_updated && data.added_items) {
+      // Only log and highlight if items were actually added to an existing order which is currently in PREPARING or READY status
+      const currentStatus = data.new_status || 'PENDING';
+      if (data.items_updated && data.added_items && (currentStatus === 'PREPARING' || currentStatus === 'READY')) {
 
         const newUpdate: OrderUpdateLog = {
           id: Math.random().toString(),
