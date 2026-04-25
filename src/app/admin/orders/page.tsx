@@ -223,8 +223,8 @@ export default function AdminOrders() {
     }
   };
 
-  const activeStatuses = ['PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED']; // Exclude PENDING as it's the default
-  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED'];
+  const activeStatuses = ['PREPARING', 'READY', 'PAID', 'CANCELLED']; // Exclude PENDING as it's the default
+  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
 
   const readySearchTerm = readySearch.trim().toLowerCase();
   const displayedOrders = statusFilter === 'READY' && readySearchTerm

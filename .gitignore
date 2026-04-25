@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/load-tests
 /.pnp
 .pnp.*
 .yarn/*
