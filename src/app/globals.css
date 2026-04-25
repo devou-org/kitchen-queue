@@ -852,8 +852,7 @@ tr:hover td {
 
 /* Table Responsive Hacks */
 @media (max-width: 640px) {
-  th:nth-child(3), td:nth-child(3), /* Subtotal */
-  th:nth-child(4), td:nth-child(4)  /* Persons */ {
+  th:nth-child(3), td:nth-child(3) /* Subtotal */ {
     display: none;
   }
   
