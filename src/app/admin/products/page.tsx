@@ -123,7 +123,7 @@ export default function AdminProducts() {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                        <Link href={`/admin/products/${p.id}/edit`} className="btn btn-secondary btn-sm">Edit</Link>
+                        <Link href={`/admin/products/${p.id}/edit`} prefetch={false} className="btn btn-secondary btn-sm">Edit</Link>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id, p.name)}>Delete</button>
                       </div>
                     </td>
