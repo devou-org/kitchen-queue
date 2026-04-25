@@ -321,6 +321,13 @@ body {
   overflow-x: auto;
   border-radius: var(--radius);
   border: 1px solid var(--border);
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .table-wrapper table {
+    min-width: max-content;
+  }
 }
 
 table {
@@ -571,6 +578,7 @@ tr:hover td {
   padding: 24px;
   max-width: 1280px;
   margin: 0 auto;
+  width: 100%;
 }
 
 /* ===================== ADMIN SIDEBAR ===================== */
@@ -631,6 +639,7 @@ tr:hover td {
   min-height: 100vh;
   background: var(--bg);
   transition: margin-left 0.3s ease;
+  min-width: 0;
 }
 
 /* ===================== LIVE UPDATES CONTAINER ===================== */
@@ -852,9 +861,7 @@ tr:hover td {
 
 /* Table Responsive Hacks */
 @media (max-width: 640px) {
-  th:nth-child(3), td:nth-child(3) /* Subtotal */ {
-    display: none;
-  }
+
   
   td, th {
     padding: 12px 8px;

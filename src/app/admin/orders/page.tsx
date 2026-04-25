@@ -366,9 +366,9 @@ export default function AdminOrders() {
                 <tr>
                   <th>Ticket</th>
                   <th>Customer</th>
-                  <th>Subtotal</th>
                   <th>Persons</th>
                   <th>Status</th>
+                  <th>Subtotal</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -405,7 +405,6 @@ export default function AdminOrders() {
                         </div>
                       )}
                     </td>
-                    <td style={{ fontWeight: 600 }}>{formatPrice(order.total_price)}</td>
                     <td>
                       <span style={{
                         fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)',
@@ -415,6 +414,7 @@ export default function AdminOrders() {
                       </span>
                     </td>
                     <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>
+                    <td style={{ fontWeight: 600 }}>{formatPrice(order.total_price)}</td>
                     <td><button className="btn btn-ghost btn-sm" style={{ color: 'var(--primary)' }}>View / Edit →</button></td>
                   </tr>
                 ))}
@@ -569,7 +569,7 @@ export default function AdminOrders() {
               <div style={{ marginTop: '24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px 12px', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ flex: 1, fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ITEM</span>
-                  <div style={{ display: 'flex', gap: '24px', textAlign: 'center', width: '220px' }}>
+                  <div style={{ display: 'flex', gap: '12px', textAlign: 'center', width: '160px', flexShrink: 0 }}>
                     <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: '#D97706', textTransform: 'uppercase' }}>Pending</span>
                     <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: '#2563EB', textTransform: 'uppercase' }}>Preparing</span>
                     <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Stock</span>
@@ -584,18 +584,18 @@ export default function AdminOrders() {
                     
                     return (
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 12px', borderBottom: '1px solid #F3F4F6' }}>
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, paddingRight: '8px' }}>
                           {item.image_url ? (
-                            <img src={item.image_url} alt={item.product_name} style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: '#F3F4F6' }} />
+                            <img src={item.image_url} alt={item.product_name} style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: '#F3F4F6', flexShrink: 0 }} />
                           ) : (
-                            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🍽️</div>
+                            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🍽️</div>
                           )}
-                          <div>
+                          <div style={{ minWidth: 0, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                             <p style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)', lineHeight: 1.2 }}>{item.product_name}</p>
                             {isLowStock && <p style={{ fontSize: '10px', color: '#DC2626', fontWeight: 700, marginTop: '2px' }}>⚠️ LOW</p>}
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '24px', textAlign: 'center', width: '220px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '12px', textAlign: 'center', width: '160px', alignItems: 'center', flexShrink: 0 }}>
                           <span style={{ flex: 1, fontSize: '18px', fontWeight: 900, color: pending > 0 ? '#D97706' : '#E5E7EB' }}>{pending}</span>
                           <span style={{ flex: 1, fontSize: '18px', fontWeight: 900, color: '#2563EB' }}>{preparing}</span>
                           <span style={{ flex: 1, fontSize: '16px', fontWeight: 700, color: isLowStock ? '#DC2626' : 'var(--text-secondary)' }}>{stock}</span>

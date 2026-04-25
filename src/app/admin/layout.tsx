@@ -152,14 +152,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="admin-layout">
-      {/* Mobile nav toggle */}
-      <button 
-        style={{ position: 'fixed', top: 16, left: 16, zIndex: 70, border: 'none', background: 'var(--card)', padding: '8px', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', cursor: 'pointer' }}
-        className="md:hidden"
-        onClick={() => setSidebarOpen(true)}
-      >
-        ☰
-      </button>
+
 
       {/* Backdrop for mobile */}
       {isSidebarOpen && (
@@ -234,6 +227,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <main className="admin-main">
+        {/* Mobile Header */}
+        <div className="md:hidden" style={{ display: 'flex', alignItems: 'center', padding: '16px', background: 'var(--card)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 40, gap: '16px' }}>
+          <button 
+            style={{ border: 'none', background: 'transparent', fontSize: '20px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--text-primary)' }}
+            onClick={() => setSidebarOpen(true)}
+          >
+            ☰
+          </button>
+        </div>
         {children}
       </main>
     </div>
