@@ -147,7 +147,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <img
-          src="/logo.jpeg"
+          src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg"
           alt="Renjz Kitchen"
           style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover' }}
         />

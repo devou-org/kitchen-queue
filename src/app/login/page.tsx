@@ -39,6 +39,7 @@ export default function LoginPage() {
   const fullPhone = `${countryCode}${phone.replace(/\D/g, '')}`;
 
   const handleSendOTP = async () => {
+    if (loading || cooldown > 0) return;
     const cleaned = phone.replace(/\D/g, '');
     if (!cleaned) return toast.error('Please enter your phone number');
     
@@ -81,7 +82,6 @@ export default function LoginPage() {
       setOtp(newOtp);
       const lastFill = Math.min(index + digits.length - 1, 5);
       otpRefs.current[lastFill]?.focus();
-      if (newOtp.every(d => d !== '')) handleVerify(newOtp.join(''));
       return;
     }
 
@@ -92,9 +92,6 @@ export default function LoginPage() {
     setOtp(newOtp);
     if (value && index < 5) {
       otpRefs.current[index + 1]?.focus();
-    }
-    if (newOtp.every(d => d !== '')) {
-      handleVerify(newOtp.join(''));
     }
   };
 
@@ -108,10 +105,6 @@ export default function LoginPage() {
     // Focus last filled box
     const lastIndex = Math.min(pasted.length - 1, 5);
     otpRefs.current[lastIndex]?.focus();
-    // Auto-verify if full OTP pasted
-    if (pasted.length === 6) {
-      handleVerify(pasted);
-    }
   };
 
   const handleOTPKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -121,6 +114,7 @@ export default function LoginPage() {
   };
 
   const handleVerify = async (code?: string) => {
+    if (loading) return;
     const otpCode = code || otp.join('');
     if (otpCode.length !== 6) return toast.error('Enter complete 6-digit OTP');
     if (!otpToken) return toast.error('OTP session expired. Please request a new OTP.');
@@ -173,7 +167,7 @@ export default function LoginPage() {
             border: '2px solid white'
           }}>
             <img
-              src="/logo.jpeg"
+              src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg"
               alt="Renjz Kitchen"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'OTP sent to your phone',
       otp_token,
-      expires_in: 300,
+      expires_in: 60,
     });
   } catch (error) {
     console.error('Send OTP error:', error);

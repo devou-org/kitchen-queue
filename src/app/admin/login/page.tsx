@@ -46,7 +46,7 @@ export default function AdminLogin() {
             border: '2px solid white'
           }}>
             <img
-              src="/logo.jpeg"
+              src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg"
               alt="Renjz Kitchen"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />

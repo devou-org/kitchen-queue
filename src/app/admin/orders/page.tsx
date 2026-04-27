@@ -461,6 +461,7 @@ export default function AdminOrders() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                 <Link
                   href={`/admin/orders/${selectedOrder.id}/edit`}
+                  prefetch={false}
                   className="btn btn-secondary btn-sm"
                   onClick={closeModal}
                   style={{

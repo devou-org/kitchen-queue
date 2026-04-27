@@ -7,9 +7,9 @@ export const metadata: Metadata = {
   description: 'Real-time restaurant queue management system. Browse menu, order online, track your queue position live.',
   keywords: 'restaurant, queue, order, food, menu, tracking, Renjz Kitchen',
   icons: {
-    icon: '/logo.jpeg',
-    shortcut: '/logo.jpeg',
-    apple: '/logo.jpeg',
+    icon: 'https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg',
+    shortcut: 'https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg',
+    apple: 'https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg',
   },
   openGraph: {
     title: 'Renjz Kitchen – Authentic Coastal Flavors',

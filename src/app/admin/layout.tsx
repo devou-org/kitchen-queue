@@ -168,7 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img 
-            src="/logo.jpeg" 
+            src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg" 
             alt="Renjz Kitchen" 
             style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} 
           />

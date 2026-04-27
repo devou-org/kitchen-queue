@@ -282,7 +282,7 @@ export default function MenuPage() {
       <div className="page-header">
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
           <img
-            src="/logo.jpeg"
+            src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg"
             alt="Renjz Kitchen"
             style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }}
           />
