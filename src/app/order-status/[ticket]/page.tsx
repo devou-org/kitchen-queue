@@ -220,6 +220,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px 100px' }} className="animate-fade-in">
 
         {/* Add More Items CTA — top of page */}
+        {/*
         {ADDABLE_STATUSES.includes(order.status) ? (
           <button
             type="button"
@@ -244,25 +245,23 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
             ➕ Add More Items to This Order
           </button>
         ) : (
-          <Link
-            href="/menu"
-            onClick={() => localStorage.removeItem('add_to_order')}
+        */}
+          <div
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               padding: '14px',
               marginBottom: '20px',
               borderRadius: '14px',
               border: '1.5px solid rgba(0,0,0,0.08)',
-              background: 'rgba(0,0,0,0.02)',
+              background: 'rgba(59,130,246,0.05)',
               color: 'var(--text-secondary)',
               fontWeight: 600, fontSize: '13px',
-              textDecoration: 'none',
-              transition: 'all 0.2s',
+              textAlign: 'center',
             }}
           >
-            🍽️ Order again? This will be a new order
-          </Link>
-        )}
+            ℹ️ If you want to edit the order, please contact nearby staff
+          </div>
+        {/* )} */}
 
         {isActive ? (
           <>

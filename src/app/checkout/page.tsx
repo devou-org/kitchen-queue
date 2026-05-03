@@ -66,9 +66,9 @@ export default function CheckoutPage() {
               });
               
               if (active) {
-                setActiveOrder(active);
+                // setActiveOrder(active);
                 // Always add to existing order automatically
-                setAddToMode(true);
+                // setAddToMode(true);
               }
             }
           })
@@ -298,6 +298,7 @@ export default function CheckoutPage() {
                     ))}
                   </select>
                 </div>
+                {/*
                 <div>
                   <label className="label">Special Instructions (optional)</label>
                   <textarea
@@ -312,6 +313,7 @@ export default function CheckoutPage() {
                     {form.notes.length}/200
                   </p>
                 </div>
+                */}
               </div>
             </div>
           </form>
