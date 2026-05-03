@@ -100,7 +100,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
         if (data.new_status === 'READY' && currentOrder?.status !== 'READY') {
           try {
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.play().catch(() => {});
+            audio.play().catch(() => { });
           } catch { }
         }
 
@@ -219,7 +219,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px 100px' }} className="animate-fade-in">
 
-        {/* Add More Items CTA — top of page */}
+
         {/*
         {ADDABLE_STATUSES.includes(order.status) ? (
           <button
@@ -246,21 +246,21 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
           </button>
         ) : (
         */}
-          <div
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              padding: '14px',
-              marginBottom: '20px',
-              borderRadius: '14px',
-              border: '1.5px solid rgba(0,0,0,0.08)',
-              background: 'rgba(59,130,246,0.05)',
-              color: 'var(--text-secondary)',
-              fontWeight: 600, fontSize: '13px',
-              textAlign: 'center',
-            }}
-          >
-            ℹ️ If you want to edit the order, please contact nearby staff
-          </div>
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            padding: '14px',
+            marginBottom: '20px',
+            borderRadius: '14px',
+            border: '1.5px solid rgba(0,0,0,0.08)',
+            background: 'rgba(59,130,246,0.05)',
+            color: 'var(--text-secondary)',
+            fontWeight: 600, fontSize: '13px',
+            textAlign: 'center',
+          }}
+        >
+          ℹ️ If you want to edit the order, please contact nearby staff
+        </div>
         {/* )} */}
 
         {isActive ? (
