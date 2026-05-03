@@ -13,6 +13,7 @@ export default function BottomNav() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%' }}>
         <Link
           href="/order-status"
+          prefetch={false}
           className={`bottom-nav-item ${isActive('/order-status') ? 'active' : ''}`}
         >
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -20,7 +21,7 @@ export default function BottomNav() {
           </svg>
           STATUS
         </Link>
-        <Link href="/menu" className="bottom-nav-center">
+        <Link href="/menu" prefetch={false} className="bottom-nav-center">
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path d="M3 3h18v18H3z M9 3v18M15 3v18M3 9h18M3 15h18"/>
           </svg>
@@ -28,6 +29,7 @@ export default function BottomNav() {
         </Link>
         <Link
           href="/history"
+          prefetch={false}
           className={`bottom-nav-item ${isActive('/history') ? 'active' : ''}`}
         >
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
