@@ -181,6 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link 
                 key={link.name} 
                 href={link.href} 
+                prefetch={false}
                 className={`sidebar-link ${isActive ? 'active' : ''}`}
                 onClick={() => setSidebarOpen(false)}
               >

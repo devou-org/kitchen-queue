@@ -119,10 +119,10 @@ export default function CartPage() {
         padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
         boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
       }}>
-        <Link href="/checkout" className="btn btn-primary btn-lg" style={{ width: '100%' }}>
+        <Link href="/checkout" prefetch={false} className="btn btn-primary btn-lg" style={{ width: '100%' }}>
           Continue to Checkout →
         </Link>
-        <Link href="/menu" className="btn btn-ghost btn-sm" style={{ textAlign: 'center' }}>
+        <Link href="/menu" prefetch={false} className="btn btn-ghost btn-sm" style={{ textAlign: 'center' }}>
           ← Back to Menu
         </Link>
       </div>

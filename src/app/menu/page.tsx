@@ -280,7 +280,7 @@ export default function MenuPage() {
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {/* Header */}
       <div className="page-header">
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+        <Link href="/" prefetch={false} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
           <img
             src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg"
             alt="Renjz Kitchen"
@@ -372,7 +372,7 @@ export default function MenuPage() {
 
       {/* Cart Button */}
       {totalItems > 0 && isServiceActive && (
-        <Link href="/cart" className="cart-btn">
+        <Link href="/cart" prefetch={false} className="cart-btn">
           <span style={{
             background: 'rgba(255,255,255,0.25)',
             width: '24px', height: '24px', borderRadius: '50%',

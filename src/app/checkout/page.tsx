@@ -10,7 +10,6 @@ import BottomNav from '@/components/BottomNav';
 // Modular Components
 import OrderSummary from './components/OrderSummary';
 import CustomerDetails from './components/CustomerDetails';
-import OtpModal from './components/OtpModal';
 import CheckoutActions from './components/CheckoutActions';
 
 // Statuses where adding to an existing order is allowed
@@ -32,11 +31,6 @@ export default function CheckoutPage() {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // OTP Verification State
-  const [otpStep, setOtpStep] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpToken, setOtpToken] = useState('');
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   // ── AUTH CHECK ──────────────────────────────────────────────────
   const checkAuth = useCallback(async () => {
@@ -100,55 +94,6 @@ export default function CheckoutPage() {
 
   const isVerified = currentUser && currentUser.phone === form.phone;
 
-  // ── HANDLE VERIFY CLICK ──────────────────────────────────────────
-  const handleVerifyClick = async () => {
-    const cleanedPhone = form.phone.replace(/\D/g, '');
-    if (!cleanedPhone || cleanedPhone.length < 10) {
-      toast.error('Please enter a valid 10-digit phone number');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const data = await authService.sendOtp(form.phone);
-      if (data.success && data.otp_token) {
-        setOtpToken(data.otp_token);
-        setOtpStep(true);
-        toast.success('OTP sent to your phone');
-      } else {
-        toast.error(data.error || 'Failed to send OTP');
-      }
-    } catch (err) {
-      toast.error('Network error. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyOtpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otpCode.length !== 6) {
-      toast.error('Please enter a valid 6-digit OTP');
-      return;
-    }
-    
-    setVerifyingOtp(true);
-    try {
-      const data = await authService.verifyOtp(otpCode, otpToken);
-      if (data.success) {
-        toast.success('Phone verified successfully!');
-        setOtpStep(false);
-        const updatedUser = authService.getUser();
-        setCurrentUser(updatedUser);
-      } else {
-        toast.error(data.error || 'Invalid OTP');
-      }
-    } catch (err) {
-      toast.error('Network error. Please try again.');
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
 
   // ── PLACE NEW ORDER ──────────────────────────────────────────────
   const handleNewOrder = async (e?: React.FormEvent) => {
@@ -326,8 +271,7 @@ export default function CheckoutPage() {
             form={form}
             setForm={setForm}
             isVerified={isVerified}
-            loading={loading}
-            handleVerifyClick={handleVerifyClick}
+            onVerified={(user) => setCurrentUser(user)}
             onSubmit={handleNewOrder}
           />
         )}
@@ -344,17 +288,6 @@ export default function CheckoutPage() {
         onSubmitNewOrder={handleNewOrder}
       />
 
-      {otpStep && (
-        <OtpModal 
-          phone={form.phone}
-          otpCode={otpCode}
-          setOtpCode={setOtpCode}
-          verifyingOtp={verifyingOtp}
-          loading={loading}
-          onSubmit={verifyOtpSubmit}
-          onClose={() => setOtpStep(false)}
-        />
-      )}
 
       <BottomNav />
     </div>
