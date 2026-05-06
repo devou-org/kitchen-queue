@@ -82,7 +82,7 @@ export default function AdminLogin() {
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px' }}>
-          <a href="/login" style={{ color: 'var(--text-secondary)' }}>← Back to Customer Flow</a>
+          <a href="/menu" style={{ color: 'var(--text-secondary)' }}>← Back to Customer Menu</a>
         </p>
       </div>
     </div>

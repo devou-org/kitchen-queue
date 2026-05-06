@@ -34,7 +34,16 @@ class AuthService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, otp_token: otpToken }),
       });
-      return await res.json();
+      const data = await res.json();
+      if (data.success && data.token) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', data.token);
+          if (data.user) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+          }
+        }
+      }
+      return data;
     } catch (error) {
       return { success: false, error: 'Network error. Please try again.' };
     }
@@ -53,14 +62,48 @@ class AuthService {
     }
   }
 
+  async refresh(): Promise<AuthResponse> {
+    try {
+      const res = await fetch('/api/auth/refresh', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (data.success && data.token) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', data.token);
+          if (data.user) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+          }
+        }
+      } else {
+        this.logout();
+      }
+      return data;
+    } catch (error) {
+      this.logout();
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  }
+
   async me(): Promise<AuthResponse> {
     if (typeof window === 'undefined') return { success: false, error: 'SSR' };
     const token = localStorage.getItem('auth_token');
-    if (!token) return { success: false, error: 'No token found' };
+    
+    // If no access token, try refreshing immediately
+    if (!token) {
+      return this.refresh();
+    }
+    
     try {
       const res = await fetch('/api/users/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      // If access token is expired, refresh it
+      if (res.status === 401) {
+        return this.refresh();
+      }
+      
       return await res.json();
     } catch (error) {
       return { success: false, error: 'Network error. Please try again.' };

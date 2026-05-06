@@ -923,3 +923,46 @@ export async function getUserByEmail(email: string) {
   const rows = await sql`SELECT * FROM users WHERE email = ${email} LIMIT 1`;
   return rows[0] || null;
 }
+
+// ============================================
+// ADMIN QUERIES
+// ============================================
+
+export async function getAdminByEmail(email: string) {
+  const rows = await sql`SELECT * FROM admins WHERE email = ${email} LIMIT 1`;
+  return rows[0] || null;
+}
+
+// ============================================
+// OTP BILLING QUERIES
+// ============================================
+
+export async function incrementOtpCount(phone: string) {
+  const localTimezone = 'Asia/Kolkata';
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
+  
+  // 1. Log the specific OTP request
+  await sql`
+    INSERT INTO otp_logs (phone, sent_at)
+    VALUES (${phone}, NOW() AT TIME ZONE ${localTimezone})
+  `;
+
+  // 2. Increment daily aggregation (Concurrency Safe via ON CONFLICT)
+  await sql`
+    INSERT INTO daily_otp_stats (date, count, cost)
+    VALUES (${today}::date, 1, 0.50)
+    ON CONFLICT (date) DO UPDATE 
+    SET count = daily_otp_stats.count + 1,
+        cost = (daily_otp_stats.count + 1) * 0.50,
+        updated_at = NOW()
+  `;
+}
+
+export async function getOtpStats(dateFrom: string, dateTo: string) {
+  const rows = await sql`
+    SELECT * FROM daily_otp_stats 
+    WHERE date BETWEEN ${dateFrom}::date AND ${dateTo}::date
+    ORDER BY date ASC
+  `;
+  return rows;
+}

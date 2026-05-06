@@ -20,20 +20,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Protect customer routes
-  const customerProtectedPaths = ['/menu', '/cart', '/checkout', '/history', '/order-status'];
-  if (customerProtectedPaths.some(p => path.startsWith(p))) {
-    const authToken = request.cookies.get('auth_token')?.value;
-    // We also check for a bypass header or if the client will handle it via localStorage
-    // But for Next.js SSR/Middleware, cookies are the best way to pre-redirect
-    if (!authToken && path !== '/login') {
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-  }
-
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/menu', '/cart', '/checkout', '/history'],
+  matcher: ['/admin/:path*'],
 };

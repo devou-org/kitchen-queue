@@ -29,7 +29,7 @@ export default function HistoryPage() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <div className="page-header">
-        <Link href="/menu" className="btn btn-ghost btn-sm" style={{ minWidth: 'auto' }}>← Menu</Link>
+        <Link prefetch={false} href="/menu" className="btn btn-ghost btn-sm" style={{ minWidth: 'auto' }}>← Menu</Link>
         <h1 style={{ fontWeight: 800, fontSize: '18px' }}>Order History</h1>
         <div />
       </div>

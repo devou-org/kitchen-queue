@@ -12,6 +12,20 @@ export default function AdminStatements() {
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [otpSummary, setOtpSummary] = useState<{ total_otps: number; total_cost: number } | null>(null);
+
+  const fetchOtpStats = async () => {
+    try {
+      const qs = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+      const res = await fetch(`/api/admin/otp-stats?${qs.toString()}`);
+      const data = await res.json();
+      if (data.success) {
+        setOtpSummary(data.summary);
+      }
+    } catch (err) {
+      console.error('Failed to load OTP stats');
+    }
+  };
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -40,6 +54,7 @@ export default function AdminStatements() {
 
   useEffect(() => {
     fetchOrders();
+    fetchOtpStats();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, statusFilter, page]);
 
@@ -136,6 +151,33 @@ export default function AdminStatements() {
             <p className="label" style={{ marginBottom: '8px' }}>Fulfillment</p>
             <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#6366F1' }}>{paidCount}</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Paid status</p>
+          </div>
+        </div>
+
+        {/* OTP Billing Section */}
+        <div className="card animate-slide-up" style={{ padding: '24px', marginBottom: '32px', background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>🔐 OTP Billing Summary</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Calculated at ₹0.50 per sent SMS</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>
+                {formatPrice(otpSummary?.total_cost || 0)}
+              </div>
+              <p className="label">Total Cost</p>
+            </div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div style={{ background: 'white', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <p className="label">OTPs Sent</p>
+              <p style={{ fontSize: '20px', fontWeight: 700 }}>{otpSummary?.total_otps || 0}</p>
+            </div>
+            <div style={{ background: 'white', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <p className="label">Rate per SMS</p>
+              <p style={{ fontSize: '20px', fontWeight: 700 }}>₹0.50</p>
+            </div>
           </div>
         </div>
 

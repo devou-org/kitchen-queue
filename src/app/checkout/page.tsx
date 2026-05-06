@@ -1,13 +1,17 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { formatPrice } from '@/lib/format';
 import { CartItem, Order } from '@/types';
 import { authService } from '@/app/services/auth.api';
 import { orderService } from '@/app/services/orders.api';
-import { TAX_RATE } from '@/lib/constants';
 import BottomNav from '@/components/BottomNav';
+
+// Modular Components
+import OrderSummary from './components/OrderSummary';
+import CustomerDetails from './components/CustomerDetails';
+import OtpModal from './components/OtpModal';
+import CheckoutActions from './components/CheckoutActions';
 
 // Statuses where adding to an existing order is allowed
 const ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
@@ -26,77 +30,161 @@ export default function CheckoutPage() {
     notes: '',
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem('cart');
-    if (saved) {
-      try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch { }
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // OTP Verification State
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+
+  // ── AUTH CHECK ──────────────────────────────────────────────────
+  const checkAuth = useCallback(async () => {
+    try {
+      const data = await authService.me();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        return data.user;
+      }
+    } catch (e) {
+      console.error('Auth check failed:', e);
     }
+    return null;
+  }, []);
 
-    const user = localStorage.getItem('user');
-    const token = localStorage.getItem('auth_token');
-
-    if (user) {
-      const u = JSON.parse(user);
-      const localName = u.name || '';
-      const localPhone = u.phone || '';
-      setForm(f => ({ ...f, phone: localPhone, customer_name: localName }));
-
-      if (token && !localName && localPhone) {
-        authService.me()
-          .then(data => {
-            if (data.success && data.user && data.user.name) {
-              const userName = data.user.name;
-              setForm(f => ({ ...f, customer_name: userName }));
-              const updated = { ...u, name: userName };
-              localStorage.setItem('user', JSON.stringify(updated));
-            }
-          })
-          .catch(() => { });
+  useEffect(() => {
+    const init = async () => {
+      // 1. Load Cart
+      const saved = localStorage.getItem('cart');
+      if (saved) {
+        try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch { }
       }
 
-      // Check if user has an active PENDING/PREPARING order FROM TODAY
-      if (localPhone) {
-        orderService.getHistory(localPhone)
-          .then(data => {
+      // 2. Check Auth & Load User
+      const user = await checkAuth();
+      if (user) {
+        setForm(f => ({ 
+          ...f, 
+          phone: user.phone || f.phone, 
+          customer_name: user.name || f.customer_name 
+        }));
+
+        // 3. Check for Active Order
+        if (user.phone) {
+          try {
+            const data = await orderService.getHistory(user.phone);
             if (data.success && data.data) {
               const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
               const active = (data.data as Order[]).find(o => {
                 const orderDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(o.created_at));
                 return ADDABLE_STATUSES.includes(o.status) && orderDate === todayStr;
               });
-              
               if (active) {
                 // setActiveOrder(active);
                 // Always add to existing order automatically
                 // setAddToMode(true);
               }
             }
-          })
-          .catch(() => { })
-          .finally(() => setCheckingActive(false));
-      } else {
-        setCheckingActive(false);
+          } catch (e) {}
+        }
       }
-    } else {
       setCheckingActive(false);
-    }
-  }, []);
+    };
+
+    init();
+  }, [checkAuth]);
 
   const items = Array.from(cart.values());
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const total = subtotal;
 
+  const isVerified = currentUser && currentUser.phone === form.phone;
+
+  // ── HANDLE VERIFY CLICK ──────────────────────────────────────────
+  const handleVerifyClick = async () => {
+    const cleanedPhone = form.phone.replace(/\D/g, '');
+    if (!cleanedPhone || cleanedPhone.length < 10) {
+      toast.error('Please enter a valid 10-digit phone number');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const data = await authService.sendOtp(form.phone);
+      if (data.success && data.otp_token) {
+        setOtpToken(data.otp_token);
+        setOtpStep(true);
+        toast.success('OTP sent to your phone');
+      } else {
+        toast.error(data.error || 'Failed to send OTP');
+      }
+    } catch (err) {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
+    }
+    
+    setVerifyingOtp(true);
+    try {
+      const data = await authService.verifyOtp(otpCode, otpToken);
+      if (data.success) {
+        toast.success('Phone verified successfully!');
+        setOtpStep(false);
+        const updatedUser = authService.getUser();
+        setCurrentUser(updatedUser);
+      } else {
+        toast.error(data.error || 'Invalid OTP');
+      }
+    } catch (err) {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
   // ── PLACE NEW ORDER ──────────────────────────────────────────────
   const handleNewOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!form.customer_name.trim() || form.customer_name.length < 2)
-      return toast.error('Please enter your name (min 2 characters)');
+    
+    // Always check auth before proceeding to ensure session is valid
+    const user = await checkAuth();
+    
+    if (!form.customer_name.trim() || form.customer_name.length < 2) {
+      toast.error('Please enter your name (min 2 characters)');
+      return;
+    }
     const cleanedPhone = form.phone.replace(/\D/g, '');
-    if (!cleanedPhone) return toast.error('Phone number is required');
-    if (cleanedPhone.length < 10) return toast.error('Please enter a valid 10-digit phone number');
-    if (!form.party_size || parseInt(form.party_size) < 1)
-      return toast.error('Please select number of persons');
-    if (items.length === 0) return toast.error('Your cart is empty');
+    if (!cleanedPhone) {
+      toast.error('Phone number is required');
+      return;
+    }
+    if (cleanedPhone.length < 10) {
+      toast.error('Please enter a valid 10-digit phone number');
+      return;
+    }
+    if (!form.party_size || parseInt(form.party_size) < 1) {
+      toast.error('Please select number of persons');
+      return;
+    }
+    if (items.length === 0) {
+      toast.error('Your cart is empty');
+      return;
+    }
+
+    // Dynamic verification check (user may have changed phone number)
+    const verified = user && user.phone === form.phone;
+    if (!verified) {
+      toast.error('Please verify your phone number first.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -115,6 +203,7 @@ export default function CheckoutPage() {
       });
 
       if (data.success && data.data) {
+        // Update user name in local storage if changed
         const existing = localStorage.getItem('user');
         if (existing) {
           try {
@@ -139,11 +228,20 @@ export default function CheckoutPage() {
   // ── ADD ITEMS TO EXISTING ORDER ──────────────────────────────────
   const handleAddToOrder = async () => {
     if (!activeOrder) return;
-    if (items.length === 0) return toast.error('Your cart is empty');
+    if (items.length === 0) {
+      toast.error('Your cart is empty');
+      return;
+    }
+
+    // Always check auth before proceeding
+    const user = await checkAuth();
+    if (!user) {
+      toast.error('Session expired. Please verify again.');
+      return;
+    }
 
     setLoading(true);
     try {
-      // Merge existing order items + new cart items
       const existingItems: { product_id: string; quantity: number }[] = (activeOrder.items || []).map(
         (oi: any) => ({ product_id: oi.product_id, quantity: Number(oi.quantity) })
       );
@@ -195,7 +293,7 @@ export default function CheckoutPage() {
         <div />
       </div>
 
-      {/* Active order info banner — auto adds to existing order */}
+      {/* Active order info banner */}
       {activeOrder && (
         <div style={{ maxWidth: '480px', margin: '12px auto 0', padding: '0 16px' }}>
           <div style={{
@@ -215,149 +313,48 @@ export default function CheckoutPage() {
       )}
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '16px', paddingBottom: '140px' }}>
-        {/* Order Summary */}
-        <div className="card" style={{ marginBottom: '16px' }}>
-          <h3 style={{ fontWeight: 700, marginBottom: '14px', fontSize: '16px' }}>📋 Order Summary</h3>
-          {items.length === 0 ? (
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Your cart is empty. Go back to the menu to add items.</p>
-          ) : (
-            <>
-              {items.map(item => (
-                <div key={item.product_id} style={{
-                  display: 'flex', justifyContent: 'space-between',
-                  padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '14px',
-                }}>
-                  <span>{item.name} × {item.quantity}</span>
-                  <span style={{ fontWeight: 600 }}>{formatPrice(item.price * item.quantity)}</span>
-                </div>
-              ))}
-              {addToMode && activeOrder && (
-                <div style={{
-                  marginTop: '10px', padding: '8px 10px',
-                  background: 'rgba(151,19,69,0.04)', borderRadius: '8px',
-                  border: '1px dashed rgba(151,19,69,0.2)',
-                }}>
-                  <p style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 600 }}>
-                    + {(activeOrder.items || []).length} existing item(s) from order #{String(activeOrder.ticket_number).padStart(3, '0')}
-                  </p>
-                </div>
-              )}
-              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  <span>Subtotal (new items)</span><span>{formatPrice(subtotal)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px', paddingTop: '8px', borderTop: '2px solid var(--border)' }}>
-                  <span>Total</span>
-                  <span style={{ color: 'var(--primary)' }}>{formatPrice(total)}</span>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        <OrderSummary 
+          items={items}
+          subtotal={subtotal}
+          total={total}
+          addToMode={addToMode}
+          activeOrder={activeOrder}
+        />
 
-        {/* Customer Details — only needed for new orders */}
         {!addToMode && (
-          <form onSubmit={handleNewOrder} id="new-order-form">
-            <div className="card">
-              <h3 style={{ fontWeight: 700, marginBottom: '18px', fontSize: '16px' }}>👤 Your Details</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label className="label">Full Name *</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Enter your name"
-                    value={form.customer_name}
-                    onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
-                    maxLength={50}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">Phone Number *</label>
-                  <input
-                    type="tel"
-                    className="input"
-                    placeholder="+91 9xxxxxxxxx"
-                    value={form.phone}
-                    onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">Number of Persons *</label>
-                  <select
-                    className="select"
-                    value={form.party_size}
-                    onChange={e => setForm(f => ({ ...f, party_size: e.target.value }))}
-                    required
-                  >
-                    <option value="" disabled>Select persons</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                      <option key={n} value={n}>{n} Party</option>
-                    ))}
-                  </select>
-                </div>
-                {/*
-                <div>
-                  <label className="label">Special Instructions (optional)</label>
-                  <textarea
-                    className="textarea"
-                    placeholder="Any allergies, dietary needs, or special requests..."
-                    value={form.notes}
-                    onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                    maxLength={200}
-                    rows={3}
-                  />
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', textAlign: 'right' }}>
-                    {form.notes.length}/200
-                  </p>
-                </div>
-                */}
-              </div>
-            </div>
-          </form>
+          <CustomerDetails 
+            form={form}
+            setForm={setForm}
+            isVerified={isVerified}
+            loading={loading}
+            handleVerifyClick={handleVerifyClick}
+            onSubmit={handleNewOrder}
+          />
         )}
       </div>
 
-      {/* Fixed Bottom CTA */}
-      <div style={{
-        position: 'fixed', bottom: 64, left: 0, right: 0,
-        background: 'white', borderTop: '1px solid var(--border)',
-        padding: '16px',
-        boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
-        zIndex: 100,
-      }}>
-        {addToMode ? (
-          <button
-            type="button"
-            className="btn btn-primary btn-lg"
-            style={{ width: '100%' }}
-            disabled={loading || items.length === 0}
-            onClick={handleAddToOrder}
-          >
-            {loading ? (
-              <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Adding Items...</>
-            ) : (
-              <>➕ Add to Order #{String(activeOrder?.ticket_number || '').padStart(3, '0')} – {formatPrice(total)}</>
-            )}
-          </button>
-        ) : (
-          <button
-            type="submit"
-            form="new-order-form"
-            className="btn btn-primary btn-lg"
-            style={{ width: '100%' }}
-            disabled={loading}
-          >
-            {loading ? (
-              <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Placing Order...</>
-            ) : (
-              <>🎉 Place Order – {formatPrice(total)}</>
-            )}
-          </button>
-        )}
-      </div>
+      <CheckoutActions 
+        addToMode={addToMode}
+        loading={loading}
+        isVerified={isVerified}
+        itemsCount={items.length}
+        total={total}
+        ticketNumber={activeOrder?.ticket_number}
+        onAddToOrder={handleAddToOrder}
+        onSubmitNewOrder={handleNewOrder}
+      />
+
+      {otpStep && (
+        <OtpModal 
+          phone={form.phone}
+          otpCode={otpCode}
+          setOtpCode={setOtpCode}
+          verifyingOtp={verifyingOtp}
+          loading={loading}
+          onSubmit={verifyOtpSubmit}
+          onClose={() => setOtpStep(false)}
+        />
+      )}
 
       <BottomNav />
     </div>
