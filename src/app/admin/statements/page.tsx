@@ -12,6 +12,7 @@ export default function AdminStatements() {
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [stats, setStats] = useState({ totalRevenue: 0, totalPaidRevenue: 0, orderCount: 0, paidCount: 0 });
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -30,6 +31,9 @@ export default function AdminStatements() {
 
       if (data.success) {
         setOrders(data.data);
+        if (data.stats) {
+          setStats(data.stats);
+        }
       }
     } catch {
       toast.error('Failed to load statements');
@@ -71,16 +75,8 @@ export default function AdminStatements() {
     document.body.removeChild(link);
   };
 
-  const totalRevenue = orders
-    .filter(o => o.status !== 'CANCELLED')
-    .reduce((sum, o) => sum + Number(o.total_price), 0);
-  
-  const totalPaidRevenue = orders
-    .filter(o => o.status=="PAID")
-    .reduce((sum, o) => sum + Number(o.total_price), 0);
+  const { totalRevenue, totalPaidRevenue, orderCount, paidCount } = stats;
 
-  const orderCount = orders.length;
-  const paidCount = orders.filter(o => o.status === 'PAID').length;
   const allStatuses = ['PENDING', 'READY', 'PAID', 'CANCELLED'];
 
   const [expiring, setExpiring] = useState(false);

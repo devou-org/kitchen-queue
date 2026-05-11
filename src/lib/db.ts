@@ -230,6 +230,91 @@ export async function getOrders(filters: {
   `;
 }
 
+export async function getOrderStats(filters: {
+  status?: string;
+  status_in?: string;
+  date_from?: string;
+  date_to?: string;
+  phone?: string;
+  search?: string;
+} = {}) {
+  const localTimezone = 'Asia/Kolkata';
+
+  if (filters.date_from && filters.date_to) {
+    if (filters.status) {
+      return await sql`
+        SELECT 
+          COUNT(*)::int as total_orders,
+          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
+        FROM orders
+        WHERE status = ${filters.status}
+          AND DATE(created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+          AND DATE(created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+      `;
+    } else if (filters.status_in) {
+      const statuses = filters.status_in.split(',');
+      return await sql`
+        SELECT 
+          COUNT(*)::int as total_orders,
+          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
+        FROM orders
+        WHERE status = ANY(${statuses})
+          AND DATE(created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+          AND DATE(created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+      `;
+    } else {
+      return await sql`
+        SELECT 
+          COUNT(*)::int as total_orders,
+          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
+        FROM orders
+        WHERE DATE(created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
+          AND DATE(created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+      `;
+    }
+  }
+
+  if (filters.status) {
+    return await sql`
+      SELECT 
+        COUNT(*)::int as total_orders,
+        COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+        COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+        COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
+      FROM orders
+      WHERE status = ${filters.status}
+    `;
+  }
+
+  if (filters.status_in) {
+    const statuses = filters.status_in.split(',');
+    return await sql`
+      SELECT 
+        COUNT(*)::int as total_orders,
+        COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+        COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+        COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
+      FROM orders
+      WHERE status = ANY(${statuses})
+    `;
+  }
+
+  return await sql`
+    SELECT 
+      COUNT(*)::int as total_orders,
+      COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+      COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+      COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
+    FROM orders
+  `;
+}
+
 export async function getOrderById(id: string) {
   const rows = await sql`
     SELECT o.*, 

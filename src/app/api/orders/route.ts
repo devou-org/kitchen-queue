@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrders, createOrder, createUser } from '@/lib/db';
+import { getOrders, getOrderStats, createOrder, createUser } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
 
@@ -31,7 +31,25 @@ export async function GET(request: NextRequest) {
     };
 
     const orders = await getOrders(filters);
-    return NextResponse.json({ success: true, data: orders, total: orders.length });
+    const statsResult = await getOrderStats(filters);
+    const stats = statsResult[0] || {
+      total_orders: 0,
+      paid_orders: 0,
+      total_revenue: 0,
+      total_paid_revenue: 0
+    };
+
+    return NextResponse.json({ 
+      success: true, 
+      data: orders, 
+      total: orders.length,
+      stats: {
+        totalRevenue: Number(stats.total_revenue),
+        totalPaidRevenue: Number(stats.total_paid_revenue),
+        orderCount: Number(stats.total_orders),
+        paidCount: Number(stats.paid_orders)
+      }
+    });
   } catch (error) {
     console.error('Get orders error:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch orders' }, { status: 500 });
