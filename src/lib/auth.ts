@@ -114,7 +114,7 @@ export interface JWTPayload {
   exp?: number;
 }
 
-export async function generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>, expiresIn = '7d'): Promise<string> {
+export async function generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>, expiresIn = '365d'): Promise<string> {
   return new SignJWT(payload as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()

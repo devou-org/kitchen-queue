@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [otpToken, setOtpToken] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -114,7 +115,7 @@ export default function LoginPage() {
   };
 
   const handleVerify = async (code?: string) => {
-    if (loading) return;
+    if (loading || isSuccess) return;
     const otpCode = code || otp.join('');
     if (otpCode.length !== 6) return toast.error('Enter complete 6-digit OTP');
     if (!otpToken) return toast.error('OTP session expired. Please request a new OTP.');
@@ -122,12 +123,13 @@ export default function LoginPage() {
     try {
       const data = await authService.verifyOtp(otpCode, otpToken);
       if (data.success) {
+        setIsSuccess(true);
         // Store in localStorage for client-side access
         if (data.token) localStorage.setItem('auth_token', data.token);
         if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
 
         // Also set as a cookie so the Next.js middleware can see it on navigation
-        const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds
+        const maxAge = 365 * 24 * 60 * 60; // 365 days in seconds
         document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
         toast.success('Welcome to Renjz Kitchen! 🎉');
@@ -135,10 +137,10 @@ export default function LoginPage() {
       } else {
         toast.error(data.error || 'Invalid OTP');
         setCooldown(0); // Re-enable Send OTP button on wrong PIN
+        setLoading(false);
       }
     } catch {
       toast.error('Network error. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
@@ -258,9 +260,9 @@ export default function LoginPage() {
                   onChange={(e) => handleOTPChange(i, e.target.value)}
                   onKeyDown={(e) => handleOTPKeyDown(i, e)}
                   onPaste={handleOTPPaste}
-                  disabled={step === 'phone'}
+                  disabled={step === 'phone' || isSuccess || loading}
                   style={{
-                    opacity: step === 'phone' ? 0.4 : 1,
+                    opacity: step === 'phone' || isSuccess ? 0.4 : 1,
                   }}
                 />
               ))}
@@ -269,9 +271,9 @@ export default function LoginPage() {
               className="btn btn-secondary btn-lg"
               style={{ width: '100%' }}
               onClick={() => handleVerify()}
-              disabled={loading || step === 'phone' || otp.some(d => !d)}
+              disabled={loading || isSuccess || step === 'phone' || otp.some(d => !d)}
             >
-              {loading && step === 'otp' ? (
+              {(loading || isSuccess) && step === 'otp' ? (
                 <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2, borderColor: 'rgba(151,19,69,0.3)', borderTopColor: 'var(--primary)' }} /> Verifying...</>
               ) : 'Verify & Login'}
             </button>
@@ -280,8 +282,9 @@ export default function LoginPage() {
                 <>Resend code in <strong>0:{cooldown.toString().padStart(2, '0')}</strong></>
               ) : step === 'otp' ? (
                 <button
-                  style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: loading || isSuccess ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: loading || isSuccess ? 0.5 : 1 }}
                   onClick={handleSendOTP}
+                  disabled={loading || isSuccess}
                 >
                   Resend OTP
                 </button>
