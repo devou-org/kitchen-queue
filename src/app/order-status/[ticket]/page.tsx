@@ -96,7 +96,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
     return () => {
       channel.unbind_all();
-      pusherClient.unsubscribe('queue-channel');
+      pusherClient?.unsubscribe('queue-channel');
     };
   }, [ticket]);
 
