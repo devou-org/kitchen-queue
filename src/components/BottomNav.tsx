@@ -14,7 +14,6 @@ export default function BottomNav() {
         
         {/* Status Link */}
         <Link prefetch={false} href="/order-status"
-          prefetch={false}
           className={`bottom-nav-item ${isActive('/order-status') ? 'active' : ''}`}
           style={{ flex: 1 }}
         >
@@ -25,7 +24,6 @@ export default function BottomNav() {
         {/* Center Menu Button (FAB Style) */}
         <div style={{ position: 'relative', top: '-15px', width: '70px', height: '70px', display: 'flex', justifyContent: 'center' }}>
           <Link prefetch={false} href="/menu" 
-            prefetch={false} 
             className="bottom-nav-center"
             style={{ 
               width: '64px', 
@@ -48,7 +46,6 @@ export default function BottomNav() {
 
         {/* History Link */}
         <Link prefetch={false} href="/history"
-          prefetch={false}
           className={`bottom-nav-item ${isActive('/history') ? 'active' : ''}`}
           style={{ flex: 1 }}
         >
