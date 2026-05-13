@@ -380,39 +380,41 @@ export default function MenuPage() {
           background: 'transparent',
           padding: '0 16px',
           zIndex: 40,
-          pointerEvents: 'none'
+          pointerEvents: 'none',
+          display: 'flex',
+          justifyContent: 'center'
         }}>
           <Link prefetch={false} href="/cart" 
             className="cart-btn"
             style={{
               pointerEvents: 'auto',
-              width: '100%',
-              maxWidth: '480px',
-              margin: '0 auto',
+              width: 'auto',
+              minWidth: '260px',
+              maxWidth: '400px',
               background: '#800020',
               borderRadius: '999px',
-              height: '56px',
+              height: '48px',
               display: 'flex',
               alignItems: 'center',
-              padding: '0 24px',
+              padding: '0 20px',
               boxShadow: '0 8px 20px rgba(128, 0, 32, 0.4)',
               color: 'white',
               textDecoration: 'none',
               fontWeight: 800,
-              fontSize: '15px'
+              fontSize: '14px',
+              gap: '12px'
             }}
           >
             <span style={{
               background: 'rgba(255,255,255,0.2)',
-              width: '28px', 
-              height: '28px', 
+              width: '24px', 
+              height: '24px', 
               borderRadius: '50%',
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
-              fontSize: '12px', 
-              fontWeight: 900,
-              marginRight: '12px'
+              fontSize: '11px', 
+              fontWeight: 900
             }}>{totalItems}</span>
             <span>Review & Order →</span>
             <span style={{ marginLeft: 'auto', opacity: 0.9 }}>{formatPrice(totalPrice)}</span>
