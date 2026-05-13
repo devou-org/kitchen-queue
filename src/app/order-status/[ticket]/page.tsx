@@ -2,16 +2,17 @@
 import { useState, useEffect, useRef, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
-  ChevronLeft, 
-  Circle, 
-  MapPin, 
-  Bell, 
-  CheckCircle2, 
-  Search, 
-  Utensils, 
+import {
+  ChevronLeft,
+  Circle,
+  MapPin,
+  Bell,
+  CheckCircle2,
+  Search,
+  Utensils,
   CircleDollarSign,
-  Info
+  Info,
+  ClipboardEdit
 } from 'lucide-react';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
@@ -48,6 +49,18 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
+  const [showSurveyTip, setShowSurveyTip] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('hideSurveyTip_kdK8Jd')) {
+      setShowSurveyTip(true);
+    }
+  }, []);
+
+  const handleSurveyClick = () => {
+    localStorage.setItem('hideSurveyTip_kdK8Jd', 'true');
+    setShowSurveyTip(false);
+  };
 
   const orderRef = useRef<Order | null>(null);
   useEffect(() => { orderRef.current = order; }, [order]);
@@ -135,11 +148,11 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   return (
     <div style={{ background: '#FDF9FA', minHeight: '100vh', paddingBottom: '120px' }}>
       {/* Header */}
-      <header style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        padding: '16px 20px', 
+      <header style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '16px 20px',
         background: 'white',
         position: 'sticky',
         top: 0,
@@ -154,17 +167,92 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
             {isLive ? 'LIVE STATUS UPDATE' : 'CONNECTING...'}
           </span>
         </div>
-        <div style={{ width: '32px' }} /> {/* Spacer */}
+        <div style={{ position: 'relative' }}>
+          <a
+            href="https://tally.so/r/kdK8Jd"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleSurveyClick}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              background: '#FFF5F7',
+              borderRadius: '50%',
+              color: '#800020',
+              textDecoration: 'none',
+              transition: 'opacity 0.2s'
+            }}
+            title="Help us get better"
+          >
+            <ClipboardEdit size={16} />
+          </a>
+
+          {showSurveyTip && (
+            <div style={{
+              position: 'absolute',
+              top: '40px',
+              right: '0',
+              background: '#33322F',
+              color: 'white',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              zIndex: 50,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '12px',
+                width: '8px',
+                height: '8px',
+                background: '#33322F',
+                transform: 'rotate(45deg)'
+              }} />
+              <span> Help us get better! 🚀</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSurveyClick();
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#9CA3AF',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  lineHeight: 1
+                }}
+              >
+                &times;
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <main style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
-        
+
         {/* Edit Order Info at Top */}
-        <p style={{ 
-          textAlign: 'center', 
-          color: '#9CA3AF', 
-          fontSize: '12px', 
-          marginBottom: '24px', 
+        <p style={{
+          textAlign: 'center',
+          color: '#9CA3AF',
+          fontSize: '12px',
+          marginBottom: '24px',
           fontWeight: 500,
           padding: '0 20px',
           lineHeight: 1.5
@@ -249,34 +337,34 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F' }}>Queue Progress</h3>
-            <span style={{ 
-              fontSize: '11px', 
-              fontWeight: 700, 
-              background: '#FFF1F2', 
-              color: '#800020', 
-              padding: '4px 10px', 
-              borderRadius: '99px' 
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              background: '#FFF1F2',
+              color: '#800020',
+              padding: '4px 10px',
+              borderRadius: '99px'
             }}>Active</span>
           </div>
 
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             {/* Connecting Lines */}
-            <div style={{ 
-              position: 'absolute', 
-              top: '20px', 
-              left: '10%', 
-              right: '10%', 
-              height: '2px', 
-              background: '#F3F4F6', 
-              zIndex: 0 
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              left: '10%',
+              right: '10%',
+              height: '2px',
+              background: '#F3F4F6',
+              zIndex: 0
             }} />
-            <div style={{ 
-              position: 'absolute', 
-              top: '20px', 
-              left: '10%', 
-              width: `${(stageIndex / (STAGES.length - 1)) * 80}%`, 
-              height: '2px', 
-              background: '#800020', 
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              left: '10%',
+              width: `${(stageIndex / (STAGES.length - 1)) * 80}%`,
+              height: '2px',
+              background: '#800020',
               zIndex: 0,
               transition: 'width 0.5s ease'
             }} />
@@ -304,9 +392,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                   }}>
                     {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />}
                   </div>
-                  <span style={{ 
-                    fontSize: '9px', 
-                    fontWeight: 800, 
+                  <span style={{
+                    fontSize: '9px',
+                    fontWeight: 800,
                     color: isPending ? '#9CA3AF' : '#800020',
                     letterSpacing: '0.02em'
                   }}>
@@ -338,9 +426,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 </span>
               </div>
             ))}
-            
+
             <div style={{ borderTop: '1px dashed #E5E7EB', margin: '8px 0' }} />
-            
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Status</span>
               <span style={{ fontWeight: 800, fontSize: '14px', color: '#EC7951', textTransform: 'uppercase' }}>
@@ -356,7 +444,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
             </div>
           </div>
         </div>
-
 
       </main>
 
