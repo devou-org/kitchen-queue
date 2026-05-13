@@ -1,71 +1,62 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LayoutDashboard, UtensilsCrossed, History } from 'lucide-react';
 
 export default function BottomNav() {
   const pathname = usePathname();
 
-  const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => pathname.startsWith(path);
 
   return (
-    <nav className="bottom-nav">
-      {/* Nav Icons Row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%' }}>
-        <Link
-          href="/order-status"
+    <nav className="bottom-nav" style={{ height: '70px', paddingBottom: 'calc(env(safe-area-inset-bottom) + 4px)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%', position: 'relative' }}>
+        
+        {/* Status Link */}
+        <Link prefetch={false} href="/order-status"
           prefetch={false}
           className={`bottom-nav-item ${isActive('/order-status') ? 'active' : ''}`}
+          style={{ flex: 1 }}
         >
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-          </svg>
-          STATUS
+          <LayoutDashboard size={22} strokeWidth={isActive('/order-status') ? 2.5 : 2} />
+          <span style={{ marginTop: '4px', fontSize: '10px', fontWeight: 700 }}>STATUS</span>
         </Link>
-        <Link href="/menu" prefetch={false} className="bottom-nav-center">
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M3 3h18v18H3z M9 3v18M15 3v18M3 9h18M3 15h18"/>
-          </svg>
-          <span style={{ fontSize: '9px', letterSpacing: '0.05em' }}>MENU</span>
-        </Link>
-        <Link
-          href="/history"
+
+        {/* Center Menu Button (FAB Style) */}
+        <div style={{ position: 'relative', top: '-15px', width: '70px', height: '70px', display: 'flex', justifyContent: 'center' }}>
+          <Link prefetch={false} href="/menu" 
+            prefetch={false} 
+            className="bottom-nav-center"
+            style={{ 
+              width: '64px', 
+              height: '64px', 
+              background: '#800020', // Maroon color from image
+              boxShadow: '0 8px 20px rgba(128, 0, 32, 0.4)',
+              border: '4px solid white'
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                <div style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
+                <div style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
+                <div style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
+              </div>
+              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.05em', color: 'white' }}>MENU</span>
+            </div>
+          </Link>
+        </div>
+
+        {/* History Link */}
+        <Link prefetch={false} href="/history"
           prefetch={false}
           className={`bottom-nav-item ${isActive('/history') ? 'active' : ''}`}
+          style={{ flex: 1 }}
         >
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-          </svg>
-          HISTORY
+          <History size={22} strokeWidth={isActive('/history') ? 2.5 : 2} />
+          <span style={{ marginTop: '4px', fontSize: '10px', fontWeight: 700 }}>HISTORY</span>
         </Link>
-      </div>
 
-      {/* Devou Credit — below nav icons */}
-      {/* <div style={{
-        width: '100%',
-        textAlign: 'center',
-        fontSize: '10px',
-        color: 'var(--text-secondary)',
-        fontWeight: 500,
-        letterSpacing: '0.03em',
-        padding: '6px 0 calc(env(safe-area-inset-bottom) + 2px)',
-        marginTop: '4px',
-        borderTop: '1px solid var(--border)',
-      }}>
-        Crafted with ♥ by{' '}
-        <a
-          href="https://devou.in"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: 'var(--primary)',
-            fontWeight: 700,
-            textDecoration: 'none',
-            letterSpacing: '0.04em',
-          }}
-        >
-          Devou
-        </a>
-      </div> */}
+      </div>
     </nav>
   );
 }

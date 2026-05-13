@@ -42,7 +42,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
       <div className="page-content-admin">
         <div style={{ textAlign: 'center', padding: '60px' }}>
           <p>Product not found.</p>
-          <Link href="/admin/products" className="btn btn-primary" style={{ marginTop: '20px' }}>Back to Products</Link>
+          <Link prefetch={false} href="/admin/products" className="btn btn-primary" style={{ marginTop: '20px' }}>Back to Products</Link>
         </div>
       </div>
     );
@@ -51,7 +51,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="page-content-admin animate-fade-in">
       <div style={{ marginBottom: '24px' }}>
-        <Link href="/admin/products" style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none' }}>
+        <Link prefetch={false} href="/admin/products" style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none' }}>
           ← Back to Products
         </Link>
         <h1 style={{ fontSize: '28px', fontWeight: 800, marginTop: '8px' }}>Edit Product: {product.name}</h1>

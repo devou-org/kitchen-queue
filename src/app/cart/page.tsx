@@ -47,7 +47,7 @@ export default function CartPage() {
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>🛒</div>
         <h2 style={{ fontWeight: 800, marginBottom: '8px' }}>Your cart is empty</h2>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Add some delicious items from our menu!</p>
-        <Link href="/menu" className="btn btn-primary btn-lg">Browse Menu</Link>
+        <Link prefetch={false} href="/menu" className="btn btn-primary btn-lg">Browse Menu</Link>
       </div>
     );
   }
@@ -114,17 +114,45 @@ export default function CartPage() {
 
       {/* Fixed Bottom */}
       <div style={{
-        position: 'fixed', bottom: 64, left: 0, right: 0,
-        background: 'white', borderTop: '1px solid var(--border)',
-        padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
-        boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
+        position: 'fixed', 
+        bottom: '80px', 
+        left: 0, 
+        right: 0,
+        background: 'transparent',
+        padding: '0 16px',
+        zIndex: 40,
+        pointerEvents: 'none'
       }}>
-        <Link href="/checkout" className="btn btn-primary btn-lg" style={{ width: '100%' }}>
-          Continue to Checkout →
-        </Link>
-        <Link href="/menu" className="btn btn-ghost btn-sm" style={{ textAlign: 'center' }}>
-          ← Back to Menu
-        </Link>
+        <div style={{
+          background: 'white',
+          padding: '16px',
+          borderRadius: '24px',
+          boxShadow: '0 -8px 24px rgba(0,0,0,0.06)',
+          pointerEvents: 'auto',
+          maxWidth: '480px',
+          margin: '0 auto',
+          border: '1px solid rgba(0,0,0,0.05)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <Link prefetch={false} href="/checkout" 
+            className="btn btn-primary btn-lg" 
+            style={{ 
+              width: '100%', 
+              background: '#800020',
+              height: '56px',
+              fontSize: '16px',
+              fontWeight: 800,
+              boxShadow: '0 8px 16px rgba(128, 0, 32, 0.25)'
+            }}
+          >
+            Continue to Checkout →
+          </Link>
+          <Link prefetch={false} href="/menu" className="btn btn-ghost btn-sm" style={{ textAlign: 'center', height: '32px' }}>
+            ← Back to Menu
+          </Link>
+        </div>
       </div>
 
       <BottomNav />

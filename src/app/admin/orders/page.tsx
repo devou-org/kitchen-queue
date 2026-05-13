@@ -459,8 +459,7 @@ export default function AdminOrders() {
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatDateTime(selectedOrder.created_at)}</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                <Link
-                  href={`/admin/orders/${selectedOrder.id}/edit`}
+                <Link prefetch={false} href={`/admin/orders/${selectedOrder.id}/edit`}
                   prefetch={false}
                   className="btn btn-secondary btn-sm"
                   onClick={closeModal}

@@ -280,7 +280,7 @@ export default function MenuPage() {
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {/* Header */}
       <div className="page-header">
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+        <Link prefetch={false} href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
           <img
             src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg"
             alt="Renjz Kitchen"
@@ -372,16 +372,52 @@ export default function MenuPage() {
 
       {/* Cart Button */}
       {totalItems > 0 && isServiceActive && (
-        <Link href="/cart" className="cart-btn">
-          <span style={{
-            background: 'rgba(255,255,255,0.25)',
-            width: '24px', height: '24px', borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '12px', fontWeight: 900,
-          }}>{totalItems}</span>
-          Review & Order →
-          <span style={{ marginLeft: 'auto', opacity: 0.9 }}>{formatPrice(totalPrice)}</span>
-        </Link>
+        <div style={{
+          position: 'fixed', 
+          bottom: '80px', 
+          left: 0, 
+          right: 0,
+          background: 'transparent',
+          padding: '0 16px',
+          zIndex: 40,
+          pointerEvents: 'none'
+        }}>
+          <Link prefetch={false} href="/cart" 
+            className="cart-btn"
+            style={{
+              pointerEvents: 'auto',
+              width: '100%',
+              maxWidth: '480px',
+              margin: '0 auto',
+              background: '#800020',
+              borderRadius: '999px',
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 24px',
+              boxShadow: '0 8px 20px rgba(128, 0, 32, 0.4)',
+              color: 'white',
+              textDecoration: 'none',
+              fontWeight: 800,
+              fontSize: '15px'
+            }}
+          >
+            <span style={{
+              background: 'rgba(255,255,255,0.2)',
+              width: '28px', 
+              height: '28px', 
+              borderRadius: '50%',
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              fontSize: '12px', 
+              fontWeight: 900,
+              marginRight: '12px'
+            }}>{totalItems}</span>
+            <span>Review & Order →</span>
+            <span style={{ marginLeft: 'auto', opacity: 0.9 }}>{formatPrice(totalPrice)}</span>
+          </Link>
+        </div>
       )}
 
       <BottomNav />

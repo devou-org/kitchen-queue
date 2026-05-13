@@ -118,7 +118,7 @@ export default function AdminInventorySummary() {
           <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Sales Summary</h1>
           <p style={{ color: 'var(--text-secondary)' }}>Detailed sales and revenue performance by item.</p>
         </div>
-        <Link href="/admin/products" className="btn btn-secondary">← Back to Products</Link>
+        <Link prefetch={false} href="/admin/products" className="btn btn-secondary">← Back to Products</Link>
       </div>
 
       {/* Date Range Filter */}

@@ -88,7 +88,7 @@ export default function OrderStatusPage() {
           <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', maxWidth: '260px', lineHeight: 1.6 }}>
             Your orders have been served or no orders are in progress right now.
           </p>
-          <Link href="/menu" className="btn btn-primary btn-lg" style={{ width: '100%', maxWidth: '280px' }}>
+          <Link prefetch={false} href="/menu" className="btn btn-primary btn-lg" style={{ width: '100%', maxWidth: '280px' }}>
             Browse Menu →
           </Link>
         </div>
@@ -124,7 +124,7 @@ export default function OrderStatusPage() {
           const pos = isNaN(rawPos) || rawPos === 0 ? 1 : rawPos;
 
           return (
-            <Link key={order.id} href={`/order-status/${order.ticket_number}`} style={{
+            <Link prefetch={false} key={order.id} href={`/order-status/${order.ticket_number}`} style={{
               display: 'flex',
               background: 'white',
               border: isReady ? '1px solid rgba(6,167,125,0.2)' : '1px solid rgba(0,0,0,0.05)',

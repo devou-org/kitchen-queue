@@ -29,7 +29,7 @@ export default function HistoryPage() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <div className="page-header">
-        <Link href="/menu" className="btn btn-ghost btn-sm" style={{ minWidth: 'auto' }}>← Menu</Link>
+        <Link prefetch={false} href="/menu" className="btn btn-ghost btn-sm" style={{ minWidth: 'auto' }}>← Menu</Link>
         <h1 style={{ fontWeight: 800, fontSize: '18px' }}>Order History</h1>
         <div />
       </div>
@@ -44,12 +44,12 @@ export default function HistoryPage() {
             <div style={{ fontSize: '64px', marginBottom: '16px' }}>📋</div>
             <h2 style={{ fontWeight: 700, marginBottom: '8px' }}>No orders yet</h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Place your first order from our menu!</p>
-            <Link href="/menu" className="btn btn-primary">Browse Menu</Link>
+            <Link prefetch={false} href="/menu" className="btn btn-primary">Browse Menu</Link>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {orders.map(order => (
-              <Link key={order.id} href={`/order-status/${order.ticket_number}`} style={{ textDecoration: 'none' }}>
+              <Link prefetch={false} key={order.id} href={`/order-status/${order.ticket_number}`} style={{ textDecoration: 'none' }}>
                 <div className="card" style={{ cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                     <div>

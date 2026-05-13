@@ -58,7 +58,7 @@ export default function AdminProducts() {
           <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Products Inventory</h1>
           <p style={{ color: 'var(--text-secondary)' }}>Manage your menu items and stock levels.</p>
         </div>
-        <Link href="/admin/products/new" className="btn btn-primary">+ Add Product</Link>
+        <Link prefetch={false} href="/admin/products/new" className="btn btn-primary">+ Add Product</Link>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -123,7 +123,7 @@ export default function AdminProducts() {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                        <Link href={`/admin/products/${p.id}/edit`} prefetch={false} className="btn btn-secondary btn-sm">Edit</Link>
+                        <Link prefetch={false} href={`/admin/products/${p.id}/edit`} className="btn btn-secondary btn-sm">Edit</Link>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id, p.name)}>Delete</button>
                       </div>
                     </td>

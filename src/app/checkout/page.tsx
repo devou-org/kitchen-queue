@@ -322,41 +322,69 @@ export default function CheckoutPage() {
 
       {/* Fixed Bottom CTA */}
       <div style={{
-        position: 'fixed', bottom: 64, left: 0, right: 0,
-        background: 'white', borderTop: '1px solid var(--border)',
-        padding: '16px',
-        boxShadow: '0 -4px 10px rgba(0,0,0,0.05)',
-        zIndex: 100,
+        position: 'fixed', 
+        bottom: '80px', // Raised to avoid clashing with the raised Menu button
+        left: 0, 
+        right: 0,
+        background: 'transparent', // Make it floating
+        padding: '0 16px',
+        zIndex: 40,
+        pointerEvents: 'none' // Only button should be clickable
       }}>
-        {addToMode ? (
-          <button
-            type="button"
-            className="btn btn-primary btn-lg"
-            style={{ width: '100%' }}
-            disabled={loading || items.length === 0}
-            onClick={handleAddToOrder}
-          >
-            {loading ? (
-              <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Adding Items...</>
-            ) : (
-              <>➕ Add to Order #{String(activeOrder?.ticket_number || '').padStart(3, '0')} – {formatPrice(total)}</>
-            )}
-          </button>
-        ) : (
-          <button
-            type="submit"
-            form="new-order-form"
-            className="btn btn-primary btn-lg"
-            style={{ width: '100%' }}
-            disabled={loading}
-          >
-            {loading ? (
-              <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Placing Order...</>
-            ) : (
-              <>🎉 Place Order – {formatPrice(total)}</>
-            )}
-          </button>
-        )}
+        <div style={{
+          background: 'white',
+          padding: '16px',
+          borderRadius: '24px',
+          boxShadow: '0 -8px 24px rgba(0,0,0,0.06)',
+          pointerEvents: 'auto',
+          maxWidth: '480px',
+          margin: '0 auto',
+          border: '1px solid rgba(0,0,0,0.05)'
+        }}>
+          {addToMode ? (
+            <button
+              type="button"
+              className="btn btn-primary btn-lg"
+              style={{ 
+                width: '100%', 
+                background: '#800020', 
+                height: '56px',
+                fontSize: '16px',
+                fontWeight: 800,
+                boxShadow: '0 8px 16px rgba(128, 0, 32, 0.25)'
+              }}
+              disabled={loading || items.length === 0}
+              onClick={handleAddToOrder}
+            >
+              {loading ? (
+                <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Adding Items...</>
+              ) : (
+                <>➕ Add to Order #{String(activeOrder?.ticket_number || '').padStart(3, '0')} – {formatPrice(total)}</>
+              )}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              form="new-order-form"
+              className="btn btn-primary btn-lg"
+              style={{ 
+                width: '100%', 
+                background: '#800020', 
+                height: '56px',
+                fontSize: '16px',
+                fontWeight: 800,
+                boxShadow: '0 8px 16px rgba(128, 0, 32, 0.25)'
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Placing Order...</>
+              ) : (
+                <>🎉 Place Order – {formatPrice(total)}</>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       <BottomNav />

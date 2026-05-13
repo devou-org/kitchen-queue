@@ -133,7 +133,8 @@ export default function LoginPage() {
         document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
         toast.success('Welcome to Renjz Kitchen! 🎉');
-        router.push('/menu');
+        // Force a hard navigation to ensure middleware and server components pick up the new cookie
+        window.location.href = '/menu';
       } else {
         toast.error(data.error || 'Invalid OTP');
         setCooldown(0); // Re-enable Send OTP button on wrong PIN

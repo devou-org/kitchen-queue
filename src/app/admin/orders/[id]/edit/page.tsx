@@ -177,7 +177,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
       <div className="page-content-admin">
         <div style={{ textAlign: 'center', padding: '60px' }}>
           <p>Order not found.</p>
-          <Link href="/admin/orders" className="btn btn-primary" style={{ marginTop: '20px' }}>Back to Orders</Link>
+          <Link prefetch={false} href="/admin/orders" className="btn btn-primary" style={{ marginTop: '20px' }}>Back to Orders</Link>
         </div>
       </div>
     );
@@ -186,8 +186,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
   return (
     <div className="page-content-admin animate-fade-in" style={{ position: 'relative' }}>
       {/* Top Right Close Button */}
-      <Link 
-        href="/admin/orders" 
+      <Link prefetch={false} href="/admin/orders" 
         style={{ 
           position: 'absolute', 
           top: '32px', 
@@ -212,7 +211,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
       </Link>
 
       <div style={{ marginBottom: '24px', paddingTop: '8px' }}>
-        <Link href="/admin/orders" style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>
+        <Link prefetch={false} href="/admin/orders" style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>
           ← Back to Orders
         </Link>
         <h1 style={{ fontSize: '28px', fontWeight: 800 }}>
@@ -397,7 +396,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Saving...' : 'Save Order Changes'}
             </button>
-            <Link href="/admin/orders" className="btn btn-ghost">Cancel</Link>
+            <Link prefetch={false} href="/admin/orders" className="btn btn-ghost">Cancel</Link>
           </div>
         </form>
       </div>
