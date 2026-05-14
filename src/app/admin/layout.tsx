@@ -178,7 +178,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {navLinks.map((link) => {
             const isActive = pathname.startsWith(link.href);
             return (
-              <Link prefetch={false} key={link.name} 
+              <Link key={link.name} 
                 href={link.href} 
                 prefetch={false}
                 className={`sidebar-link ${isActive ? 'active' : ''}`}
