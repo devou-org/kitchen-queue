@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyOTPToken, generateToken } from '@/lib/auth';
-import { getUserByPhone, createUser } from '@/lib/db';
+import { verifyOTPToken, generateAccessToken, generateRefreshToken } from '@/lib/auth';
+import sql, { getUserByPhone, createUser } from '@/lib/db';
 import { validateOTP } from '@/lib/validators';
 
 export async function POST(request: NextRequest) {
@@ -34,15 +34,22 @@ export async function POST(request: NextRequest) {
       user = await createUser(phone);
     }
 
-    const token = await generateToken({
+    // User is considered verified because we are issuing tokens after successful OTP check
+
+    const token = await generateAccessToken({
       userId: user.id,
       phone: user.phone,
       isAdmin: user.is_admin || false,
-    }, '7d');
+    }, '1d');
+
+    const refreshToken = await generateRefreshToken({
+      userId: user.id,
+      tokenVersion: user.refresh_token_version || 1,
+    }, '30d');
 
     const response = NextResponse.json({
       success: true,
-      token,
+      token, // access token
       user: {
         id: user.id,
         phone: user.phone,
@@ -51,12 +58,21 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Set cookie
+    // Set auth_token (access token) cookie (optional, primarily for frontend JS access if needed)
     response.cookies.set('auth_token', token, {
-      httpOnly: false, // Set to false so client-side can check it or just rely on localStorage
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 24 * 60 * 60, // 1 day
+      path: '/',
+    });
+
+    // Set refresh_token cookie (Strictly HttpOnly)
+    response.cookies.set('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax', // or 'strict'
+      maxAge: 30 * 24 * 60 * 60, // 30 days
       path: '/',
     });
 
@@ -66,3 +82,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Verification failed' }, { status: 500 });
   }
 }
+ 

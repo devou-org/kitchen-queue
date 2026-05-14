@@ -438,9 +438,9 @@ export default function AdminOrders() {
       {mounted && selectedOrder && createPortal(
         <div className="modal-backdrop" onClick={closeModal} style={{ alignItems: 'center' }}>
           <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h2>
                   <span className={`badge badge-${selectedOrder.status.toLowerCase()}`}>{selectedOrder.status}</span>
                   {selectedOrder.table_number && (
@@ -450,7 +450,8 @@ export default function AdminOrders() {
                       color: 'white',
                       background: 'var(--primary)',
                       padding: '4px 8px',
-                      borderRadius: 'var(--radius-sm)'
+                      borderRadius: 'var(--radius-sm)',
+                      whiteSpace: 'nowrap'
                     }}>
                       🪑 TABLE {selectedOrder.table_number}
                     </span>
@@ -467,7 +468,8 @@ export default function AdminOrders() {
                     padding: '0 14px',
                     fontSize: '10px',
                     fontWeight: 800,
-                    letterSpacing: '0.02em'
+                    letterSpacing: '0.02em',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   EDIT ORDER
@@ -543,6 +545,23 @@ export default function AdminOrders() {
                 </div>
               )}
             </div>
+
+            <button 
+              onClick={closeModal}
+              style={{
+                width: '100%',
+                marginTop: '16px',
+                padding: '12px',
+                background: 'white',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                fontWeight: 700,
+                color: 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
           </div>
         </div>,
         document.body

@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS otp_logs (
 -- 4. Seed default admin (Email: admin@devou.com, Password: admin123)
 -- Hash generated for 'admin123'
 INSERT INTO admins (email, password, is_super_admin)
-VALUES ('admin3047@renjzkitchen.com', '$2b$10$XmN9C.iR/X.8m8.m8.m8.Oq/L.m8.m8.m8.m8.m8.m8.m8.m8.m8', true)
+VALUES ('admin3047@renjzkitchen.com', '$2b$10$tBlZ7y98r9x0UMgG6vUS5.3B1yus2tpNXog3KR3X7IviHy0TGsVhi', true)
 ON CONFLICT (email) DO NOTHING;
 
 -- 5. Indexes for performance

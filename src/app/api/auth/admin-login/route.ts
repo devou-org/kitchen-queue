@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyPassword, generateToken } from '@/lib/auth';
-import { getUserByEmail } from '@/lib/db';
+import { verifyPassword, generateAccessToken } from '@/lib/auth';
+import { getAdminByEmail } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,26 +13,21 @@ export async function POST(request: NextRequest) {
 
     const userEmail = email.trim();
 
-    const expectedEmail = process.env.ADMIN_EMAIL || "admin3047@renjzkitchen.com";
-    if (userEmail !== expectedEmail) {
-      return NextResponse.json({ success: false, error: 'Invalid credentials (E)' }, { status: 401 });
+    const admin = await getAdminByEmail(userEmail);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const hash = "$2b$10$L40pis2dxrnJNtl9ZJXoLO21U.CXI3mOm5I2Ez3A9BiZLx6dAYeDe";
-    if (!hash) {
-      return NextResponse.json({ success: false, error: 'Admin account not seamlessly configured in .env' }, { status: 401 });
-    }
-
-    const isValid = await verifyPassword(password, hash);
+    const isValid = await verifyPassword(password, admin.password);
     if (!isValid) {
-      return NextResponse.json({ success: false, error: 'Invalid credentials (P)' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const token = await generateToken({
+    const token = await generateAccessToken({
       userId: 'admin-system',
       email: userEmail,
       isAdmin: true,
-    }, '8h');
+    }, '1d');
 
     const response = NextResponse.json({
       success: true,
@@ -59,3 +54,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Login failed' }, { status: 500 });
   }
 }
+ 

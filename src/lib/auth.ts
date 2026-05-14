@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
+import { incrementOtpCount } from './db';
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'fallback-secret-change-in-production-32chars!!'
@@ -114,7 +115,22 @@ export interface JWTPayload {
   exp?: number;
 }
 
-export async function generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>, expiresIn = '365d'): Promise<string> {
+export async function generateAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp'>, expiresIn = '365d'): Promise<string> {
+  return new SignJWT(payload as Record<string, unknown>)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
+    .sign(JWT_SECRET);
+}
+
+export interface RefreshTokenPayload {
+  userId: string;
+  tokenVersion: number;
+  iat?: number;
+  exp?: number;
+}
+
+export async function generateRefreshToken(payload: Omit<RefreshTokenPayload, 'iat' | 'exp'>, expiresIn = '30d'): Promise<string> {
   return new SignJWT(payload as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -170,7 +186,11 @@ export async function sendOTPviaSMS(phone: string, otp: string): Promise<boolean
 
     const data = await response.json();
     console.log('SMS Response:', data);
-    return data.return === true;
+    if (data.return === true) {
+      await incrementOtpCount(phone);
+      return true;
+    }
+    return false;
   } catch (error) {
     console.error('SMS send error:', error);
     return false;

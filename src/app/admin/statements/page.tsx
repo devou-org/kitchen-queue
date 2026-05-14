@@ -13,12 +13,26 @@ export default function AdminStatements() {
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [stats, setStats] = useState({ totalRevenue: 0, totalPaidRevenue: 0, orderCount: 0, paidCount: 0 });
+  const [otpSummary, setOtpSummary] = useState<{ total_otps: number; total_cost: number } | null>(null);
+
+  const fetchOtpStats = async () => {
+    try {
+      const qs = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+      const res = await fetch(`/api/admin/otp-stats?${qs.toString()}`);
+      const data = await res.json();
+      if (data.success) {
+        setOtpSummary(data.summary);
+      }
+    } catch (err) {
+      console.error('Failed to load OTP stats');
+    }
+  };
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const qs = new URLSearchParams({ 
-        page: page.toString(), 
+      const qs = new URLSearchParams({
+        page: page.toString(),
         per_page: '200',
         date_from: dateFrom,
         date_to: dateTo,
@@ -44,7 +58,8 @@ export default function AdminStatements() {
 
   useEffect(() => {
     fetchOrders();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchOtpStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, statusFilter, page]);
 
   const exportCSV = () => {
@@ -82,7 +97,7 @@ export default function AdminStatements() {
   const [expiring, setExpiring] = useState(false);
   const handleExpireOldOrders = async () => {
     if (!window.confirm('Are you sure you want to expire all unfulfilled orders from PREVIOUS days? This will restore their stock items back to inventory.')) return;
-    
+
     setExpiring(true);
     try {
       const res = await fetch('/api/cron/expire-orders');
@@ -109,7 +124,7 @@ export default function AdminStatements() {
         </div>
 
         {/* ... (rest of the content remains inside the animated container) */}
-        
+
         {/* I will truncate some parts here but keep the structure */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '32px' }}>
           {/* Summary Cards */}
@@ -135,6 +150,33 @@ export default function AdminStatements() {
           </div>
         </div>
 
+        {/* OTP Billing Section */}
+        <div className="card animate-slide-up" style={{ padding: '24px', marginBottom: '32px', background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>🔐 OTP Billing Summary</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Calculated at ₹0.50 per sent SMS</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>
+                {formatPrice(otpSummary?.total_cost || 0)}
+              </div>
+              <p className="label">Total Cost</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div style={{ background: 'white', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <p className="label">OTPs Sent</p>
+              <p style={{ fontSize: '20px', fontWeight: 700 }}>{otpSummary?.total_otps || 0}</p>
+            </div>
+            <div style={{ background: 'white', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <p className="label">Rate per SMS</p>
+              <p style={{ fontSize: '20px', fontWeight: 700 }}>₹0.50</p>
+            </div>
+          </div>
+        </div>
+
         <div className="card" style={{ padding: '20px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
             <div style={{ flex: '1', minWidth: '140px' }}>
@@ -154,9 +196,9 @@ export default function AdminStatements() {
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 24px' }}>📥 Export Statements (CSV)</button>
-              <button 
-                className="btn btn-secondary" 
-                onClick={handleExpireOldOrders} 
+              <button
+                className="btn btn-secondary"
+                onClick={handleExpireOldOrders}
                 disabled={expiring}
                 style={{ height: '42px', padding: '0 20px', color: 'var(--warning)', borderColor: 'var(--warning)' }}
               >
@@ -195,11 +237,11 @@ export default function AdminStatements() {
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: '4px',
                           fontSize: '11px', fontWeight: 700,
-                          color: order.status=="PAID"  ? '#059669' : 'var(--warning)',
-                          background: order.status=="PAID"  ? 'rgba(5,150,105,0.1)' : 'rgba(255,165,0,0.1)',
+                          color: order.status == "PAID" ? '#059669' : 'var(--warning)',
+                          background: order.status == "PAID" ? 'rgba(5,150,105,0.1)' : 'rgba(255,165,0,0.1)',
                           padding: '2px 8px', borderRadius: 'var(--radius-full)',
                         }}>
-                          {order.status=="PAID" ? '✓ PAID' : '⏳ PENDING'}
+                          {order.status == "PAID" ? '✓ PAID' : '⏳ PENDING'}
                         </span>
                       </td>
                       <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>
@@ -213,7 +255,7 @@ export default function AdminStatements() {
               </table>
             )}
           </div>
-          
+
           <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Showing {orders.length} records in this period</span>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -263,7 +305,7 @@ export default function AdminStatements() {
                 <span>Total Amount</span><span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
               </div>
             </div>
-            
+
             <div style={{ textAlign: 'center' }}>
               <button onClick={() => setSelectedOrder(null)} className="btn btn-secondary" style={{ width: '100%' }}>Close Summary</button>
             </div>

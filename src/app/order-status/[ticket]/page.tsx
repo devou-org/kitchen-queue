@@ -337,14 +337,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F' }}>Queue Progress</h3>
-            <span style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              background: '#FFF1F2',
-              color: '#800020',
-              padding: '4px 10px',
-              borderRadius: '99px'
-            }}>Active</span>
           </div>
 
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

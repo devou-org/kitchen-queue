@@ -280,7 +280,7 @@ export default function MenuPage() {
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {/* Header */}
       <div className="page-header">
-        <Link prefetch={false} href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+        <Link href="/" prefetch={false} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
           <img
             src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg"
             alt="Renjz Kitchen"
