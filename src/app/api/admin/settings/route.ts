@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import sql from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import sql, { getRestaurantBySlug } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 
 // Ensure columns exist (one-time migration check)
@@ -22,10 +22,17 @@ async function requireAdmin(request: Request) {
   return payload;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     await ensureColumnExists();
-    const rows = await sql`SELECT is_service_active, service_message FROM queue_state WHERE id = 1 LIMIT 1`;
+    const rows = await sql`SELECT is_service_active, service_message FROM queue_state WHERE restaurant_id = ${restaurant.id} LIMIT 1`;
     return NextResponse.json({ 
       success: true, 
       isServiceActive: rows[0]?.is_service_active ?? true,
@@ -36,8 +43,15 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     const admin = await requireAdmin(request);
     if (!admin) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -49,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     await ensureColumnExists();
-    await sql`UPDATE queue_state SET is_service_active = ${active}, service_message = ${message || null} WHERE id = 1`;
+    await sql`UPDATE queue_state SET is_service_active = ${active}, service_message = ${message || null} WHERE restaurant_id = ${restaurant.id}`;
     
     return NextResponse.json({ 
       success: true, 

@@ -8,6 +8,7 @@ import { formatPrice, formatDateTime } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 interface OrderUpdateLog {
   id: string;
@@ -39,6 +40,7 @@ export default function AdminOrders() {
 
   // Live Updates Log
   const [recentUpdates, setRecentUpdates] = useState<OrderUpdateLog[]>([]);
+  const { restaurant } = useRestaurant();
 
   const dismissUpdate = (id: string) => {
     setRecentUpdates(prev => prev.filter(u => u.id !== id));
@@ -107,8 +109,9 @@ export default function AdminOrders() {
   }, [fetchOrders]);
 
   useEffect(() => {
-    if (!pusherClient) return;
-    const channel = pusherClient.subscribe('queue-channel');
+    if (!pusherClient || !restaurant) return;
+    const channelName = restaurant.pusher_channel;
+    const channel = pusherClient.subscribe(channelName);
 
     channel.bind('new_order', (data: any) => {
       toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
@@ -190,7 +193,7 @@ export default function AdminOrders() {
       channel.unbind_all();
       channel.unsubscribe();
     };
-  }, [fetchOrdersDebounced, statusFilter]);
+  }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
   const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string) => {
     setModalLoading(true);

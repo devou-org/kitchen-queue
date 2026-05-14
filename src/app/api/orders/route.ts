@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrders, getOrderStats, createOrder, createUser } from '@/lib/db';
+import { getOrders, getOrderStats, createOrder, createUser, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
 
@@ -15,6 +15,13 @@ async function requireAdmin(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     const admin = await requireAdmin(request);
     if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
@@ -30,8 +37,8 @@ export async function GET(request: NextRequest) {
       per_page: parseInt(searchParams.get('per_page') || '50'),
     };
 
-    const orders = await getOrders(filters);
-    const statsResult = await getOrderStats(filters);
+    const orders = await getOrders(restaurant.id, filters);
+    const statsResult = await getOrderStats(restaurant.id, filters);
     const stats = statsResult[0] || {
       total_orders: 0,
       paid_orders: 0,
@@ -58,9 +65,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     // 1. Check Service Status FIRST
     const { default: sql } = await import('@/lib/db');
-    const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE id = 1 LIMIT 1` as {is_service_active: boolean, service_message: string}[];
+    const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE restaurant_id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
     
     if (settings[0] && !settings[0].is_service_active) {
       return NextResponse.json({
@@ -87,6 +101,7 @@ export async function POST(request: NextRequest) {
     total_price = Math.round(total_price * 100) / 100;
 
     const order = await createOrder({
+      restaurant_id: restaurant.id,
       customer_name: customer_name.trim(),
       phone,
       total_price,
@@ -107,10 +122,12 @@ export async function POST(request: NextRequest) {
         type: 'new_order',
         order_id: order.id,
         ticket_number: order.ticket_number,
+        restaurant_id: restaurant.id,
         timestamp: new Date().toISOString()
       };
       console.log('🚀 About to trigger new_order event...');
-      await pusherServer.trigger('queue-channel', 'new_order', sseData);
+      // Use a room specific to the restaurant
+      await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'new_order', sseData);
     } catch (pushErr) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
     }

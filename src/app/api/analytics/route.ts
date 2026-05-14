@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDailyAnalytics, getPeakHours, getTopProducts, getDashboardStats, getKitchenSnapshot } from '@/lib/db';
+import { getDailyAnalytics, getPeakHours, getTopProducts, getDashboardStats, getKitchenSnapshot, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 
 async function requireAdmin(request: NextRequest) {
@@ -15,8 +15,6 @@ async function requireAdmin(request: NextRequest) {
   return payload?.isAdmin ? payload : null;
 }
 
-
-
 const getDateRange = (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const today = new Date().toISOString().split('T')[0];
@@ -28,6 +26,10 @@ const getDateRange = (req: NextRequest) => {
 };
 
 export async function GET(request: NextRequest) {
+  const slug = request.headers.get('x-restaurant-slug') || 'demo';
+  const restaurant = await getRestaurantBySlug(slug);
+  if (!restaurant) return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+
   const admin = await requireAdmin(request);
   if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
@@ -37,24 +39,24 @@ export async function GET(request: NextRequest) {
     const { date_from, date_to } = getDateRange(request);
 
     if (type === 'dashboard') {
-      const stats = await getDashboardStats();
+      const stats = await getDashboardStats(restaurant.id);
       return NextResponse.json({ success: true, data: stats });
     }
     if (type === 'daily') {
-      const data = await getDailyAnalytics(date_from, date_to);
+      const data = await getDailyAnalytics(restaurant.id, date_from, date_to);
       return NextResponse.json({ success: true, data });
     }
     if (type === 'peak-hours') {
-      const data = await getPeakHours(date_from, date_to);
+      const data = await getPeakHours(restaurant.id, date_from, date_to);
       return NextResponse.json({ success: true, data });
     }
     if (type === 'top-products') {
       const limit = parseInt(searchParams.get('limit') || '10');
-      const data = await getTopProducts(date_from, date_to, limit);
+      const data = await getTopProducts(restaurant.id, date_from, date_to, limit);
       return NextResponse.json({ success: true, data });
     }
     if (type === 'kitchen-snapshot') {
-      const data = await getKitchenSnapshot();
+      const data = await getKitchenSnapshot(restaurant.id);
       return NextResponse.json({ success: true, data });
     }
 
@@ -64,3 +66,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to fetch analytics' }, { status: 500 });
   }
 }
+

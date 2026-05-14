@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql, { getOrderById, updateOrderStatus, setOrderPaymentStatus, updateOrderDetails } from '@/lib/db';
+import sql, { getOrderById, updateOrderStatus, setOrderPaymentStatus, updateOrderDetails, getRestaurantBySlug } from '@/lib/db';
 import { Order, OrderItem } from '@/types';
 import { verifyToken } from '@/lib/auth';
 import { STATUS_TRANSITIONS } from '@/lib/constants';
@@ -41,11 +41,18 @@ async function getAuthContext(request: NextRequest) {
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     const admin = await requireAdmin(request);
     if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
-    const order = await getOrderById(id);
+    const order = await getOrderById(restaurant.id, id);
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     return NextResponse.json({ success: true, data: order });
   } catch (error) {
@@ -55,11 +62,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { status, is_paid, table_number, customer_name, phone, notes, party_size, items } = body;
 
-    const existing = await getOrderById(id);
+    const existing = await getOrderById(restaurant.id, id);
     if (!existing) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
     // ── AUTH: check who is calling ──────────────────────────────
@@ -72,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Customer may ONLY update items, and only when order is PENDING/PREPARING
     if (!admin && customer) {
       // 🛡️ CHECK SERVICE STATUS FOR CUSTOMERS
-      const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE id = 1 LIMIT 1` as {is_service_active: boolean, service_message: string}[];
+      const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE restaurant_id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
       if (settings[0] && !settings[0].is_service_active) {
         return NextResponse.json({
           success: false,
@@ -186,7 +200,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         payload.items = items;
       }
 
-      order = await updateOrderDetails(id, payload);
+      order = await updateOrderDetails(restaurant.id, id, payload);
 
       // 🔔 BROADCAST DETAILS UPDATE (With added items specific info)
       try {
@@ -216,10 +230,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           }
         }
 
-        await pusherServer.trigger('queue-channel', 'order_update', {
+        await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'order_update', {
           type: 'order_update',
           items_updated: Array.isArray(payload.items),
           added_items: addedItemsList.length > 0 ? addedItemsList : undefined,
+          restaurant_id: restaurant.id,
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: order.status,
@@ -259,11 +274,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       // Update in DB
-      order = await updateOrderStatus(id, status || existing.status, table_number);
+      order = await updateOrderStatus(restaurant.id, id, status || existing.status, table_number);
 
       // ✅ AUTO-MARK AS PAID: If status is 'PAID', ensure is_paid is true
       if (status === 'PAID') {
-        order = await setOrderPaymentStatus(id, true);
+        order = await setOrderPaymentStatus(restaurant.id, id, true);
         console.log(`💰 Auto-marked Order #${existing.ticket_number} as PAID due to status change.`);
       }
 
@@ -271,8 +286,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       // 🔔 BROADCAST UPDATE
       try {
-        await pusherServer.trigger('queue-channel', 'order_update', {
+        await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'order_update', {
           type: 'order_update',
+          restaurant_id: restaurant.id,
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: status || order.status,
@@ -288,14 +304,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // ✅ UPDATE PAYMENT STATUS
     if (typeof is_paid === 'boolean') {
-      order = await setOrderPaymentStatus(id, is_paid);
+      order = await setOrderPaymentStatus(restaurant.id, id, is_paid);
 
       console.log(`✅ Payment updated: Order #${existing.ticket_number} → is_paid: ${is_paid}`);
 
       // 🔔 BROADCAST PAYMENT CHANGE
       try {
-        await pusherServer.trigger('queue-channel', 'order_update', {
+        await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'order_update', {
           type: 'payment_update',
+          restaurant_id: restaurant.id,
           order_id: id,
           ticket_number: existing.ticket_number,
           is_paid: is_paid,

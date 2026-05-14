@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProducts, createProduct } from '@/lib/db';
+import { getProducts, createProduct, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { calculateProductStatus } from '@/lib/validators';
 
-
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const products = await getProducts(true);
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
+    const products = await getProducts(restaurant.id, true);
     return NextResponse.json({ success: true, data: products });
   } catch (error) {
     console.error('Get products error:', error);
@@ -17,6 +22,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     // Verify admin token
     const adminToken = request.cookies.get('admin_token')?.value;
     const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
@@ -27,6 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = await verifyToken(token);
+    // Ideally, we should also check if the admin belongs to this restaurant_id
     if (!payload || !payload.isAdmin) {
       return NextResponse.json({ success: false, error: 'Forbidden - Admin only' }, { status: 403 });
     }
@@ -43,6 +56,7 @@ export async function POST(request: NextRequest) {
     const status = calculateProductStatus(stock, buffer);
 
     const product = await createProduct({
+      restaurant_id: restaurant.id,
       name: name.trim(),
       description: description.trim(),
       price: parseFloat(price),

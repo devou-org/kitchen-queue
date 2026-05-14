@@ -19,6 +19,7 @@ import { Order } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 type QueueState = {
   type: string;
@@ -45,6 +46,7 @@ function getStageIndex(status: string) {
 export default function OrderStatusTicketPage({ params }: { params: Promise<{ ticket: string }> }) {
   const { ticket } = use(params);
   const router = useRouter();
+  const { restaurant } = useRestaurant();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
@@ -85,8 +87,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
     fetchOrder();
 
-    if (!pusherClient) return;
-    const channel = pusherClient.subscribe('queue-channel');
+    if (!pusherClient || !restaurant) return;
+    const channelName = restaurant.pusher_channel;
+    const channel = pusherClient.subscribe(channelName);
 
     channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
     channel.bind('pusher:subscription_error', () => setIsLive(false));
@@ -109,9 +112,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
     return () => {
       channel.unbind_all();
-      pusherClient?.unsubscribe('queue-channel');
+      pusherClient?.unsubscribe(channelName);
     };
-  }, [ticket]);
+  }, [ticket, restaurant]);
 
   if (loading) {
     return (

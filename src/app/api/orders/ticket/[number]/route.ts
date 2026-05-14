@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrderByTicket } from '@/lib/db';
+import { getOrderByTicket, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ number: string }> }) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     const { number } = await params;
     const ticketNumber = parseInt(number);
 
@@ -11,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ success: false, error: 'Invalid ticket number' }, { status: 400 });
     }
 
-    const order = await getOrderByTicket(ticketNumber);
+    const order = await getOrderByTicket(restaurant.id, ticketNumber);
     if (!order) {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }

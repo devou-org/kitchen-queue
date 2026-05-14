@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { advanceQueue } from '@/lib/db';
+import { advanceQueue, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
 
 export async function POST(request: NextRequest) {
   try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
     const adminToken = request.cookies.get('admin_token')?.value;
     const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
     const token = adminToken || authHeader;
@@ -14,11 +21,12 @@ export async function POST(request: NextRequest) {
     const payload = await verifyToken(token);
     if (!payload?.isAdmin) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
 
-    const state = await advanceQueue();
+    const state = await advanceQueue(restaurant.id);
 
     // Broadcast to all connected customers via Pusher
-    await pusherServer.trigger('queue-channel', 'queue_update', {
+    await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'queue_update', {
       type: 'queue_update',
+      restaurant_id: restaurant.id,
       queue_number: state.current_queue_number,
       last_served_number: state.last_served_number,
       timestamp: new Date().toISOString(),

@@ -5,11 +5,13 @@ import { formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import { pusherClient } from '@/lib/pusher-client';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function OrderStatusPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
+  const { restaurant } = useRestaurant();
 
   const fetchOrders = async (silent = false) => {
     try {
@@ -32,15 +34,16 @@ export default function OrderStatusPage() {
 
   useEffect(() => {
     fetchOrders();
-    if (!pusherClient) return;
-    const channel = pusherClient.subscribe('queue-channel');
+    if (!pusherClient || !restaurant) return;
+    const channelName = restaurant.pusher_channel;
+    const channel = pusherClient.subscribe(channelName);
     setIsLive(true);
     channel.bind('order_update', () => fetchOrders(true));
     channel.bind('new_order', () => fetchOrders(true));
     channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
     channel.bind('pusher:subscription_error', () => setIsLive(false));
     return () => { channel.unbind_all(); channel.unsubscribe(); };
-  }, []);
+  }, [restaurant]);
 
   const Header = () => (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 10 }}>
