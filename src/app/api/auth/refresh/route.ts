@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const newRefreshToken = await generateRefreshToken({
       userId: user.id,
       tokenVersion: user.refresh_token_version || 1,
-    }, '30d');
+    }, '365d');
 
     const response = NextResponse.json({
       success: true,
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: 365 * 24 * 60 * 60, // 365 days
       path: '/',
     });
 

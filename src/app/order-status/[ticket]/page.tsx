@@ -382,7 +382,15 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                     boxShadow: isCurrent ? '0 0 0 4px rgba(128, 0, 32, 0.05)' : 'none',
                     transition: 'all 0.3s ease'
                   }}>
-                    {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />}
+                    {isCompleted ? (
+                      <CheckCircle2 size={20} fill="#800020" />
+                    ) : (
+                      <Icon 
+                        size={20} 
+                        fill={isCurrent && stage.key === 'PAID' ? '#800020' : 'none'} 
+                        strokeWidth={isCurrent ? 2.5 : 2} 
+                      />
+                    )}
                   </div>
                   <span style={{
                     fontSize: '9px',
