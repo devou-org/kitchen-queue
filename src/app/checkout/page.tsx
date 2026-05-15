@@ -28,6 +28,7 @@ export default function CheckoutPage() {
     party_size: '',
     notes: '',
   });
+  const [otpActive, setOtpActive] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -261,7 +262,7 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '16px', paddingBottom: '140px' }}>
+      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '16px', paddingBottom: '280px' }}>
         <OrderSummary 
           items={items}
           subtotal={subtotal}
@@ -278,22 +279,25 @@ export default function CheckoutPage() {
             onVerified={(user) => setCurrentUser(user)}
             onSubmit={handleNewOrder}
             totalQty={items.reduce((s, i) => s + i.quantity, 0)}
+            onOtpStepChange={setOtpActive}
           />
         )}
       </div>
 
-      <CheckoutActions 
-        addToMode={addToMode}
-        loading={loading}
-        isVerified={isVerified}
-        itemsCount={items.length}
-        total={total}
-        ticketNumber={activeOrder?.ticket_number}
-        onAddToOrder={handleAddToOrder}
-        onSubmitNewOrder={handleNewOrder}
-        isPartySizeValid={addToMode ? true : (items.reduce((s, i) => s + i.quantity, 0) >= parseInt(form.party_size || '1') - 1)}
-        hasActiveOrder={!!activeOrder}
-      />
+      {!otpActive && (
+        <CheckoutActions 
+          addToMode={addToMode}
+          loading={loading}
+          isVerified={isVerified}
+          itemsCount={items.length}
+          total={total}
+          ticketNumber={activeOrder?.ticket_number}
+          onAddToOrder={handleAddToOrder}
+          onSubmitNewOrder={handleNewOrder}
+          isPartySizeValid={addToMode ? true : (items.reduce((s, i) => s + i.quantity, 0) >= parseInt(form.party_size || '1') - 1)}
+          hasActiveOrder={!!activeOrder}
+        />
+      )}
 
 
       <BottomNav />

@@ -363,8 +363,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
 
             {STAGES.map((stage, i) => {
               const Icon = stage.icon;
-              const isCompleted = stageIndex > i;
-              const isCurrent = stageIndex === i;
+              const isCompleted = stageIndex > i || (stageIndex === i && stage.key === 'PAID');
+              const isCurrent = stageIndex === i && stage.key !== 'PAID';
               const isPending = stageIndex < i;
 
               return (
@@ -383,7 +383,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                     transition: 'all 0.3s ease'
                   }}>
                     {isCompleted ? (
-                      <CheckCircle2 size={20} fill="#800020" />
+                      <CheckCircle2 size={20} />
                     ) : (
                       <Icon 
                         size={20} 

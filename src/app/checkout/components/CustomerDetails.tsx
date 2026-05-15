@@ -19,6 +19,7 @@ interface CustomerDetailsProps {
   onVerified: (user: any) => void;
   onSubmit: (e: React.FormEvent) => void;
   totalQty?: number;
+  onOtpStepChange?: (active: boolean) => void;
 }
 
 export default function CustomerDetails({
@@ -27,7 +28,8 @@ export default function CustomerDetails({
   isVerified,
   onVerified,
   onSubmit,
-  totalQty
+  totalQty,
+  onOtpStepChange
 }: CustomerDetailsProps) {
   const [otpStep, setOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -35,6 +37,10 @@ export default function CustomerDetails({
   const [loading, setLoading] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    onOtpStepChange?.(otpStep);
+  }, [otpStep, onOtpStepChange]);
 
   // Countdown timer for Resend OTP
   useEffect(() => {
