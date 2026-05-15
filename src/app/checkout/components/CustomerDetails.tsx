@@ -21,10 +21,10 @@ interface CustomerDetailsProps {
   totalQty?: number;
 }
 
-export default function CustomerDetails({ 
-  form, 
-  setForm, 
-  isVerified, 
+export default function CustomerDetails({
+  form,
+  setForm,
+  isVerified,
   onVerified,
   onSubmit,
   totalQty
@@ -53,7 +53,7 @@ export default function CustomerDetails({
       toast.error('Please enter a valid 10-digit phone number');
       return;
     }
-    
+
     setLoading(true);
     try {
       const data = await authService.sendOtp(form.phone);
@@ -78,7 +78,7 @@ export default function CustomerDetails({
       toast.error('Please enter a valid 6-digit OTP');
       return;
     }
-    
+
     setVerifyingOtp(true);
     try {
       const data = await authService.verifyOtp(otpCode, otpToken);
@@ -120,7 +120,7 @@ export default function CustomerDetails({
               <input
                 type="tel"
                 className="input"
-                placeholder="+91 9xxxxxxxxx"
+                placeholder="9xxxxxxxxx"
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                 style={{ flex: 1 }}
@@ -128,32 +128,32 @@ export default function CustomerDetails({
                 disabled={otpStep}
               />
               {isVerified ? (
-                <span style={{ 
-                  color: '#10B981', background: 'rgba(16, 185, 129, 0.1)', 
-                  padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 
+                <span style={{
+                  color: '#10B981', background: 'rgba(16, 185, 129, 0.1)',
+                  padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700
                 }}>
                   ✅ Verified
                 </span>
               ) : (
                 otpStep ? (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => { setOtpStep(false); setOtpCode(''); }}
                     style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', padding: '0 8px' }}
                   >
                     Edit
                   </button>
                 ) : (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={handleVerifyClick}
                     disabled={loading || form.phone.replace(/\D/g, '').length < 10}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: (loading || form.phone.replace(/\D/g, '').length < 10) ? '#ccc' : 'var(--primary)', 
-                      fontSize: '13px', 
-                      fontWeight: 700, 
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: (loading || form.phone.replace(/\D/g, '').length < 10) ? '#ccc' : 'var(--primary)',
+                      fontSize: '13px',
+                      fontWeight: 700,
                       cursor: (loading || form.phone.replace(/\D/g, '').length < 10) ? 'not-allowed' : 'pointer',
                       padding: '0 8px',
                       whiteSpace: 'nowrap'
@@ -164,7 +164,7 @@ export default function CustomerDetails({
                 )
               )}
             </div>
-            
+
             {/* NEW OTP FIELD UI */}
             {otpStep && !isVerified && (
               <div style={{ marginTop: '16px', padding: '20px', background: '#FFF0F2', borderRadius: '16px', animation: 'slideDown 0.3s ease-out' }}>
@@ -174,7 +174,7 @@ export default function CustomerDetails({
                     Sent to +91 {form.phone.slice(-4).padStart(10, '*')}
                   </span>
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', marginBottom: '24px' }}>
                   {[0, 1, 2, 3, 4, 5].map((index) => (
                     <input
@@ -189,7 +189,7 @@ export default function CustomerDetails({
                         const newOtp = otpCode.split('');
                         newOtp[index] = val;
                         setOtpCode(newOtp.join(''));
-                        
+
                         if (val && index < 5) {
                           const next = document.getElementById(`otp-input-${index + 1}`);
                           if (next) next.focus();
@@ -232,17 +232,17 @@ export default function CustomerDetails({
                     />
                   ))}
                 </div>
-                
-                <button 
-                  type="button" 
+
+                <button
+                  type="button"
                   onClick={verifyOtpSubmit}
                   disabled={verifyingOtp || otpCode.length !== 6}
-                  style={{ 
-                    width: '100%', 
-                    padding: '16px', 
-                    borderRadius: '12px', 
-                    background: 'var(--primary)', 
-                    color: 'white', 
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    background: 'var(--primary)',
+                    color: 'white',
                     fontWeight: 700,
                     fontSize: '15px',
                     border: 'none',
@@ -253,7 +253,7 @@ export default function CustomerDetails({
                 >
                   {verifyingOtp ? 'Verifying...' : 'Verify Code'}
                 </button>
-                
+
                 <div style={{ marginTop: '20px', textAlign: 'center' }}>
                   {resendTimer > 0 ? (
                     <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0, fontWeight: 500 }}>
