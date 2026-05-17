@@ -19,6 +19,8 @@ type Restaurant = {
   phone?: string;
   address?: string;
   logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
   created_at: string;
   orders_30d?: number;
   active_products?: number;
@@ -27,21 +29,35 @@ type Restaurant = {
 
 type ModalMode = 'create' | 'edit' | null;
 
-const EMPTY_FORM = { name: '', slug: '', phone: '', address: '', logo_url: '', modules: ALL_MODULES.map(m => m.key) };
+const EMPTY_FORM = { name: '', slug: '', phone: '', address: '', logo_url: '', primary_color: '#800020', secondary_color: '#ecfdf5', modules: ALL_MODULES.map(m => m.key) };
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [selected, setSelected] = useState<Restaurant | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [modulePanel, setModulePanel] = useState<Restaurant | null>(null);
-  const [moduleSaving, setModuleSaving] = useState(false);
+
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
 
   const authHeaders = { credentials: 'include' as const };
+
+  const fetchWalletBalance = useCallback(async () => {
+    setWalletLoading(true);
+    try {
+      const res = await fetch('/api/super-admin/wallet-balance', authHeaders);
+      const data = await res.json();
+      if (data.success) {
+        setWalletBalance(data.wallet);
+      }
+    } catch {
+      console.error('Failed to load wallet balance');
+    } finally {
+      setWalletLoading(false);
+    }
+  }, []);
 
   const fetchRestaurants = useCallback(async () => {
     try {
@@ -51,37 +67,16 @@ export default function SuperAdminDashboard() {
       if (data.success) setRestaurants(data.data);
     } catch { toast.error('Failed to load restaurants'); }
     finally { setLoading(false); }
-  }, []);
+  }, [router]);
 
-  useEffect(() => { fetchRestaurants(); }, [fetchRestaurants]);
+  useEffect(() => {
+    fetchRestaurants();
+    fetchWalletBalance();
+  }, [fetchRestaurants, fetchWalletBalance]);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
-    setSelected(null);
     setModalMode('create');
-  };
-
-  const openEdit = async (r: Restaurant) => {
-    setSaving(false);
-    const res = await fetch(`/api/super-admin/restaurants/${r.id}`, authHeaders);
-    const data = await res.json();
-    const full: Restaurant = data.data || r;
-    setSelected(full);
-    setForm({
-      name: full.name,
-      slug: full.slug,
-      phone: full.phone || '',
-      address: full.address || '',
-      logo_url: full.logo_url || '',
-      modules: (full.modules || []).filter(m => m.is_enabled).map(m => m.module_name),
-    });
-    setModalMode('edit');
-  };
-
-  const openModules = async (r: Restaurant) => {
-    const res = await fetch(`/api/super-admin/restaurants/${r.id}`, authHeaders);
-    const data = await res.json();
-    setModulePanel(data.data || r);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,73 +87,22 @@ export default function SuperAdminDashboard() {
         ...form,
         modules: form.modules,
       };
-      const url = modalMode === 'create'
-        ? '/api/super-admin/restaurants'
-        : `/api/super-admin/restaurants/${selected?.id}`;
-      const method = modalMode === 'create' ? 'POST' : 'PUT';
-
-      const res = await fetch(url, {
-        method,
+      const res = await fetch('/api/super-admin/restaurants', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(modalMode === 'create' ? 'Restaurant created! 🎉' : 'Restaurant updated!');
+        toast.success('Restaurant created! 🎉');
         setModalMode(null);
         fetchRestaurants();
       } else {
-        toast.error(data.error || 'Failed to save');
+        toast.error(data.error || 'Failed to create restaurant');
       }
     } catch { toast.error('Network error'); }
     finally { setSaving(false); }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      const res = await fetch(`/api/super-admin/restaurants/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success('Restaurant deleted');
-        setDeleteConfirm(null);
-        fetchRestaurants();
-      } else {
-        toast.error(data.error || 'Failed to delete');
-      }
-    } catch { toast.error('Network error'); }
-  };
-
-  const handleModuleToggle = async (moduleName: string, isEnabled: boolean) => {
-    if (!modulePanel) return;
-    setModuleSaving(true);
-    try {
-      const currentModules = modulePanel.modules || [];
-      const updatedModules = currentModules.map(m =>
-        m.module_name === moduleName ? { ...m, is_enabled: isEnabled } : m
-      );
-      if (!currentModules.find(m => m.module_name === moduleName)) {
-        updatedModules.push({ module_name: moduleName, is_enabled: isEnabled });
-      }
-      const res = await fetch(`/api/super-admin/restaurants/${modulePanel.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ modules: updatedModules }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setModulePanel(data.data);
-        toast.success(`${moduleName} ${isEnabled ? 'enabled' : 'disabled'}`);
-        fetchRestaurants();
-      } else {
-        toast.error(data.error || 'Failed to update module');
-      }
-    } catch { toast.error('Network error'); }
-    finally { setModuleSaving(false); }
   };
 
   const toggleFormModule = (key: string) => {
@@ -177,7 +121,7 @@ export default function SuperAdminDashboard() {
       {/* Header */}
       <div style={S.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={S.logoBox}>⚡</div>
+          <div style={S.logoBox}>🌿</div>
           <div>
             <h1 style={S.headerTitle}>Devou Platform</h1>
             <p style={S.headerSub}>Super Admin Console</p>
@@ -189,12 +133,24 @@ export default function SuperAdminDashboard() {
       {/* Stats Bar */}
       <div style={S.statsBar}>
         {[
-          { label: 'Total Restaurants', value: restaurants.length, icon: '🏪' },
-          { label: 'Total Modules Active', value: restaurants.reduce((acc, r) => acc + (r.active_products || 0), 0), icon: '⚙️' },
-          { label: 'Orders (30d)', value: restaurants.reduce((acc, r) => acc + Number(r.orders_30d || 0), 0), icon: '📦' },
+          { label: 'Total Restaurants', value: restaurants.length, icon: '🏪', color: '#10b981' },
+          { label: 'Total Modules Active', value: restaurants.reduce((acc, r) => acc + (r.active_products || 0), 0), icon: '⚙️', color: '#059669' },
+          { label: 'Orders (30d)', value: restaurants.reduce((acc, r) => acc + Number(r.orders_30d || 0), 0), icon: '📦', color: '#047857' },
+          {
+            label: 'SMS Wallet Balance',
+            value: walletLoading ? '⏳ Loading...' : (walletBalance !== null ? `₹${Number(walletBalance).toFixed(2)}` : '⚠️ Config'),
+            icon: '💬',
+            color: '#0891b2'
+          },
         ].map(stat => (
           <div key={stat.label} style={S.statCard}>
-            <span style={{ fontSize: '28px' }}>{stat.icon}</span>
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '10px',
+              backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '24px', flexShrink: 0
+            }}>
+              {stat.icon}
+            </div>
             <div>
               <div style={S.statValue}>{stat.value}</div>
               <div style={S.statLabel}>{stat.label}</div>
@@ -206,22 +162,34 @@ export default function SuperAdminDashboard() {
       {/* Restaurant Grid */}
       <div style={S.grid}>
         {loading ? (
-          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px', color: '#64748b' }}>
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
-            Loading restaurants...
+            <p style={{ fontWeight: 600 }}>Loading restaurants...</p>
           </div>
         ) : restaurants.length === 0 ? (
-          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px', color: '#64748b' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏪</div>
-            <p style={{ fontSize: '18px', fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>No restaurants yet</p>
+            <p style={{ fontSize: '18px', fontWeight: 700, color: '#334155' }}>No restaurants yet</p>
             <p style={{ fontSize: '14px', marginTop: '8px' }}>Click "New Restaurant" to add your first tenant</p>
           </div>
         ) : restaurants.map(r => (
-          <div key={r.id} style={S.card}>
+          <div
+            key={r.id}
+            onClick={() => router.push(`/super-admin/restaurants/${r.id}`)}
+            style={{ ...S.card, cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.06)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'none';
+              e.currentTarget.style.boxShadow = S.card.boxShadow || 'none';
+            }}
+          >
             <div style={S.cardHeader}>
               <div style={S.cardAvatar}>
                 {r.logo_url
-                  ? <img src={r.logo_url} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '10px' }} />
+                  ? <img src={r.logo_url} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
                   : r.name.charAt(0).toUpperCase()}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -234,11 +202,11 @@ export default function SuperAdminDashboard() {
 
             <div style={S.cardStats}>
               <div style={S.cardStat}>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: '#a78bfa' }}>{r.orders_30d || 0}</span>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: '#047857' }}>{r.orders_30d || 0}</span>
                 <span style={S.cardStatLabel}>orders/30d</span>
               </div>
               <div style={S.cardStat}>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: '#34d399' }}>{r.active_products || 0}</span>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: '#10b981' }}>{r.active_products || 0}</span>
                 <span style={S.cardStatLabel}>products</span>
               </div>
             </div>
@@ -246,28 +214,29 @@ export default function SuperAdminDashboard() {
             {r.phone && <p style={S.cardMeta}>📞 {r.phone}</p>}
             {r.address && <p style={S.cardMeta}>📍 {r.address}</p>}
 
-            <div style={S.cardActions}>
-              <button onClick={() => openModules(r)} style={S.btnModules}>⚙️ Modules</button>
-              <button onClick={() => openEdit(r)} style={S.btnEdit}>Edit</button>
-              <button onClick={() => setDeleteConfirm(r.id)} style={S.btnDelete}>✕</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+              <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>Manage Settings →</span>
+              <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                🎨 Custom Theme Set
+              </span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Create/Edit Modal */}
-      {modalMode && (
+      {/* Create Modal */}
+      {modalMode === 'create' && (
         <div style={S.backdrop} onClick={() => setModalMode(null)}>
           <div style={S.modal} onClick={e => e.stopPropagation()}>
             <div style={S.modalHeader}>
-              <h2 style={S.modalTitle}>{modalMode === 'create' ? '🏪 New Restaurant' : '✏️ Edit Restaurant'}</h2>
+              <h2 style={S.modalTitle}>🏪 New Restaurant</h2>
               <button onClick={() => setModalMode(null)} style={S.closeBtn}>✕</button>
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', maxHeight: '70vh', padding: '4px 2px' }}>
               {[
                 { label: 'Restaurant Name *', key: 'name', placeholder: 'e.g. Renjz Kitchen', type: 'text', required: true },
-                { label: 'Slug (for subdomain) *', key: 'slug', placeholder: 'e.g. renjz (only lowercase, numbers, hyphens)', type: 'text', required: true },
+                { label: 'Slug (for URL route) *', key: 'slug', placeholder: 'e.g. renjz (only lowercase, numbers, hyphens)', type: 'text', required: true },
                 { label: 'Phone', key: 'phone', placeholder: '+91 98765 43210', type: 'text', required: false },
                 { label: 'Address', key: 'address', placeholder: 'Restaurant address', type: 'text', required: false },
                 { label: 'Logo URL', key: 'logo_url', placeholder: 'https://...', type: 'url', required: false },
@@ -287,6 +256,48 @@ export default function SuperAdminDashboard() {
                   />
                 </div>
               ))}
+              {/* Color Configuration */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={S.fieldLabel}>Primary Color</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="color"
+                      value={form.primary_color}
+                      onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))}
+                      style={{ width: '40px', height: '38px', padding: 0, border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
+                    />
+                    <input
+                      type="text"
+                      value={form.primary_color}
+                      onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))}
+                      placeholder="#800020"
+                      maxLength={7}
+                      style={{ ...S.input, padding: '8px 10px', height: '38px', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={S.fieldLabel}>Secondary Color</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="color"
+                      value={form.secondary_color}
+                      onChange={e => setForm(f => ({ ...f, secondary_color: e.target.value }))}
+                      style={{ width: '40px', height: '38px', padding: 0, border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
+                    />
+                    <input
+                      type="text"
+                      value={form.secondary_color}
+                      onChange={e => setForm(f => ({ ...f, secondary_color: e.target.value }))}
+                      placeholder="#ecfdf5"
+                      maxLength={7}
+                      style={{ ...S.input, padding: '8px 10px', height: '38px', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                </div>
+              </div>
 
               {/* Module toggles in modal */}
               <div>
@@ -302,9 +313,9 @@ export default function SuperAdminDashboard() {
                         style={{
                           padding: '10px 12px',
                           borderRadius: '8px',
-                          border: `1px solid ${active ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.1)'}`,
-                          background: active ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
-                          color: active ? '#a78bfa' : 'rgba(255,255,255,0.5)',
+                          border: `1px solid ${active ? '#10b981' : '#cbd5e1'}`,
+                          background: active ? '#ecfdf5' : '#f8fafc',
+                          color: active ? '#047857' : '#475569',
                           fontSize: '12px',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -325,95 +336,9 @@ export default function SuperAdminDashboard() {
               </div>
 
               <button type="submit" disabled={saving} style={S.submitBtn}>
-                {saving ? 'Saving...' : modalMode === 'create' ? 'Create Restaurant' : 'Save Changes'}
+                {saving ? 'Creating...' : 'Create Restaurant'}
               </button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Module Management Panel */}
-      {modulePanel && (
-        <div style={S.backdrop} onClick={() => setModulePanel(null)}>
-          <div style={S.modal} onClick={e => e.stopPropagation()}>
-            <div style={S.modalHeader}>
-              <h2 style={S.modalTitle}>⚙️ Modules — {modulePanel.name}</h2>
-              <button onClick={() => setModulePanel(null)} style={S.closeBtn}>✕</button>
-            </div>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '20px' }}>
-              Toggle which features this restaurant has access to.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {ALL_MODULES.map(mod => {
-                const mData = (modulePanel.modules || []).find(m => m.module_name === mod.key);
-                const isEnabled = mData?.is_enabled ?? true;
-                return (
-                  <div key={mod.key} style={{
-                    display: 'flex', alignItems: 'center', gap: '14px',
-                    padding: '14px 16px',
-                    borderRadius: '10px',
-                    border: `1px solid ${isEnabled ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                    background: isEnabled ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.03)',
-                    transition: 'all 0.2s',
-                  }}>
-                    <span style={{ fontSize: '24px' }}>{mod.icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: 'white', fontWeight: 700, fontSize: '14px' }}>{mod.label}</div>
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '2px' }}>{mod.desc}</div>
-                    </div>
-                    {/* Toggle switch */}
-                    <button
-                      onClick={() => handleModuleToggle(mod.key, !isEnabled)}
-                      disabled={moduleSaving}
-                      style={{
-                        width: '48px', height: '26px',
-                        borderRadius: '13px',
-                        border: 'none',
-                        background: isEnabled ? '#6366f1' : 'rgba(255,255,255,0.15)',
-                        cursor: moduleSaving ? 'not-allowed' : 'pointer',
-                        position: 'relative',
-                        transition: 'background 0.2s',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <div style={{
-                        width: '20px', height: '20px',
-                        borderRadius: '50%',
-                        background: 'white',
-                        position: 'absolute',
-                        top: '3px',
-                        left: isEnabled ? '25px' : '3px',
-                        transition: 'left 0.2s',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                      }} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirm */}
-      {deleteConfirm && (
-        <div style={S.backdrop} onClick={() => setDeleteConfirm(null)}>
-          <div style={{ ...S.modal, maxWidth: '380px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
-              <h2 style={{ color: 'white', fontWeight: 800, marginBottom: '8px' }}>Delete Restaurant?</h2>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px', marginBottom: '24px' }}>
-                This will permanently delete the restaurant and ALL its data (orders, products, queue). This cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setDeleteConfirm(null)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontWeight: 700 }}>
-                  Cancel
-                </button>
-                <button onClick={() => handleDelete(deleteConfirm)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontWeight: 700 }}>
-                  Delete
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -422,37 +347,37 @@ export default function SuperAdminDashboard() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: '100vh', background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d1b2a 100%)', fontFamily: "'Inter', sans-serif", padding: '0 0 60px' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 32px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap', gap: '16px' },
-  logoBox: { width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 },
-  headerTitle: { color: 'white', fontSize: '20px', fontWeight: 800, margin: 0 },
-  headerSub: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '2px' },
-  createBtn: { padding: '10px 20px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '14px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,0.3)' },
+  page: { minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif", padding: '0 0 60px', color: '#0f172a' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 32px', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '16px', backgroundColor: '#ffffff' },
+  logoBox: { width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 },
+  headerTitle: { color: '#0f172a', fontSize: '20px', fontWeight: 800, margin: 0 },
+  headerSub: { color: '#64748b', fontSize: '12px', marginTop: '2px' },
+  createBtn: { padding: '10px 20px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(16,185,129,0.25)', transition: 'all 0.2s' },
   statsBar: { display: 'flex', gap: '16px', padding: '24px 32px', flexWrap: 'wrap' },
-  statCard: { display: 'flex', alignItems: 'center', gap: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px 24px', flex: '1', minWidth: '180px' },
-  statValue: { color: 'white', fontSize: '28px', fontWeight: 900, lineHeight: 1 },
-  statLabel: { color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: 600, marginTop: '4px' },
+  statCard: { display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px 24px', flex: '1', minWidth: '180px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' },
+  statValue: { color: '#0f172a', fontSize: '28px', fontWeight: 900, lineHeight: 1 },
+  statLabel: { color: '#64748b', fontSize: '12px', fontWeight: 600, marginTop: '4px' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px', padding: '0 32px' },
-  card: { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'border-color 0.2s', cursor: 'default' },
+  card: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'border-color 0.2s, box-shadow 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', cursor: 'default' },
   cardHeader: { display: 'flex', alignItems: 'flex-start', gap: '12px' },
-  cardAvatar: { width: '44px', height: '44px', borderRadius: '10px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: '18px', flexShrink: 0 },
-  cardName: { color: 'white', fontWeight: 800, fontSize: '16px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardAvatar: { width: '44px', height: '44px', borderRadius: '8px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', fontWeight: 900, fontSize: '18px', flexShrink: 0, border: '1px solid #a7f3d0' },
+  cardName: { color: '#0f172a', fontWeight: 800, fontSize: '16px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   cardSlug: { marginTop: '4px' },
-  slugBadge: { background: 'rgba(99,102,241,0.2)', color: '#a78bfa', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace' },
+  slugBadge: { background: '#f1f5f9', color: '#475569', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace', border: '1px solid #e2e8f0' },
   cardStats: { display: 'flex', gap: '16px' },
   cardStat: { display: 'flex', flexDirection: 'column', gap: '2px' },
-  cardStatLabel: { color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 600 },
-  cardMeta: { color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardStatLabel: { color: '#64748b', fontSize: '11px', fontWeight: 600 },
+  cardMeta: { color: '#475569', fontSize: '13px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   cardActions: { display: 'flex', gap: '8px', marginTop: '4px' },
-  btnModules: { flex: 1, padding: '8px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '7px', color: '#a78bfa', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
-  btnEdit: { padding: '8px 16px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '7px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
-  btnDelete: { padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '7px', color: '#fca5a5', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
-  backdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-  modal: { background: '#1a1a3e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto' },
+  btnModules: { flex: 1, padding: '8px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', color: '#047857', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' },
+  btnEdit: { padding: '8px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#334155', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' },
+  btnDelete: { padding: '8px 12px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '6px', color: '#b91c1c', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' },
+  backdrop: { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
+  modal: { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  modalTitle: { color: 'white', fontWeight: 800, fontSize: '18px', margin: 0 },
-  closeBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '20px', cursor: 'pointer', padding: '4px 8px' },
-  fieldLabel: { display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' },
-  input: { width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', color: 'white', fontSize: '14px', outline: 'none', boxSizing: 'border-box' },
-  submitBtn: { padding: '12px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '14px', fontWeight: 700, cursor: 'pointer', marginTop: '4px' },
+  modalTitle: { color: '#0f172a', fontWeight: 800, fontSize: '18px', margin: 0 },
+  closeBtn: { background: 'none', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer', padding: '4px 8px' },
+  fieldLabel: { display: 'block', color: '#475569', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  input: { width: '100%', padding: '10px 14px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '14px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' },
+  submitBtn: { padding: '12px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: 700, cursor: 'pointer', marginTop: '4px', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' },
 };

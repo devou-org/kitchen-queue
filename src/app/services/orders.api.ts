@@ -27,7 +27,17 @@ class OrderService {
   private getAuthHeaders(): Record<string, string> {
     if (typeof window === 'undefined') return {};
     const token = localStorage.getItem('auth_token') || localStorage.getItem('admin_token');
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    // Extract slug from URL: /[slug]/...
+    const path = window.location.pathname;
+    const segments = path.split('/').filter(Boolean);
+    const slug = segments[0];
+
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (slug) headers['x-restaurant-slug'] = slug;
+    
+    return headers;
   }
 
   async createOrder(orderData: CreateOrderData): Promise<ApiResponse<Order>> {

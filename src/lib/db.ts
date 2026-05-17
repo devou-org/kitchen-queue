@@ -10,7 +10,7 @@ export default sql;
 // ============================================
 
 export async function getRestaurantBySlug(slug: string) {
-  const rows = await sql`SELECT id, name, slug, logo_url, phone, address FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+  const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description FROM restaurants WHERE slug = ${slug} LIMIT 1`;
   return rows[0] || null;
 }
 
@@ -31,13 +31,13 @@ export async function getRestaurantModules(restaurantId: string) {
 export async function getAllRestaurants() {
   const rows = await sql`
     SELECT 
-      r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.created_at,
+      r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at,
       COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
       COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
     FROM restaurants r
     LEFT JOIN orders o ON o.restaurant_id = r.id
     LEFT JOIN products p ON p.restaurant_id = r.id
-    GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.created_at
+    GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at
     ORDER BY r.created_at DESC
   `;
   return rows;
@@ -45,7 +45,7 @@ export async function getAllRestaurants() {
 
 export async function getRestaurantById(id: string) {
   const rows = await sql`
-    SELECT id, name, slug, phone, address, logo_url, created_at, updated_at
+    SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at
     FROM restaurants WHERE id = ${id} LIMIT 1
   `;
   return rows[0] || null;
@@ -57,11 +57,16 @@ export async function createRestaurant(data: {
   phone?: string;
   address?: string;
   logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  menu_layout?: string;
+  menu_title?: string;
+  menu_description?: string;
   modules?: string[];
 }) {
   const rows = await sql`
-    INSERT INTO restaurants (name, slug, phone, address, logo_url)
-    VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null})
+    INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description)
+    VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
     RETURNING *
   `;
   const restaurant = rows[0];
@@ -94,6 +99,11 @@ export async function updateRestaurant(id: string, data: {
   phone?: string | null;
   address?: string | null;
   logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  menu_layout?: string | null;
+  menu_title?: string | null;
+  menu_description?: string | null;
 }) {
   const rows = await sql`
     UPDATE restaurants SET
@@ -102,6 +112,11 @@ export async function updateRestaurant(id: string, data: {
       phone = COALESCE(${data.phone ?? null}, phone),
       address = COALESCE(${data.address ?? null}, address),
       logo_url = COALESCE(${data.logo_url ?? null}, logo_url),
+      primary_color = COALESCE(${data.primary_color ?? null}, primary_color),
+      secondary_color = COALESCE(${data.secondary_color ?? null}, secondary_color),
+      menu_layout = COALESCE(${data.menu_layout ?? null}, menu_layout),
+      menu_title = COALESCE(${data.menu_title ?? null}, menu_title),
+      menu_description = COALESCE(${data.menu_description ?? null}, menu_description),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *

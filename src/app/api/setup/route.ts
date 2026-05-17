@@ -15,6 +15,19 @@ export async function GET() {
       );
     `;
 
+    // Migration to add theme colors and menu custom fields to restaurants if they don't exist
+    try {
+      await sql`
+        ALTER TABLE restaurants 
+        ADD COLUMN IF NOT EXISTS primary_color VARCHAR(50) DEFAULT '#971345',
+        ADD COLUMN IF NOT EXISTS secondary_color VARCHAR(50) DEFAULT '#EC7951',
+        ADD COLUMN IF NOT EXISTS menu_title VARCHAR(200) DEFAULT 'Today''s Specials',
+        ADD COLUMN IF NOT EXISTS menu_description TEXT DEFAULT 'Hand-curated coastal delicacies prepared with traditional recipes.';
+      `;
+    } catch (e) {
+      console.log("Migration columns might already exist or table does not exist yet:", e);
+    }
+
     await sql`
       CREATE TABLE IF NOT EXISTS products (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

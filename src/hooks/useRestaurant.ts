@@ -6,7 +6,13 @@ export type RestaurantContext = {
   name: string;
   slug: string;
   logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  menu_layout?: 'LIST' | 'GRID';
+  menu_title?: string;
+  menu_description?: string;
   pusher_channel: string;
+  modules?: Record<string, boolean>;
 };
 
 let cached: RestaurantContext | null = null;
@@ -16,7 +22,16 @@ async function fetchRestaurant(): Promise<RestaurantContext | null> {
   if (cached) return cached;
   if (fetchPromise) return fetchPromise;
 
-  fetchPromise = fetch('/api/restaurant')
+  // Extract slug from URL: /[slug]/...
+  let slug = '';
+  if (typeof window !== 'undefined') {
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    slug = segments[0] || '';
+  }
+
+  fetchPromise = fetch('/api/restaurant', {
+    headers: slug ? { 'x-restaurant-slug': slug } : {}
+  })
     .then(res => res.json())
     .then(data => {
       if (data.success && data.data) {

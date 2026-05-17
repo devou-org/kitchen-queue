@@ -589,8 +589,8 @@ tr:hover td {
 
 .sidebar {
   width: 240px;
-  background: #1F2937;
-  color: white;
+  background: #FFFFFF;
+  color: var(--text-primary);
   flex-shrink: 0;
   position: fixed;
   top: 0;
@@ -598,39 +598,43 @@ tr:hover td {
   left: 0;
   overflow-y: auto;
   z-index: 60;
+  border-right: 1px solid var(--border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
 }
 
 .sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 24px 20px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
 }
 
 .sidebar-nav {
-  padding: 12px 0;
+  padding: 16px 0;
 }
 
 .sidebar-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 20px;
+  gap: 12px;
+  padding: 12px 16px;
+  margin: 4px 12px;
   font-size: 14px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  color: var(--text-secondary);
   text-decoration: none;
-  transition: all 0.15s ease;
-  border-radius: 0;
+  transition: all 0.2s ease;
+  border-radius: 10px;
 }
 
 .sidebar-link:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--primary);
+  background: #F9FAFB;
 }
 
 .sidebar-link.active {
-  color: white;
-  background: rgba(151, 19, 69, 0.2);
-  border-right: 3px solid var(--primary);
+  color: white !important;
+  background: var(--primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .admin-main {
@@ -911,16 +915,16 @@ tr:hover td {
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #F9FAFB;
+  border: 1px solid var(--border);
   border-radius: 12px;
   margin-bottom: 20px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .status-toggle-wrapper:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: #F3F4F6;
+  border-color: #D1D5DB;
 }
 
 .status-toggle-label {
@@ -932,13 +936,13 @@ tr:hover td {
 .status-label-primary {
   font-size: 13px;
   font-weight: 700;
-  color: white;
+  color: var(--text-primary);
 }
 
 .status-label-secondary {
   font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -963,7 +967,7 @@ tr:hover td {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: #E5E7EB;
   transition: .3s;
   border-radius: 24px;
 }

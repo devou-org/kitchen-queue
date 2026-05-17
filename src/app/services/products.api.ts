@@ -4,13 +4,26 @@ class ProductService {
   private getAuthHeaders(): Record<string, string> {
     if (typeof window === 'undefined') return {};
     const token = localStorage.getItem('admin_token') || localStorage.getItem('auth_token');
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    // Extract slug from URL: /[slug]/...
+    const path = window.location.pathname;
+    const segments = path.split('/').filter(Boolean);
+    const slug = segments[0];
+
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (slug) headers['x-restaurant-slug'] = slug;
+    
+    return headers;
   }
 
   // --- PUBLIC METHODS ---
   async getProducts(): Promise<ApiResponse<Product[]>> {
     try {
-      const res = await fetch('/api/products', { cache: 'no-store' });
+      const res = await fetch('/api/products', { 
+        headers: this.getAuthHeaders(),
+        cache: 'no-store' 
+      });
       return await res.json();
     } catch {
       return { success: false, error: 'Network error fetching menu' };
@@ -19,7 +32,10 @@ class ProductService {
 
   async getProductById(id: string): Promise<ApiResponse<Product>> {
     try {
-      const res = await fetch(`/api/products/${id}`, { cache: 'no-store' });
+      const res = await fetch(`/api/products/${id}`, { 
+        headers: this.getAuthHeaders(),
+        cache: 'no-store' 
+      });
       return await res.json();
     } catch {
       return { success: false, error: 'Network error fetching product' };

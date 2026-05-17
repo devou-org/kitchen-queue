@@ -14,11 +14,22 @@ export interface AuthResponse {
 }
 
 class AuthService {
+  private getCommonHeaders(): Record<string, string> {
+    if (typeof window === 'undefined') return {};
+    const path = window.location.pathname;
+    const segments = path.split('/').filter(Boolean);
+    const slug = segments[0];
+    return slug ? { 'x-restaurant-slug': slug } : {};
+  }
+
   async sendOtp(phone: string): Promise<AuthResponse> {
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...this.getCommonHeaders()
+        },
         body: JSON.stringify({ phone }),
       });
       return await res.json();
@@ -31,7 +42,10 @@ class AuthService {
     try {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...this.getCommonHeaders()
+        },
         body: JSON.stringify({ code, otp_token: otpToken }),
       });
       const data = await res.json();
@@ -53,7 +67,10 @@ class AuthService {
     try {
       const res = await fetch('/api/auth/admin-login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...this.getCommonHeaders()
+        },
         body: JSON.stringify({ email, password }),
       });
       return await res.json();
@@ -66,6 +83,7 @@ class AuthService {
     try {
       const res = await fetch('/api/auth/refresh', {
         method: 'POST',
+        headers: this.getCommonHeaders(),
       });
       const data = await res.json();
       if (data.success && data.token) {
@@ -96,7 +114,10 @@ class AuthService {
     
     try {
       const res = await fetch('/api/users/me', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          ...this.getCommonHeaders()
+        },
       });
       
       // If access token is expired, refresh it

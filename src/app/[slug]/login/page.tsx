@@ -1,0 +1,323 @@
+'use client';
+import { useState, useRef, useEffect, ChangeEvent } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { authService } from '@/app/services/auth.api';
+import { useRestaurant } from '@/hooks/useRestaurant';
+
+const COUNTRY_CODES = [
+  { code: '+91', label: '🇮🇳 +91', country: 'India' },
+
+];
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { slug } = useParams();
+  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [countryCode, setCountryCode] = useState('+91');
+  const [phone, setPhone] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const { restaurant } = useRestaurant();
+
+  useEffect(() => {
+    // Check if user is already logged in (skip OTP)
+    const token = localStorage.getItem('auth_token');
+    const user = authService.getUser();
+    if (token && user) {
+      router.push(`/${slug}/menu`);
+    }
+  }, [router, slug]);
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [cooldown]);
+
+  const fullPhone = `${countryCode}${phone.replace(/\D/g, '')}`;
+
+  const handleSendOTP = async () => {
+    if (loading || cooldown > 0) return;
+    const cleaned = phone.replace(/\D/g, '');
+    if (!cleaned) return toast.error('Please enter your phone number');
+    
+    if (countryCode === '+91' && cleaned.length !== 10) {
+      return toast.error('Please enter a valid 10-digit phone number');
+    }
+    
+    if (cleaned.length < 7 || cleaned.length > 15) {
+      return toast.error('Please enter a valid phone number');
+    }
+
+    setLoading(true);
+    try {
+      const data = await authService.sendOtp(fullPhone);
+      if (data.success) {
+        setOtpToken(data.otp_token || '');
+        setStep('otp');
+        setCooldown(60);
+        toast.success('OTP sent to your phone!');
+      } else {
+        toast.error(data.error || 'Failed to send OTP');
+      }
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOTPChange = (index: number, value: string) => {
+    // Strip non-digits
+    const digits = value.replace(/\D/g, '');
+
+    // Handle multi-digit input (Android keyboard or browser autofill)
+    if (digits.length > 1) {
+      const newOtp = [...otp];
+      digits.split('').slice(0, 6 - index).forEach((d, i) => {
+        newOtp[index + i] = d;
+      });
+      setOtp(newOtp);
+      const lastFill = Math.min(index + digits.length - 1, 5);
+      otpRefs.current[lastFill]?.focus();
+      return;
+    }
+
+    // Single digit — normal flow
+    if (!/^\d?$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+    if (value && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOTPPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+    const newOtp = [...otp];
+    pasted.split('').forEach((digit, i) => { newOtp[i] = digit; });
+    setOtp(newOtp);
+    // Focus last filled box
+    const lastIndex = Math.min(pasted.length - 1, 5);
+    otpRefs.current[lastIndex]?.focus();
+  };
+
+  const handleOTPKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerify = async (code?: string) => {
+    if (loading || isSuccess) return;
+    const otpCode = code || otp.join('');
+    if (otpCode.length !== 6) return toast.error('Enter complete 6-digit OTP');
+    if (!otpToken) return toast.error('OTP session expired. Please request a new OTP.');
+    setLoading(true);
+    try {
+      const data = await authService.verifyOtp(otpCode, otpToken);
+      if (data.success) {
+        setIsSuccess(true);
+        // Store in localStorage for client-side access
+        if (data.token) localStorage.setItem('auth_token', data.token);
+        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+
+        // Also set as a cookie so the Next.js middleware can see it on navigation
+        const maxAge = 365 * 24 * 60 * 60; // 365 days in seconds
+        document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+        toast.success(`Welcome to ${restaurant?.name || 'Renjz Kitchen'}! 🎉`);
+        // Force a hard navigation to ensure middleware and server components pick up the new cookie
+        window.location.href = `/${slug}/menu`;
+      } else {
+        toast.error(data.error || 'Invalid OTP');
+        setCooldown(0); // Re-enable Send OTP button on wrong PIN
+        setLoading(false);
+      }
+    } catch {
+      toast.error('Network error. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'var(--bg-gradient)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+    }}>
+      {restaurant?.primary_color && (
+        <style dangerouslySetInnerHTML={{ __html: `
+          :root {
+            --primary: ${restaurant.primary_color};
+            --primary-dark: ${restaurant.primary_color};
+          }
+        `}} />
+      )}
+      <div style={{ width: '100%', maxWidth: '400px' }} className="animate-fade-in">
+
+        {/* Brand Header */}
+        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+          <div style={{
+            width: '90px', height: '90px',
+            background: 'white',
+            borderRadius: '24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 20px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
+            overflow: 'hidden',
+            border: '2px solid white'
+          }}>
+            {restaurant?.logo_url ? (
+              <img
+                src={restaurant.logo_url}
+                alt={restaurant.name || 'Logo'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{
+                width: '100%', height: '100%',
+                backgroundColor: restaurant?.primary_color || 'var(--primary)',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 800, fontSize: '36px'
+              }}>
+                {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
+              </div>
+            )}
+          </div>
+          <h1 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '8px', letterSpacing: '-0.5px' }}>
+            {restaurant?.name || 'Loading...'}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', fontWeight: 500 }}>
+            Taste of Home in every bite.
+          </p>
+        </div>
+
+        {/* Card */}
+        <div className="card" style={{ borderRadius: '20px', padding: '28px', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
+
+          {/* Phone Step */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label className="label">Phone Number</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select
+                  className="select"
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  style={{ width: '120px', flexShrink: 0 }}
+                >
+                  {COUNTRY_CODES.map(c => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  className="input"
+                  placeholder="9xxxxxxxxx"
+                  value={phone}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendOTP()}
+                  style={{ flex: 1 }}
+                />
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                We'll send a 6-digit code to verify your account.
+              </p>
+            </div>
+
+            <button
+              className="btn btn-primary btn-lg"
+              style={{ width: '100%' }}
+              onClick={handleSendOTP}
+              disabled={loading || !phone.trim() || cooldown > 0}
+            >
+              {loading && step === 'phone' ? (
+                <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Sending...</>
+              ) : cooldown > 0 ? (
+                <>Resend in {cooldown}s</>
+              ) : (
+                <>Send OTP →</>
+              )}
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            margin: '20px 0', color: 'var(--text-secondary)', fontSize: '12px',
+            textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600,
+          }}>
+            <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--border)' }} />
+            VERIFICATION
+            <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--border)' }} />
+          </div>
+
+          {/* OTP Step */}
+          <div>
+            <p style={{ textAlign: 'center', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Enter 6-digit code
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
+              {otp.map((digit, i) => (
+                <input
+                  key={i}
+                  ref={(el) => { otpRefs.current[i] = el; }}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  className="otp-input"
+                  value={digit}
+                  onChange={(e) => handleOTPChange(i, e.target.value)}
+                  onKeyDown={(e) => handleOTPKeyDown(i, e)}
+                  onPaste={handleOTPPaste}
+                  disabled={step === 'phone' || isSuccess || loading}
+                  style={{
+                    opacity: step === 'phone' || isSuccess ? 0.4 : 1,
+                  }}
+                />
+              ))}
+            </div>
+            <button
+              className="btn btn-secondary btn-lg"
+              style={{ width: '100%' }}
+              onClick={() => handleVerify()}
+              disabled={loading || isSuccess || step === 'phone' || otp.some(d => !d)}
+            >
+              {(loading || isSuccess) && step === 'otp' ? (
+                <><span className="loader" style={{ width: 18, height: 18, borderWidth: 2, borderColor: 'rgba(151,19,69,0.3)', borderTopColor: 'var(--primary)' }} /> Verifying...</>
+              ) : 'Verify & Login'}
+            </button>
+            <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '12px' }}>
+              {cooldown > 0 ? (
+                <>Resend code in <strong>0:{cooldown.toString().padStart(2, '0')}</strong></>
+              ) : step === 'otp' ? (
+                <button
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: loading || isSuccess ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: loading || isSuccess ? 0.5 : 1 }}
+                  onClick={handleSendOTP}
+                  disabled={loading || isSuccess}
+                >
+                  Resend OTP
+                </button>
+              ) : null}
+            </p>
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+  );
+}

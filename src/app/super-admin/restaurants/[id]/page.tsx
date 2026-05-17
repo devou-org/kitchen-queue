@@ -1,0 +1,636 @@
+'use client';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
+import { toast, Toaster } from 'react-hot-toast';
+
+type Module = {
+  module_name: string;
+  is_enabled: boolean;
+};
+
+type Restaurant = {
+  id: string;
+  name: string;
+  slug: string;
+  phone?: string;
+  address?: string;
+  logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  menu_layout?: 'LIST' | 'GRID';
+  menu_title?: string;
+  menu_description?: string;
+  created_at: string;
+  modules?: Module[];
+};
+
+const ALL_MODULES = [
+  { key: 'DIGITAL_MENU', label: '📖 Digital Menu', desc: 'Allows customers to view products and details on their phones.', icon: '📖' },
+  { key: 'ONLINE_ORDERING', label: '🛒 Online Ordering', desc: 'Enables online checkout, payments, and shopping carts.', icon: '🛒' },
+  { key: 'QUEUE_MANAGEMENT', label: '🎟️ Queue Management', desc: 'Tracks active order tokens and served tokens for kitchen screen.', icon: '🎟️' },
+  { key: 'INVENTORY', label: '📦 Inventory Control', desc: 'Manages real-time stock, buffer alerts, and product availability.', icon: '📦' },
+  { key: 'ANALYTICS', label: '📊 Live Analytics', desc: 'Displays 30-day orders, conversion rates, and revenue dashboards.', icon: '📊' },
+  { key: 'REPORTS', label: '📋 PDF Reports', desc: 'Generates end-of-day sales, order lists, and customer activity logs.', icon: '📋' },
+];
+
+export default function RestaurantDetails() {
+  const router = useRouter();
+  const params = useParams();
+  const id = params?.id as string;
+
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  // Form Fields State
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [primaryColor, setPrimaryColor] = useState('#971345');
+  const [secondaryColor, setSecondaryColor] = useState('#EC7951');
+  const [menuLayout, setMenuLayout] = useState<'LIST' | 'GRID'>('LIST');
+  const [menuTitle, setMenuTitle] = useState("Today's Specials");
+  const [menuDescription, setMenuDescription] = useState("Hand-curated coastal delicacies prepared with traditional recipes.");
+
+  const authHeaders = { credentials: 'include' as const };
+
+  const fetchRestaurant = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/super-admin/restaurants/${id}`, authHeaders);
+      if (res.status === 401) {
+        router.push('/super-admin/login');
+        return;
+      }
+      const data = await res.json();
+      if (data.success && data.data) {
+        const r: Restaurant = data.data;
+        setRestaurant(r);
+        setName(r.name);
+        setSlug(r.slug);
+        setPhone(r.phone || '');
+        setAddress(r.address || '');
+        setLogoUrl(r.logo_url || '');
+        setPrimaryColor(r.primary_color || '#971345');
+        setSecondaryColor(r.secondary_color || '#EC7951');
+        setMenuLayout((r as any).menu_layout || 'LIST');
+        setMenuTitle(r.menu_title || "Today's Specials");
+        setMenuDescription(r.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes.");
+      } else {
+        toast.error('Restaurant not found');
+        router.push('/super-admin');
+      }
+    } catch {
+      toast.error('Failed to load restaurant details');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, router]);
+
+  useEffect(() => {
+    fetchRestaurant();
+  }, [fetchRestaurant]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !slug.trim()) {
+      toast.error('Name and slug are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/super-admin/restaurants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        ...authHeaders,
+        body: JSON.stringify({
+          name,
+          slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, ''),
+          phone: phone || null,
+          address: address || null,
+          logo_url: logoUrl || null,
+          primary_color: primaryColor,
+          secondary_color: secondaryColor,
+          menu_layout: menuLayout,
+          menu_title: menuTitle || null,
+          menu_description: menuDescription || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Restaurant profile updated successfully!');
+        setRestaurant(data.data);
+      } else {
+        toast.error(data.error || 'Failed to update restaurant');
+      }
+    } catch {
+      toast.error('Connection error while updating restaurant');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleModule = async (moduleKey: string, isEnabled: boolean) => {
+    if (!restaurant) return;
+    try {
+      const currentModules = restaurant.modules || [];
+      const updatedModules = currentModules.map(m =>
+        m.module_name === moduleKey ? { ...m, is_enabled: isEnabled } : m
+      );
+      if (!currentModules.find(m => m.module_name === moduleKey)) {
+        updatedModules.push({ module_name: moduleKey, is_enabled: isEnabled });
+      }
+
+      // Optimistic update
+      setRestaurant(prev => prev ? { ...prev, modules: updatedModules } : null);
+
+      const res = await fetch(`/api/super-admin/restaurants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        ...authHeaders,
+        body: JSON.stringify({ modules: updatedModules }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`${ALL_MODULES.find(m => m.key === moduleKey)?.label} subscription updated!`);
+      } else {
+        toast.error(data.error || 'Failed to update module');
+        fetchRestaurant(); // Rollback
+      }
+    } catch {
+      toast.error('Failed to sync module change with server');
+      fetchRestaurant(); // Rollback
+    }
+  };
+
+  const handleDeleteRestaurant = async () => {
+    try {
+      const res = await fetch(`/api/super-admin/restaurants/${id}`, {
+        method: 'DELETE',
+        ...authHeaders,
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Restaurant deleted successfully!');
+        router.push('/super-admin');
+      } else {
+        toast.error(data.error || 'Failed to delete restaurant');
+      }
+    } catch {
+      toast.error('Connection error while deleting restaurant');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif" }}>
+        <div style={{ fontSize: '48px', animation: 'spin 1s linear infinite', marginBottom: '16px' }}>⏳</div>
+        <p style={{ color: '#475569', fontWeight: 600 }}>Loading restaurant configuration...</p>
+      </div>
+    );
+  }
+
+  if (!restaurant) return null;
+
+  return (
+    <div style={S.page}>
+      <Toaster position="top-right" />
+      
+      {/* Top Banner Navigation */}
+      <div style={S.topNav}>
+        <Link href="/super-admin" style={S.backBtn}>
+          ← Back to Dashboard
+        </Link>
+        <span style={{ color: '#94a3b8', margin: '0 8px' }}>|</span>
+        <span style={{ color: '#64748b', fontSize: '13px', fontWeight: 500 }}>
+          Manage Tenant: <strong>{restaurant.name}</strong>
+        </span>
+      </div>
+
+      <div style={S.container}>
+        {/* Title Header */}
+        <div style={S.header}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              width: '56px', height: '56px', borderRadius: '12px',
+              backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '24px', flexShrink: 0, overflow: 'hidden'
+            }}>
+              {logoUrl ? (
+                <img src={logoUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                name.charAt(0).toUpperCase()
+              )}
+            </div>
+            <div>
+              <h1 style={S.title}>{name}</h1>
+              <p style={S.subtitle}>slug: <span style={S.slugBadge}>/{slug}</span> • registered: {new Date(restaurant.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <a href={`/${slug}/menu`} target="_blank" rel="noopener noreferrer" style={S.secondaryLinkBtn}>
+              🌐 Customer Menu
+            </a>
+            <a href={`/${slug}/admin/products`} target="_blank" rel="noopener noreferrer" style={S.primaryLinkBtn}>
+              🔑 Admin Portal
+            </a>
+          </div>
+        </div>
+
+        {/* Dashboard Panels Layout */}
+        <div style={S.grid}>
+          {/* Left Panel: Profile Configurations */}
+          <div style={S.card}>
+            <h2 style={S.cardTitle}>✏️ Profile & Branding</h2>
+            <p style={S.cardDesc}>Configure logo URL, phone number, physical address, and theme colors.</p>
+            
+            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+              <div>
+                <label style={S.label}>Restaurant Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  style={S.input}
+                  placeholder="e.g. Renjz Kitchen"
+                />
+              </div>
+
+              <div>
+                <label style={S.label}>Slug (URL route) *</label>
+                <input
+                  type="text"
+                  required
+                  value={slug}
+                  onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  style={S.input}
+                  placeholder="e.g. renjz"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={S.label}>Phone Number</label>
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    style={S.input}
+                    placeholder="+91 98765 43210"
+                  />
+                </div>
+                <div>
+                  <label style={S.label}>Logo URL</label>
+                  <input
+                    type="url"
+                    value={logoUrl}
+                    onChange={e => setLogoUrl(e.target.value)}
+                    style={S.input}
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={S.label}>Address</label>
+                <textarea
+                  value={address}
+                  onChange={e => setAddress(e.target.value)}
+                  style={{ ...S.input, height: '70px', resize: 'vertical' }}
+                  placeholder="Street details, City, Pin"
+                />
+              </div>
+
+              <div>
+                <label style={S.label}>Menu Header Title</label>
+                <input
+                  type="text"
+                  value={menuTitle}
+                  onChange={e => setMenuTitle(e.target.value)}
+                  style={S.input}
+                  placeholder="e.g. Today's Specials"
+                />
+              </div>
+
+              <div>
+                <label style={S.label}>Menu Header Description</label>
+                <textarea
+                  value={menuDescription}
+                  onChange={e => setMenuDescription(e.target.value)}
+                  style={{ ...S.input, height: '70px', resize: 'vertical' }}
+                  placeholder="e.g. Hand-curated coastal delicacies prepared with traditional recipes."
+                />
+              </div>
+
+              {/* Menu Layout Switcher */}
+              <div>
+                <label style={S.label}>Digital Menu Card Layout</label>
+                <p style={{ fontSize: '11px', color: '#64748b', marginTop: '-4px', marginBottom: '10px' }}>
+                  Choose how items are displayed on the customer's mobile menu screen.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setMenuLayout('LIST')}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '10px',
+                      border: menuLayout === 'LIST' ? '2px solid #10b981' : '1px solid #cbd5e1',
+                      background: menuLayout === 'LIST' ? '#ecfdf5' : '#ffffff',
+                      color: menuLayout === 'LIST' ? '#047857' : '#334155',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ fontSize: '20px' }}>≡</span>
+                    <span style={{ fontWeight: 800, fontSize: '13px' }}>Horizontal List</span>
+                    <span style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>Full-width rows with side images</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMenuLayout('GRID')}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '10px',
+                      border: menuLayout === 'GRID' ? '2px solid #10b981' : '1px solid #cbd5e1',
+                      background: menuLayout === 'GRID' ? '#ecfdf5' : '#ffffff',
+                      color: menuLayout === 'GRID' ? '#047857' : '#334155',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ fontSize: '20px' }}>☷</span>
+                    <span style={{ fontWeight: 800, fontSize: '13px' }}>2-Column Grid</span>
+                    <span style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>2 items per row with top images</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Theme Colors Configuration */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div>
+                  <label style={S.label}>Primary Color</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                    <input
+                      type="color"
+                      value={primaryColor}
+                      onChange={e => setPrimaryColor(e.target.value)}
+                      style={S.colorSwatch}
+                    />
+                    <input
+                      type="text"
+                      value={primaryColor}
+                      onChange={e => setPrimaryColor(e.target.value)}
+                      maxLength={7}
+                      style={S.colorInput}
+                      placeholder="#971345"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={S.label}>Secondary Color</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                    <input
+                      type="color"
+                      value={secondaryColor}
+                      onChange={e => setSecondaryColor(e.target.value)}
+                      style={S.colorSwatch}
+                    />
+                    <input
+                      type="text"
+                      value={secondaryColor}
+                      onChange={e => setSecondaryColor(e.target.value)}
+                      maxLength={7}
+                      style={S.colorInput}
+                      placeholder="#EC7951"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" disabled={saving} style={S.saveBtn}>
+                {saving ? 'Saving Profiles...' : 'Save Profile Changes'}
+              </button>
+            </form>
+          </div>
+
+          {/* Right Panel: Modules and Brand Preview */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* Dynamic Customer Branding Live Preview */}
+            <div style={S.card}>
+              <h2 style={S.cardTitle}>👁️ Brand Live Preview</h2>
+              <p style={S.cardDesc}>Real-time visual rendering of how customers see the menu header.</p>
+              
+              <div style={{
+                marginTop: '16px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+              }}>
+                {/* Header Mockup */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '14px 18px',
+                  borderBottom: '1px solid #f1f5f9',
+                  backgroundColor: '#ffffff'
+                }}>
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" style={{ width: '34px', height: '34px', borderRadius: '6px', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{
+                      width: '34px', height: '34px', borderRadius: '6px',
+                      backgroundColor: primaryColor, color: 'white',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 800, fontSize: '14px'
+                    }}>
+                      {name ? name.charAt(0).toUpperCase() : '🌿'}
+                    </div>
+                  )}
+                  <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>
+                    {name || 'Restaurant Name'}
+                  </span>
+                </div>
+                
+                {/* Body Banner Mockup */}
+                <div style={{ padding: '24px 18px 12px 18px', background: 'linear-gradient(to bottom right, #fdfdfd, #f8fafc)' }}>
+                  <div style={{ height: '8px', width: '120px', borderRadius: '4px', backgroundColor: primaryColor, marginBottom: '8px' }} />
+                  <div style={{ height: '6px', width: '220px', borderRadius: '3px', backgroundColor: '#e2e8f0', marginBottom: '16px' }} />
+                  
+                  {/* Category Pill Mockup */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{
+                      padding: '6px 14px', borderRadius: '30px',
+                      backgroundColor: primaryColor, color: 'white',
+                      fontSize: '11px', fontWeight: 700
+                    }}>
+                      All Specials
+                    </div>
+                    <div style={{
+                      padding: '6px 14px', borderRadius: '30px',
+                      backgroundColor: '#f1f5f9', color: '#64748b',
+                      fontSize: '11px', fontWeight: 600
+                    }}>
+                      Starters
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mockup Item Cards */}
+                <div style={{ padding: '0 18px 18px 18px', backgroundColor: '#f8fafc' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                    Layout Preview
+                  </div>
+                  {menuLayout === 'GRID' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      {[1, 2].map(i => (
+                        <div key={i} style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ height: '50px', backgroundColor: '#f1f5f9', borderRadius: '6px' }} />
+                          <div style={{ height: '6px', width: '70%', backgroundColor: '#cbd5e1', borderRadius: '3px' }} />
+                          <div style={{ height: '6px', width: '40%', backgroundColor: primaryColor, borderRadius: '3px', marginTop: 'auto' }} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ height: '6px', width: '60%', backgroundColor: '#cbd5e1', borderRadius: '3px' }} />
+                          <div style={{ height: '6px', width: '40%', backgroundColor: primaryColor, borderRadius: '3px' }} />
+                        </div>
+                        <div style={{ width: '28px', height: '28px', backgroundColor: '#f1f5f9', borderRadius: '4px', flexShrink: 0 }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Subscribed Modules Settings */}
+            <div style={S.card}>
+              <h2 style={S.cardTitle}>⚙️ Subscription Modules</h2>
+              <p style={S.cardDesc}>Instantly toggle which platform services are enabled for this restaurant.</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+                {ALL_MODULES.map(mod => {
+                  const mData = (restaurant.modules || []).find(m => m.module_name === mod.key);
+                  const isEnabled = mData ? mData.is_enabled : true;
+
+                  return (
+                    <div key={mod.key} style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: '12px 14px', borderRadius: '8px',
+                      border: `1px solid ${isEnabled ? '#a7f3d0' : '#e2e8f0'}`,
+                      backgroundColor: isEnabled ? '#ecfdf5' : '#f8fafc',
+                      transition: 'all 0.2s',
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{mod.label}</span>
+                          {isEnabled && <span style={{ fontSize: '11px', padding: '1px 5px', borderRadius: '4px', backgroundColor: '#10b981', color: 'white', fontWeight: 700 }}>active</span>}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '11px', marginTop: '2px' }}>{mod.desc}</div>
+                      </div>
+                      
+                      {/* Interactive Switch */}
+                      <button
+                        onClick={() => handleToggleModule(mod.key, !isEnabled)}
+                        style={{
+                          width: '42px', height: '22px', borderRadius: '11px',
+                          border: 'none', backgroundColor: isEnabled ? '#10b981' : '#cbd5e1',
+                          cursor: 'pointer', position: 'relative', transition: 'background-color 0.2s',
+                          flexShrink: 0
+                        }}
+                      >
+                        <div style={{
+                          width: '16px', height: '16px', borderRadius: '50%',
+                          backgroundColor: 'white', position: 'absolute', top: '3px',
+                          left: isEnabled ? '23px' : '3px', transition: 'left 0.2s',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Danger Zone deletion panel */}
+            <div style={{ ...S.card, borderColor: '#fecaca', backgroundColor: '#fff5f5' }}>
+              <h2 style={{ ...S.cardTitle, color: '#991b1b' }}>⚠️ Danger Zone</h2>
+              <p style={{ ...S.cardDesc, color: '#7f1d1d' }}>Delete this restaurant and all associated digital products, token logs, and queues permanently.</p>
+              
+              {!deleteConfirm ? (
+                <button onClick={() => setDeleteConfirm(true)} style={S.deleteInitBtn}>
+                  Delete Restaurant
+                </button>
+              ) : (
+                <div style={{ marginTop: '12px' }}>
+                  <p style={{ fontSize: '12px', color: '#b91c1c', fontWeight: 700, marginBottom: '8px' }}>Are you absolutely sure? This action is non-reversible.</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => setDeleteConfirm(false)} style={S.cancelBtn}>
+                      No, Keep It
+                    </button>
+                    <button onClick={handleDeleteRestaurant} style={S.deleteConfirmBtn}>
+                      Yes, Delete Permanently
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const S: Record<string, React.CSSProperties> = {
+  page: { minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif", padding: '0 0 80px', color: '#0f172a' },
+  topNav: { display: 'flex', alignItems: 'center', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 32px' },
+  backBtn: { fontSize: '13px', color: '#059669', textDecoration: 'none', fontWeight: 700 },
+  container: { maxWidth: '1080px', margin: '0 auto', padding: '24px 20px 0' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px', backgroundColor: '#ffffff', padding: '20px 24px', borderRadius: '12px', border: '1px solid #e2e8f0' },
+  title: { fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: 0 },
+  subtitle: { fontSize: '13px', color: '#64748b', marginTop: '4px', margin: 0 },
+  slugBadge: { background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '11px', fontWeight: 700 },
+  primaryLinkBtn: { textDecoration: 'none', padding: '10px 18px', backgroundColor: '#10b981', color: 'white', fontSize: '13px', fontWeight: 700, borderRadius: '8px', boxShadow: '0 2px 8px rgba(16,185,129,0.2)' },
+  secondaryLinkBtn: { textDecoration: 'none', padding: '10px 18px', backgroundColor: '#ffffff', color: '#334155', fontSize: '13px', fontWeight: 700, borderRadius: '8px', border: '1px solid #cbd5e1' },
+  grid: { display: 'grid', gridTemplateColumns: 'minmax(300px, 3fr) minmax(300px, 2fr)', gap: '20px', alignItems: 'start' },
+  card: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' },
+  cardTitle: { fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 },
+  cardDesc: { fontSize: '12px', color: '#64748b', marginTop: '4px', margin: 0 },
+  label: { display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' },
+  input: { width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' },
+  colorSwatch: { width: '38px', height: '38px', padding: 0, border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 },
+  colorInput: { flex: 1, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '14px', fontFamily: 'monospace' },
+  saveBtn: { display: 'block', width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.15)', marginTop: '8px' },
+  deleteInitBtn: { display: 'block', width: '100%', padding: '10px', backgroundColor: 'transparent', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginTop: '12px' },
+  deleteConfirmBtn: { flex: 1, padding: '10px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
+  cancelBtn: { flex: 1, padding: '10px', backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }
+};

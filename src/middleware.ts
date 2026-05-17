@@ -3,53 +3,54 @@ import type { NextRequest } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
 export async function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-  const host = request.headers.get('host') || '';
-  
-  // Extract subdomain (fallback to 'demo' for local dev)
-  let subdomain = 'demo';
-  const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1') || host.match(/^192\.168\./);
-  
-  if (isLocalhost) {
-    const parts = host.split('.');
-    if (parts.length > 1 && !parts[0].includes('localhost') && !parts[0].match(/^\d+$/)) {
-      subdomain = parts[0];
+  const { pathname } = request.nextUrl;
+  const pathSegments = pathname.split('/').filter(Boolean);
+  const requestHeaders = new Headers(request.headers);
+
+  // If it's an API route, try to get slug from header or query
+  if (pathname.startsWith('/api')) {
+    const slug = request.headers.get('x-restaurant-slug') || request.nextUrl.searchParams.get('restaurant_slug');
+    if (slug) {
+      requestHeaders.set('x-restaurant-slug', slug);
+      return NextResponse.next({
+        request: { headers: requestHeaders },
+      });
     }
-  } else {
-    const parts = host.split('.');
-    if (parts.length >= 3) {
-      subdomain = parts[0];
-    }
+    // If no slug, just proceed (might be super-admin or auth)
+    return NextResponse.next();
   }
 
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-restaurant-slug', subdomain);
+  // Skip middleware for static files, etc.
+  if (
+    pathname.startsWith('/_next') || 
+    pathname.startsWith('/favicon.ico') ||
+    pathname.startsWith('/super-admin')
+  ) {
+    return NextResponse.next();
+  }
 
-  // Protect admin routes
-  if (path.startsWith('/admin') && path !== '/admin/login') {
+  // Extract slug from path (e.g., /[slug]/menu -> slug)
+  const slug = pathSegments[0];
+  if (!slug) {
+    return NextResponse.next();
+  }
+
+  requestHeaders.set('x-restaurant-slug', slug);
+
+  // Remaining path after slug (e.g., /admin/orders)
+  const subPath = '/' + pathSegments.slice(1).join('/');
+
+  // Protect admin routes: /[slug]/admin/...
+  if (subPath.startsWith('/admin') && subPath !== '/admin/login') {
     const adminToken = request.cookies.get('admin_token')?.value;
     if (!adminToken) {
-      return NextResponse.redirect(new URL('/admin/login', request.url));
+      return NextResponse.redirect(new URL(`/${slug}/admin/login`, request.url));
     }
 
     const payload = await verifyToken(adminToken);
     if (!payload?.isAdmin) {
-      const response = NextResponse.redirect(new URL('/admin/login', request.url));
+      const response = NextResponse.redirect(new URL(`/${slug}/admin/login`, request.url));
       response.cookies.delete('admin_token');
-      return response;
-    }
-  }
-
-  // Protect super-admin routes
-  if (path.startsWith('/super-admin') && path !== '/super-admin/login') {
-    const superAdminToken = request.cookies.get('super_admin_token')?.value;
-    if (!superAdminToken) {
-      return NextResponse.redirect(new URL('/super-admin/login', request.url));
-    }
-    const payload = await verifyToken(superAdminToken);
-    if (!(payload as any)?.isSuperAdmin) {
-      const response = NextResponse.redirect(new URL('/super-admin/login', request.url));
-      response.cookies.delete('super_admin_token');
       return response;
     }
   }
@@ -62,5 +63,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/super-admin/:path*', '/menu', '/cart', '/checkout', '/history', '/order-status', '/order-status/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

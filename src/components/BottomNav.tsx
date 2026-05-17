@@ -1,19 +1,26 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useParams } from 'next/navigation';
 import { LayoutDashboard, UtensilsCrossed, History } from 'lucide-react';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const params = useParams();
+  const slug = params?.slug;
+  const { restaurant, loading } = useRestaurant();
 
-  const isActive = (path: string) => pathname.startsWith(path);
+  const isActive = (path: string) => pathname.includes(path);
+
+  if (loading) return null;
+  if (restaurant?.modules?.ONLINE_ORDERING === false) return null;
 
   return (
     <nav className="bottom-nav" style={{ height: '70px', paddingBottom: 'calc(env(safe-area-inset-bottom) + 4px)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%', position: 'relative' }}>
         
         {/* Status Link */}
-        <Link prefetch={false} href="/order-status"
+        <Link prefetch={false} href={`/${slug}/order-status`}
           className={`bottom-nav-item ${isActive('/order-status') ? 'active' : ''}`}
           style={{ flex: 1 }}
         >
@@ -23,13 +30,13 @@ export default function BottomNav() {
 
         {/* Center Menu Button (FAB Style) */}
         <div style={{ position: 'relative', top: '-15px', width: '70px', height: '70px', display: 'flex', justifyContent: 'center' }}>
-          <Link prefetch={false} href="/menu" 
+          <Link prefetch={false} href={`/${slug}/menu`} 
             className="bottom-nav-center"
             style={{ 
               width: '64px', 
               height: '64px', 
-              background: '#800020', // Maroon color from image
-              boxShadow: '0 8px 20px rgba(128, 0, 32, 0.4)',
+              background: 'var(--primary)',
+              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
               border: '4px solid white'
             }}
           >
@@ -45,7 +52,7 @@ export default function BottomNav() {
         </div>
 
         {/* History Link */}
-        <Link prefetch={false} href="/history"
+        <Link prefetch={false} href={`/${slug}/history`}
           className={`bottom-nav-item ${isActive('/history') ? 'active' : ''}`}
           style={{ flex: 1 }}
         >

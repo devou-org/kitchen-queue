@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
 import { inventoryService } from '@/app/services/inventory.api';
@@ -12,6 +12,7 @@ interface Category {
 
 export default function AdminProductForm({ initialData }: { initialData?: Product }) {
   const router = useRouter();
+  const { slug } = useParams();
   const isEditing = !!initialData;
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -52,7 +53,8 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('auth_token')}`,
+          'x-restaurant-slug': slug as string
         },
         body: JSON.stringify({ name: newCategoryName.trim() }),
         cache: 'no-store'
@@ -102,7 +104,11 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('auth_token')}`,
+          'x-restaurant-slug': slug as string
+        },
         body: JSON.stringify(payload),
         cache: 'no-store'
       });
@@ -110,7 +116,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
       const data = await res.json();
       if (data.success) {
         toast.success(`Product ${isEditing ? 'updated' : 'created'} successfully!`);
-        router.push('/admin/products');
+        router.push(`/${slug}/admin/products`);
       } else {
         toast.error(data.error || 'Failed to save product');
       }
@@ -224,7 +230,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
           <button type="submit" className="btn btn-primary" disabled={loading} style={{ minWidth: '140px' }}>
             {loading ? <span className="loader" style={{ width: 16, height: 16, borderWidth: 2 }} /> : isEditing ? 'Update Product' : 'Create Product'}
           </button>
-          <button type="button" className="btn btn-ghost" onClick={() => router.push('/admin/products')}>Cancel</button>
+          <button type="button" className="btn btn-ghost" onClick={() => router.push(`/${slug}/admin/products`)}>Cancel</button>
         </div>
       </form>
     </div>

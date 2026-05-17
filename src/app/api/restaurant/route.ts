@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRestaurantBySlug } from '@/lib/db';
+import { getRestaurantBySlug, getRestaurantModules } from '@/lib/db';
 
 /**
  * GET /api/restaurant
@@ -15,6 +15,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
+    const moduleRows = await getRestaurantModules(restaurant.id);
+    const modules = (moduleRows || []).reduce((acc: Record<string, boolean>, row: any) => {
+      acc[row.module_name] = !!row.is_enabled;
+      return acc;
+    }, {} as Record<string, boolean>);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -22,8 +28,14 @@ export async function GET(request: NextRequest) {
         name: restaurant.name,
         slug: restaurant.slug,
         logo_url: restaurant.logo_url,
+        primary_color: restaurant.primary_color,
+        secondary_color: restaurant.secondary_color,
+        menu_layout: restaurant.menu_layout || 'LIST',
+        menu_title: restaurant.menu_title || "Today's Specials",
+        menu_description: restaurant.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes.",
         // Derived channel name so clients don't have to construct it themselves
         pusher_channel: `queue-channel-${restaurant.id}`,
+        modules,
       },
     });
   } catch (error) {
@@ -31,3 +43,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to fetch restaurant' }, { status: 500 });
   }
 }
+
