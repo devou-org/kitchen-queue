@@ -9,9 +9,41 @@ export default sql;
 // RESTAURANT & MODULE QUERIES
 // ============================================
 
+async function runAutoMigration(sqlConnection: any) {
+  try {
+    await sqlConnection`
+      ALTER TABLE restaurants 
+      ADD COLUMN IF NOT EXISTS menu_title VARCHAR(200) DEFAULT 'Today''s Specials',
+      ADD COLUMN IF NOT EXISTS menu_description TEXT DEFAULT 'Hand-curated coastal delicacies prepared with traditional recipes.';
+    `;
+    console.log("Auto-migrated menu columns successfully!");
+  } catch (err) {
+    console.error("Auto-migration failed:", err);
+  }
+}
+
 export async function getRestaurantBySlug(slug: string) {
-  const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description FROM restaurants WHERE slug = ${slug} LIMIT 1`;
-  return rows[0] || null;
+  try {
+    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+    return rows[0] || null;
+  } catch (error: any) {
+    if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+      console.log("Missing menu columns detected in getRestaurantBySlug. Attempting auto-migration...");
+      await runAutoMigration(sql);
+      try {
+        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+        return rows[0] || null;
+      } catch (retryError) {
+        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+        if (rows[0]) {
+          rows[0].menu_title = "Today's Specials";
+          rows[0].menu_description = "Hand-curated coastal delicacies prepared with traditional recipes.";
+        }
+        return rows[0] || null;
+      }
+    }
+    throw error;
+  }
 }
 
 export async function getRestaurantModules(restaurantId: string) {
@@ -29,26 +61,90 @@ export async function getRestaurantModules(restaurantId: string) {
 // ============================================
 
 export async function getAllRestaurants() {
-  const rows = await sql`
-    SELECT 
-      r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at,
-      COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
-      COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
-    FROM restaurants r
-    LEFT JOIN orders o ON o.restaurant_id = r.id
-    LEFT JOIN products p ON p.restaurant_id = r.id
-    GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at
-    ORDER BY r.created_at DESC
-  `;
-  return rows;
+  try {
+    const rows = await sql`
+      SELECT 
+        r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at,
+        COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
+        COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
+      FROM restaurants r
+      LEFT JOIN orders o ON o.restaurant_id = r.id
+      LEFT JOIN products p ON p.restaurant_id = r.id
+      GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at
+      ORDER BY r.created_at DESC
+    `;
+    return rows;
+  } catch (error: any) {
+    if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+      console.log("Missing menu columns detected in getAllRestaurants. Attempting auto-migration...");
+      await runAutoMigration(sql);
+      try {
+        const rows = await sql`
+          SELECT 
+            r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at,
+            COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
+          FROM restaurants r
+          LEFT JOIN orders o ON o.restaurant_id = r.id
+          LEFT JOIN products p ON p.restaurant_id = r.id
+          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at
+          ORDER BY r.created_at DESC
+        `;
+        return rows;
+      } catch (retryError) {
+        const rows = await sql`
+          SELECT 
+            r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.created_at,
+            COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
+          FROM restaurants r
+          LEFT JOIN orders o ON o.restaurant_id = r.id
+          LEFT JOIN products p ON p.restaurant_id = r.id
+          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.created_at
+          ORDER BY r.created_at DESC
+        `;
+        return rows.map((r: any) => ({
+          ...r,
+          menu_title: "Today's Specials",
+          menu_description: "Hand-curated coastal delicacies prepared with traditional recipes."
+        }));
+      }
+    }
+    throw error;
+  }
 }
 
 export async function getRestaurantById(id: string) {
-  const rows = await sql`
-    SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at
-    FROM restaurants WHERE id = ${id} LIMIT 1
-  `;
-  return rows[0] || null;
+  try {
+    const rows = await sql`
+      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at
+      FROM restaurants WHERE id = ${id} LIMIT 1
+    `;
+    return rows[0] || null;
+  } catch (error: any) {
+    if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+      console.log("Missing menu columns detected in getRestaurantById. Attempting auto-migration...");
+      await runAutoMigration(sql);
+      try {
+        const rows = await sql`
+          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at
+          FROM restaurants WHERE id = ${id} LIMIT 1
+        `;
+        return rows[0] || null;
+      } catch (retryError) {
+        const rows = await sql`
+          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, created_at, updated_at
+          FROM restaurants WHERE id = ${id} LIMIT 1
+        `;
+        if (rows[0]) {
+          rows[0].menu_title = "Today's Specials";
+          rows[0].menu_description = "Hand-curated coastal delicacies prepared with traditional recipes.";
+        }
+        return rows[0] || null;
+      }
+    }
+    throw error;
+  }
 }
 
 export async function createRestaurant(data: {
@@ -64,12 +160,42 @@ export async function createRestaurant(data: {
   menu_description?: string;
   modules?: string[];
 }) {
-  const rows = await sql`
-    INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description)
-    VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
-    RETURNING *
-  `;
-  const restaurant = rows[0];
+  let restaurant: any = null;
+  try {
+    const rows = await sql`
+      INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description)
+      VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
+      RETURNING *
+    `;
+    restaurant = rows[0];
+  } catch (error: any) {
+    if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+      console.log("Missing menu columns detected in createRestaurant. Attempting auto-migration...");
+      await runAutoMigration(sql);
+      try {
+        const rows = await sql`
+          INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description)
+          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
+          RETURNING *
+        `;
+        restaurant = rows[0];
+      } catch (retryError) {
+        // Safe fallback without custom columns
+        const rows = await sql`
+          INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout)
+          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'})
+          RETURNING *
+        `;
+        restaurant = rows[0];
+        if (restaurant) {
+          restaurant.menu_title = "Today's Specials";
+          restaurant.menu_description = "Hand-curated coastal delicacies prepared with traditional recipes.";
+        }
+      }
+    } else {
+      throw error;
+    }
+  }
 
   // Seed default modules for the new restaurant
   const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS'];
@@ -105,23 +231,72 @@ export async function updateRestaurant(id: string, data: {
   menu_title?: string | null;
   menu_description?: string | null;
 }) {
-  const rows = await sql`
-    UPDATE restaurants SET
-      name = COALESCE(${data.name ?? null}, name),
-      slug = COALESCE(${data.slug ?? null}, slug),
-      phone = COALESCE(${data.phone ?? null}, phone),
-      address = COALESCE(${data.address ?? null}, address),
-      logo_url = COALESCE(${data.logo_url ?? null}, logo_url),
-      primary_color = COALESCE(${data.primary_color ?? null}, primary_color),
-      secondary_color = COALESCE(${data.secondary_color ?? null}, secondary_color),
-      menu_layout = COALESCE(${data.menu_layout ?? null}, menu_layout),
-      menu_title = COALESCE(${data.menu_title ?? null}, menu_title),
-      menu_description = COALESCE(${data.menu_description ?? null}, menu_description),
-      updated_at = NOW()
-    WHERE id = ${id}
-    RETURNING *
-  `;
-  return rows[0] || null;
+  try {
+    const rows = await sql`
+      UPDATE restaurants SET
+        name = COALESCE(${data.name ?? null}, name),
+        slug = COALESCE(${data.slug ?? null}, slug),
+        phone = COALESCE(${data.phone ?? null}, phone),
+        address = COALESCE(${data.address ?? null}, address),
+        logo_url = COALESCE(${data.logo_url ?? null}, logo_url),
+        primary_color = COALESCE(${data.primary_color ?? null}, primary_color),
+        secondary_color = COALESCE(${data.secondary_color ?? null}, secondary_color),
+        menu_layout = COALESCE(${data.menu_layout ?? null}, menu_layout),
+        menu_title = COALESCE(${data.menu_title ?? null}, menu_title),
+        menu_description = COALESCE(${data.menu_description ?? null}, menu_description),
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+    return rows[0] || null;
+  } catch (error: any) {
+    if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+      console.log("Missing menu columns detected in updateRestaurant. Attempting auto-migration...");
+      await runAutoMigration(sql);
+      try {
+        const rows = await sql`
+          UPDATE restaurants SET
+            name = COALESCE(${data.name ?? null}, name),
+            slug = COALESCE(${data.slug ?? null}, slug),
+            phone = COALESCE(${data.phone ?? null}, phone),
+            address = COALESCE(${data.address ?? null}, address),
+            logo_url = COALESCE(${data.logo_url ?? null}, logo_url),
+            primary_color = COALESCE(${data.primary_color ?? null}, primary_color),
+            secondary_color = COALESCE(${data.secondary_color ?? null}, secondary_color),
+            menu_layout = COALESCE(${data.menu_layout ?? null}, menu_layout),
+            menu_title = COALESCE(${data.menu_title ?? null}, menu_title),
+            menu_description = COALESCE(${data.menu_description ?? null}, menu_description),
+            updated_at = NOW()
+          WHERE id = ${id}
+          RETURNING *
+        `;
+        return rows[0] || null;
+      } catch (retryError) {
+        // Fallback update without custom columns
+        const rows = await sql`
+          UPDATE restaurants SET
+            name = COALESCE(${data.name ?? null}, name),
+            slug = COALESCE(${data.slug ?? null}, slug),
+            phone = COALESCE(${data.phone ?? null}, phone),
+            address = COALESCE(${data.address ?? null}, address),
+            logo_url = COALESCE(${data.logo_url ?? null}, logo_url),
+            primary_color = COALESCE(${data.primary_color ?? null}, primary_color),
+            secondary_color = COALESCE(${data.secondary_color ?? null}, secondary_color),
+            menu_layout = COALESCE(${data.menu_layout ?? null}, menu_layout),
+            updated_at = NOW()
+          WHERE id = ${id}
+          RETURNING *
+        `;
+        const res = rows[0] || null;
+        if (res) {
+          res.menu_title = "Today's Specials";
+          res.menu_description = "Hand-curated coastal delicacies prepared with traditional recipes.";
+        }
+        return res;
+      }
+    }
+    throw error;
+  }
 }
 
 export async function deleteRestaurant(id: string) {
