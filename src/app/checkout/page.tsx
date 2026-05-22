@@ -102,30 +102,38 @@ export default function CheckoutPage() {
   // ── PLACE NEW ORDER ──────────────────────────────────────────────
   const handleNewOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (loading) return;
     
-    // Always check auth before proceeding to ensure session is valid
-    const user = await checkAuth();
+    setLoading(true);
+
+    // Use existing user state for verification check
+    const user = currentUser;
     
     if (!form.customer_name.trim() || form.customer_name.length < 2) {
       toast.error('Please enter your name (min 2 characters)');
+      setLoading(false);
       return;
     }
     const cleanedPhone = form.phone.replace(/\D/g, '');
     if (!cleanedPhone) {
       toast.error('Phone number is required');
+      setLoading(false);
       return;
     }
     if (cleanedPhone.length < 10) {
       toast.error('Please enter a valid 10-digit phone number');
+      setLoading(false);
       return;
     }
     const partySize = parseInt(form.party_size);
     if (!form.party_size || partySize < 1) {
       toast.error('Please select number of persons');
+      setLoading(false);
       return;
     }
     if (items.length === 0) {
       toast.error('Your cart is empty');
+      setLoading(false);
       return;
     }
 
@@ -133,10 +141,10 @@ export default function CheckoutPage() {
     const verified = user && user.phone === form.phone;
     if (!verified) {
       toast.error('Please verify your phone number first.');
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
     try {
       const orderItems = items.map(i => ({
         product_id: i.product_id,
@@ -177,20 +185,28 @@ export default function CheckoutPage() {
 
   // ── ADD ITEMS TO EXISTING ORDER ──────────────────────────────────
   const handleAddToOrder = async () => {
-    if (!activeOrder) return;
+    if (loading) return;
+    
+    setLoading(true);
+
+    if (!activeOrder) {
+      setLoading(false);
+      return;
+    }
     if (items.length === 0) {
       toast.error('Your cart is empty');
+      setLoading(false);
       return;
     }
 
-    // Always check auth before proceeding
-    const user = await checkAuth();
+    // Use existing user state for verification check
+    const user = currentUser;
     if (!user) {
       toast.error('Session expired. Please verify again.');
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
     try {
       const existingItems: { product_id: string; quantity: number }[] = (activeOrder.items || []).map(
         (oi: any) => ({ product_id: oi.product_id, quantity: Number(oi.quantity) })
