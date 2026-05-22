@@ -43,6 +43,8 @@ export default function RestaurantDetails() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  
+  const [queueStatuses, setQueueStatuses] = useState<any[]>([]);
 
   // Form Fields State
   const [name, setName] = useState('');
@@ -57,6 +59,19 @@ export default function RestaurantDetails() {
   const [menuDescription, setMenuDescription] = useState("Hand-curated coastal delicacies prepared with traditional recipes.");
 
   const authHeaders = { credentials: 'include' as const };
+
+  const fetchQueueStatuses = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/super-admin/queue/status?restaurantId=${id}`, authHeaders);
+      const data = await res.json();
+      if (data.success) {
+        setQueueStatuses(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching queue statuses', err);
+    }
+  }, [id]);
 
   const fetchRestaurant = useCallback(async () => {
     if (!id) return;
@@ -94,7 +109,8 @@ export default function RestaurantDetails() {
 
   useEffect(() => {
     fetchRestaurant();
-  }, [fetchRestaurant]);
+    fetchQueueStatuses();
+  }, [fetchRestaurant, fetchQueueStatuses]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,6 +181,24 @@ export default function RestaurantDetails() {
     } catch {
       toast.error('Failed to sync module change with server');
       fetchRestaurant(); // Rollback
+    }
+  };
+
+  const handleDeleteStatus = async (statusId: string) => {
+    try {
+      const res = await fetch(`/api/super-admin/queue/status?statusId=${statusId}&restaurantId=${id}`, {
+        method: 'DELETE',
+        ...authHeaders,
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Queue status deleted!');
+        fetchQueueStatuses();
+      } else {
+        toast.error(data.error || 'Failed to delete status');
+      }
+    } catch {
+      toast.error('Connection error while deleting status');
     }
   };
 
@@ -577,6 +611,73 @@ export default function RestaurantDetails() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Queue Management Settings */}
+            <div style={S.card}>
+              <h2 style={S.cardTitle}>🎟️ Queue Management</h2>
+              <p style={S.cardDesc}>Add custom status tags for this restaurant's queue (e.g. VIP_WAITING).</p>
+              
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const input = (e.target as any).statusInput;
+                const customStatus = input.value;
+                if (!customStatus) return;
+                
+                try {
+                  const res = await fetch(`/api/super-admin/queue/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    ...authHeaders,
+                    body: JSON.stringify({ restaurantId: id, statusEnum: customStatus.toUpperCase().replace(/\s+/g, '_') })
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    toast.success(`Status ${customStatus} added!`);
+                    input.value = '';
+                    fetchQueueStatuses();
+                  } else {
+                    toast.error(data.error || 'Failed to add status');
+                  }
+                } catch (err) {
+                  toast.error('Connection error adding status');
+                }
+              }} style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                <input 
+                  type="text" 
+                  name="statusInput"
+                  placeholder="New Status (e.g. VIP_WAITING)" 
+                  style={{ flex: 1, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                  required
+                />
+                <button type="submit" style={{ padding: '10px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                  Add Status
+                </button>
+              </form>
+
+              {queueStatuses.length > 0 && (
+                <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {queueStatuses.map((qs) => (
+                    <div key={qs.id} style={{ 
+                      display: 'flex', alignItems: 'center', gap: '8px', 
+                      backgroundColor: '#f1f5f9', padding: '6px 12px', 
+                      borderRadius: '16px', fontSize: '12px', fontWeight: 600, color: '#334155' 
+                    }}>
+                      {qs.possible_queue_status}
+                      <button 
+                        onClick={() => handleDeleteStatus(qs.id)}
+                        style={{
+                          background: 'none', border: 'none', color: '#94a3b8', 
+                          cursor: 'pointer', fontSize: '12px', padding: '0 2px', display: 'flex', alignItems: 'center'
+                        }}
+                        title="Delete status"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Danger Zone deletion panel */}

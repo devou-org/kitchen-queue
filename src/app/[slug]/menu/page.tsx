@@ -362,6 +362,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const { restaurant, loading: restaurantLoading } = useRestaurant();
   const menuLayout = restaurant?.menu_layout || 'LIST';
   const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
+  const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -810,7 +811,48 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         </div>
       )}
 
-      {showOrdering && <BottomNav />}
+      {/* Join Waitlist Button (if queue enabled but ordering disabled) */}
+      {!showOrdering && showQueue && isServiceActive && (
+        <div style={{
+          position: 'fixed', 
+          bottom: '80px', 
+          left: 0, 
+          right: 0,
+          background: 'transparent',
+          padding: '0 16px',
+          zIndex: 40,
+          pointerEvents: 'none',
+          display: 'flex',
+          justifyContent: 'center'
+        }}>
+          <Link prefetch={false} href={`/${slug}/queue`} 
+            className="cart-btn animate-fade-in"
+            style={{
+              pointerEvents: 'auto',
+              width: 'auto',
+              minWidth: '260px',
+              maxWidth: '400px',
+              background: 'var(--primary)',
+              borderRadius: '999px',
+              height: '48px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 20px',
+              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
+              color: 'white',
+              textDecoration: 'none',
+              fontWeight: 800,
+              fontSize: '15px',
+              gap: '8px'
+            }}
+          >
+            📋 Join Waitlist
+          </Link>
+        </div>
+      )}
+
+      {(showOrdering || showQueue) && <BottomNav />}
     </div>
   );
 }

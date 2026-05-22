@@ -124,6 +124,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { restaurant, loading: resLoading } = useRestaurant();
   const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
+  const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
@@ -150,10 +151,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         pathname.startsWith(`/${slug}/admin/statements`) || 
         pathname.startsWith(`/${slug}/admin/inventory`);
       if (isUnauthorizedPath) {
-        router.replace(`/${slug}/admin/products`);
+        const target = showQueue ? 'queue' : 'products';
+        router.replace(`/${slug}/admin/${target}`);
       }
     }
-  }, [restaurant, resLoading, pathname, router, slug]);
+  }, [restaurant, resLoading, pathname, router, slug, showQueue]);
 
   // If loading or on login page, render children without sidebar
   if (loading || pathname === `/${slug}/admin/login`) {
@@ -170,6 +172,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navLinks = [
     ...(showOrdering ? [{ name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
+    ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/inventory`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
