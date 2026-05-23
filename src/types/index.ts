@@ -55,6 +55,7 @@ export interface Order {
   updated_at: string;
   items?: OrderItem[];
   queue_position?: number;
+  queue_id?: string;
 }
 
 export interface QueueState {
