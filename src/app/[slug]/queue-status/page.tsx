@@ -9,7 +9,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 
 import { useParams, useRouter } from 'next/navigation';
 
-export default function OrderStatusPage() {
+export default function QueueStatusPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
@@ -37,7 +37,7 @@ export default function OrderStatusPage() {
             try {
               const parsed = JSON.parse(queueTicket);
               if (parsed.tokenNumber && parsed.expiresAt > Date.now()) {
-                router.replace(`/${slug}/order-status/${parsed.tokenNumber}`);
+                router.replace(`/${slug}/queue-status/${parsed.tokenNumber}`);
                 return;
               }
             } catch (e) {}
@@ -48,7 +48,7 @@ export default function OrderStatusPage() {
       }
       const user = JSON.parse(userStr);
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(user.phone)}&t=${Date.now()}`, {
+      const res = await fetch(`/api/queue/history?phone=${encodeURIComponent(user.phone)}&t=${Date.now()}`, {
         headers: { 
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           'x-restaurant-slug': Array.isArray(slug) ? slug[0] : slug 
@@ -58,7 +58,7 @@ export default function OrderStatusPage() {
       if (data.success && data.data) setOrders(data.data);
       else if (!silent) setOrders([]);
     } catch (err) {
-      console.error('Failed to fetch orders:', err);
+      console.error('Failed to fetch queue tickets:', err);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -70,8 +70,7 @@ export default function OrderStatusPage() {
     const channelName = restaurant.pusher_channel;
     const channel = pusherClient.subscribe(channelName);
     setIsLive(true);
-    channel.bind('order_update', () => fetchOrders(true));
-    channel.bind('new_order', () => fetchOrders(true));
+    channel.bind('queue_updated', () => fetchOrders(true));
     channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
     channel.bind('pusher:subscription_error', () => setIsLive(false));
     return () => { channel.unbind_all(); channel.unsubscribe(); };
@@ -115,20 +114,12 @@ export default function OrderStatusPage() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', background: 'var(--bg-gradient)' }}>
         <div className="loader" style={{ width: 44, height: 44, borderWidth: 4 }} />
-        <p style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Loading your orders...</p>
+        <p style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Loading your tickets...</p>
       </div>
     );
   }
 
-  const activeOrders = orders.filter(o => {
-    if (!['PENDING', 'PREPARING', 'READY', 'WAITING'].includes(o.status)) return false;
-    
-    // Check if order is from today (using Asia/Kolkata timezone to match standard)
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-    const orderDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(o.created_at));
-    
-    return orderDate === today;
-  });
+  const activeOrders = orders;
 
   if (activeOrders.length === 0) {
     return (
@@ -138,9 +129,9 @@ export default function OrderStatusPage() {
           <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(151,19,69,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', marginBottom: '24px' }}>
             🍽️
           </div>
-          <h2 style={{ fontWeight: 800, fontSize: '22px', marginBottom: '8px' }}>No Active Orders</h2>
+          <h2 style={{ fontWeight: 800, fontSize: '22px', marginBottom: '8px' }}>No Active Queue</h2>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', maxWidth: '260px', lineHeight: 1.6 }}>
-            Your orders have been served or no orders are in progress right now.
+            your tickets have been served or no orders are in progress right now.
           </p>
           <Link prefetch={false} href={`/${slug}/menu`} className="btn btn-primary btn-lg" style={{ width: '100%', maxWidth: '280px' }}>
             Browse Menu →
@@ -159,7 +150,7 @@ export default function OrderStatusPage() {
         {/* Section heading */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
           <div>
-            <h2 style={{ fontSize: '22px', fontWeight: 900, lineHeight: 1 }}>Active Orders</h2>
+            <h2 style={{ fontSize: '22px', fontWeight: 900, lineHeight: 1 }}>Active Queue</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>Updates in real-time — no need to refresh</p>
           </div>
           <span style={{
@@ -173,12 +164,12 @@ export default function OrderStatusPage() {
         </div>
 
         {activeOrders.map((order) => {
-          const isReady = order.status === 'READY';
-          const rawPos = Number(order.queue_position);
+          const isReady = order.queue_status === 'READY';
+          const rawPos = Number(order.position);
           const pos = isNaN(rawPos) || rawPos === 0 ? 1 : rawPos;
 
           return (
-            <Link prefetch={false} key={order.id} href={`/${slug}/order-status/${order.ticket_number}`} style={{
+            <Link prefetch={false} key={order.id} href={`/${slug}/queue-status/${order.token_number}`} style={{
               display: 'flex',
               background: 'white',
               border: isReady ? '1px solid rgba(6,167,125,0.2)' : '1px solid rgba(0,0,0,0.05)',
@@ -201,10 +192,7 @@ export default function OrderStatusPage() {
                 borderRight: '1px solid rgba(0,0,0,0.03)'
               }}>
                 <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.15em', color: '#9ca3af', marginBottom: '6px' }}>TICKET</span>
-                <span style={{ fontSize: '26px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1, marginBottom: order.is_paid ? '6px' : '0' }}>#{String(order.ticket_number).padStart(3, '0')}</span>
-                {order.is_paid && (
-                  <span style={{ fontSize: '9px', color: 'var(--success)', fontWeight: 800, background: 'rgba(6,167,125,0.1)', padding: '2px 6px', borderRadius: '4px', marginTop: '2px' }}>✓ PAID</span>
-                )}
+                <span style={{ fontSize: '26px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1, marginBottom: '0' }}>#{String(order.token_number).padStart(3, '0')}</span>
               </div>
 
               {/* Middle: STATUS */}
@@ -218,7 +206,7 @@ export default function OrderStatusPage() {
               }}>
                 <div style={{ 
                   display: 'flex', alignItems: 'center', gap: '8px', 
-                  background: isReady ? 'var(--success)' : (order.status === 'PENDING' ? '#f59e0b' : 'var(--primary)'), 
+                  background: isReady ? 'var(--success)' : (order.queue_status === 'WAITING' ? '#f59e0b' : 'var(--primary)'), 
                   color: 'white', 
                   padding: '8px 16px', 
                   borderRadius: '99px',
@@ -227,7 +215,7 @@ export default function OrderStatusPage() {
                   letterSpacing: '0.05em'
                 }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'white', opacity: 0.9 }} />
-                  {order.status}
+                  {order.queue_status}
                 </div>
               </div>
 
@@ -243,10 +231,10 @@ export default function OrderStatusPage() {
                 minWidth: '90px'
               }}>
                 <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.15em', color: '#9ca3af', marginBottom: '6px' }}>
-                  {isReady ? 'STATUS' : 'POSITION'}
+                  POSITION
                 </span>
-                <span style={{ fontSize: '18px', fontWeight: 700, color: isReady ? 'var(--success)' : 'var(--primary)', lineHeight: 1 }}>
-                  {isReady ? 'GO!' : formatOrdinal(pos)}
+                <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)', lineHeight: 1 }}>
+                  {formatOrdinal(pos)}
                 </span>
               </div>
             </Link>

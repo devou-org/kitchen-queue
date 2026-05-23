@@ -815,7 +815,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       {!showOrdering && showQueue && isServiceActive && (
         <div style={{
           position: 'fixed', 
-          bottom: '80px', 
+          bottom: '30px', 
           left: 0, 
           right: 0,
           background: 'transparent',
@@ -823,15 +823,38 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           zIndex: 40,
           pointerEvents: 'none',
           display: 'flex',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          gap: '12px'
         }}>
-          <Link prefetch={false} href={`/${slug}/queue`} 
-            className="cart-btn animate-fade-in"
+          <Link prefetch={false} href={`/${slug}/queue-status`} 
+            className="animate-fade-in"
             style={{
               pointerEvents: 'auto',
-              width: 'auto',
-              minWidth: '260px',
-              maxWidth: '400px',
+              background: 'white',
+              border: '2px solid var(--primary)',
+              borderRadius: '999px',
+              height: '48px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 20px',
+              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
+              color: 'var(--primary)',
+              textDecoration: 'none',
+              fontWeight: 800,
+              fontSize: '15px',
+              gap: '8px'
+            }}
+          >
+            🔍 Check Status
+          </Link>
+
+          <Link prefetch={false} href={`/${slug}/queue`} 
+            className="animate-fade-in"
+            style={{
+              pointerEvents: 'auto',
+              flex: 1,
+              maxWidth: '220px',
               background: 'var(--primary)',
               borderRadius: '999px',
               height: '48px',

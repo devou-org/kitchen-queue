@@ -10,8 +10,6 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
   const slug = params?.slug as string;
   const router = useRouter();
 
-  const [mode, setMode] = useState<'JOIN' | 'CHECK'>('JOIN');
-
   // Join form state
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -27,9 +25,6 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
-  // Check form state
-  const [checkToken, setCheckToken] = useState('');
-
   // 1. Auto-redirect if they have an active ticket in localStorage
   useEffect(() => {
     try {
@@ -37,7 +32,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
       if (stored) {
         const { tokenNumber, expiresAt } = JSON.parse(stored);
         if (Date.now() < expiresAt) {
-          router.replace(`/${slug}/queue/ticket/${tokenNumber}`);
+          router.replace(`/${slug}/queue-status/${tokenNumber}`);
         } else {
           localStorage.removeItem(`queue_ticket_${restaurantId}`);
         }
@@ -126,7 +121,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
           tokenNumber: data.token_number,
           expiresAt: Date.now() + 60 * 60 * 1000 // 1 hour
         }));
-        router.push(`/${slug}/queue/ticket/${data.token_number}`);
+        router.push(`/${slug}/queue-status/${data.token_number}`);
       } else {
         toast.error(data.error || 'Failed to join queue');
       }
@@ -134,13 +129,6 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
       toast.error('Error joining queue');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCheckSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (checkToken) {
-      router.push(`/${slug}/queue/ticket/${checkToken.replace('#', '').trim()}`);
     }
   };
 
@@ -159,38 +147,9 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
     }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '8px', backgroundColor: 'var(--primary)' }} />
       
-      {/* Toggle Tabs */}
-      <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '12px', padding: '4px', marginBottom: '32px' }}>
-         <button 
-           type="button"
-           onClick={() => setMode('JOIN')}
-           style={{
-             flex: 1, padding: '10px', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
-             backgroundColor: mode === 'JOIN' ? '#ffffff' : 'transparent',
-             color: mode === 'JOIN' ? '#0f172a' : '#64748b',
-             boxShadow: mode === 'JOIN' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-             transition: 'all 0.2s'
-           }}
-         >
-           Join Waitlist
-         </button>
-         <button 
-           type="button"
-           onClick={() => setMode('CHECK')}
-           style={{
-             flex: 1, padding: '10px', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
-             backgroundColor: mode === 'CHECK' ? '#ffffff' : 'transparent',
-             color: mode === 'CHECK' ? '#0f172a' : '#64748b',
-             boxShadow: mode === 'CHECK' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-             transition: 'all 0.2s'
-           }}
-         >
-           Check Status
-         </button>
-      </div>
+      {/* Toggle Tabs Removed */}
       
-      {mode === 'JOIN' ? (
-        <form onSubmit={handleJoinSubmit}>
+      <form onSubmit={handleJoinSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: '#334155', marginBottom: '8px' }}>Full Name *</label>
@@ -324,38 +283,6 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
             </button>
           </div>
         </form>
-      ) : (
-        <form onSubmit={handleCheckSubmit}>
-           <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-              <p style={{ color: '#64748b', fontSize: '14px', textAlign: 'center', fontWeight: 500 }}>
-                Enter your Token Number to check your live position in the waitlist.
-              </p>
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: '#334155', marginBottom: '8px' }}>Token Number</label>
-                <input 
-                  type="text" required 
-                  value={checkToken} onChange={e => setCheckToken(e.target.value)}
-                  style={{
-                    width: '100%', padding: '16px', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0',
-                    borderRadius: '14px', fontSize: '24px', color: '#0f172a', outline: 'none', transition: 'all 0.2s',
-                    borderBottomColor: checkToken ? 'var(--primary)' : '#e2e8f0',
-                    boxSizing: 'border-box', fontWeight: 900, textAlign: 'center', letterSpacing: '0.1em'
-                  }}
-                  placeholder="001"
-                />
-              </div>
-
-              <button type="submit" style={{
-                width: '100%', padding: '18px', backgroundColor: '#0f172a', color: '#ffffff',
-                border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: 800, cursor: 'pointer',
-                marginTop: '8px', letterSpacing: '0.02em',
-                boxShadow: '0 8px 20px -8px #0f172a'
-              }}>
-                Check Status
-              </button>
-           </div>
-        </form>
-      )}
     </div>
   );
 }

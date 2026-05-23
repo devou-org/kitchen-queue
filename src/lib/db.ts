@@ -1,7 +1,7 @@
 import { neon, Pool } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export default sql;
 
@@ -699,30 +699,40 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
   const rows = await sql`
     WITH active_ranks AS (
        SELECT
-         id,
+         q.id,
          ROW_NUMBER() OVER (
-           PARTITION BY DATE(created_at)
-           ORDER BY ticket_number ASC
+           PARTITION BY DATE(q.created_at)
+           ORDER BY q.token_number ASC
          )::integer as pos
-       FROM orders
-       WHERE restaurant_id = ${restaurantId} AND UPPER(status) = 'PENDING'
+       FROM queues q
+       JOIN queue_status qs ON qs.id = q.queue_status_id
+       WHERE q.restaurant_id = ${restaurantId} AND qs.possible_queue_status IN ('PENDING', 'WAITING', 'PREPARING')
     )
-    SELECT o.*, 
+    SELECT q.id, q.token_number as ticket_number, q.created_at, q.queue_type,
+      o.id as order_id, o.is_paid, o.total_price,
+      qs.possible_queue_status as status,
+      qs.color as status_color,
+      u.name as customer_name,
       COALESCE(ar.pos, 0) as queue_position,
-      json_agg(json_build_object(
-        'id', oi.id, 
-        'product_id', oi.product_id,
-        'quantity', oi.quantity, 
-        'price_at_purchase', oi.price_at_purchase,
-        'product_name', p.name
-      ) ORDER BY oi.id) as items
-    FROM orders o
-    LEFT JOIN active_ranks ar ON ar.id = o.id
-    LEFT JOIN order_items oi ON oi.order_id = o.id
-    LEFT JOIN products p ON p.id = oi.product_id
-    WHERE o.restaurant_id = ${restaurantId} AND o.phone = ${phone}
-    GROUP BY o.id, ar.pos
-    ORDER BY o.created_at DESC
+      (
+        SELECT json_agg(json_build_object(
+          'id', oi.id, 
+          'product_id', oi.product_id,
+          'quantity', oi.quantity, 
+          'price_at_purchase', oi.price_at_purchase,
+          'product_name', p.name
+        ) ORDER BY oi.id) 
+        FROM order_items oi 
+        LEFT JOIN products p ON p.id = oi.product_id 
+        WHERE oi.order_id = o.id
+      ) as items
+    FROM queues q
+    JOIN users u ON u.id = q.user_id
+    JOIN queue_status qs ON qs.id = q.queue_status_id
+    LEFT JOIN orders o ON o.queue_id = q.id
+    LEFT JOIN active_ranks ar ON ar.id = q.id
+    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone}
+    ORDER BY q.created_at DESC
     LIMIT 20
   `;
   return rows;
@@ -815,13 +825,46 @@ export async function createOrder(data: {
       throw new Error('Insufficient stock for one or more items.');
     }
 
+    // 1. Ensure user exists
+    const userRes = await client.query(`
+      INSERT INTO users (name, phone, role)
+      VALUES ($1, $2, 'USER')
+      ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name
+      RETURNING id
+    `, [data.customer_name || 'Guest', data.phone || '0000000000']);
+    const userId = userRes.rows[0].id;
+
+    // 2. Get PENDING status ID
+    const statusRes = await client.query(`
+      SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = 'PENDING' LIMIT 1
+    `, [data.restaurant_id]);
+    const statusId = statusRes.rows[0]?.id;
+
+    // 3. Get next token number
+    const tokenRes = await client.query(`
+      SELECT COALESCE(MAX(token_number), 0) + 1 AS next_token 
+      FROM queues 
+      WHERE restaurant_id = $1 AND CAST(created_at AS DATE) = CURRENT_DATE
+    `, [data.restaurant_id]);
+    const nextToken = tokenRes.rows[0].next_token;
+
+    // 4. Create Queue Entry
+    const queueRes = await client.query(`
+      INSERT INTO queues (
+        restaurant_id, user_id, queue_status_id, token_number, 
+        queue_type, party_size, notes
+      ) VALUES ($1, $2, $3, $4, 'ORDER', $5, $6)
+      RETURNING id
+    `, [data.restaurant_id, userId, statusId, nextToken, data.party_size || 1, data.notes || '']);
+    const queueId = queueRes.rows[0].id;
+
     const orderResult = await client.query(
       `
-        INSERT INTO orders (restaurant_id, customer_name, phone, total_price, status, is_paid, notes, party_size)
-        VALUES ($1, $2, $3, $4, 'PENDING', false, $5, $6)
+        INSERT INTO orders (restaurant_id, queue_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number)
+        VALUES ($1, $2, $3, $4, $5, 'PENDING', false, $6, $7, $8)
         RETURNING id
       `,
-      [data.restaurant_id, data.customer_name, data.phone, computedTotal, data.notes || null, data.party_size || 1]
+      [data.restaurant_id, queueId, data.customer_name, data.phone, computedTotal, data.notes || null, data.party_size || 1, nextToken]
     );
 
     const orderId = orderResult.rows[0]?.id;

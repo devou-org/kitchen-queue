@@ -15,6 +15,8 @@ export default function BottomNav() {
   if (loading) return null;
   if (restaurant?.modules?.ONLINE_ORDERING === false) return null;
 
+  const showOrdering = true;
+
   return (
     <nav className="bottom-nav" style={{ height: '70px', paddingBottom: 'calc(env(safe-area-inset-bottom) + 4px)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%', position: 'relative' }}>
@@ -51,14 +53,18 @@ export default function BottomNav() {
           </Link>
         </div>
 
-        {/* History Link */}
-        <Link prefetch={false} href={`/${slug}/history`}
-          className={`bottom-nav-item ${isActive('/history') ? 'active' : ''}`}
-          style={{ flex: 1 }}
-        >
-          <History size={22} strokeWidth={isActive('/history') ? 2.5 : 2} />
-          <span style={{ marginTop: '4px', fontSize: '10px', fontWeight: 700 }}>HISTORY</span>
-        </Link>
+        {/* History Link (Only if ordering is enabled) */}
+        {showOrdering ? (
+          <Link prefetch={false} href={`/${slug}/history`}
+            className={`bottom-nav-item ${isActive('/history') ? 'active' : ''}`}
+            style={{ flex: 1 }}
+          >
+            <History size={22} strokeWidth={isActive('/history') ? 2.5 : 2} />
+            <span style={{ marginTop: '4px', fontSize: '10px', fontWeight: 700 }}>HISTORY</span>
+          </Link>
+        ) : (
+          <div style={{ flex: 1 }} />
+        )}
 
       </div>
     </nav>

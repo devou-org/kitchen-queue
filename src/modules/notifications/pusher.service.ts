@@ -10,25 +10,13 @@ export class PusherService {
    * @param channelType 'QUEUE', 'ORDERS', 'KITCHEN'
    */
   static async getChannelName(restaurantId: string, channelType: string): Promise<string> {
-    const res = await pool.query(`
-      SELECT channel_name FROM restaurant_channels
-      WHERE restaurant_id = $1 AND channel_type = $2
-      LIMIT 1
-    `, [restaurantId, channelType]);
-
-    if (res.rowCount > 0) {
-      return res.rows[0].channel_name;
-    }
+    // We don't use the DB table for channels anymore, we just return the standard format
+    // This fixes the mismatch between frontend and backend channels
 
     // Fallback/Create on demand if it doesn't exist
-    const newChannelName = `private-${channelType.toLowerCase()}-${restaurantId}`;
+    // We will just use the standard queue-channel format to match the frontend
+    const newChannelName = `queue-channel-${restaurantId}`;
     
-    await pool.query(`
-      INSERT INTO restaurant_channels (restaurant_id, channel_name, channel_type)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (restaurant_id, channel_type) DO NOTHING
-    `, [restaurantId, newChannelName, channelType]);
-
     return newChannelName;
   }
 

@@ -38,12 +38,14 @@ export class QueueService {
 
       // Check if user is already in queue
       const existingQueueRes = await client.query(`
-        SELECT q.*
+        SELECT q.*, qs.possible_queue_status 
         FROM queues q
         JOIN queue_status qs ON q.queue_status_id = qs.id
-        WHERE q.user_id = $1 AND q.restaurant_id = $2 
-          AND CAST(q.created_at AS DATE) = CURRENT_DATE
-          AND qs.possible_queue_status IN ('WAITING', 'SEATED')
+        WHERE q.user_id = $1 
+          AND q.restaurant_id = $2 
+          AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+          AND qs.possible_queue_status = 'WAITING'
+        ORDER BY q.created_at DESC LIMIT 1
       `, [userId, restaurantId]);
 
       if (existingQueueRes.rows.length > 0) {
@@ -56,7 +58,7 @@ export class QueueService {
           JOIN queue_status qs ON q.queue_status_id = qs.id
           WHERE q.restaurant_id = $1 
             AND qs.possible_queue_status = 'WAITING' 
-            AND CAST(q.created_at AS DATE) = CURRENT_DATE
+            AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
             AND q.token_number < $2
         `, [restaurantId, existingQueue.token_number]);
 
@@ -87,7 +89,7 @@ export class QueueService {
       const tokenRes = await client.query(`
         SELECT COALESCE(MAX(token_number), 0) + 1 AS next_token 
         FROM queues 
-        WHERE restaurant_id = $1 AND CAST(created_at AS DATE) = CURRENT_DATE
+        WHERE restaurant_id = $1 AND (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
       `, [restaurantId]);
 
       const nextToken = tokenRes.rows[0].next_token;
@@ -96,7 +98,7 @@ export class QueueService {
       const waitTimeRes = await client.query(`
         SELECT COUNT(*) as queue_length 
         FROM queues 
-        WHERE restaurant_id = $1 AND queue_status_id = $2 AND CAST(created_at AS DATE) = CURRENT_DATE
+        WHERE restaurant_id = $1 AND queue_status_id = $2 AND (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
       `, [restaurantId, waitingStatusId]);
 
       const queueLength = parseInt(waitTimeRes.rows[0].queue_length, 10);
@@ -178,13 +180,25 @@ export class QueueService {
   /**
    * Super Admin: Add new custom queue status to a restaurant
    */
-  static async addQueueStatus(restaurantId: string, statusEnum: string) {
+  static async addQueueStatus(restaurantId: string, statusEnum: string, color: string = '#cbd5e1') {
+    try {
+      await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '#cbd5e1'`);
+    } catch(e) {}
+
     const res = await pool.query(`
-      INSERT INTO queue_status (restaurant_id, possible_queue_status)
-      VALUES ($1, $2)
+      INSERT INTO queue_status (restaurant_id, possible_queue_status, color)
+      VALUES ($1, $2, $3)
       ON CONFLICT DO NOTHING
       RETURNING *
-    `, [restaurantId, statusEnum]);
+    `, [restaurantId, statusEnum, color]);
+    
+    if (res.rows.length === 0) {
+      // It exists, let's update color
+      const updateRes = await pool.query(`
+        UPDATE queue_status SET color = $3 WHERE restaurant_id = $1 AND possible_queue_status = $2 RETURNING *
+      `, [restaurantId, statusEnum, color]);
+      return updateRes.rows[0];
+    }
     return res.rows[0];
   }
 
@@ -217,12 +231,19 @@ export class QueueService {
    * Super Admin: Delete custom queue status
    */
   static async deleteQueueStatus(statusId: string, restaurantId: string) {
-    const res = await pool.query(`
-      DELETE FROM queue_status 
-      WHERE id = $1 AND restaurant_id = $2
-      RETURNING *
-    `, [statusId, restaurantId]);
-    return res.rows[0];
+    try {
+      const res = await pool.query(`
+        DELETE FROM queue_status 
+        WHERE id = $1 AND restaurant_id = $2
+        RETURNING *
+      `, [statusId, restaurantId]);
+      return res.rows[0];
+    } catch (error: any) {
+      if (error.code === '23503') {
+        throw new Error('Cannot delete this status because it is currently in use by active or past queue tickets.');
+      }
+      throw error;
+    }
   }
 
   /**
@@ -253,5 +274,34 @@ export class QueueService {
     const queue = res.rows[0];
     queue.position = parseInt(queue.wait_position, 10) + 1;
     return queue;
+  }
+
+  /**
+   * Customer: Get active queue history by phone
+   */
+  static async getQueueHistory(restaurantId: string, phone: string) {
+    const res = await pool.query(`
+      SELECT q.*, qs.possible_queue_status as queue_status, u.name as user_name, u.phone as user_phone,
+      (
+        SELECT COUNT(*)
+        FROM queues q2
+        WHERE q2.restaurant_id = $1
+          AND q2.queue_status_id = q.queue_status_id
+          AND CAST(q2.created_at AS DATE) = CURRENT_DATE
+          AND q2.token_number < q.token_number
+      ) as wait_position
+      FROM queues q
+      JOIN queue_status qs ON q.queue_status_id = qs.id
+      JOIN users u ON q.user_id = u.id
+      WHERE q.restaurant_id = $1 
+        AND u.phone = $2
+        AND CAST(q.created_at AS DATE) = CURRENT_DATE
+      ORDER BY q.created_at DESC
+    `, [restaurantId, phone]);
+    
+    return res.rows.map(q => ({
+      ...q,
+      position: parseInt(q.wait_position, 10) + 1
+    }));
   }
 }

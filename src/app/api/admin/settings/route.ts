@@ -75,3 +75,58 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    
+    if (!restaurant) {
+       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
+    const admin = await requireAdmin(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    
+    // Allow updating these fields
+    const { 
+      name, 
+      phone, 
+      address, 
+      logo_url, 
+      primary_color, 
+      secondary_color, 
+      menu_layout, 
+      menu_title, 
+      menu_description 
+    } = body;
+
+    if (!name) {
+      return NextResponse.json({ success: false, error: 'Name is required' }, { status: 400 });
+    }
+
+    await sql`
+      UPDATE restaurants 
+      SET 
+        name = ${name},
+        phone = ${phone || null},
+        address = ${address || null},
+        logo_url = ${logo_url || null},
+        primary_color = ${primary_color},
+        secondary_color = ${secondary_color},
+        menu_layout = ${menu_layout},
+        menu_title = ${menu_title || null},
+        menu_description = ${menu_description || null},
+        updated_at = NOW()
+      WHERE id = ${restaurant.id}
+    `;
+
+    return NextResponse.json({ success: true, message: 'Settings updated successfully' });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

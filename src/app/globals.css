@@ -94,12 +94,12 @@ body {
 }
 
 .btn-danger {
-  background: var(--secondary);
+  background: #EF4444;
   color: white;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #a81f24;
+  background: #DC2626;
   transform: translateY(-1px);
 }
 

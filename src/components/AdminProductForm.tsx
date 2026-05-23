@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
 import { inventoryService } from '@/app/services/inventory.api';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 interface Category {
   id: string;
@@ -14,6 +15,8 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
   const router = useRouter();
   const { slug } = useParams();
   const isEditing = !!initialData;
+  const { restaurant } = useRestaurant();
+  const showInventory = restaurant?.modules?.INVENTORY !== false;
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -205,16 +208,18 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <div style={{ flex: 1 }}>
-            <label className="label">Stock Quantity</label>
-            <input type="number" className="input" value={form.stock_quantity} onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))} placeholder="0" />
+        {showInventory && (
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ flex: 1 }}>
+              <label className="label">Stock Quantity</label>
+              <input type="number" className="input" value={form.stock_quantity} onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))} placeholder="0" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="label">Buffer Quantity</label>
+              <input type="number" className="input" value={form.buffer_quantity} onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))} placeholder="0" />
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <label className="label">Buffer Quantity</label>
-            <input type="number" className="input" value={form.buffer_quantity} onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))} placeholder="0" />
-          </div>
-        </div>
+        )}
 
         <div>
           <label className="label">Image URL (Optional)</label>

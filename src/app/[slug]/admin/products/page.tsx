@@ -7,8 +7,11 @@ import { formatPrice } from '@/lib/format';
 import { productService } from '@/app/services/products.api';
 
 import { useParams } from 'next/navigation';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function AdminProducts() {
+  const { restaurant } = useRestaurant();
+  const showInventory = restaurant?.modules?.INVENTORY !== false;
   const { slug } = useParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,7 +117,7 @@ export default function AdminProducts() {
                   <th>Product</th>
                   <th>Category</th>
                   <th>Price</th>
-                  <th>Stock / Buffer</th>
+                  {showInventory && <th>Stock / Buffer</th>}
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -139,14 +142,16 @@ export default function AdminProducts() {
                     </td>
                     <td>{p.category}</td>
                     <td style={{ fontWeight: 600 }}>{formatPrice(p.price)}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 800, fontSize: '15px', color: p.stock_quantity <= p.buffer_quantity ? 'var(--warning)' : 'inherit' }}>
-                          {Math.max(0, p.stock_quantity)}
-                        </span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/ {p.buffer_quantity}</span>
-                      </div>
-                    </td>
+                    {showInventory && (
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 800, fontSize: '15px', color: p.stock_quantity <= p.buffer_quantity ? 'var(--warning)' : 'inherit' }}>
+                            {Math.max(0, p.stock_quantity)}
+                          </span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/ {p.buffer_quantity}</span>
+                        </div>
+                      </td>
+                    )}
                     <td>
                       <button
                         onClick={() => handleToggleStatus(p.id, p.status)}

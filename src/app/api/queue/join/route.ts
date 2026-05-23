@@ -10,18 +10,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 1-Hour Waitlist Rate Limit per Phone Number
-    const { pool } = require('@/lib/db');
-    const rateLimitCheck = await pool.query(`
-      SELECT id FROM queues 
-      WHERE restaurant_id = $1 
-      AND user_id IN (SELECT id FROM users WHERE phone = $2)
-      AND created_at > NOW() - INTERVAL '1 hour'
-    `, [restaurantId, phone]);
-
-    if (rateLimitCheck.rows.length > 0) {
-      return NextResponse.json({ success: false, error: 'You have already joined the waitlist recently. Please check your existing ticket or try again in an hour.' }, { status: 400 });
-    }
+    // We removed the strict rate limit so that `QueueService.joinQueue` can elegantly 
+    // handle returning the existing active ticket or creating a new one if previous is seated.
 
     const queueData = await QueueService.joinQueue({
       restaurantId,

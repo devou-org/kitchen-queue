@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings } from 'lucide-react';
 import { useRestaurant } from '@/hooks/useRestaurant';
 
 const ServiceToggle = () => {
@@ -129,7 +129,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     // Check if token exists in cookie or localStorage
     const adminToken = localStorage.getItem('admin_token');
-    const hasCookie = document.cookie.includes('admin_token=');
+    const hasCookie = document.cookie.includes('admin_logged_in=1');
     
     // Allow access to login page
     if (pathname === `/${slug}/admin/login`) {
@@ -137,7 +137,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return;
     }
 
-    if (!adminToken && !hasCookie) {
+    if (!hasCookie) {
       router.push(`/${slug}/admin/login`);
     } else {
       setLoading(false);
@@ -164,7 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = () => {
     authService.logout();
-    localStorage.removeItem('admin_token');
+    document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'; document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     router.push(`/${slug}/admin/login`);
   };
 
@@ -176,6 +176,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/inventory`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
+    { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
   ];
 
   return (

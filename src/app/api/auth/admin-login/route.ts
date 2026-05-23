@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
+    response.cookies.set('admin_logged_in', '1', { httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 8 * 60 * 60, path: '/' });
+
     return response;
   } catch (error) {
     console.error('Admin login error:', error);

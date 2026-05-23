@@ -21,7 +21,9 @@ export default function AdminLogin() {
     try {
       const data = await authService.adminLogin(email, password);
       if (data.success) {
-        if (data.token) localStorage.setItem('admin_token', data.token);
+        if (data.token) {
+          // Tokens are handled via httpOnly cookies from the backend
+        }
         toast.success('Welcome back, Admin!');
         router.push(`/${slug}/admin/orders`);
       } else {

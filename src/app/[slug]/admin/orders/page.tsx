@@ -334,7 +334,7 @@ export default function AdminOrders() {
             <div style={{ flex: 1, minWidth: '200px' }}>
               <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Filter Status</label>
               <select
-                className="input"
+                className="select"
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);

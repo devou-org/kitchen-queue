@@ -28,26 +28,16 @@ type QueueState = {
   timestamp: string;
 };
 
-const STAGES = [
-  { key: 'WAITING', label: 'WAITING', icon: Search },
-  { key: 'PENDING', label: 'CHECK-IN', icon: CheckCircle2 },
-  { key: 'PREPARING', label: 'PREPARING', icon: Search },
-  { key: 'READY', label: 'READY', icon: Utensils },
-  { key: 'PAID', label: 'PAID', icon: CircleDollarSign },
-  { key: 'SEATED', label: 'SEATED', icon: Utensils },
-];
+const ICONS: Record<string, any> = {
+  'WAITING': Search,
+  'PENDING': CheckCircle2,
+  'PREPARING': Search,
+  'READY': Utensils,
+  'PAID': CircleDollarSign,
+  'SEATED': Utensils,
+};
 
-function getStageIndex(status: string) {
-  if (status === 'WAITING') return 0;
-  if (status === 'PENDING') return 1;
-  if (status === 'PREPARING') return 2;
-  if (status === 'READY') return 3;
-  if (status === 'PAID') return 4;
-  if (status === 'SEATED') return 5;
-  return -1; // cancelled
-}
-
-export default function OrderStatusTicketPage({ params }: { params: Promise<{ slug: string; ticket: string }> }) {
+export default function QueueStatusTicketPage({ params }: { params: Promise<{ slug: string; ticket: string }> }) {
   const { slug, ticket } = use(params);
   const router = useRouter();
   const { restaurant, loading: resLoading } = useRestaurant();
@@ -62,7 +52,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     }
   }, [restaurant, resLoading, router, slug]);
 
-  const [order, setOrder] = useState<Order | null>(null);
+  const [ticketData, setTicketData] = useState<any>(null);
+  const [stages, setStages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
@@ -79,28 +70,45 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     setShowSurveyTip(false);
   };
 
-  const orderRef = useRef<Order | null>(null);
-  useEffect(() => { orderRef.current = order; }, [order]);
+  const ticketRef = useRef<any>(null);
+  useEffect(() => { ticketRef.current = ticketData; }, [ticketData]);
 
   useEffect(() => {
-    const fetchOrder = async (silent = false) => {
+    const fetchTicketAndStatuses = async (silent = false) => {
+      if (!restaurant) return;
       try {
-        const data = await orderService.getOrderByTicket(ticket);
-        if (data.success && data.data) {
-          setOrder(data.data);
+        const [ticketRes, statusesRes] = await Promise.all([
+          fetch(`/api/queue/ticket?restaurantId=${restaurant.id}&tokenNumber=${ticket}`),
+          fetch(`/api/queue/statuses`, { headers: { 'x-restaurant-slug': Array.isArray(slug) ? slug[0] : slug } })
+        ]);
+
+        const ticketResult = await ticketRes.json();
+        if (ticketResult.success && ticketResult.data) {
+          setTicketData(ticketResult.data);
         } else if (!silent) {
-          setError(data.error || 'Order not found');
-          setOrder(null);
+          setError(ticketResult.error || 'Ticket not found');
+          setTicketData(null);
         }
+
+        const statusesResult = await statusesRes.json();
+        if (statusesResult.success && statusesResult.data) {
+           const formattedStages = statusesResult.data.map((s: any) => ({
+             key: s.possible_queue_status,
+             label: s.possible_queue_status,
+             icon: ICONS[s.possible_queue_status] || Search
+           }));
+           setStages(formattedStages);
+        }
+
       } catch (err) {
-        console.error('❌ Failed to fetch order:', err);
-        if (!silent) setError('Failed to load order');
+        console.error('❌ Failed to fetch data:', err);
+        if (!silent) setError('Failed to load data');
       } finally {
         if (!silent) setLoading(false);
       }
     };
 
-    fetchOrder();
+    fetchTicketAndStatuses();
 
     if (!pusherClient || !restaurant) return;
     const channelName = restaurant.pusher_channel;
@@ -109,19 +117,23 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
     channel.bind('pusher:subscription_error', () => setIsLive(false));
 
-    channel.bind('order_update', (data: any) => {
-      const currentTicketInt = parseInt(ticket);
-      const currentOrder = orderRef.current;
-      const isOurOrder = data.ticket_number === currentTicketInt || (currentOrder?.id && data.order_id === currentOrder.id);
-
-      if (isOurOrder) {
-        if (data.new_status === 'READY' && currentOrder?.status !== 'READY') {
-          try {
-            new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { });
-          } catch { }
+    channel.bind('queue_updated', (data: any) => {
+      if (data.type === 'UPDATE' && data.queue) {
+        const currentTicketInt = parseInt(ticket);
+        const currentTicket = ticketRef.current;
+        const isOurTicket = data.queue.token_number === currentTicketInt;
+        
+        if (isOurTicket) {
+          if (data.queue.queue_status === 'READY' && currentTicket?.queue_status !== 'READY') {
+            try {
+              new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { });
+            } catch { }
+          }
+          setTicketData((prev: any) => prev ? { ...prev, queue_status: data.queue.queue_status || prev.queue_status } : null);
+          fetchTicketAndStatuses(true);
         }
-        setOrder(prev => prev ? { ...prev, status: data.new_status || prev.status, is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : prev.is_paid } : null);
-        fetchOrder(true);
+      } else if (data.type === 'JOIN') {
+         fetchTicketAndStatuses(true);
       }
     });
 
@@ -158,7 +170,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     );
   }
 
-  if (error || !order) {
+  if (error || !ticketData) {
     return (
       <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh' }}>
         <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', background: 'white' }}>
@@ -177,8 +189,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     );
   }
 
-  const stageIndex = getStageIndex(order.status);
-  const position = typeof order.queue_position === 'number' ? order.queue_position : 0;
+  const stageIndex = stages.findIndex(s => s.key === (ticketData.queue_status || 'WAITING'));
+  const currentStageIndex = stageIndex !== -1 ? stageIndex : 0;
+  const position = typeof ticketData.position === 'number' ? ticketData.position : 0;
   const displayPosition = position || 1;
 
   return (
@@ -310,37 +323,35 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             YOUR TICKET NUMBER
           </p>
           <h1 style={{ fontSize: '72px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1, margin: '8px 0' }}>
-            #{String(order.ticket_number).padStart(3, '0')}
+            #{String(ticketData.token_number).padStart(3, '0')}
           </h1>
 
-          {/* Queue Position Sub-card - Only for PENDING status */}
-          {order.status === 'PENDING' && (
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              background: 'rgba(0,0,0,0.03)',
-              padding: '12px 24px',
-              borderRadius: '16px',
-              marginTop: '16px'
-            }}>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  QUEUE POSITION
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
-                  <span style={{ fontSize: '28px', fontWeight: 800, color: '#33322F' }}>
-                    {formatOrdinal(displayPosition)}
-                  </span>
-                </div>
+          {/* Queue Position Sub-card */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            background: 'rgba(0,0,0,0.03)',
+            padding: '12px 24px',
+            borderRadius: '16px',
+            marginTop: '16px'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                QUEUE POSITION
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
+                <span style={{ fontSize: '28px', fontWeight: 800, color: '#33322F' }}>
+                  {formatOrdinal(displayPosition)}
+                </span>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Notification Banner - Only for PENDING status */}
-        {order.status === 'PENDING' && (
+        {/* Notification Banner - Only for PENDING/WAITING status */}
+        {(ticketData.queue_status === 'WAITING' || ticketData.queue_status === 'PENDING') && (
           <div style={{
             background: '#EEF6FF',
             borderRadius: '18px',
@@ -390,18 +401,18 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               position: 'absolute',
               top: '20px',
               left: '10%',
-              width: `${(stageIndex / (STAGES.length - 1)) * 80}%`,
+              width: stages.length > 1 ? `${(currentStageIndex / (stages.length - 1)) * 80}%` : '0%',
               height: '2px',
               background: 'var(--primary)',
               zIndex: 0,
               transition: 'width 0.5s ease'
             }} />
 
-            {STAGES.map((stage, i) => {
+            {stages.map((stage, i) => {
               const Icon = stage.icon;
-              const isCompleted = stageIndex > i || (stageIndex === i && stage.key === 'PAID');
-              const isCurrent = stageIndex === i && stage.key !== 'PAID';
-              const isPending = stageIndex < i;
+              const isCompleted = currentStageIndex > i || (currentStageIndex === i && i === stages.length - 1);
+              const isCurrent = currentStageIndex === i && i !== stages.length - 1;
+              const isPending = currentStageIndex < i;
 
               return (
                 <div key={stage.key} style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flex: 1 }}>
@@ -434,42 +445,53 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
           </div>
         </div>
 
-        {/* Order Details Card */}
+        {/* Waitlist Details Card */}
         <div style={{
           background: 'white',
           borderRadius: '24px',
           padding: '24px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
         }}>
-          <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F', marginBottom: '20px' }}>Order Details</h3>
+          <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F', marginBottom: '20px' }}>Waitlist Details</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {(order.items || []).map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <p style={{ fontWeight: 700, fontSize: '15px', color: '#33322F' }}>{item.product_name}</p>
-                  <p style={{ fontSize: '13px', color: '#9CA3AF', marginTop: '2px' }}>Quantity: {item.quantity}</p>
-                </div>
-                <span style={{ fontWeight: 700, fontSize: '15px', color: '#33322F' }}>
-                  {formatPrice(item.price_at_purchase * item.quantity)}
-                </span>
-              </div>
-            ))}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Name</span>
+              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
+                {ticketData.user_name || '-'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Party Size</span>
+              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
+                👤 {ticketData.party_size}
+              </span>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Joined At</span>
+              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
+                {new Date(ticketData.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
 
             <div style={{ borderTop: '1px dashed #E5E7EB', margin: '8px 0' }} />
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Status</span>
               <span style={{ fontWeight: 800, fontSize: '14px', color: '#EC7951', textTransform: 'uppercase' }}>
-                {order.status}
+                {ticketData.queue_status}
+              </span>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Current Position</span>
+              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
+                {displayPosition}
               </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '18px', fontWeight: 800, color: '#33322F' }}>Total</span>
-              <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--primary)' }}>
-                {formatPrice(order.total_price)}
-              </span>
-            </div>
           </div>
         </div>
 

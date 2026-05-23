@@ -98,7 +98,7 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
   });
 
   return (
-    <div className="page-content-admin animate-fade-in" style={{ padding: '0' }}>
+    <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Queue Management</h1>
@@ -112,13 +112,12 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
             <div style={{ flex: 1, minWidth: '200px' }}>
               <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Filter Status</label>
               <select
-                className="input"
+                className="select"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{ height: '42px' }}
               >
                 <option value="">WAITING (Active)</option>
-                <option value="ALL">All Entries</option>
                 {allStatuses.map(s => <option key={s.id} value={s.possible_queue_status}>{s.possible_queue_status}</option>)}
               </select>
             </div>
