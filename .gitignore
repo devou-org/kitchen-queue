@@ -4,6 +4,7 @@
 /node_modules
 /load-tests
 /.pnp
+/scripts
 .pnp.*
 .yarn/*
 !.yarn/patches
