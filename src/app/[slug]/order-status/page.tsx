@@ -51,7 +51,7 @@ export default function OrderStatusPage() {
       const res = await fetch(`/api/orders/history?phone=${encodeURIComponent(user.phone)}&t=${Date.now()}`, {
         headers: { 
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          'x-restaurant-slug': Array.isArray(slug) ? slug[0] : slug 
+          'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || ''
         },
       });
       const data = await res.json();

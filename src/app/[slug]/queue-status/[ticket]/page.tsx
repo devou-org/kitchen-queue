@@ -79,7 +79,7 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
       try {
         const [ticketRes, statusesRes] = await Promise.all([
           fetch(`/api/queue/ticket?restaurantId=${restaurant.id}&tokenNumber=${ticket}`),
-          fetch(`/api/queue/statuses`, { headers: { 'x-restaurant-slug': Array.isArray(slug) ? slug[0] : slug } })
+          fetch(`/api/queue/statuses`, { headers: { 'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || '' } })
         ]);
 
         const ticketResult = await ticketRes.json();
@@ -137,23 +137,7 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
       }
     });
 
-    channel.bind('queue_updated', (data: any) => {
-      if (data.type === 'UPDATE' && data.queue) {
-        const currentTicketInt = parseInt(ticket);
-        const currentOrder = orderRef.current;
-        const isOurOrder = data.queue.token_number === currentTicketInt || (currentOrder?.id && data.queue.id === currentOrder.queue_id);
-        
-        if (isOurOrder) {
-          if (data.queue.queue_status === 'READY' && currentOrder?.status !== 'READY') {
-            try {
-              new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { });
-            } catch { }
-          }
-          setOrder(prev => prev ? { ...prev, status: data.queue.queue_status || prev.status } : null);
-          fetchOrder(true);
-        }
-      }
-    });
+
 
     return () => {
       channel.unbind_all();

@@ -10,7 +10,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import { useParams, useRouter } from 'next/navigation';
 
 export default function QueueStatusPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const { slug } = useParams();
@@ -51,7 +51,7 @@ export default function QueueStatusPage() {
       const res = await fetch(`/api/queue/history?phone=${encodeURIComponent(user.phone)}&t=${Date.now()}`, {
         headers: { 
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          'x-restaurant-slug': Array.isArray(slug) ? slug[0] : slug 
+          'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || ''
         },
       });
       const data = await res.json();
