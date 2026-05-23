@@ -24,8 +24,11 @@ export default function AdminLogin() {
         if (data.token) {
           // Tokens are handled via httpOnly cookies from the backend
         }
+        const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
+        const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
+        const target = showOrdering ? 'orders' : (showQueue ? 'queue' : 'products');
         toast.success('Welcome back, Admin!');
-        router.push(`/${slug}/admin/orders`);
+        router.push(`/${slug}/admin/${target}`);
       } else {
         toast.error(data.error || 'Invalid credentials');
       }

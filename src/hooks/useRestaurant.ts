@@ -5,6 +5,8 @@ export type RestaurantContext = {
   id: string;
   name: string;
   slug: string;
+  phone?: string;
+  address?: string;
   logo_url?: string;
   primary_color?: string;
   secondary_color?: string;

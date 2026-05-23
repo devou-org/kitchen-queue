@@ -157,9 +157,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [restaurant, resLoading, pathname, router, slug, showQueue]);
 
-  // If loading or on login page, render children without sidebar
-  if (loading || pathname === `/${slug}/admin/login`) {
-    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>{loading ? null : children}</div>;
+  // If on login page, render children without sidebar
+  if (pathname === `/${slug}/admin/login`) {
+    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>{children}</div>;
+  }
+
+  // If loading auth or restaurant data, show skeleton
+  if (loading || resLoading) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <div className="admin-layout" style={{ opacity: 0.6, pointerEvents: 'none' }}>
+          {/* Skeleton Sidebar */}
+          <aside className="sidebar open" style={{ borderRight: '1px solid var(--border)', background: 'white' }}>
+            <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#e2e8f0', animation: 'pulse 2s infinite' }} />
+              <div style={{ height: '20px', width: '120px', background: '#e2e8f0', borderRadius: '4px', animation: 'pulse 2s infinite' }} />
+            </div>
+            <nav className="sidebar-nav" style={{ marginTop: '30px' }}>
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} style={{ height: '44px', background: '#e2e8f0', borderRadius: '8px', marginBottom: '12px', animation: 'pulse 2s infinite' }} />
+              ))}
+            </nav>
+          </aside>
+          {/* Skeleton Main */}
+          <main className="admin-main" style={{ padding: '24px' }}>
+            <div style={{ height: '32px', width: '250px', background: '#e2e8f0', borderRadius: '8px', marginBottom: '32px', animation: 'pulse 2s infinite' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+              {[1, 2, 3].map(i => (
+                <div key={i} style={{ height: '120px', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', animation: 'pulse 2s infinite' }} />
+              ))}
+            </div>
+            <div style={{ height: '500px', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', animation: 'pulse 2s infinite' }} />
+          </main>
+        </div>
+      </div>
+    );
   }
 
   const handleLogout = () => {

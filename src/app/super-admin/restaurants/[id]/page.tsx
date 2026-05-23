@@ -45,6 +45,10 @@ export default function RestaurantDetails() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   
   const [queueStatuses, setQueueStatuses] = useState<any[]>([]);
+  
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [savingAdmin, setSavingAdmin] = useState(false);
 
   // Form Fields State
   const [name, setName] = useState('');
@@ -107,10 +111,52 @@ export default function RestaurantDetails() {
     }
   }, [id, router]);
 
+  const fetchAdminDetails = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/super-admin/restaurants/${id}/admin`, authHeaders);
+      const data = await res.json();
+      if (data.success && data.email) {
+        setAdminEmail(data.email);
+      }
+    } catch (err) {
+      console.error('Error fetching admin details', err);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchRestaurant();
     fetchQueueStatuses();
-  }, [fetchRestaurant, fetchQueueStatuses]);
+    fetchAdminDetails();
+  }, [fetchRestaurant, fetchQueueStatuses, fetchAdminDetails]);
+
+  const handleSaveAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminEmail.trim()) {
+      toast.error('Email is required');
+      return;
+    }
+    setSavingAdmin(true);
+    try {
+      const res = await fetch(`/api/super-admin/restaurants/${id}/admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        ...authHeaders,
+        body: JSON.stringify({ email: adminEmail, password: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || 'Admin credentials updated!');
+        setAdminPassword('');
+      } else {
+        toast.error(data.error || 'Failed to update credentials');
+      }
+    } catch {
+      toast.error('Connection error while updating credentials');
+    } finally {
+      setSavingAdmin(false);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,18 +326,122 @@ export default function RestaurantDetails() {
 
         {/* Dashboard Panels Layout */}
         <div style={S.grid}>
-          {/* Left Panel: Profile Configurations */}
-          <div style={S.card}>
-            <h2 style={S.cardTitle}>✏️ Profile & Branding</h2>
-            <p style={S.cardDesc}>
-              Branding and Profile configurations (name, colors, logo, and menu layout) have been moved to the <strong>Restaurant Admin Portal</strong> under the <strong>Settings</strong> tab.
-            </p>
-            <div style={{ marginTop: '16px' }}>
-              <a href={`/${slug}/admin/settings`} target="_blank" rel="noopener noreferrer" style={S.primaryLinkBtn}>
-                Manage Settings →
-              </a>
+          {/* Left Panel: Admin & Queue */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* Admin Credentials */}
+            <div style={S.card}>
+              <h2 style={S.cardTitle}>🔑 Admin Credentials</h2>
+              <p style={S.cardDesc}>Set the login email and password for this restaurant's Admin Portal.</p>
+              
+              <form onSubmit={handleSaveAdmin} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={S.label}>Admin Email</label>
+                  <input 
+                    type="email" 
+                    value={adminEmail} 
+                    onChange={e => setAdminEmail(e.target.value)}
+                    placeholder="admin@restaurant.com" 
+                    style={S.input}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={S.label}>New Password (leave blank to keep current)</label>
+                  <input 
+                    type="password" 
+                    value={adminPassword} 
+                    onChange={e => setAdminPassword(e.target.value)}
+                    placeholder="••••••••" 
+                    style={S.input}
+                  />
+                </div>
+                <button type="submit" style={{ ...S.primaryLinkBtn, border: 'none', cursor: 'pointer', textAlign: 'center' }} disabled={savingAdmin}>
+                  {savingAdmin ? 'Saving...' : 'Save Credentials'}
+                </button>
+              </form>
             </div>
-          </div>
+
+            {/* Queue Management */}
+            <div style={S.card}>
+              <h2 style={S.cardTitle}>🎟️ Queue Management</h2>
+            <p style={S.cardDesc}>Add custom status tags for this restaurant's queue (e.g. VIP_WAITING).</p>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const input = (e.target as any).statusInput;
+              const colorInput = (e.target as any).statusColor;
+              const customStatus = input.value;
+              const color = colorInput.value;
+              if (!customStatus) return;
+              
+              try {
+                const res = await fetch(`/api/super-admin/queue/status`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  ...authHeaders,
+                  body: JSON.stringify({ restaurantId: id, statusEnum: customStatus.toUpperCase().replace(/\s+/g, '_'), color })
+                });
+                const data = await res.json();
+                if (data.success) {
+                  toast.success(`Status ${customStatus} added!`);
+                  input.value = '';
+                  fetchQueueStatuses();
+                } else {
+                  toast.error(data.error || 'Failed to add status');
+                }
+              } catch (err) {
+                toast.error('Connection error adding status');
+              }
+            }}>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                <input 
+                  type="color" 
+                  name="statusColor"
+                  defaultValue="#cbd5e1"
+                  style={{ ...S.colorSwatch, width: '42px', height: '42px' }}
+                  title="Status Color"
+                />
+                <input 
+                  type="text" 
+                  name="statusInput"
+                  placeholder="New Status (e.g. VIP_WAITING)" 
+                  style={{ flex: 1, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                  required
+                />
+                <button type="submit" style={{ padding: '10px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                  Add Status
+                </button>
+              </div>
+            </form>
+
+            {queueStatuses.length > 0 && (
+              <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {queueStatuses.map((qs) => (
+                  <div key={qs.id} style={{ 
+                    display: 'flex', alignItems: 'center', gap: '8px', 
+                    backgroundColor: '#f1f5f9', padding: '6px 12px', 
+                    borderRadius: '16px', fontSize: '12px', fontWeight: 600, color: '#334155',
+                    border: `1px solid ${qs.color || '#e2e8f0'}`
+                  }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: qs.color || '#cbd5e1' }} />
+                    {qs.possible_queue_status}
+                    <button 
+                      onClick={() => handleDeleteStatus(qs.id)}
+                      style={{
+                        background: 'none', border: 'none', color: '#94a3b8', 
+                        cursor: 'pointer', fontSize: '12px', padding: '0 2px', display: 'flex', alignItems: 'center'
+                      }}
+                      title="Delete status"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            </div> {/* End Queue Management Card */}
+          </div> {/* End Left Panel Flex */}
 
           {/* Right Panel: Modules and Brand Preview */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -347,85 +497,7 @@ export default function RestaurantDetails() {
               </div>
             </div>
 
-            {/* Queue Management Settings */}
-            <div style={S.card}>
-              <h2 style={S.cardTitle}>🎟️ Queue Management</h2>
-              <p style={S.cardDesc}>Add custom status tags for this restaurant's queue (e.g. VIP_WAITING).</p>
-              
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const input = (e.target as any).statusInput;
-                const colorInput = (e.target as any).statusColor;
-                const customStatus = input.value;
-                const color = colorInput.value;
-                if (!customStatus) return;
-                
-                try {
-                  const res = await fetch(`/api/super-admin/queue/status`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    ...authHeaders,
-                    body: JSON.stringify({ restaurantId: id, statusEnum: customStatus.toUpperCase().replace(/\s+/g, '_'), color })
-                  });
-                  const data = await res.json();
-                  if (data.success) {
-                    toast.success(`Status ${customStatus} added!`);
-                    input.value = '';
-                    fetchQueueStatuses();
-                  } else {
-                    toast.error(data.error || 'Failed to add status');
-                  }
-                } catch (err) {
-                  toast.error('Connection error adding status');
-                }
-              }}>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                  <input 
-                    type="color" 
-                    name="statusColor"
-                    defaultValue="#cbd5e1"
-                    style={{ ...S.colorSwatch, width: '42px', height: '42px' }}
-                    title="Status Color"
-                  />
-                  <input 
-                    type="text" 
-                    name="statusInput"
-                    placeholder="New Status (e.g. VIP_WAITING)" 
-                    style={{ flex: 1, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
-                    required
-                  />
-                  <button type="submit" style={{ padding: '10px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-                    Add Status
-                  </button>
-                </div>
-              </form>
 
-              {queueStatuses.length > 0 && (
-                <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {queueStatuses.map((qs) => (
-                    <div key={qs.id} style={{ 
-                      display: 'flex', alignItems: 'center', gap: '8px', 
-                      backgroundColor: '#f1f5f9', padding: '6px 12px', 
-                      borderRadius: '16px', fontSize: '12px', fontWeight: 600, color: '#334155',
-                      border: `1px solid ${qs.color || '#e2e8f0'}`
-                    }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: qs.color || '#cbd5e1' }} />
-                      {qs.possible_queue_status}
-                      <button 
-                        onClick={() => handleDeleteStatus(qs.id)}
-                        style={{
-                          background: 'none', border: 'none', color: '#94a3b8', 
-                          cursor: 'pointer', fontSize: '12px', padding: '0 2px', display: 'flex', alignItems: 'center'
-                        }}
-                        title="Delete status"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Danger Zone deletion panel */}
             <div style={{ ...S.card, borderColor: '#fecaca', backgroundColor: '#fff5f5' }}>

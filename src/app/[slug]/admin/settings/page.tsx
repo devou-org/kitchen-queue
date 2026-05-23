@@ -187,7 +187,7 @@ export default function AdminSettings() {
               </div>
 
               <div>
-                <label style={S.label}>Secondary Color</label>
+                <label style={S.label}>Background Color</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
                   <input type="color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} style={S.colorSwatch} />
                   <input type="text" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} maxLength={7} style={S.colorInput} placeholder="#EC7951" />

@@ -97,25 +97,25 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}>{product.name}</h3>
-          
+
           {product.description && (
             <p style={{
               fontSize: '11px',
               color: '#64748b',
-              marginBottom: '6px',
+              marginBottom: '0px',
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               lineHeight: '1.3',
-              height: '28px'
+              height: 'auto'
             }}>
               {product.description}
             </p>
           )}
 
-          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <p style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '14px', margin: 0 }}>
               {formatPrice(product.price)}
             </p>
@@ -533,7 +533,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     return (
       <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '0 0 80px', fontFamily: "'Inter', sans-serif" }}>
         {/* Shimmer / Pulse inline style keyframes */}
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{
+          __html: `
           @keyframes skeleton-pulse {
             0%, 100% { opacity: 0.6; }
             50% { opacity: 1; }
@@ -609,7 +610,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {restaurant?.primary_color && (
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{
+          __html: `
           :root {
             --primary: ${restaurant.primary_color};
             --primary-dark: ${restaurant.primary_color};
@@ -664,8 +666,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         {/* Search */}
         <div style={{ padding: '0 16px 12px' }}>
           <div style={{ position: 'relative', width: '100%' }}>
-            <Search 
-              size={18} 
+            <Search
+              size={18}
               style={{
                 position: 'absolute',
                 left: '14px',
@@ -762,9 +764,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       {/* Cart Button */}
       {totalItems > 0 && isServiceActive && showOrdering && (
         <div style={{
-          position: 'fixed', 
-          bottom: '80px', 
-          left: 0, 
+          position: 'fixed',
+          bottom: '80px',
+          left: 0,
           right: 0,
           background: 'transparent',
           padding: '0 16px',
@@ -773,7 +775,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           display: 'flex',
           justifyContent: 'center'
         }}>
-          <Link prefetch={false} href={`/${slug}/cart`} 
+          <Link prefetch={false} href={`/${slug}/cart`}
             className="cart-btn"
             style={{
               pointerEvents: 'auto',
@@ -796,13 +798,13 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           >
             <span style={{
               background: 'rgba(255,255,255,0.2)',
-              width: '24px', 
-              height: '24px', 
+              width: '24px',
+              height: '24px',
               borderRadius: '50%',
-              display: 'flex', 
-              alignItems: 'center', 
+              display: 'flex',
+              alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '11px', 
+              fontSize: '11px',
               fontWeight: 900
             }}>{totalItems}</span>
             <span>Review & Order →</span>
@@ -814,9 +816,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       {/* Join Waitlist Button (if queue enabled but ordering disabled) */}
       {!showOrdering && showQueue && isServiceActive && (
         <div style={{
-          position: 'fixed', 
-          bottom: '30px', 
-          left: 0, 
+          position: 'fixed',
+          bottom: '30px',
+          left: 0,
           right: 0,
           background: 'transparent',
           padding: '0 16px',
@@ -826,7 +828,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           justifyContent: 'center',
           gap: '12px'
         }}>
-          <Link prefetch={false} href={`/${slug}/queue-status`} 
+          <Link prefetch={false} href={`/${slug}/queue-status`}
             className="animate-fade-in"
             style={{
               pointerEvents: 'auto',
@@ -849,7 +851,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
             🔍 Check Status
           </Link>
 
-          <Link prefetch={false} href={`/${slug}/queue`} 
+          <Link prefetch={false} href={`/${slug}/queue`}
             className="animate-fade-in"
             style={{
               pointerEvents: 'auto',

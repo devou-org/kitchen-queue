@@ -1,4 +1,32 @@
+import { Metadata } from 'next';
 import { getRestaurantBySlug } from '@/lib/db';
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const restaurant = await getRestaurantBySlug(slug);
+
+  if (!restaurant) {
+    return {
+      title: 'Restaurant Not Found',
+      description: 'The requested restaurant could not be found.',
+    };
+  }
+
+  return {
+    title: `${restaurant.name}`,
+    description: restaurant.menu_description || `Welcome to ${restaurant.name}. View our digital menu and order online.`,
+    icons: restaurant.logo_url ? {
+      icon: restaurant.logo_url,
+      shortcut: restaurant.logo_url,
+      apple: restaurant.logo_url,
+    } : undefined,
+    openGraph: {
+      title: restaurant.name,
+      description: restaurant.menu_description || `Welcome to ${restaurant.name}. View our digital menu and order online.`,
+      images: restaurant.logo_url ? [{ url: restaurant.logo_url }] : [],
+    },
+  };
+}
 
 export default async function SlugLayout({
   children,
