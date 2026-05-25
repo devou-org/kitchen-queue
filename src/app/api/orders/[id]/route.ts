@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sql, { getOrderById, updateOrderStatus, setOrderPaymentStatus, updateOrderDetails, getRestaurantBySlug } from '@/lib/db';
 import { Order, OrderItem } from '@/types';
 import { verifyToken } from '@/lib/auth';
-import { STATUS_TRANSITIONS } from '@/lib/constants';
+// import { STATUS_TRANSITIONS } from '@/lib/constants';
 import { pusherServer } from '@/lib/pusher';
 import { validatePhone } from '@/lib/validators';
 
@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Customer may ONLY update items, and only when order is PENDING/PREPARING
     if (!admin && customer) {
       // 🛡️ CHECK SERVICE STATUS FOR CUSTOMERS
-      const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE restaurant_id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
+      const settings = await sql`SELECT is_service_active, service_message FROM restaurants WHERE id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
       if (settings[0] && !settings[0].is_service_active) {
         return NextResponse.json({
           success: false,
@@ -250,11 +250,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // ✅ UPDATE STATUS & TABLE NUMBER
     if (status || table_number) {
       if (status && status !== existing.status) {
-        const validTransitions = STATUS_TRANSITIONS[existing.status] || [];
-        if (!validTransitions.includes(status)) {
+        // Fetch queue statuses for the restaurant to validate the new status
+        const allowedStatusesRes = await sql`SELECT possible_queue_status FROM queue_status WHERE restaurant_id = ${restaurant.id}` as {possible_queue_status: string}[];
+        const allowedStatuses = allowedStatusesRes.map(s => s.possible_queue_status);
+        
+        // Also allow base order statuses for backwards compatibility
+        const baseOrderStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED'];
+        const validStatuses = [...new Set([...allowedStatuses, ...baseOrderStatuses])];
+        
+        if (!validStatuses.includes(status)) {
           return NextResponse.json({
             success: false,
-            error: `Cannot transition from ${existing.status} to ${status}`,
+            error: `Invalid status: ${status}.`,
           }, { status: 400 });
         }
       }

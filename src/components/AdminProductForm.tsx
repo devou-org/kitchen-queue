@@ -31,6 +31,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
     stock_quantity: initialData?.stock_quantity?.toString() || '0',
     buffer_quantity: initialData?.buffer_quantity?.toString() || '0',
     image_url: initialData?.image_url || '',
+    dietary_preference: initialData?.dietary_preference || 'NON_VEG',
   });
 
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
       stock_quantity: isNaN(stockVal) ? 0 : stockVal,
       buffer_quantity: isNaN(bufferVal) ? 0 : bufferVal,
       image_url: form.image_url.trim(),
+      dietary_preference: form.dietary_preference,
       // status is deliberately removed to let server calculate based on stock/buffer
     };
 
@@ -206,6 +208,15 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
             <label className="label">Price (₹) *</label>
             <input type="number" step="0.01" className="input" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" required />
           </div>
+        </div>
+
+        <div>
+          <label className="label">Dietary Preference</label>
+          <select className="input" value={form.dietary_preference} onChange={e => setForm(f => ({ ...f, dietary_preference: e.target.value }))}>
+            <option value="VEG">Vegetarian</option>
+            <option value="NON_VEG">Non-Vegetarian</option>
+            <option value="EGG">Egg</option>
+          </select>
         </div>
 
         {showInventory && (

@@ -211,8 +211,8 @@ export async function createRestaurant(data: {
 
   // Create queue state for the new restaurant
   await sql`
-    INSERT INTO queue_state (restaurant_id, current_queue_number, last_served_number)
-    VALUES (${restaurant.id}, 1, 0)
+    INSERT INTO queue_state (id, restaurant_id, current_queue_number, last_served_number)
+    VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM queue_state), ${restaurant.id}, 1, 0)
     ON CONFLICT (restaurant_id) DO NOTHING
   `;
 
@@ -366,11 +366,12 @@ export async function createProduct(data: {
   buffer_quantity: number;
   status: string;
   category: string;
+  dietary_preference?: string;
 }) {
   const rows = await sql`
-    INSERT INTO products (restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category)
+    INSERT INTO products (restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference)
     VALUES (${data.restaurant_id}, ${data.name}, ${data.description}, ${data.price}, ${data.image_url}, 
-            ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category})
+            ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'})
     RETURNING *
   `;
   return rows[0];
@@ -386,6 +387,7 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
   status: string;
   category: string;
   is_active: boolean;
+  dietary_preference: string;
 }>) {
   const rows = await sql`
     UPDATE products SET
@@ -398,6 +400,7 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
       status = COALESCE(${data.status ?? null}, status),
       category = COALESCE(${data.category ?? null}, category),
       is_active = COALESCE(${data.is_active ?? null}, is_active),
+      dietary_preference = COALESCE(${data.dietary_preference ?? null}, dietary_preference),
       updated_at = NOW()
     WHERE restaurant_id = ${restaurantId} AND id = ${id}
     RETURNING *

@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Check Service Status FIRST
     const { default: sql } = await import('@/lib/db');
-    const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE restaurant_id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
+    const settings = await sql`SELECT is_service_active, service_message FROM restaurants WHERE id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
     
     if (settings[0] && !settings[0].is_service_active) {
       return NextResponse.json({

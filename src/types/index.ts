@@ -3,7 +3,7 @@
 // ============================================
 
 export type ProductStatus = 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK';
-export type OrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'PAID' | 'CANCELLED';
+export type OrderStatus = string;
 
 export interface User {
   id: string;
@@ -25,6 +25,7 @@ export interface Product {
   status: ProductStatus;
   category: string;
   is_active: boolean;
+  dietary_preference?: string;
   created_at: string;
   updated_at: string;
 }

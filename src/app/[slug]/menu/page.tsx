@@ -9,7 +9,7 @@ import BottomNav from '@/components/BottomNav';
 import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { Search } from 'lucide-react';
+import { Search, MapPin } from 'lucide-react';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -21,6 +21,32 @@ const STATUS_ORDER: Record<ProductStatus, number> = {
   AVAILABLE: 1,
   LOW_STOCK: 2,
   OUT_OF_STOCK: 3,
+};
+
+const DietaryIcon = ({ preference }: { preference?: string }) => {
+  if (!preference) return null;
+  if (preference === 'VEG') {
+    return (
+      <div style={{ width: '14px', height: '14px', border: '1px solid #16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
+        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#16a34a' }} />
+      </div>
+    );
+  }
+  if (preference === 'NON_VEG') {
+    return (
+      <div style={{ width: '14px', height: '14px', border: '1px solid #dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
+        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#dc2626' }} />
+      </div>
+    );
+  }
+  if (preference === 'EGG') {
+    return (
+      <div style={{ width: '14px', height: '14px', border: '1px solid #d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
+        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#d97706' }} />
+      </div>
+    );
+  }
+  return null;
 };
 
 function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout = 'LIST' }: {
@@ -82,21 +108,24 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
             backgroundColor: product.status === 'AVAILABLE' ? '#ecfdf5' : product.status === 'LOW_STOCK' ? '#fffbeb' : '#fef2f2',
             color: product.status === 'AVAILABLE' ? '#059669' : product.status === 'LOW_STOCK' ? '#d97706' : '#dc2626',
           }}>
-            {STATUS_BADGE[product.status].label}
+            {showOrdering ? `${product.stock_quantity ?? 0} left` : STATUS_BADGE[product.status].label}
           </span>
         </div>
 
         {/* Info */}
         <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{
-            fontWeight: 800,
-            fontSize: '14px',
-            color: '#0f172a',
-            marginBottom: '2px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>{product.name}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <h3 style={{
+              fontWeight: 800,
+              fontSize: '14px',
+              color: '#0f172a',
+              marginBottom: '2px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>{product.name}</h3>
+            <DietaryIcon preference={product.dietary_preference} />
+          </div>
 
           {product.description && (
             <p style={{
@@ -184,21 +213,24 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
             backgroundColor: product.status === 'AVAILABLE' ? '#ecfdf5' : product.status === 'LOW_STOCK' ? '#fffbeb' : '#fef2f2',
             color: product.status === 'AVAILABLE' ? '#059669' : product.status === 'LOW_STOCK' ? '#d97706' : '#dc2626',
           }}>
-            {STATUS_BADGE[product.status].label}
+            {showOrdering ? `${product.stock_quantity ?? 0} left` : STATUS_BADGE[product.status].label}
           </span>
         </div>
 
-        <h3 style={{
-          fontWeight: 800,
-          fontSize: '15px',
-          color: '#0f172a',
-          margin: '3px 0 1px',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {product.name}
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <h3 style={{
+            fontWeight: 800,
+            fontSize: '15px',
+            color: '#0f172a',
+            margin: '3px 0 1px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {product.name}
+          </h3>
+          <DietaryIcon preference={product.dietary_preference} />
+        </div>
 
         {product.description && (
           <p style={{
@@ -409,7 +441,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         }
 
         // Fetch Service Status
-        const settingsRes = await fetch('/api/admin/settings');
+        const settingsRes = await fetch('/api/admin/settings', {
+          headers: { 'x-restaurant-slug': Array.isArray(slug) ? slug[0] : slug }
+        });
         const settingsData = await settingsRes.json();
         if (settingsData.success) {
           setIsServiceActive(settingsData.isServiceActive);
@@ -652,6 +686,12 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.4 }}>
             {restaurant?.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes."}
           </p>
+          {restaurant?.address && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '12px', color: 'var(--text-secondary)' }}>
+              <MapPin size={14} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--primary)' }} />
+              <span style={{ fontSize: '13px', lineHeight: 1.3 }}>{restaurant.address}</span>
+            </div>
+          )}
         </div>
 
         {!isServiceActive && (

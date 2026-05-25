@@ -5,8 +5,8 @@ import { verifyToken } from '@/lib/auth';
 // Ensure columns exist (one-time migration check)
 async function ensureColumnExists() {
   try {
-    await sql`ALTER TABLE queue_state ADD COLUMN IF NOT EXISTS is_service_active BOOLEAN DEFAULT TRUE`;
-    await sql`ALTER TABLE queue_state ADD COLUMN IF NOT EXISTS service_message TEXT`;
+    await sql`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS is_service_active BOOLEAN DEFAULT TRUE`;
+    await sql`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS service_message TEXT`;
   } catch (err) {
     console.error('Migration error:', err);
   }
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     await ensureColumnExists();
-    const rows = await sql`SELECT is_service_active, service_message FROM queue_state WHERE restaurant_id = ${restaurant.id} LIMIT 1`;
+    const rows = await sql`SELECT is_service_active, service_message FROM restaurants WHERE id = ${restaurant.id} LIMIT 1`;
     return NextResponse.json({ 
       success: true, 
       isServiceActive: rows[0]?.is_service_active ?? true,
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     await ensureColumnExists();
-    await sql`UPDATE queue_state SET is_service_active = ${active}, service_message = ${message || null} WHERE restaurant_id = ${restaurant.id}`;
+    await sql`UPDATE restaurants SET is_service_active = ${active}, service_message = ${message || null} WHERE id = ${restaurant.id}`;
     
     return NextResponse.json({ 
       success: true, 

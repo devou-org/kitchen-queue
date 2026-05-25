@@ -43,7 +43,29 @@ export default function AdminOrders() {
 
   // Live Updates Log
   const [recentUpdates, setRecentUpdates] = useState<OrderUpdateLog[]>([]);
+  const [queueStatuses, setQueueStatuses] = useState<string[]>([]);
   const { restaurant } = useRestaurant();
+
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      try {
+        const res = await fetch('/api/queue/statuses', {
+          headers: { 'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || '' }
+        });
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          setQueueStatuses(data.data.map((s: any) => s.possible_queue_status));
+        } else {
+          // Fallback if no dynamic statuses found
+          setQueueStatuses(['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED']);
+        }
+      } catch (err) {
+        console.error('Failed to fetch queue statuses', err);
+        setQueueStatuses(['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED']);
+      }
+    };
+    fetchStatuses();
+  }, [slug]);
 
   const dismissUpdate = (id: string) => {
     setRecentUpdates(prev => prev.filter(u => u.id !== id));
@@ -230,8 +252,10 @@ export default function AdminOrders() {
     }
   };
 
-  const activeStatuses = ['PREPARING', 'READY', 'PAID', 'CANCELLED']; // Exclude PENDING as it's the default
-  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
+  const allStatuses = queueStatuses.length > 0 ? queueStatuses : ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
+  // Active statuses exclude the first one usually (which is like PENDING or WAITING)
+  const defaultStatus = allStatuses[0] || 'PENDING';
+  const activeStatuses = allStatuses.slice(1);
 
   const readySearchTerm = readySearch.trim().toLowerCase();
   const displayedOrders = statusFilter === 'READY' && readySearchTerm
@@ -343,7 +367,7 @@ export default function AdminOrders() {
                 }}
                 style={{ height: '42px' }}
               >
-                <option value="">PENDING</option>
+                <option value="">{defaultStatus}</option>
                 {activeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -540,7 +564,7 @@ export default function AdminOrders() {
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => {
-                        const nextStatus = selectedOrder.status === 'PENDING' ? 'PREPARING' : selectedOrder.status;
+                        const nextStatus = selectedOrder.status === defaultStatus && activeStatuses.length > 0 ? activeStatuses[0] : selectedOrder.status;
                         handleStatusChange(selectedOrder.id, nextStatus, tempTableNumber);
                       }}
                       disabled={modalLoading || !tempTableNumber}

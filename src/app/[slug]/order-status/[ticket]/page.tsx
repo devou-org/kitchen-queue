@@ -28,7 +28,7 @@ type QueueState = {
   timestamp: string;
 };
 
-const STAGES = [
+const DEFAULT_STAGES = [
   { key: 'WAITING', label: 'WAITING', icon: Search },
   { key: 'PENDING', label: 'CHECK-IN', icon: CheckCircle2 },
   { key: 'PREPARING', label: 'PREPARING', icon: Search },
@@ -37,14 +37,9 @@ const STAGES = [
   { key: 'SEATED', label: 'SEATED', icon: Utensils },
 ];
 
-function getStageIndex(status: string) {
-  if (status === 'WAITING') return 0;
-  if (status === 'PENDING') return 1;
-  if (status === 'PREPARING') return 2;
-  if (status === 'READY') return 3;
-  if (status === 'PAID') return 4;
-  if (status === 'SEATED') return 5;
-  return -1; // cancelled
+function getStageIndex(status: string, stages: any[]) {
+  const index = stages.findIndex(s => s.key === status);
+  return index !== -1 ? index : 0;
 }
 
 export default function OrderStatusTicketPage({ params }: { params: Promise<{ slug: string; ticket: string }> }) {
@@ -67,6 +62,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
   const [showSurveyTip, setShowSurveyTip] = useState(false);
+  const [stages, setStages] = useState(DEFAULT_STAGES);
 
   useEffect(() => {
     if (!localStorage.getItem('hideSurveyTip_kdK8Jd')) {
@@ -101,6 +97,26 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     };
 
     fetchOrder();
+
+    const fetchQueueStatuses = async () => {
+      try {
+        const res = await fetch('/api/queue/statuses', {
+          headers: { 'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || '' }
+        });
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          const dynamicStages = data.data.map((s: any) => ({
+            key: s.possible_queue_status,
+            label: s.possible_queue_status,
+            icon: CheckCircle2
+          }));
+          setStages(dynamicStages);
+        }
+      } catch (err) {
+        console.error('Failed to fetch queue statuses', err);
+      }
+    };
+    fetchQueueStatuses();
 
     if (!pusherClient || !restaurant) return;
     const channelName = restaurant.pusher_channel;
@@ -177,7 +193,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     );
   }
 
-  const stageIndex = getStageIndex(order.status);
+  const stageIndex = getStageIndex(order.status, stages);
   const position = typeof order.queue_position === 'number' ? order.queue_position : 0;
   const displayPosition = position || 1;
 
@@ -390,14 +406,14 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               position: 'absolute',
               top: '20px',
               left: '10%',
-              width: `${(stageIndex / (STAGES.length - 1)) * 80}%`,
+              width: `${stages.length > 1 ? (stageIndex / (stages.length - 1)) * 80 : 0}%`,
               height: '2px',
               background: 'var(--primary)',
               zIndex: 0,
               transition: 'width 0.5s ease'
             }} />
 
-            {STAGES.map((stage, i) => {
+            {stages.map((stage, i) => {
               const Icon = stage.icon;
               const isCompleted = stageIndex > i || (stageIndex === i && stage.key === 'PAID');
               const isCurrent = stageIndex === i && stage.key !== 'PAID';
@@ -424,7 +440,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
                     fontSize: '9px',
                     fontWeight: 800,
                     color: isPending ? '#9CA3AF' : 'var(--primary)',
-                    letterSpacing: '0.02em'
+                    letterSpacing: '0.02em',
+                    textAlign: 'center'
                   }}>
                     {stage.label}
                   </span>
