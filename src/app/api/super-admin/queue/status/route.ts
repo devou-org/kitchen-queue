@@ -18,13 +18,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { restaurantId, statusEnum, color } = await req.json();
+    const { restaurantId, statusEnum, color, priority } = await req.json();
 
     if (!restaurantId || !statusEnum) {
       return NextResponse.json({ success: false, error: 'restaurantId and statusEnum required' }, { status: 400 });
     }
 
-    await QueueService.addQueueStatus(restaurantId, statusEnum, color || '#cbd5e1');
+    await QueueService.addQueueStatus(restaurantId, statusEnum, color || '#cbd5e1', priority ? Number(priority) : 0);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

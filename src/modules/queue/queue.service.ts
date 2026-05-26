@@ -44,7 +44,9 @@ export class QueueService {
         WHERE q.user_id = $1 
           AND q.restaurant_id = $2 
           AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
-          AND qs.possible_queue_status = 'WAITING'
+          AND qs.possible_queue_status = (
+            SELECT possible_queue_status FROM queue_status WHERE restaurant_id = $2 ORDER BY id ASC LIMIT 1
+          )
         ORDER BY q.created_at DESC LIMIT 1
       `, [userId, restaurantId]);
 
@@ -57,7 +59,9 @@ export class QueueService {
           FROM queues q
           JOIN queue_status qs ON q.queue_status_id = qs.id
           WHERE q.restaurant_id = $1 
-            AND qs.possible_queue_status = 'WAITING' 
+            AND qs.possible_queue_status = (
+              SELECT possible_queue_status FROM queue_status WHERE restaurant_id = $1 ORDER BY id ASC LIMIT 1
+            )
             AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
             AND q.token_number < $2
         `, [restaurantId, existingQueue.token_number]);
@@ -69,15 +73,16 @@ export class QueueService {
         return existingQueue;
       }
 
-      // 2. Get 'WAITING' queue status id for this restaurant
+      // 2. Get the default first status id for this restaurant
       const statusRes = await client.query(`
         SELECT id FROM queue_status 
-        WHERE restaurant_id = $1 AND possible_queue_status = 'WAITING'
+        WHERE restaurant_id = $1
+        ORDER BY id ASC
         LIMIT 1
       `, [restaurantId]);
 
       if (statusRes.rowCount === 0) {
-        throw new Error('Waiting status not configured for this restaurant');
+        throw new Error('No queue statuses configured for this restaurant');
       }
 
       const waitingStatusId = statusRes.rows[0].id;
@@ -180,23 +185,24 @@ export class QueueService {
   /**
    * Super Admin: Add new custom queue status to a restaurant
    */
-  static async addQueueStatus(restaurantId: string, statusEnum: string, color: string = '#cbd5e1') {
+  static async addQueueStatus(restaurantId: string, statusEnum: string, color: string = '#cbd5e1', priority: number = 0) {
     try {
       await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '#cbd5e1'`);
+      await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS priority INT DEFAULT 0`);
     } catch(e) {}
 
     const res = await pool.query(`
-      INSERT INTO queue_status (restaurant_id, possible_queue_status, color)
-      VALUES ($1, $2, $3)
-      ON CONFLICT DO NOTHING
+      INSERT INTO queue_status (restaurant_id, possible_queue_status, color, priority)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (restaurant_id, possible_queue_status) DO NOTHING
       RETURNING *
-    `, [restaurantId, statusEnum, color]);
+    `, [restaurantId, statusEnum, color, priority]);
     
     if (res.rows.length === 0) {
-      // It exists, let's update color
+      // It exists, let's update color and priority
       const updateRes = await pool.query(`
-        UPDATE queue_status SET color = $3 WHERE restaurant_id = $1 AND possible_queue_status = $2 RETURNING *
-      `, [restaurantId, statusEnum, color]);
+        UPDATE queue_status SET color = $3, priority = $4 WHERE restaurant_id = $1 AND possible_queue_status = $2 RETURNING *
+      `, [restaurantId, statusEnum, color, priority]);
       return updateRes.rows[0];
     }
     return res.rows[0];
@@ -222,7 +228,7 @@ export class QueueService {
    */
   static async getQueueStatuses(restaurantId: string) {
     const res = await pool.query(`
-      SELECT * FROM queue_status WHERE restaurant_id = $1
+      SELECT * FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC
     `, [restaurantId]);
     return res.rows;
   }

@@ -105,7 +105,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
         });
         const data = await res.json();
         if (data.success && data.data && data.data.length > 0) {
-          const dynamicStages = data.data.map((s: any) => ({
+          const dynamicStages = data.data
+            .filter((s: any) => s.possible_queue_status !== 'CANCELLED')
+            .map((s: any) => ({
             key: s.possible_queue_status,
             label: s.possible_queue_status,
             icon: CheckCircle2

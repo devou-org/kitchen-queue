@@ -371,8 +371,10 @@ export default function RestaurantDetails() {
               e.preventDefault();
               const input = (e.target as any).statusInput;
               const colorInput = (e.target as any).statusColor;
+              const priorityInput = (e.target as any).statusPriority;
               const customStatus = input.value;
               const color = colorInput.value;
+              const priority = priorityInput.value;
               if (!customStatus) return;
               
               try {
@@ -380,12 +382,13 @@ export default function RestaurantDetails() {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   ...authHeaders,
-                  body: JSON.stringify({ restaurantId: id, statusEnum: customStatus.toUpperCase().replace(/\s+/g, '_'), color })
+                  body: JSON.stringify({ restaurantId: id, statusEnum: customStatus.toUpperCase().replace(/\s+/g, '_'), color, priority: priority ? Number(priority) : 0 })
                 });
                 const data = await res.json();
                 if (data.success) {
                   toast.success(`Status ${customStatus} added!`);
                   input.value = '';
+                  priorityInput.value = '';
                   fetchQueueStatuses();
                 } else {
                   toast.error(data.error || 'Failed to add status');
@@ -409,6 +412,12 @@ export default function RestaurantDetails() {
                   style={{ flex: 1, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
                   required
                 />
+                <input 
+                  type="number" 
+                  name="statusPriority"
+                  placeholder="Priority (e.g. 1)" 
+                  style={{ width: '80px', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                />
                 <button type="submit" style={{ padding: '10px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
                   Add Status
                 </button>
@@ -417,7 +426,7 @@ export default function RestaurantDetails() {
 
             {queueStatuses.length > 0 && (
               <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {queueStatuses.map((qs) => (
+                {queueStatuses.sort((a, b) => a.priority - b.priority).map((qs) => (
                   <div key={qs.id} style={{ 
                     display: 'flex', alignItems: 'center', gap: '8px', 
                     backgroundColor: '#f1f5f9', padding: '6px 12px', 
@@ -425,7 +434,7 @@ export default function RestaurantDetails() {
                     border: `1px solid ${qs.color || '#e2e8f0'}`
                   }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: qs.color || '#cbd5e1' }} />
-                    {qs.possible_queue_status}
+                    {qs.possible_queue_status} <span style={{ color: '#94a3b8', fontSize: '10px' }}>(P{qs.priority || 0})</span>
                     <button 
                       onClick={() => handleDeleteStatus(qs.id)}
                       style={{

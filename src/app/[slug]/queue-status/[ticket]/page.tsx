@@ -92,7 +92,9 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
 
         const statusesResult = await statusesRes.json();
         if (statusesResult.success && statusesResult.data) {
-           const formattedStages = statusesResult.data.map((s: any) => ({
+           const formattedStages = statusesResult.data
+             .filter((s: any) => s.possible_queue_status !== 'CANCELLED')
+             .map((s: any) => ({
              key: s.possible_queue_status,
              label: s.possible_queue_status,
              icon: ICONS[s.possible_queue_status] || Search

@@ -92,6 +92,7 @@ export default function AdminOrders() {
     if (!silent) setLoading(true);
     try {
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
       
       const data = await orderService.getOrders({
         page,
@@ -99,7 +100,7 @@ export default function AdminOrders() {
         sort: 'ASC',
         date_from: today,
         date_to: today,
-        status: statusFilter || 'PENDING'
+        status: statusFilter || currentDefault
       });
 
       if (data.success && data.data) {
@@ -111,7 +112,7 @@ export default function AdminOrders() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, queueStatuses]);
 
   useEffect(() => {
     fetchOrders();
@@ -161,8 +162,9 @@ export default function AdminOrders() {
           }
           return o;
         }).filter(o => {
-          // If statusFilter is empty, we are in the default "PENDING" view
-          const currentFilter = statusFilter || 'PENDING';
+          // If statusFilter is empty, we are in the default view
+          const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
+          const currentFilter = statusFilter || currentDefault;
           if (currentFilter !== 'ALL') {
              return o.status === currentFilter;
           }
@@ -231,11 +233,11 @@ export default function AdminOrders() {
         // Success feedback handled by Pusher event to avoid duplicates
         // Update local state instantly for UI responsiveness
         setOrders(prev => {
-          const isDefaultView = !statusFilter;
+          const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
           return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number } : o)
             .filter(o => {
               if (statusFilter) return o.status === statusFilter;
-              return o.status === 'PENDING';
+              return o.status === currentDefault;
             });
         });
         setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number } : null);

@@ -837,11 +837,12 @@ export async function createOrder(data: {
     `, [data.customer_name || 'Guest', data.phone || '0000000000']);
     const userId = userRes.rows[0].id;
 
-    // 2. Get PENDING status ID
+    // 2. Get default first status ID and name
     const statusRes = await client.query(`
-      SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = 'PENDING' LIMIT 1
+      SELECT id, possible_queue_status FROM queue_status WHERE restaurant_id = $1 ORDER BY id ASC LIMIT 1
     `, [data.restaurant_id]);
     const statusId = statusRes.rows[0]?.id;
+    const defaultStatus = statusRes.rows[0]?.possible_queue_status || 'PENDING';
 
     // 3. Get next token number
     const tokenRes = await client.query(`
@@ -864,10 +865,10 @@ export async function createOrder(data: {
     const orderResult = await client.query(
       `
         INSERT INTO orders (restaurant_id, queue_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number)
-        VALUES ($1, $2, $3, $4, $5, 'PENDING', false, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9)
         RETURNING id
       `,
-      [data.restaurant_id, queueId, data.customer_name, data.phone, computedTotal, data.notes || null, data.party_size || 1, nextToken]
+      [data.restaurant_id, queueId, data.customer_name, data.phone, computedTotal, defaultStatus, data.notes || null, data.party_size || 1, nextToken]
     );
 
     const orderId = orderResult.rows[0]?.id;
