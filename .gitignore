@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/socket-server
 /load-tests
 /.pnp
 /scripts
@@ -11,6 +12,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+
 
 # testing
 /coverage

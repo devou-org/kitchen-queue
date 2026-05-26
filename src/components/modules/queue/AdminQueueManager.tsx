@@ -145,7 +145,6 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
                   <th>Token</th>
                   <th>Name & Phone</th>
                   <th>Party Size</th>
-                  <th>Notes</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -166,11 +165,6 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
                         👤 {q.party_size} Party
                       </span>
                     </td>
-                    <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                        {q.notes || '-'}
-                      </span>
-                    </td>
                     <td>
                       <span className={`badge ${q.queue_status === 'WAITING' ? 'badge-pending' : q.queue_status === 'SEATED' ? 'badge-ready' : 'badge-paid'}`}>
                         {q.queue_status}
@@ -186,29 +180,12 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
                         >
                           {allStatuses.map(s => <option key={s.id} value={s.possible_queue_status}>{s.possible_queue_status}</option>)}
                         </select>
-                        
-                        {q.queue_status === 'WAITING' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(q.id, 'SEATED')} 
-                            className="btn btn-success btn-sm"
-                          >
-                            Seat
-                          </button>
-                        )}
-                        {q.queue_status !== 'NO_SHOW' && q.queue_status !== 'SEATED' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(q.id, 'NO_SHOW')} 
-                            className="btn btn-danger btn-sm"
-                          >
-                            No Show
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
                 ))}
                 {displayedQueues.length === 0 && (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>No entries match your filters.</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>No entries match your filters.</td></tr>
                 )}
               </tbody>
             </table>
