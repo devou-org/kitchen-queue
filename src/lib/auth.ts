@@ -164,7 +164,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 // FAST2SMS OTP SENDER
 // ============================================
 
-export async function sendOTPviaSMS(phone: string, otp: string): Promise<boolean> {
+export async function sendOTPviaSMS(phone: string, otp: string, restaurantId?: string): Promise<boolean> {
   try {
     const cleanPhone = phone.replace(/^\+91/, '').replace(/\D/g, '');
 
@@ -188,7 +188,7 @@ export async function sendOTPviaSMS(phone: string, otp: string): Promise<boolean
     const data = await response.json();
     console.log('SMS Response:', data);
     if (data.return === true) {
-      await incrementOtpCount(phone);
+      await incrementOtpCount(phone, restaurantId);
       return true;
     }
     return false;

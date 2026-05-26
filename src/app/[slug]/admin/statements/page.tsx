@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
@@ -15,10 +16,17 @@ export default function AdminStatements() {
   const [stats, setStats] = useState({ totalRevenue: 0, totalPaidRevenue: 0, orderCount: 0, paidCount: 0 });
   const [otpSummary, setOtpSummary] = useState<{ total_otps: number; total_cost: number } | null>(null);
 
+  const { slug } = useParams();
+
   const fetchOtpStats = async () => {
     try {
       const qs = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
-      const res = await fetch(`/api/admin/otp-stats?${qs.toString()}`);
+      const res = await fetch(`/api/admin/otp-stats?${qs.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`,
+          'x-restaurant-slug': slug as string
+        }
+      });
       const data = await res.json();
       if (data.success) {
         setOtpSummary(data.summary);
@@ -40,7 +48,12 @@ export default function AdminStatements() {
       });
       if (statusFilter) qs.append('status', statusFilter);
 
-      const res = await fetch(`/api/orders?${qs.toString()}`);
+      const res = await fetch(`/api/orders?${qs.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`,
+          'x-restaurant-slug': slug as string
+        }
+      });
       const data = await res.json();
 
       if (data.success) {

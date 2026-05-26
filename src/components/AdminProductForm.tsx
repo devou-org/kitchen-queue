@@ -16,7 +16,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
   const { slug } = useParams();
   const isEditing = !!initialData;
   const { restaurant } = useRestaurant();
-  const showInventory = restaurant?.modules?.INVENTORY !== false;
+  const showOnlineOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -219,7 +219,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
           </select>
         </div>
 
-        {showInventory && (
+        {showOnlineOrdering && (
           <div style={{ display: 'flex', gap: '16px' }}>
             <div style={{ flex: 1 }}>
               <label className="label">Stock Quantity</label>

@@ -29,9 +29,6 @@ const ALL_MODULES = [
   { key: 'DIGITAL_MENU', label: '📖 Digital Menu', desc: 'Allows customers to view products and details on their phones.', icon: '📖' },
   { key: 'ONLINE_ORDERING', label: '🛒 Online Ordering', desc: 'Enables online checkout, payments, and shopping carts.', icon: '🛒' },
   { key: 'QUEUE_MANAGEMENT', label: '🎟️ Queue Management', desc: 'Tracks active order tokens and served tokens for kitchen screen.', icon: '🎟️' },
-  { key: 'INVENTORY', label: '📦 Inventory Control', desc: 'Manages real-time stock, buffer alerts, and product availability.', icon: '📦' },
-  { key: 'ANALYTICS', label: '📊 Live Analytics', desc: 'Displays 30-day orders, conversion rates, and revenue dashboards.', icon: '📊' },
-  { key: 'REPORTS', label: '📋 PDF Reports', desc: 'Generates end-of-day sales, order lists, and customer activity logs.', icon: '📋' },
 ];
 
 export default function RestaurantDetails() {

@@ -125,6 +125,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { restaurant, loading: resLoading } = useRestaurant();
   const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
+  const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
@@ -270,7 +271,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
         <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
-          {showOrdering && <ServiceToggle />}
+          {(showOrdering || showDigitalMenu) && <ServiceToggle />}
           <button 
             className="btn" 
             style={{ 

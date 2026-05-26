@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOtpStats } from '@/lib/db';
+import { getOtpStats, getRestaurantBySlug } from '@/lib/db';
 import { jwtVerify } from 'jose';
 
 const JWT_SECRET = new TextEncoder().encode(
@@ -24,13 +24,22 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get('date_from');
     const dateTo = searchParams.get('date_to');
+    const slug = request.headers.get('x-restaurant-slug');
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json({ success: false, error: 'Date range required' }, { status: 400 });
     }
 
+    let restaurantId: string | undefined = undefined;
+    if (slug) {
+      const restaurant = await getRestaurantBySlug(slug);
+      if (restaurant) {
+        restaurantId = restaurant.id;
+      }
+    }
+
     // 3. Fetch Stats
-    const stats = await getOtpStats(dateFrom, dateTo);
+    const stats = await getOtpStats(dateFrom, dateTo, restaurantId);
     
     const totalCount = stats.reduce((sum, s) => sum + (s.count || 0), 0);
     const totalCost = stats.reduce((sum, s) => sum + parseFloat(s.cost || '0'), 0);

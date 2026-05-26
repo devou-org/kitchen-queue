@@ -198,7 +198,7 @@ export async function createRestaurant(data: {
   }
 
   // Seed default modules for the new restaurant
-  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS'];
+  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT'];
   const enabledModules = data.modules || ALL_MODULES;
 
   for (const mod of ALL_MODULES) {
@@ -668,13 +668,17 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
   const rows = await sql`
     WITH active_ranks AS (
        SELECT
-         id,
-         ROW_NUMBER() OVER (
-           PARTITION BY DATE(created_at)
-           ORDER BY ticket_number ASC
-         )::integer as pos
-       FROM orders
-       WHERE restaurant_id = ${restaurantId} AND UPPER(status) = 'PENDING'
+         o1.id,
+         (
+           SELECT COUNT(*)::integer
+           FROM orders o2
+           WHERE o2.restaurant_id = o1.restaurant_id
+             AND o2.status = o1.status
+             AND DATE(o2.created_at) = DATE(o1.created_at)
+             AND o2.ticket_number <= o1.ticket_number
+         ) as pos
+       FROM orders o1
+       WHERE o1.restaurant_id = ${restaurantId}
     )
     SELECT o.*, 
       COALESCE(ar.pos, 0) as queue_position,
@@ -839,7 +843,7 @@ export async function createOrder(data: {
 
     // 2. Get default first status ID and name
     const statusRes = await client.query(`
-      SELECT id, possible_queue_status FROM queue_status WHERE restaurant_id = $1 ORDER BY id ASC LIMIT 1
+      SELECT id, possible_queue_status FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC LIMIT 1
     `, [data.restaurant_id]);
     const statusId = statusRes.rows[0]?.id;
     const defaultStatus = statusRes.rows[0]?.possible_queue_status || 'PENDING';
@@ -1405,32 +1409,43 @@ export async function getAdminByEmail(email: string) {
 // OTP BILLING QUERIES
 // ============================================
 
-export async function incrementOtpCount(phone: string) {
+export async function incrementOtpCount(phone: string, restaurantId?: string) {
   const localTimezone = 'Asia/Kolkata';
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
   
   // 1. Log the specific OTP request
   await sql`
-    INSERT INTO otp_logs (phone, sent_at)
-    VALUES (${phone}, NOW() AT TIME ZONE ${localTimezone})
+    INSERT INTO otp_logs (phone, sent_at, restaurant_id)
+    VALUES (${phone}, NOW() AT TIME ZONE ${localTimezone}, ${restaurantId || null})
   `;
 
   // 2. Increment daily aggregation (Concurrency Safe via ON CONFLICT)
-  await sql`
-    INSERT INTO daily_otp_stats (date, count, cost)
-    VALUES (${today}::date, 1, 0.50)
-    ON CONFLICT (date) DO UPDATE 
-    SET count = daily_otp_stats.count + 1,
-        cost = (daily_otp_stats.count + 1) * 0.50,
-        updated_at = NOW()
-  `;
+  // If restaurantId is null, it's tracked generically for backwards compatibility
+  if (restaurantId) {
+    await sql`
+      INSERT INTO daily_otp_stats (date, count, cost, restaurant_id)
+      VALUES (${today}::date, 1, 0.50, ${restaurantId})
+      ON CONFLICT (date, restaurant_id) DO UPDATE 
+      SET count = daily_otp_stats.count + 1,
+          cost = (daily_otp_stats.count + 1) * 0.50,
+          updated_at = NOW()
+    `;
+  }
 }
 
-export async function getOtpStats(dateFrom: string, dateTo: string) {
-  const rows = await sql`
+export async function getOtpStats(dateFrom: string, dateTo: string, restaurantId?: string) {
+  if (restaurantId) {
+    return await sql`
+      SELECT * FROM daily_otp_stats 
+      WHERE date BETWEEN ${dateFrom}::date AND ${dateTo}::date
+        AND restaurant_id = ${restaurantId}
+      ORDER BY date ASC
+    `;
+  }
+  return await sql`
     SELECT * FROM daily_otp_stats 
     WHERE date BETWEEN ${dateFrom}::date AND ${dateTo}::date
+      AND restaurant_id IS NULL
     ORDER BY date ASC
   `;
-  return rows;
 }
