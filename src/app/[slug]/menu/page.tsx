@@ -494,11 +494,18 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     for (const [id, item] of cart.entries()) {
       const product = byId.get(id);
 
+      if (!product) {
+        newCart.delete(id);
+        removedNames.push(item.name);
+        changed = true;
+        continue;
+      }
+
       const pStatus = showOrdering 
         ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
         : product.status;
 
-      if (!product || pStatus === 'OUT_OF_STOCK') {
+      if (pStatus === 'OUT_OF_STOCK') {
         newCart.delete(id);
         removedNames.push(item.name);
         changed = true;
