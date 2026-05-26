@@ -113,6 +113,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   // ── PLACE NEW ORDER ──────────────────────────────────────────────
   const handleNewOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (loading) return;
     
     // Always check auth before proceeding to ensure session is valid
     const user = await checkAuth();
@@ -188,6 +189,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
   // ── ADD ITEMS TO EXISTING ORDER ──────────────────────────────────
   const handleAddToOrder = async () => {
+    if (loading) return;
     if (!activeOrder) return;
     if (items.length === 0) {
       toast.error('Your cart is empty');

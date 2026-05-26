@@ -367,7 +367,7 @@ export default function RestaurantDetails() {
               <h2 style={S.cardTitle}>🎟️ Queue Management</h2>
             <p style={S.cardDesc}>Add custom status tags for this restaurant's queue (e.g. VIP_WAITING).</p>
             
-            <form onSubmit={async (e) => {
+            <form id="add-status-form" onSubmit={async (e) => {
               e.preventDefault();
               const input = (e.target as any).statusInput;
               const colorInput = (e.target as any).statusColor;
@@ -435,11 +435,30 @@ export default function RestaurantDetails() {
                   }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: qs.color || '#cbd5e1' }} />
                     {qs.possible_queue_status} <span style={{ color: '#94a3b8', fontSize: '10px' }}>(P{qs.priority || 0})</span>
+                    <button
+                      type="button" 
+                      onClick={() => {
+                        const form = document.getElementById('add-status-form') as HTMLFormElement;
+                        if (form) {
+                          form.statusInput.value = qs.possible_queue_status;
+                          form.statusColor.value = qs.color || '#cbd5e1';
+                          form.statusPriority.value = qs.priority || 0;
+                          form.statusInput.focus();
+                        }
+                      }}
+                      style={{
+                        background: 'none', border: 'none', color: '#64748b', 
+                        cursor: 'pointer', fontSize: '12px', padding: '0 4px', display: 'flex', alignItems: 'center', marginLeft: '4px'
+                      }}
+                      title="Edit status"
+                    >
+                      ✏️
+                    </button>
                     <button 
                       onClick={() => handleDeleteStatus(qs.id)}
                       style={{
-                        background: 'none', border: 'none', color: '#94a3b8', 
-                        cursor: 'pointer', fontSize: '12px', padding: '0 2px', display: 'flex', alignItems: 'center'
+                        background: 'none', border: 'none', color: '#ef4444', 
+                        cursor: 'pointer', fontSize: '12px', padding: '0 4px', display: 'flex', alignItems: 'center'
                       }}
                       title="Delete status"
                     >

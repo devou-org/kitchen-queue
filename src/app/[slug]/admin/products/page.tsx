@@ -11,7 +11,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function AdminProducts() {
   const { restaurant } = useRestaurant();
-  const showInventory = restaurant?.modules?.INVENTORY !== false;
+  const showOnlineOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const { slug } = useParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +117,7 @@ export default function AdminProducts() {
                   <th>Product</th>
                   <th>Category</th>
                   <th>Price</th>
-                  {showInventory && <th>Stock / Buffer</th>}
+                  {showOnlineOrdering && <th>Stock / Buffer</th>}
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -142,57 +142,79 @@ export default function AdminProducts() {
                     </td>
                     <td>{p.category}</td>
                     <td style={{ fontWeight: 600 }}>{formatPrice(p.price)}</td>
-                    {showInventory && (
+                    {showOnlineOrdering && (
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 800, fontSize: '15px', color: p.stock_quantity <= p.buffer_quantity ? 'var(--warning)' : 'inherit' }}>
-                            {Math.max(0, p.stock_quantity)}
-                          </span>
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/ {p.buffer_quantity}</span>
+                          <input 
+                            type="number" 
+                            style={{ width: '60px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                            value={p.stock_quantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              setProducts(prev => prev.map(x => x.id === p.id ? { ...x, stock_quantity: val } : x));
+                            }}
+                            onBlur={(e) => handleStockUpdate(p.id, parseInt(e.target.value) || 0, p.buffer_quantity)}
+                          />
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/</span>
+                          <input 
+                            type="number" 
+                            style={{ width: '60px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                            value={p.buffer_quantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              setProducts(prev => prev.map(x => x.id === p.id ? { ...x, buffer_quantity: val } : x));
+                            }}
+                            onBlur={(e) => handleStockUpdate(p.id, p.stock_quantity, parseInt(e.target.value) || 0)}
+                          />
                         </div>
                       </td>
                     )}
                     <td>
-                      <button
-                        onClick={() => handleToggleStatus(p.id, p.status)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: 0,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          outline: 'none'
-                        }}
-                        title={`Click to mark as ${p.status === 'AVAILABLE' ? 'Out of Stock' : 'Available'}`}
-                      >
-                        {/* Custom modern emerald/slate toggle switch */}
-                        <div style={{
-                          position: 'relative',
-                          width: '38px',
-                          height: '20px',
-                          background: p.status === 'AVAILABLE' ? '#10b981' : '#cbd5e1',
-                          borderRadius: '999px',
-                          transition: 'background-color 0.2s ease',
-                          cursor: 'pointer'
-                        }}>
+                      {!showOnlineOrdering ? (
+                        <button
+                          onClick={() => handleToggleStatus(p.id, p.status)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            outline: 'none'
+                          }}
+                          title={`Click to mark as ${p.status === 'AVAILABLE' ? 'Out of Stock' : 'Available'}`}
+                        >
                           <div style={{
-                            position: 'absolute',
-                            top: '2px',
-                            left: p.status === 'AVAILABLE' ? '20px' : '2px',
-                            width: '16px',
-                            height: '16px',
-                            background: 'white',
-                            borderRadius: '50%',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
-                            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }} />
-                        </div>
-                        <span className={`badge badge-${p.status.toLowerCase().replace(/_/g, '-')}`} style={{ margin: 0, cursor: 'pointer' }}>
+                            position: 'relative',
+                            width: '38px',
+                            height: '20px',
+                            background: p.status === 'AVAILABLE' ? '#10b981' : '#cbd5e1',
+                            borderRadius: '999px',
+                            transition: 'background-color 0.2s ease',
+                            cursor: 'pointer'
+                          }}>
+                            <div style={{
+                              position: 'absolute',
+                              top: '2px',
+                              left: p.status === 'AVAILABLE' ? '20px' : '2px',
+                              width: '16px',
+                              height: '16px',
+                              background: 'white',
+                              borderRadius: '50%',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                              transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }} />
+                          </div>
+                          <span className={`badge badge-${p.status.toLowerCase().replace(/_/g, '-')}`} style={{ margin: 0, cursor: 'pointer' }}>
+                            {p.status.replace(/_/g, ' ')}
+                          </span>
+                        </button>
+                      ) : (
+                        <span className={`badge badge-${p.status.toLowerCase().replace(/_/g, '-')}`} style={{ margin: 0 }}>
                           {p.status.replace(/_/g, ' ')}
                         </span>
-                      </button>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>

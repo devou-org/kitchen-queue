@@ -27,21 +27,21 @@ const DietaryIcon = ({ preference }: { preference?: string }) => {
   if (!preference) return null;
   if (preference === 'VEG') {
     return (
-      <div style={{ width: '14px', height: '14px', border: '1px solid #16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
+      <div style={{ flexShrink: 0, width: '14px', height: '14px', border: '1px solid #16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
         <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#16a34a' }} />
       </div>
     );
   }
   if (preference === 'NON_VEG') {
     return (
-      <div style={{ width: '14px', height: '14px', border: '1px solid #dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
+      <div style={{ flexShrink: 0, width: '14px', height: '14px', border: '1px solid #dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
         <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#dc2626' }} />
       </div>
     );
   }
   if (preference === 'EGG') {
     return (
-      <div style={{ width: '14px', height: '14px', border: '1px solid #d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
+      <div style={{ flexShrink: 0, width: '14px', height: '14px', border: '1px solid #d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '3px', background: 'white' }}>
         <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#d97706' }} />
       </div>
     );
@@ -56,7 +56,10 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
   showOrdering?: boolean;
   layout?: 'LIST' | 'GRID';
 }) {
-  const isOut = product.status === 'OUT_OF_STOCK';
+  const computedStatus = showOrdering
+    ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+    : product.status;
+  const isOut = computedStatus === 'OUT_OF_STOCK';
 
   if (layout === 'GRID') {
     return (
@@ -105,16 +108,16 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
             padding: '2px 5px',
             borderRadius: '4px',
             textTransform: 'uppercase',
-            backgroundColor: product.status === 'AVAILABLE' ? '#ecfdf5' : product.status === 'LOW_STOCK' ? '#fffbeb' : '#fef2f2',
-            color: product.status === 'AVAILABLE' ? '#059669' : product.status === 'LOW_STOCK' ? '#d97706' : '#dc2626',
+            backgroundColor: computedStatus === 'AVAILABLE' ? '#ecfdf5' : computedStatus === 'LOW_STOCK' ? '#fffbeb' : '#fef2f2',
+            color: computedStatus === 'AVAILABLE' ? '#059669' : computedStatus === 'LOW_STOCK' ? '#d97706' : '#dc2626',
           }}>
-            {showOrdering ? `${product.stock_quantity ?? 0} left` : STATUS_BADGE[product.status].label}
+            {STATUS_BADGE[computedStatus].label}
           </span>
         </div>
 
         {/* Info */}
-        <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
             <h3 style={{
               fontWeight: 800,
               fontSize: '14px',
@@ -123,6 +126,8 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              flexShrink: 1,
+              minWidth: 0
             }}>{product.name}</h3>
             <DietaryIcon preference={product.dietary_preference} />
           </div>
@@ -210,14 +215,14 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
             padding: '2px 6px',
             borderRadius: '4px',
             textTransform: 'uppercase',
-            backgroundColor: product.status === 'AVAILABLE' ? '#ecfdf5' : product.status === 'LOW_STOCK' ? '#fffbeb' : '#fef2f2',
-            color: product.status === 'AVAILABLE' ? '#059669' : product.status === 'LOW_STOCK' ? '#d97706' : '#dc2626',
+            backgroundColor: computedStatus === 'AVAILABLE' ? '#ecfdf5' : computedStatus === 'LOW_STOCK' ? '#fffbeb' : '#fef2f2',
+            color: computedStatus === 'AVAILABLE' ? '#059669' : computedStatus === 'LOW_STOCK' ? '#d97706' : '#dc2626',
           }}>
-            {showOrdering ? `${product.stock_quantity ?? 0} left` : STATUS_BADGE[product.status].label}
+            {STATUS_BADGE[computedStatus].label}
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
           <h3 style={{
             fontWeight: 800,
             fontSize: '15px',
@@ -226,6 +231,8 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            flexShrink: 1,
+            minWidth: 0
           }}>
             {product.name}
           </h3>
@@ -487,7 +494,11 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     for (const [id, item] of cart.entries()) {
       const product = byId.get(id);
 
-      if (!product || product.status === 'OUT_OF_STOCK') {
+      const pStatus = showOrdering 
+        ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+        : product.status;
+
+      if (!product || pStatus === 'OUT_OF_STOCK') {
         newCart.delete(id);
         removedNames.push(item.name);
         changed = true;
@@ -502,7 +513,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       ) {
         newCart.set(id, {
           ...item,
-          status: product.status,
+          status: pStatus,
           price: product.price,
           name: product.name,
           image_url: product.image_url,
@@ -524,7 +535,11 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     const product = products.find(p => p.id === id);
     if (!product) return;
 
-    if (delta > 0 && product.status === 'OUT_OF_STOCK') {
+    const pStatus = showOrdering 
+      ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+      : product.status;
+
+    if (delta > 0 && pStatus === 'OUT_OF_STOCK') {
       toast.error('This item is out of stock');
       return;
     }
@@ -542,7 +557,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         price: product.price,
         quantity: Math.min(newQty, 10),
         image_url: product.image_url,
-        status: product.status,
+        status: pStatus,
       });
     }
     saveCart(newCart);

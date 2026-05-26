@@ -86,7 +86,7 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
 
   const displayedQueues = queues.filter(q => {
     if (statusFilter && q.queue_status !== statusFilter) return false;
-    if (!statusFilter && !['WAITING'].includes(q.queue_status)) return false; // Default to active waitlist
+    if (!statusFilter && ['CANCELLED'].includes(q.queue_status)) return false; // Default to active (not cancelled)
     
     if (search) {
       const term = search.toLowerCase();
@@ -117,7 +117,7 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{ height: '42px' }}
               >
-                <option value="">WAITING (Active)</option>
+                <option value="">All Active</option>
                 {allStatuses.map(s => <option key={s.id} value={s.possible_queue_status}>{s.possible_queue_status}</option>)}
               </select>
             </div>

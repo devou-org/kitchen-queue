@@ -99,6 +99,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
 
   const handleJoinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (!isVerified) {
       toast.error('Please verify your phone number first');
       return;

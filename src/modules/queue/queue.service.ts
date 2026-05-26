@@ -77,7 +77,7 @@ export class QueueService {
       const statusRes = await client.query(`
         SELECT id FROM queue_status 
         WHERE restaurant_id = $1
-        ORDER BY id ASC
+        ORDER BY priority ASC, id ASC
         LIMIT 1
       `, [restaurantId]);
 
@@ -191,21 +191,21 @@ export class QueueService {
       await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS priority INT DEFAULT 0`);
     } catch(e) {}
 
-    const res = await pool.query(`
-      INSERT INTO queue_status (restaurant_id, possible_queue_status, color, priority)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (restaurant_id, possible_queue_status) DO NOTHING
-      RETURNING *
-    `, [restaurantId, statusEnum, color, priority]);
+    const check = await pool.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = $2`, [restaurantId, statusEnum]);
     
-    if (res.rows.length === 0) {
+    if (check.rows.length > 0) {
       // It exists, let's update color and priority
       const updateRes = await pool.query(`
         UPDATE queue_status SET color = $3, priority = $4 WHERE restaurant_id = $1 AND possible_queue_status = $2 RETURNING *
       `, [restaurantId, statusEnum, color, priority]);
       return updateRes.rows[0];
+    } else {
+      const res = await pool.query(`
+        INSERT INTO queue_status (restaurant_id, possible_queue_status, color, priority)
+        VALUES ($1, $2, $3, $4) RETURNING *
+      `, [restaurantId, statusEnum, color, priority]);
+      return res.rows[0];
     }
-    return res.rows[0];
   }
 
   /**
