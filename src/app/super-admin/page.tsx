@@ -2,14 +2,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
+import { ClipboardList, ShoppingCart, Ticket, Package, BarChart3, Receipt, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare } from 'lucide-react';
+import 'react-phone-number-input/style.css';
+import PhoneInput from 'react-phone-number-input';
 
 const ALL_MODULES = [
-  { key: 'DIGITAL_MENU', label: 'Digital Menu', icon: '📋', desc: 'QR code menu, categories, pricing' },
-  { key: 'ONLINE_ORDERING', label: 'Online Ordering', icon: '🛒', desc: 'Cart, checkout, OTP verification' },
-  { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', icon: '🎟️', desc: 'Token generation, live queue display' },
-  { key: 'INVENTORY', label: 'Inventory', icon: '📦', desc: 'Stock tracking, low stock alerts' },
-  { key: 'ANALYTICS', label: 'Analytics', icon: '📊', desc: 'Revenue, peak hours, reports' },
-  { key: 'REPORTS', label: 'Reports', icon: '🧾', desc: 'Statements, billing, exports' },
+  { key: 'DIGITAL_MENU', label: 'Digital Menu', icon: <ClipboardList size={16} />, desc: 'QR code menu, categories, pricing' },
+  { key: 'ONLINE_ORDERING', label: 'Online Ordering', icon: <ShoppingCart size={16} />, desc: 'Cart, checkout, OTP verification' },
+  { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', icon: <Ticket size={16} />, desc: 'Token generation, live queue display' },
+  { key: 'INVENTORY', label: 'Inventory', icon: <Package size={16} />, desc: 'Stock tracking, low stock alerts' },
+  { key: 'ANALYTICS', label: 'Analytics', icon: <BarChart3 size={16} />, desc: 'Revenue, peak hours, reports' },
+  { key: 'REPORTS', label: 'Reports', icon: <Receipt size={16} />, desc: 'Statements, billing, exports' },
 ];
 
 type Restaurant = {
@@ -29,7 +32,7 @@ type Restaurant = {
 
 type ModalMode = 'create' | 'edit' | null;
 
-const EMPTY_FORM = { name: '', slug: '', phone: '', address: '', logo_url: '', primary_color: '#800020', secondary_color: '#ecfdf5', modules: ALL_MODULES.map(m => m.key) };
+const EMPTY_FORM = { name: '', slug: '', phone: '', address_street: '', address_city: '', address_state: '', address_zip: '', address_country: '', logo_url: '', primary_color: '#800020', secondary_color: '#ecfdf5', modules: ALL_MODULES.map(m => m.key) };
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
@@ -84,7 +87,13 @@ export default function SuperAdminDashboard() {
     setSaving(true);
     try {
       const payload = {
-        ...form,
+        name: form.name,
+        slug: form.slug,
+        phone: form.phone || '',
+        address: [form.address_street, form.address_city, form.address_state, form.address_zip, form.address_country].filter(Boolean).join(', '),
+        logo_url: form.logo_url,
+        primary_color: form.primary_color,
+        secondary_color: form.secondary_color,
         modules: form.modules,
       };
       const res = await fetch('/api/super-admin/restaurants', {
@@ -95,7 +104,7 @@ export default function SuperAdminDashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success('Restaurant created! 🎉');
+        toast.success('Restaurant created!');
         setModalMode(null);
         fetchRestaurants();
       } else {
@@ -121,9 +130,11 @@ export default function SuperAdminDashboard() {
       {/* Header */}
       <div style={S.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={S.logoBox}>🌿</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', flexShrink: 0 }}>
+            <img src="https://ik.imagekit.io/j2q8x5lu0/qdine/qdine-logo-rotated.png" alt="Qdine Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} />
+          </div>
           <div>
-            <h1 style={S.headerTitle}>Devou Platform</h1>
+            <h1 style={S.headerTitle}>Qdine Super admin</h1>
             <p style={S.headerSub}>Super Admin Console</p>
           </div>
         </div>
@@ -133,13 +144,11 @@ export default function SuperAdminDashboard() {
       {/* Stats Bar */}
       <div style={S.statsBar}>
         {[
-          { label: 'Total Restaurants', value: restaurants.length, icon: '🏪', color: '#10b981' },
-          { label: 'Total Modules Active', value: restaurants.reduce((acc, r) => acc + (r.active_products || 0), 0), icon: '⚙️', color: '#059669' },
-          { label: 'Orders (30d)', value: restaurants.reduce((acc, r) => acc + Number(r.orders_30d || 0), 0), icon: '📦', color: '#047857' },
+          { label: 'Total Restaurants', value: restaurants.length, icon: <Store size={24} />, color: '#10b981' },
           {
             label: 'SMS Wallet Balance',
-            value: walletLoading ? '⏳ Loading...' : (walletBalance !== null ? `₹${Number(walletBalance).toFixed(2)}` : '⚠️ Config'),
-            icon: '💬',
+            value: walletLoading ? 'Loading...' : (walletBalance !== null ? `₹${Number(walletBalance).toFixed(2)}` : 'Config Error'),
+            icon: <MessageSquare size={24} />,
             color: '#0891b2'
           },
         ].map(stat => (
@@ -163,12 +172,12 @@ export default function SuperAdminDashboard() {
       <div style={S.grid}>
         {loading ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px', color: '#64748b' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}><Hourglass size={32} /></div>
             <p style={{ fontWeight: 600 }}>Loading restaurants...</p>
           </div>
         ) : restaurants.length === 0 ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px', color: '#64748b' }}>
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏪</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', color: '#059669' }}><Store size={48} /></div>
             <p style={{ fontSize: '18px', fontWeight: 700, color: '#334155' }}>No restaurants yet</p>
             <p style={{ fontSize: '14px', marginTop: '8px' }}>Click "New Restaurant" to add your first tenant</p>
           </div>
@@ -200,24 +209,13 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
 
-            <div style={S.cardStats}>
-              <div style={S.cardStat}>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: '#047857' }}>{r.orders_30d || 0}</span>
-                <span style={S.cardStatLabel}>orders/30d</span>
-              </div>
-              <div style={S.cardStat}>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: '#10b981' }}>{r.active_products || 0}</span>
-                <span style={S.cardStatLabel}>products</span>
-              </div>
-            </div>
-
-            {r.phone && <p style={S.cardMeta}>📞 {r.phone}</p>}
-            {r.address && <p style={S.cardMeta}>📍 {r.address}</p>}
+            {r.phone && <p style={S.cardMeta}><Phone size={12} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '4px' }} />{r.phone}</p>}
+            {r.address && <p style={S.cardMeta}><MapPin size={12} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '4px' }} />{r.address}</p>}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
               <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>Manage Settings →</span>
-              <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                🎨 Custom Theme Set
+              <span style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Palette size={14} /> Custom Theme Set
               </span>
             </div>
           </div>
@@ -229,33 +227,68 @@ export default function SuperAdminDashboard() {
         <div style={S.backdrop} onClick={() => setModalMode(null)}>
           <div style={S.modal} onClick={e => e.stopPropagation()}>
             <div style={S.modalHeader}>
-              <h2 style={S.modalTitle}>🏪 New Restaurant</h2>
-              <button onClick={() => setModalMode(null)} style={S.closeBtn}>✕</button>
+              <h2 style={S.modalTitle}><Store size={20} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '6px' }} /> New Restaurant</h2>
+              <button onClick={() => setModalMode(null)} style={S.closeBtn}><X size={20} /></button>
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', maxHeight: '70vh', padding: '4px 2px' }}>
-              {[
-                { label: 'Restaurant Name *', key: 'name', placeholder: 'e.g. Renjz Kitchen', type: 'text', required: true },
-                { label: 'Slug (for URL route) *', key: 'slug', placeholder: 'e.g. renjz (only lowercase, numbers, hyphens)', type: 'text', required: true },
-                { label: 'Phone', key: 'phone', placeholder: '+91 98765 43210', type: 'text', required: false },
-                { label: 'Address', key: 'address', placeholder: 'Restaurant address', type: 'text', required: false },
-                { label: 'Logo URL', key: 'logo_url', placeholder: 'https://...', type: 'url', required: false },
-              ].map(field => (
-                <div key={field.key}>
-                  <label style={S.fieldLabel}>{field.label}</label>
-                  <input
-                    type={field.type}
-                    required={field.required}
-                    value={(form as any)[field.key]}
-                    onChange={e => {
-                      const val = field.key === 'slug' ? e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') : e.target.value;
-                      setForm(f => ({ ...f, [field.key]: val }));
-                    }}
-                    placeholder={field.placeholder}
-                    style={S.input}
-                  />
+              <div>
+                <label style={S.fieldLabel}>Restaurant Name *</label>
+                <input type="text" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Renjz Kitchen" style={S.input} />
+              </div>
+              
+              <div>
+                <label style={S.fieldLabel}>Slug (for URL route) *</label>
+                <input type="text" required value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))} placeholder="e.g. renjz" style={S.input} />
+              </div>
+              
+              <div>
+                <label style={S.fieldLabel}>Phone *</label>
+                <PhoneInput
+                  international
+                  countryCallingCodeEditable={false}
+                  placeholder="Enter phone number"
+                  value={form.phone as any}
+                  onChange={val => setForm(f => ({ ...f, phone: val ? String(val) : '' }))}
+                  defaultCountry="IN"
+                  required
+                  style={{ ...S.input, display: 'flex', alignItems: 'center' }}
+                />
+                <style>{`
+                  .PhoneInputInput {
+                    border: none;
+                    outline: none;
+                    flex: 1;
+                    font-size: 14px;
+                    background: transparent;
+                    color: #0f172a;
+                    padding-left: 8px;
+                  }
+                  .PhoneInputCountry {
+                    margin-right: 8px;
+                  }
+                `}</style>
+              </div>
+
+              <div>
+                <label style={S.fieldLabel}>Address *</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input type="text" required value={form.address_street} onChange={e => setForm(f => ({ ...f, address_street: e.target.value }))} placeholder="Street Address" style={S.input} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <input type="text" required value={form.address_city} onChange={e => setForm(f => ({ ...f, address_city: e.target.value }))} placeholder="City" style={S.input} />
+                    <input type="text" required value={form.address_state} onChange={e => setForm(f => ({ ...f, address_state: e.target.value }))} placeholder="State / Province" style={S.input} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <input type="text" required value={form.address_zip} onChange={e => setForm(f => ({ ...f, address_zip: e.target.value }))} placeholder="ZIP / Postal Code" style={S.input} />
+                    <input type="text" required value={form.address_country} onChange={e => setForm(f => ({ ...f, address_country: e.target.value }))} placeholder="Country" style={S.input} />
+                  </div>
                 </div>
-              ))}
+              </div>
+
+              <div>
+                <label style={S.fieldLabel}>Logo URL</label>
+                <input type="url" value={form.logo_url} onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))} placeholder="https://..." style={S.input} />
+              </div>
               {/* Color Configuration */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
@@ -328,7 +361,7 @@ export default function SuperAdminDashboard() {
                       >
                         <span>{mod.icon}</span>
                         <span>{mod.label}</span>
-                        {active && <span style={{ marginLeft: 'auto', fontSize: '10px' }}>✓</span>}
+                        {active && <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}><Check size={14} /></span>}
                       </button>
                     );
                   })}

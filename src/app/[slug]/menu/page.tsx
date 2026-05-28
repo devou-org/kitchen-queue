@@ -693,9 +693,24 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
             </div>
           )}
-          <span style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text-primary)' }}>
-            {restaurant?.name || 'Loading...'}
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text-primary)', lineHeight: 1.2 }}>
+              {restaurant?.name || 'Loading...'}
+            </span>
+            {restaurant?.address && (
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px', marginTop: '2px', fontWeight: 600 }}>
+                <MapPin size={10} style={{ color: 'var(--primary)' }} />
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+                  {(() => {
+                    const parts = restaurant.address.split(',').map(s => s.trim());
+                    if (parts.length >= 3) return `${parts[0]}, ${parts[2]}`;
+                    if (parts.length >= 2) return `${parts[0]}, ${parts[1]}`;
+                    return parts[0];
+                  })()}
+                </span>
+              </span>
+            )}
+          </div>
         </Link>
       </div>
 
@@ -708,12 +723,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.4 }}>
             {restaurant?.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes."}
           </p>
-          {restaurant?.address && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '12px', color: 'var(--text-secondary)' }}>
-              <MapPin size={14} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--primary)' }} />
-              <span style={{ fontSize: '13px', lineHeight: 1.3 }}>{restaurant.address}</span>
-            </div>
-          )}
         </div>
 
         {!isServiceActive && (

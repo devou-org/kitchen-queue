@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
-
+import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart } from 'lucide-react';
 type Module = {
   module_name: string;
   is_enabled: boolean;
@@ -26,9 +26,9 @@ type Restaurant = {
 };
 
 const ALL_MODULES = [
-  { key: 'DIGITAL_MENU', label: '📖 Digital Menu', desc: 'Allows customers to view products and details on their phones.', icon: '📖' },
-  { key: 'ONLINE_ORDERING', label: '🛒 Online Ordering', desc: 'Enables online checkout, payments, and shopping carts.', icon: '🛒' },
-  { key: 'QUEUE_MANAGEMENT', label: '🎟️ Queue Management', desc: 'Tracks active order tokens and served tokens for kitchen screen.', icon: '🎟️' },
+  { key: 'DIGITAL_MENU', label: 'Digital Menu', desc: 'Allows customers to view products and details on their phones.', icon: <ClipboardList size={16} /> },
+  { key: 'ONLINE_ORDERING', label: 'Online Ordering', desc: 'Enables online checkout, payments, and shopping carts.', icon: <ShoppingCart size={16} /> },
+  { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', desc: 'Tracks active order tokens and served tokens for kitchen screen.', icon: <Ticket size={16} /> },
 ];
 
 export default function RestaurantDetails() {
@@ -266,7 +266,7 @@ export default function RestaurantDetails() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif" }}>
-        <div style={{ fontSize: '48px', animation: 'spin 1s linear infinite', marginBottom: '16px' }}>⏳</div>
+        <div style={{ marginBottom: '16px', color: '#64748b', display: 'flex', justifyContent: 'center' }}><Loader2 size={48} className="animate-spin" /></div>
         <p style={{ color: '#475569', fontWeight: 600 }}>Loading restaurant configuration...</p>
       </div>
     );
@@ -312,11 +312,11 @@ export default function RestaurantDetails() {
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <a href={`/${slug}/menu`} target="_blank" rel="noopener noreferrer" style={S.secondaryLinkBtn}>
-              🌐 Customer Menu
+            <a href={`/${slug}/menu`} target="_blank" rel="noopener noreferrer" style={{...S.secondaryLinkBtn, display: 'flex', alignItems: 'center', gap: '6px'}}>
+              <Globe size={16} /> Customer Menu
             </a>
-            <a href={`/${slug}/admin/products`} target="_blank" rel="noopener noreferrer" style={S.primaryLinkBtn}>
-              🔑 Admin Portal
+            <a href={`/${slug}/admin/products`} target="_blank" rel="noopener noreferrer" style={{...S.primaryLinkBtn, display: 'flex', alignItems: 'center', gap: '6px'}}>
+              <Key size={16} /> Admin Portal
             </a>
           </div>
         </div>
@@ -328,7 +328,7 @@ export default function RestaurantDetails() {
             
             {/* Admin Credentials */}
             <div style={S.card}>
-              <h2 style={S.cardTitle}>🔑 Admin Credentials</h2>
+              <h2 style={{...S.cardTitle, display: 'flex', alignItems: 'center', gap: '8px'}}><Key size={20} /> Admin Credentials</h2>
               <p style={S.cardDesc}>Set the login email and password for this restaurant's Admin Portal.</p>
               
               <form onSubmit={handleSaveAdmin} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -361,7 +361,7 @@ export default function RestaurantDetails() {
 
             {/* Queue Management */}
             <div style={S.card}>
-              <h2 style={S.cardTitle}>🎟️ Queue Management</h2>
+              <h2 style={{...S.cardTitle, display: 'flex', alignItems: 'center', gap: '8px'}}><Ticket size={20} /> Queue Management</h2>
             <p style={S.cardDesc}>Add custom status tags for this restaurant's queue (e.g. VIP_WAITING).</p>
             
             <form id="add-status-form" onSubmit={async (e) => {
@@ -449,7 +449,7 @@ export default function RestaurantDetails() {
                       }}
                       title="Edit status"
                     >
-                      ✏️
+                      <Pencil size={14} />
                     </button>
                     <button 
                       onClick={() => handleDeleteStatus(qs.id)}
@@ -459,7 +459,7 @@ export default function RestaurantDetails() {
                       }}
                       title="Delete status"
                     >
-                      ✕
+                      <X size={14} />
                     </button>
                   </div>
                 ))}
@@ -475,7 +475,7 @@ export default function RestaurantDetails() {
 
             {/* Subscribed Modules Settings */}
             <div style={S.card}>
-              <h2 style={S.cardTitle}>⚙️ Subscription Modules</h2>
+              <h2 style={{...S.cardTitle, display: 'flex', alignItems: 'center', gap: '8px'}}><Settings size={20} /> Subscription Modules</h2>
               <p style={S.cardDesc}>Instantly toggle which platform services are enabled for this restaurant.</p>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
@@ -493,7 +493,7 @@ export default function RestaurantDetails() {
                     }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{mod.label}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{mod.icon} {mod.label}</span>
                           {isEnabled && <span style={{ fontSize: '11px', padding: '1px 5px', borderRadius: '4px', backgroundColor: '#10b981', color: 'white', fontWeight: 700 }}>active</span>}
                         </div>
                         <div style={{ color: '#64748b', fontSize: '11px', marginTop: '2px' }}>{mod.desc}</div>
@@ -526,7 +526,7 @@ export default function RestaurantDetails() {
 
             {/* Danger Zone deletion panel */}
             <div style={{ ...S.card, borderColor: '#fecaca', backgroundColor: '#fff5f5' }}>
-              <h2 style={{ ...S.cardTitle, color: '#991b1b' }}>⚠️ Danger Zone</h2>
+              <h2 style={{ ...S.cardTitle, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '8px' }}><AlertTriangle size={20} /> Danger Zone</h2>
               <p style={{ ...S.cardDesc, color: '#7f1d1d' }}>Delete this restaurant and all associated digital products, token logs, and queues permanently.</p>
               
               {!deleteConfirm ? (
