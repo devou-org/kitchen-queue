@@ -9,7 +9,7 @@ import BottomNav from '@/components/BottomNav';
 import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { Search, MapPin } from 'lucide-react';
+import { Search, MapPin, ClipboardList } from 'lucide-react';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -919,7 +919,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               gap: '8px'
             }}
           >
-            🔍 Check Status
+            <Search size={18} />
+            Check Status
           </Link>
 
           <Link prefetch={false} href={`/${slug}/queue`}
@@ -943,7 +944,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               gap: '8px'
             }}
           >
-            📋 Join Waitlist
+            <ClipboardList size={18} />
+            Join Waitlist
           </Link>
         </div>
       )}

@@ -187,6 +187,7 @@ export class QueueService {
    */
   static async addQueueStatus(restaurantId: string, statusEnum: string, color: string = '#cbd5e1', priority: number = 0) {
     try {
+      await pool.query(`ALTER TABLE queue_status ALTER COLUMN possible_queue_status TYPE VARCHAR(50) USING possible_queue_status::text`);
       await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '#cbd5e1'`);
       await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS priority INT DEFAULT 0`);
     } catch(e) {}

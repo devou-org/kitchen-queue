@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import { Store, Eye } from 'lucide-react';
 
 export default function AdminSettings() {
   const params = useParams();
@@ -13,7 +16,11 @@ export default function AdminSettings() {
   // Form Fields State
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
+  const [addressStreet, setAddressStreet] = useState('');
+  const [addressCity, setAddressCity] = useState('');
+  const [addressState, setAddressState] = useState('');
+  const [addressZip, setAddressZip] = useState('');
+  const [addressCountry, setAddressCountry] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#971345');
   const [secondaryColor, setSecondaryColor] = useState('#EC7951');
@@ -25,7 +32,12 @@ export default function AdminSettings() {
     if (restaurant) {
       setName(restaurant.name || '');
       setPhone(restaurant.phone || '');
-      setAddress(restaurant.address || '');
+      const parts = (restaurant.address || '').split(',').map((s: string) => s.trim());
+      setAddressStreet(parts[0] || '');
+      setAddressCity(parts[1] || '');
+      setAddressState(parts[2] || '');
+      setAddressZip(parts[3] || '');
+      setAddressCountry(parts.slice(4).join(', ') || '');
       setLogoUrl(restaurant.logo_url || '');
       setPrimaryColor(restaurant.primary_color || '#971345');
       setSecondaryColor(restaurant.secondary_color || '#EC7951');
@@ -52,7 +64,7 @@ export default function AdminSettings() {
         body: JSON.stringify({
           name,
           phone: phone || null,
-          address: address || null,
+          address: [addressStreet, addressCity, addressState, addressZip, addressCountry].filter(Boolean).join(', ') || null,
           logo_url: logoUrl || null,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
@@ -84,7 +96,10 @@ export default function AdminSettings() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 3fr) minmax(300px, 2fr)', gap: '20px', alignItems: 'start' }}>
         {/* Left Panel: Profile Configurations */}
         <div className="card">
-          <h2 style={S.cardTitle}>✏️ Profile & Branding</h2>
+          <h2 style={S.cardTitle}>
+            <Store size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '6px' }} />
+            Profile & Branding
+          </h2>
           <p style={S.cardDesc}>Configure logo URL, phone number, physical address, and theme colors.</p>
           
           <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
@@ -99,10 +114,29 @@ export default function AdminSettings() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <label style={S.label}>Phone Number</label>
-                <input
-                  type="text" value={phone} onChange={e => setPhone(e.target.value)}
-                  style={S.input} placeholder="+91 98765 43210"
+                <PhoneInput
+                  international
+                  countryCallingCodeEditable={false}
+                  placeholder="Enter phone number"
+                  value={phone as any}
+                  onChange={val => setPhone(val ? String(val) : '')}
+                  defaultCountry="IN"
+                  style={{ ...S.input, display: 'flex', alignItems: 'center' }}
                 />
+                <style>{`
+                  .PhoneInputInput {
+                    border: none;
+                    outline: none;
+                    flex: 1;
+                    font-size: 14px;
+                    background: transparent;
+                    color: #0f172a;
+                    padding-left: 8px;
+                  }
+                  .PhoneInputCountry {
+                    margin-right: 8px;
+                  }
+                `}</style>
               </div>
               <div>
                 <label style={S.label}>Logo URL</label>
@@ -115,11 +149,17 @@ export default function AdminSettings() {
 
             <div>
               <label style={S.label}>Address</label>
-              <textarea
-                value={address} onChange={e => setAddress(e.target.value)}
-                style={{ ...S.input, height: '70px', resize: 'vertical' }}
-                placeholder="Street details, City, Pin"
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input type="text" value={addressStreet} onChange={e => setAddressStreet(e.target.value)} placeholder="Street Address" style={S.input} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <input type="text" value={addressCity} onChange={e => setAddressCity(e.target.value)} placeholder="City" style={S.input} />
+                  <input type="text" value={addressState} onChange={e => setAddressState(e.target.value)} placeholder="State / Province" style={S.input} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <input type="text" value={addressZip} onChange={e => setAddressZip(e.target.value)} placeholder="ZIP / Postal Code" style={S.input} />
+                  <input type="text" value={addressCountry} onChange={e => setAddressCountry(e.target.value)} placeholder="Country" style={S.input} />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -205,7 +245,10 @@ export default function AdminSettings() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Dynamic Customer Branding Live Preview */}
           <div className="card">
-            <h2 style={S.cardTitle}>👁️ Brand Live Preview</h2>
+            <h2 style={S.cardTitle}>
+              <Eye size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '6px' }} />
+              Brand Live Preview
+            </h2>
             <p style={S.cardDesc}>Real-time visual rendering of how customers see the menu header.</p>
             
             <div style={{ marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>

@@ -130,8 +130,8 @@ export default function SuperAdminDashboard() {
       {/* Header */}
       <div style={S.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', flexShrink: 0 }}>
-            <img src="https://ik.imagekit.io/j2q8x5lu0/qdine/qdine-logo-rotated.png" alt="Qdine Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', flexShrink: 0, borderRadius: '50%', overflow: 'hidden', backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+            <img src="https://ik.imagekit.io/j2q8x5lu0/qdine/qdine-logo-rotated.png" alt="Qdine Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div>
             <h1 style={S.headerTitle}>Qdine Super admin</h1>

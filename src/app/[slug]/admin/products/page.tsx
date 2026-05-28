@@ -145,27 +145,9 @@ export default function AdminProducts() {
                     {showOnlineOrdering && (
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <input 
-                            type="number" 
-                            style={{ width: '60px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}
-                            value={p.stock_quantity}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
-                              setProducts(prev => prev.map(x => x.id === p.id ? { ...x, stock_quantity: val } : x));
-                            }}
-                            onBlur={(e) => handleStockUpdate(p.id, parseInt(e.target.value) || 0, p.buffer_quantity)}
-                          />
+                          <span style={{ fontWeight: 700, fontSize: '15px' }}>{p.stock_quantity}</span>
                           <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/</span>
-                          <input 
-                            type="number" 
-                            style={{ width: '60px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}
-                            value={p.buffer_quantity}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
-                              setProducts(prev => prev.map(x => x.id === p.id ? { ...x, buffer_quantity: val } : x));
-                            }}
-                            onBlur={(e) => handleStockUpdate(p.id, p.stock_quantity, parseInt(e.target.value) || 0)}
-                          />
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{p.buffer_quantity}</span>
                         </div>
                       </td>
                     )}

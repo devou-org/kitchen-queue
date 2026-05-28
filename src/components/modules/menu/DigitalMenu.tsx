@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Search, ClipboardList } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -73,10 +74,10 @@ export default function DigitalMenu({ items, restaurantId }: { items: MenuItem[]
       ) : (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md flex justify-center gap-4 z-50">
            <a href={`/${typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : ''}/queue`} className="flex-1 max-w-[160px] text-center bg-[#063124] text-white px-4 py-3 rounded-full font-bold shadow-xl hover:bg-green-900 transition flex items-center justify-center gap-2">
-             📋 Join Waitlist
+             <ClipboardList size={18} /> Join Waitlist
            </a>
            <a href={`/${typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : ''}/queue`} className="flex-1 max-w-[160px] text-center bg-white text-[#063124] border-2 border-[#063124] px-4 py-3 rounded-full font-bold shadow-xl hover:bg-gray-50 transition flex items-center justify-center gap-2">
-             🎟️ Check Status
+             <Search size={18} /> Check Status
            </a>
         </div>
       )}
