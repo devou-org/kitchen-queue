@@ -169,9 +169,53 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', background: 'var(--bg-gradient)' }}>
-        <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
-        <p style={{ color: '#6B6667' }}>Fetching ticket #{ticket}...</p>
+      <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh', paddingBottom: '120px' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'white' }}>
+          <div style={{ width: 24, height: 24, background: '#f3f4f6', borderRadius: '50%' }} />
+          <div style={{ width: 120, height: 16, background: '#f3f4f6', borderRadius: '8px' }} />
+          <div style={{ width: 32, height: 32, background: '#f3f4f6', borderRadius: '50%' }} />
+        </header>
+
+        <main style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
+          <div style={{ width: '80%', height: 14, background: '#f3f4f6', borderRadius: '4px', margin: '0 auto 24px' }} />
+
+          {/* Ticket Card Skeleton */}
+          <div style={{ background: 'white', borderRadius: '24px', padding: '32px 24px', textAlign: 'center', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ width: 140, height: 14, background: '#f3f4f6', borderRadius: '4px', margin: '0 auto 8px' }} />
+            <div style={{ width: 180, height: 60, background: '#f3f4f6', borderRadius: '12px', margin: '8px auto' }} />
+            <div style={{ width: 120, height: 40, background: '#f3f4f6', borderRadius: '16px', margin: '16px auto 0' }} />
+          </div>
+
+          {/* Progress Card Skeleton */}
+          <div style={{ background: 'white', borderRadius: '24px', padding: '24px', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ width: 120, height: 20, background: '#f3f4f6', borderRadius: '6px', marginBottom: '24px' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: '20px', left: '10%', right: '10%', height: '2px', background: '#f3f4f6' }} />
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 1 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f3f4f6' }} />
+                  <div style={{ width: 40, height: 8, background: '#f3f4f6', borderRadius: '4px' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Details Card Skeleton */}
+          <div style={{ background: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ width: 120, height: 20, background: '#f3f4f6', borderRadius: '6px', marginBottom: '20px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {[1, 2].map((i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ width: 100, height: 16, background: '#f3f4f6', borderRadius: '4px' }} />
+                    <div style={{ width: 60, height: 12, background: '#f3f4f6', borderRadius: '4px' }} />
+                  </div>
+                  <div style={{ width: 60, height: 16, background: '#f3f4f6', borderRadius: '4px' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

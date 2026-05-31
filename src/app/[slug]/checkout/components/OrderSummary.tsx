@@ -1,5 +1,6 @@
 import { formatPrice } from '@/lib/format';
 import { CartItem, Order } from '@/types';
+import { ClipboardList } from 'lucide-react';
 
 interface OrderSummaryProps {
   items: CartItem[];
@@ -12,7 +13,10 @@ interface OrderSummaryProps {
 export default function OrderSummary({ items, subtotal, total, addToMode, activeOrder }: OrderSummaryProps) {
   return (
     <div className="card" style={{ marginBottom: '16px' }}>
-      <h3 style={{ fontWeight: 700, marginBottom: '14px', fontSize: '16px' }}>📋 Order Summary</h3>
+      <h3 style={{ fontWeight: 700, marginBottom: '14px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <ClipboardList size={18} />
+        Order Summary
+      </h3>
       {items.length === 0 ? (
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Your cart is empty. Go back to the menu to add items.</p>
       ) : (

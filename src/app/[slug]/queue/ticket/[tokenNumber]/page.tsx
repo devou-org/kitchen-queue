@@ -63,8 +63,49 @@ export default function QueueTicketPage() {
 
   if (restaurantLoading || loading) {
     return (
-      <div style={{ background: '#f8fafc', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p>Loading Ticket...</p>
+      <div style={{ background: 'var(--bg, #f8fafc)', minHeight: '100vh' }}>
+        <div className="page-header" style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '12px 16px', borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff', height: '57px', boxSizing: 'border-box'
+        }}>
+          <div style={{ width: 60, height: 20, background: '#f1f5f9', borderRadius: '4px' }} />
+        </div>
+
+        <div style={{ padding: '24px 16px', maxWidth: '480px', margin: '0 auto', paddingBottom: '100px' }}>
+          <div style={{
+            padding: '40px 32px',
+            backgroundColor: '#ffffff',
+            borderRadius: '24px',
+            boxShadow: '0 20px 40px -15px rgba(0,0,0,0.08)',
+            border: '1px solid #f1f5f9',
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '8px', backgroundColor: '#e2e8f0' }} />
+            
+            <div style={{ width: 140, height: 32, background: '#f1f5f9', borderRadius: '8px', margin: '0 auto 8px' }} />
+            <div style={{ width: 80, height: 26, background: '#f1f5f9', borderRadius: '14px', margin: '0 auto 24px' }} />
+
+            <div style={{ width: 120, height: 16, background: '#f1f5f9', borderRadius: '4px', margin: '0 auto 8px' }} />
+            <div style={{ width: 160, height: 80, background: '#f1f5f9', borderRadius: '12px', margin: '0 auto 32px' }} />
+            
+            <div style={{ backgroundColor: '#f8fafc', borderRadius: '16px', padding: '20px', border: '1px solid #f1f5f9', marginBottom: '24px' }}>
+              <div style={{ width: 100, height: 12, background: '#e2e8f0', borderRadius: '4px', margin: '0 auto 8px' }} />
+              <div style={{ width: 40, height: 32, background: '#e2e8f0', borderRadius: '8px', margin: '0 auto' }} />
+            </div>
+
+            <div style={{ textAlign: 'left', marginTop: '32px', paddingTop: '24px', borderTop: '1px dashed #cbd5e1' }}>
+               {[1, 2, 3].map((i) => (
+                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <div style={{ width: 60, height: 14, background: '#f1f5f9', borderRadius: '4px' }} />
+                    <div style={{ width: 80, height: 14, background: '#f1f5f9', borderRadius: '4px' }} />
+                 </div>
+               ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -25,6 +25,10 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
+  // Active Queue State
+  const [activeQueue, setActiveQueue] = useState<any>(null);
+  const [checkingActive, setCheckingActive] = useState(true);
+
   // 1. Auto-redirect if they have an active ticket in localStorage
   useEffect(() => {
     try {
@@ -42,11 +46,33 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
     }
     
     // Check if user is already logged in
+    const checkActiveQueue = async (phoneToUse: string) => {
+      try {
+        const res = await fetch(`/api/queue/history?phone=${phoneToUse}`, {
+          headers: { 'x-restaurant-slug': slug }
+        });
+        const data = await res.json();
+        if (data.success && data.data.length > 0) {
+          // If the most recent one is not SEATED, they can't join again
+          const latest = data.data[0];
+          if (latest.queue_status !== 'SEATED') {
+            setActiveQueue(latest);
+          }
+        }
+      } catch (err) {
+      } finally {
+        setCheckingActive(false);
+      }
+    };
+
     const user = authService.getUser();
     if (user && user.phone) {
       setPhone(user.phone);
       if (user.name) setName(user.name);
       setIsVerified(true);
+      checkActiveQueue(user.phone);
+    } else {
+      setCheckingActive(false);
     }
   }, [restaurantId, slug, router]);
 
@@ -87,6 +113,21 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
         toast.success('Phone verified successfully!');
         setOtpStep(false);
         setIsVerified(true);
+        // After verify, check active queue
+        setCheckingActive(true);
+        try {
+          const res = await fetch(`/api/queue/history?phone=${phone}`, {
+            headers: { 'x-restaurant-slug': slug }
+          });
+          const historyData = await res.json();
+          if (historyData.success && historyData.data.length > 0) {
+            const latest = historyData.data[0];
+            if (latest.queue_status !== 'SEATED') {
+              setActiveQueue(latest);
+            }
+          }
+        } catch {}
+        setCheckingActive(false);
       } else {
         toast.error(data.error || 'Invalid OTP');
       }
@@ -148,8 +189,26 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
     }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '8px', backgroundColor: 'var(--primary)' }} />
       
-      {/* Toggle Tabs Removed */}
-      
+      {checkingActive ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+          <div className="loader" style={{ width: 24, height: 24, borderWidth: 2 }} />
+        </div>
+      ) : activeQueue ? (
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎟️</div>
+          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>You are already in the queue!</h3>
+          <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: 1.5 }}>
+            Your current token is <strong>#{activeQueue.token_number}</strong> and your status is <strong style={{ color: 'var(--primary)' }}>{activeQueue.queue_status}</strong>.
+            You cannot join the queue again until you are SEATED.
+          </p>
+          <button onClick={() => router.push(`/${slug}/queue-status/${activeQueue.token_number}`)} style={{
+            width: '100%', padding: '16px', backgroundColor: 'var(--primary)', color: '#ffffff',
+            border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer',
+          }}>
+            View Queue Status
+          </button>
+        </div>
+      ) : (
       <form onSubmit={handleJoinSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
             <div>
@@ -280,10 +339,16 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
               marginTop: '8px', opacity: (loading || !isVerified) ? 0.5 : 1, transition: 'opacity 0.2s', letterSpacing: '0.02em',
               boxShadow: '0 8px 20px -8px var(--primary)'
             }}>
-              {loading ? 'Joining...' : 'Confirm Waitlist'}
+              {loading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <div className="loader" style={{ width: 16, height: 16, borderWidth: 2, borderColor: '#fff', borderBottomColor: 'transparent' }} />
+                  Joining...
+                </div>
+              ) : 'Confirm Waitlist'}
             </button>
           </div>
         </form>
+      )}
     </div>
   );
 }

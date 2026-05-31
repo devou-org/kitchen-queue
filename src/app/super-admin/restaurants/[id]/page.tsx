@@ -196,6 +196,17 @@ export default function RestaurantDetails() {
 
   const handleToggleModule = async (moduleKey: string, isEnabled: boolean) => {
     if (!restaurant) return;
+
+    if (isEnabled && moduleKey === 'ONLINE_ORDERING') {
+      const confirm = window.confirm("Default states 'PAID' and 'CANCELLED' will be added to the statuses. Proceed?");
+      if (!confirm) return;
+    }
+
+    if (isEnabled && moduleKey === 'QUEUE_MANAGEMENT') {
+      const confirm = window.confirm("Default state 'SEATED' will be added to the queue statuses. Proceed?");
+      if (!confirm) return;
+    }
+
     try {
       const currentModules = restaurant.modules || [];
       const updatedModules = currentModules.map(m =>
@@ -217,6 +228,28 @@ export default function RestaurantDetails() {
       const data = await res.json();
       if (data.success) {
         toast.success(`${ALL_MODULES.find(m => m.key === moduleKey)?.label} subscription updated!`);
+        
+        // Auto-add statuses if enabled
+        if (isEnabled && moduleKey === 'ONLINE_ORDERING') {
+          await fetch(`/api/super-admin/queue/status`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders,
+            body: JSON.stringify({ restaurantId: id, statusEnum: 'PAID', color: '#10b981', priority: 998 })
+          });
+          await fetch(`/api/super-admin/queue/status`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders,
+            body: JSON.stringify({ restaurantId: id, statusEnum: 'CANCELLED', color: '#ef4444', priority: 999 })
+          });
+          fetchQueueStatuses();
+        }
+        
+        if (isEnabled && moduleKey === 'QUEUE_MANAGEMENT') {
+          await fetch(`/api/super-admin/queue/status`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders,
+            body: JSON.stringify({ restaurantId: id, statusEnum: 'SEATED', color: '#3b82f6', priority: 100 })
+          });
+          fetchQueueStatuses();
+        }
+
       } else {
         toast.error(data.error || 'Failed to update module');
         fetchRestaurant(); // Rollback

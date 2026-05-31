@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { authService } from '@/app/services/auth.api';
+import { User, BadgeCheck, Info } from 'lucide-react';
 
 interface CustomerDetailsProps {
   form: {
@@ -100,7 +101,10 @@ export default function CustomerDetails({
   return (
     <form onSubmit={onSubmit} id="new-order-form">
       <div className="card">
-        <h3 style={{ fontWeight: 700, marginBottom: '18px', fontSize: '16px' }}>👤 Your Details</h3>
+        <h3 style={{ fontWeight: 700, marginBottom: '18px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <User size={18} />
+          Your Details
+        </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <label className="label">Full Name *</label>
@@ -130,9 +134,10 @@ export default function CustomerDetails({
               {isVerified ? (
                 <span style={{ 
                   color: '#10B981', background: 'rgba(16, 185, 129, 0.1)', 
-                  padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 
+                  padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
+                  display: 'flex', alignItems: 'center', gap: '6px'
                 }}>
-                  ✅ Verified
+                  <BadgeCheck size={16} /> Verified
                 </span>
               ) : (
                 otpStep ? (
@@ -292,7 +297,7 @@ export default function CustomerDetails({
                 alignItems: 'flex-start',
                 gap: '8px'
               }}>
-                <span style={{ fontSize: '14px', color: '#3b82f6', marginTop: '2px' }}>ℹ️</span>
+                <span style={{ fontSize: '14px', color: '#3b82f6', marginTop: '2px' }}><Info size={16} /></span>
                 <p style={{ margin: 0, fontSize: '13px', color: '#1e40af', lineHeight: 1.4, fontWeight: 500 }}>
                   For a party of {form.party_size}, you must order at least {parseInt(form.party_size) - 1} item{parseInt(form.party_size) - 1 > 1 ? 's' : ''}.
                 </p>
