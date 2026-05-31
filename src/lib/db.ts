@@ -767,7 +767,7 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
     JOIN queue_status qs ON qs.id = q.queue_status_id
     LEFT JOIN orders o ON o.queue_id = q.id
     LEFT JOIN active_ranks ar ON ar.id = q.id
-    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone}
+    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone} AND q.queue_type = 'ORDER'
     ORDER BY q.created_at DESC
     LIMIT 20
   `;
@@ -776,12 +776,12 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
 
 export async function getOrdersByPhonePaginated(restaurantId: string, phone: string, page: number = 1, limit: number = 20) {
   const offset = (page - 1) * limit;
-  
+
   const countRows = await sql`
     SELECT COUNT(*)::integer as total
     FROM queues q
     JOIN users u ON u.id = q.user_id
-    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone}
+    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone} AND q.queue_type = 'ORDER'
   `;
   const total = countRows[0]?.total || 0;
 
@@ -801,7 +801,7 @@ export async function getOrdersByPhonePaginated(restaurantId: string, phone: str
     JOIN users u ON u.id = q.user_id
     JOIN queue_status qs ON qs.id = q.queue_status_id
     LEFT JOIN orders o ON o.queue_id = q.id
-    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone}
+    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone} AND q.queue_type = 'ORDER'
     ORDER BY q.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -1193,37 +1193,32 @@ export async function setOrderPaymentStatus(restaurantId: string, id: string, is
   return rows[0];
 }
 
-export async function expireOldTickets() {
+export async function expireOldOrders() {
   const localTimezone = 'Asia/Kolkata';
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
 
-  // 1. Expire old food orders
+  // 1. Get IDs of orders to expire
   const toExpire = await sql`
     SELECT id, restaurant_id FROM orders 
     WHERE status IN ('PENDING', 'PREPARING')
       AND DATE(created_at AT TIME ZONE ${localTimezone}) < ${today}::date
   `;
 
-  let expiredOrdersCount = 0;
+  if (toExpire.length === 0) return { expiredCount: 0 };
+
+  // 2. Cancel them and restore stock
+  let expiredCount = 0;
   for (const row of toExpire) {
     try {
       await updateOrderStatus(row.restaurant_id, row.id, 'EXPIRED');
       await restoreOrderStock(row.id);
-      expiredOrdersCount++;
+      expiredCount++;
     } catch (err) {
       console.error(`Failed to expire order ${row.id}:`, err);
     }
   }
 
-  // 2. Expire old waitlist queues (that were never seated/completed)
-  // Since statuses are dynamic per restaurant, we will just set them to the highest priority status (usually SEATED/CANCELLED) 
-  // or a system default if they are from a previous day. Wait, 'queue_status_id' is a foreign key. We can't just set string.
-  // Instead, we will find all 'SEATED' or 'CANCELLED' statuses for each restaurant and update them, 
-  // but a simpler way is we just don't need to mutate 'queues', because the queries strictly filter by CURRENT_DATE.
-  // We will just let them naturally hide by date. However, to keep it clean, we can just log that they were ignored.
-  // Actually, we can update the 'updated_at' just for record keeping, but they are already invisible to the user.
-
-  return { expiredOrdersCount };
+  return { expiredCount };
 }
 
 // ============================================

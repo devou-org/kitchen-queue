@@ -21,7 +21,7 @@ export class QueueService {
     const { restaurantId, name, phone, partySize, notes, queueType = 'WALK_IN' } = params;
 
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
 
@@ -50,7 +50,7 @@ export class QueueService {
 
       if (existingQueueRes.rows.length > 0) {
         const existingQueue = existingQueueRes.rows[0];
-        
+
         // If the most recent ticket is not in a terminal state, return it instead of creating a new one
         const inactiveStatuses = ['SEATED', 'CANCELLED', 'COMPLETED'];
         if (!inactiveStatuses.includes(existingQueue.possible_queue_status)) {
@@ -68,7 +68,7 @@ export class QueueService {
           `, [restaurantId, existingQueue.token_number]);
 
           const queueLength = parseInt(waitTimeRes.rows[0].queue_length, 10);
-          existingQueue.position = existingQueue.queue_status_id ? (queueLength + 1) : 0; 
+          existingQueue.position = existingQueue.queue_status_id ? (queueLength + 1) : 0;
 
           await client.query('COMMIT');
           return existingQueue;
@@ -119,12 +119,12 @@ export class QueueService {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `, [
-        restaurantId, userId, waitingStatusId, nextToken, 
+        restaurantId, userId, waitingStatusId, nextToken,
         queueType, partySize, null, notes
       ]);
 
       await client.query('COMMIT');
-      
+
       const newQueue = queueRes.rows[0];
       newQueue.position = position;
 
@@ -169,7 +169,7 @@ export class QueueService {
       `, [statusId, queueId, restaurantId]);
 
       await client.query('COMMIT');
-      
+
       const updatedQueue = updateRes.rows[0];
       import('../notifications/pusher.service').then(m => {
         m.PusherService.emitToRestaurant(restaurantId, 'QUEUE', 'queue_updated', { type: 'UPDATE', queue: updatedQueue });
@@ -192,10 +192,10 @@ export class QueueService {
       await pool.query(`ALTER TABLE queue_status ALTER COLUMN possible_queue_status TYPE VARCHAR(50) USING possible_queue_status::text`);
       await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '#cbd5e1'`);
       await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS priority INT DEFAULT 0`);
-    } catch(e) {}
+    } catch (e) { }
 
     const check = await pool.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = $2`, [restaurantId, statusEnum]);
-    
+
     if (check.rows.length > 0) {
       // It exists, let's update color and priority
       const updateRes = await pool.query(`
@@ -266,7 +266,7 @@ export class QueueService {
         FROM queues q2
         WHERE q2.restaurant_id = $1
           AND q2.queue_status_id = q.queue_status_id
-        AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+          AND CAST(q2.created_at AS DATE) = CURRENT_DATE
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -274,12 +274,12 @@ export class QueueService {
       JOIN users u ON q.user_id = u.id
       WHERE q.restaurant_id = $1 
         AND q.token_number = $2 
-        AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+        AND CAST(q.created_at AS DATE) = CURRENT_DATE
       LIMIT 1
     `, [restaurantId, tokenNumber]);
-    
+
     if (res.rows.length === 0) return null;
-    
+
     const queue = res.rows[0];
     queue.position = parseInt(queue.wait_position, 10) + 1;
     return queue;
@@ -304,10 +304,11 @@ export class QueueService {
       JOIN users u ON q.user_id = u.id
       WHERE q.restaurant_id = $1 
         AND u.phone = $2
+        AND q.queue_type = 'WALK_IN'
         AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
       ORDER BY q.created_at DESC
     `, [restaurantId, phone]);
-    
+
     return res.rows.map(q => ({
       ...q,
       position: parseInt(q.wait_position, 10) + 1
