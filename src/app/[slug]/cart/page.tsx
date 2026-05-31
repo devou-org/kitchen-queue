@@ -126,7 +126,7 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
       {/* Fixed Bottom */}
       <div style={{
         position: 'fixed',
-        bottom: 'calc(110px + env(safe-area-inset-bottom))',
+        bottom: 'calc(24px + env(safe-area-inset-bottom))',
         left: 0,
         right: 0,
         margin: '0 auto',

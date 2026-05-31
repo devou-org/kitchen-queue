@@ -29,23 +29,8 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
   const [activeQueue, setActiveQueue] = useState<any>(null);
   const [checkingActive, setCheckingActive] = useState(true);
 
-  // 1. Auto-redirect if they have an active ticket in localStorage
+  // 1. Check if user is already logged in and has an active queue ticket
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(`queue_ticket_${restaurantId}`);
-      if (stored) {
-        const { tokenNumber, expiresAt } = JSON.parse(stored);
-        if (Date.now() < expiresAt) {
-          router.replace(`/${slug}/queue-status/${tokenNumber}`);
-        } else {
-          localStorage.removeItem(`queue_ticket_${restaurantId}`);
-        }
-      }
-    } catch (e) {
-      // ignore
-    }
-    
-    // Check if user is already logged in
     const checkActiveQueue = async (phoneToUse: string) => {
       try {
         const res = await fetch(`/api/queue/history?phone=${phoneToUse}`, {
@@ -159,10 +144,6 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        localStorage.setItem(`queue_ticket_${restaurantId}`, JSON.stringify({
-          tokenNumber: data.token_number,
-          expiresAt: Date.now() + 60 * 60 * 1000 // 1 hour
-        }));
         router.push(`/${slug}/queue-status/${data.token_number}`);
       } else {
         toast.error(data.error || 'Failed to join queue');

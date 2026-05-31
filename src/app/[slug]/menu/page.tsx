@@ -712,15 +712,17 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
             )}
           </div>
         </Link>
-        <Link href={`/${slug}/order-status`} prefetch={false} style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-          padding: '6px 12px', borderRadius: '20px',
-          backgroundColor: '#f1f5f9', color: 'var(--text-primary)',
-          textDecoration: 'none', fontWeight: 700, fontSize: '13px'
-        }}>
-          <Ticket size={16} />
-          My Tickets
-        </Link>
+        {!showQueue && (
+          <Link href={`/${slug}/order-status`} prefetch={false} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            padding: '6px 12px', borderRadius: '20px',
+            backgroundColor: '#f1f5f9', color: 'var(--text-primary)',
+            textDecoration: 'none', fontWeight: 700, fontSize: '13px'
+          }}>
+            <Ticket size={16} />
+            My Tickets
+          </Link>
+        )}
       </div>
 
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '0' }}>
@@ -845,7 +847,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       {totalItems > 0 && isServiceActive && showOrdering && (
         <div style={{
           position: 'fixed',
-          bottom: '80px',
+          bottom: '24px',
           left: 0,
           right: 0,
           background: 'transparent',

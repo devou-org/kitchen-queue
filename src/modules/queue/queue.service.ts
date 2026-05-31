@@ -43,34 +43,36 @@ export class QueueService {
         JOIN queue_status qs ON q.queue_status_id = qs.id
         WHERE q.user_id = $1 
           AND q.restaurant_id = $2 
+          AND q.queue_type = $3
           AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
-          AND qs.possible_queue_status = (
-            SELECT possible_queue_status FROM queue_status WHERE restaurant_id = $2 ORDER BY id ASC LIMIT 1
-          )
         ORDER BY q.created_at DESC LIMIT 1
-      `, [userId, restaurantId]);
+      `, [userId, restaurantId, queueType]);
 
       if (existingQueueRes.rows.length > 0) {
         const existingQueue = existingQueueRes.rows[0];
         
-        // Calculate current position (how many WAITING people have a smaller token number)
-        const waitTimeRes = await client.query(`
-          SELECT COUNT(*) as queue_length 
-          FROM queues q
-          JOIN queue_status qs ON q.queue_status_id = qs.id
-          WHERE q.restaurant_id = $1 
-            AND qs.possible_queue_status = (
-              SELECT possible_queue_status FROM queue_status WHERE restaurant_id = $1 ORDER BY id ASC LIMIT 1
-            )
-            AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
-            AND q.token_number < $2
-        `, [restaurantId, existingQueue.token_number]);
+        // If the most recent ticket is not in a terminal state, return it instead of creating a new one
+        const inactiveStatuses = ['SEATED', 'CANCELLED', 'COMPLETED'];
+        if (!inactiveStatuses.includes(existingQueue.possible_queue_status)) {
+          // Calculate current position (how many people in the first status have a smaller token number)
+          const waitTimeRes = await client.query(`
+            SELECT COUNT(*) as queue_length 
+            FROM queues q
+            JOIN queue_status qs ON q.queue_status_id = qs.id
+            WHERE q.restaurant_id = $1 
+              AND qs.possible_queue_status = (
+                SELECT possible_queue_status FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC LIMIT 1
+              )
+              AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+              AND q.token_number < $2
+          `, [restaurantId, existingQueue.token_number]);
 
-        const queueLength = parseInt(waitTimeRes.rows[0].queue_length, 10);
-        existingQueue.position = existingQueue.queue_status_id ? (queueLength + 1) : 0; // Or handle 'SEATED' position
+          const queueLength = parseInt(waitTimeRes.rows[0].queue_length, 10);
+          existingQueue.position = existingQueue.queue_status_id ? (queueLength + 1) : 0; 
 
-        await client.query('COMMIT');
-        return existingQueue;
+          await client.query('COMMIT');
+          return existingQueue;
+        }
       }
 
       // 2. Get the default first status id for this restaurant
@@ -264,7 +266,7 @@ export class QueueService {
         FROM queues q2
         WHERE q2.restaurant_id = $1
           AND q2.queue_status_id = q.queue_status_id
-          AND CAST(q2.created_at AS DATE) = CURRENT_DATE
+        AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -272,7 +274,7 @@ export class QueueService {
       JOIN users u ON q.user_id = u.id
       WHERE q.restaurant_id = $1 
         AND q.token_number = $2 
-        AND CAST(q.created_at AS DATE) = CURRENT_DATE
+        AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
       LIMIT 1
     `, [restaurantId, tokenNumber]);
     
@@ -294,7 +296,7 @@ export class QueueService {
         FROM queues q2
         WHERE q2.restaurant_id = $1
           AND q2.queue_status_id = q.queue_status_id
-          AND CAST(q2.created_at AS DATE) = CURRENT_DATE
+        AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -302,7 +304,7 @@ export class QueueService {
       JOIN users u ON q.user_id = u.id
       WHERE q.restaurant_id = $1 
         AND u.phone = $2
-        AND CAST(q.created_at AS DATE) = CURRENT_DATE
+        AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
       ORDER BY q.created_at DESC
     `, [restaurantId, phone]);
     

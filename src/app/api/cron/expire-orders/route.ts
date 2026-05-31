@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { expireOldOrders } from '@/lib/db';
+import { expireOldTickets } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -11,10 +11,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await expireOldOrders();
+    const result = await expireOldTickets();
     return NextResponse.json({ 
       success: true, 
-      message: `Successfully expired ${result.expiredCount} old orders.`,
+      message: `Successfully expired ${result.expiredOrdersCount} old orders.`,
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
