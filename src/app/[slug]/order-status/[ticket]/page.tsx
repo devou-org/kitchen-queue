@@ -108,10 +108,10 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
           const dynamicStages = data.data
             .filter((s: any) => s.possible_queue_status !== 'CANCELLED')
             .map((s: any) => ({
-            key: s.possible_queue_status,
-            label: s.possible_queue_status,
-            icon: CheckCircle2
-          }));
+              key: s.possible_queue_status,
+              label: s.possible_queue_status,
+              icon: CheckCircle2
+            }));
           setStages(dynamicStages);
         }
       } catch (err) {
@@ -148,7 +148,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
         const currentTicketInt = parseInt(ticket);
         const currentOrder = orderRef.current;
         const isOurOrder = data.queue.token_number === currentTicketInt || (currentOrder?.id && data.queue.id === currentOrder.queue_id);
-        
+
         if (isOurOrder) {
           if (data.queue.queue_status === 'READY' && currentOrder?.status !== 'READY') {
             try {
@@ -331,8 +331,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             #{String(order.ticket_number).padStart(3, '0')}
           </h1>
 
-          {/* Queue Position Sub-card - Only for PENDING status */}
-          {order.status === 'PENDING' && (
+          {/* Queue Position Sub-card - For active waiting statuses */}
+          {['PENDING', 'WAITING', 'PREPARING'].includes((order.status || '').trim().toUpperCase()) && (
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -357,8 +357,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
           )}
         </div>
 
-        {/* Notification Banner - Only for PENDING status */}
-        {order.status === 'PENDING' && (
+        {/* Notification Banner - For active waiting statuses */}
+        {['PENDING', 'WAITING', 'PREPARING'].includes((order.status || '').trim().toUpperCase()) && (
           <div style={{
             background: '#EEF6FF',
             borderRadius: '18px',

@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const refreshToken = await generateRefreshToken({
       userId: user.id,
       tokenVersion: user.refresh_token_version || 1,
-    }, '30d');
+    }, '90d');
 
     const response = NextResponse.json({
       success: true,
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     // Set auth_token (access token) cookie (optional, primarily for frontend JS access if needed)
     response.cookies.set('auth_token', token, {
-      httpOnly: false,
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 24 * 60 * 60, // 1 day
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax', // or 'strict'
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: 90 * 24 * 60 * 60, // 90 days
       path: '/',
     });
 
@@ -82,4 +82,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Verification failed' }, { status: 500 });
   }
 }
- 
+

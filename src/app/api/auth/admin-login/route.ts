@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyPassword, generateAccessToken } from '@/lib/auth';
+import { verifyPassword, generateAccessToken, generateRefreshToken } from '@/lib/auth';
 import { getAdminByEmail } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
@@ -29,6 +29,11 @@ export async function POST(request: NextRequest) {
       isAdmin: true,
     }, '1d');
 
+    const refreshToken = await generateRefreshToken({
+      userId: 'admin-system',
+      tokenVersion: 1,
+    }, '90d');
+
     const response = NextResponse.json({
       success: true,
       token,
@@ -44,11 +49,19 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 8 * 60 * 60, // 8 hours
+      maxAge: 24 * 60 * 60, // 8 hours
       path: '/',
     });
 
-    response.cookies.set('admin_logged_in', '1', { httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 8 * 60 * 60, path: '/' });
+    response.cookies.set('admin_logged_in', '1', { httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 90 * 24 * 60 * 60, path: '/' });
+
+    response.cookies.set('admin_refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 90 * 24 * 60 * 60, // 90 days
+      path: '/',
+    });
 
     return response;
   } catch (error) {
@@ -56,4 +69,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Login failed' }, { status: 500 });
   }
 }
- 
+

@@ -703,9 +703,9 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
            SELECT COUNT(*)::integer
            FROM orders o2
            WHERE o2.restaurant_id = o1.restaurant_id
-             AND o2.status = o1.status
-             AND DATE(o2.created_at) = DATE(o1.created_at)
-             AND o2.ticket_number <= o1.ticket_number
+             AND UPPER(TRIM(o2.status)) IN ('PENDING', 'WAITING', 'PREPARING')
+             AND (o2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (o1.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+             AND (o2.created_at < o1.created_at OR (o2.created_at = o1.created_at AND o2.ticket_number <= o1.ticket_number))
          ) as pos
        FROM orders o1
        WHERE o1.restaurant_id = ${restaurantId}
@@ -738,8 +738,7 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
        SELECT
          q.id,
          ROW_NUMBER() OVER (
-           PARTITION BY DATE(q.created_at)
-           ORDER BY q.token_number ASC
+           ORDER BY q.created_at ASC, q.token_number ASC
          )::integer as pos
        FROM queues q
        JOIN queue_status qs ON qs.id = q.queue_status_id
@@ -1229,8 +1228,8 @@ export async function advanceQueue(restaurantId: string) {
       INSERT INTO queue_history (restaurant_id, action, queue_number, details_json)
       VALUES (${restaurantId}, 'ADVANCE', ${rows[0].current_queue_number}, '{"source": "admin"}')
     `;
-  } catch(e) {
-     // fallback if queue_history doesn't have restaurant_id yet
+  } catch (e) {
+    // fallback if queue_history doesn't have restaurant_id yet
   }
   return rows[0];
 }
@@ -1445,7 +1444,7 @@ export async function getAdminByEmail(email: string) {
 export async function incrementOtpCount(phone: string, restaurantId?: string) {
   const localTimezone = 'Asia/Kolkata';
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
-  
+
   // 1. Log the specific OTP request
   await sql`
     INSERT INTO otp_logs (phone, sent_at, restaurant_id)

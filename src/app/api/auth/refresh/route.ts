@@ -10,14 +10,17 @@ const JWT_SECRET = new TextEncoder().encode(
 export async function POST(request: NextRequest) {
   try {
     const refreshToken = request.cookies.get('refresh_token')?.value;
+    const adminRefreshToken = request.cookies.get('admin_refresh_token')?.value;
 
-    if (!refreshToken) {
+    const tokenToVerify = adminRefreshToken || refreshToken;
+
+    if (!tokenToVerify) {
       return NextResponse.json({ success: false, error: 'No refresh token' }, { status: 401 });
     }
 
     let payload;
     try {
-      const verified = await jwtVerify(refreshToken, JWT_SECRET);
+      const verified = await jwtVerify(tokenToVerify, JWT_SECRET);
       payload = verified.payload as any;
     } catch (err) {
       return NextResponse.json({ success: false, error: 'Invalid refresh token' }, { status: 401 });
@@ -27,7 +30,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid refresh token payload' }, { status: 401 });
     }
 
-    // Verify user exists and get version
+    // Handle Admin Refresh
+    if (payload.userId === 'admin-system') {
+      const token = await generateAccessToken({
+        userId: 'admin-system',
+        email: payload.email || 'admin@system.local',
+        isAdmin: true,
+      }, '1d');
+
+      const newRefreshToken = await generateRefreshToken({
+        userId: 'admin-system',
+        tokenVersion: 1,
+      }, '90d');
+
+      const response = NextResponse.json({
+        success: true,
+        token,
+        user: {
+          id: 'admin-system',
+          email: payload.email,
+          name: 'System Admin',
+          is_admin: true,
+        },
+      });
+
+      response.cookies.set('admin_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60, // 1 day
+        path: '/',
+      });
+
+      response.cookies.set('admin_refresh_token', newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 90 * 24 * 60 * 60, // 90 days
+        path: '/',
+      });
+
+      response.cookies.set('admin_logged_in', '1', { httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 90 * 24 * 60 * 60, path: '/' });
+
+      return response;
+    }
+
+    // Handle Standard User Refresh
     const userRows = await sql`SELECT * FROM users WHERE id = ${payload.userId} LIMIT 1`;
     const user = userRows[0];
 
@@ -50,7 +98,7 @@ export async function POST(request: NextRequest) {
     const newRefreshToken = await generateRefreshToken({
       userId: user.id,
       tokenVersion: user.refresh_token_version || 1,
-    }, '30d');
+    }, '90d');
 
     const response = NextResponse.json({
       success: true,
@@ -65,10 +113,10 @@ export async function POST(request: NextRequest) {
     });
 
     response.cookies.set('auth_token', token, {
-      httpOnly: false,
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 15 * 60, // 15 minutes
+      maxAge: 24 * 60 * 60, // 1 day
       path: '/',
     });
 
@@ -76,7 +124,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: 90 * 24 * 60 * 60, // 90 days
       path: '/',
     });
 

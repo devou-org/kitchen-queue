@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { authService } from '@/app/services/auth.api';
@@ -12,6 +12,22 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { restaurant } = useRestaurant();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const hasCookie = document.cookie.split('; ').find(row => row.startsWith('admin_logged_in='));
+      if (hasCookie) {
+        const res = await authService.refresh();
+        if (res.success && res.user?.is_admin) {
+          const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
+          const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
+          const target = showOrdering ? 'orders' : (showQueue ? 'queue' : 'products');
+          router.replace(`/${slug}/admin/${target}`);
+        }
+      }
+    };
+    checkAuth();
+  }, [slug, restaurant, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
