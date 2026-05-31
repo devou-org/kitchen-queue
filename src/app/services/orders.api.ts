@@ -56,18 +56,17 @@ class OrderService {
     }
   }
 
-  async getHistory(phone?: string): Promise<ApiResponse<Order[]>> {
+  async getHistory(phone?: string, page: number = 1, limit: number = 20): Promise<import('@/types').PaginatedResponse<Order>> {
     try {
-      const url = phone 
-        ? `/api/orders/history?phone=${encodeURIComponent(phone)}&t=${Date.now()}`
-        : `/api/orders/history?t=${Date.now()}`;
+      const params = new URLSearchParams({ page: page.toString(), limit: limit.toString(), t: Date.now().toString() });
+      if (phone) params.append('phone', phone);
         
-      const res = await fetch(url, {
+      const res = await fetch(`/api/orders/history?${params.toString()}`, {
         headers: this.getAuthHeaders(),
       });
       return await res.json();
     } catch (error) {
-      return { success: false, error: 'Network error while fetching history.' };
+      return { success: false, error: 'Network error while fetching history.', data: [], total: 0, page: 1, per_page: 20 };
     }
   }
 

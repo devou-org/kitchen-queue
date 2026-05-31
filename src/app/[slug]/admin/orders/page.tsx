@@ -44,6 +44,7 @@ export default function AdminOrders() {
   // Live Updates Log
   const [recentUpdates, setRecentUpdates] = useState<OrderUpdateLog[]>([]);
   const [queueStatuses, setQueueStatuses] = useState<string[]>([]);
+  const [statusesLoaded, setStatusesLoaded] = useState(false);
   const { restaurant } = useRestaurant();
 
   useEffect(() => {
@@ -62,6 +63,8 @@ export default function AdminOrders() {
       } catch (err) {
         console.error('Failed to fetch queue statuses', err);
         setQueueStatuses(['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED']);
+      } finally {
+        setStatusesLoaded(true);
       }
     };
     fetchStatuses();
@@ -89,6 +92,7 @@ export default function AdminOrders() {
   };
 
   const fetchOrders = useCallback(async (silent = false) => {
+    if (!statusesLoaded) return;
     if (!silent) setLoading(true);
     try {
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
@@ -112,7 +116,7 @@ export default function AdminOrders() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, statusFilter, queueStatuses]);
+  }, [page, statusFilter, queueStatuses, statusesLoaded]);
 
   useEffect(() => {
     fetchOrders();
@@ -368,9 +372,16 @@ export default function AdminOrders() {
                   setPage(1);
                 }}
                 style={{ height: '42px' }}
+                disabled={!statusesLoaded}
               >
-                <option value="">{defaultStatus}</option>
-                {activeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                {!statusesLoaded ? (
+                  <option value="">Loading...</option>
+                ) : (
+                  <>
+                    <option value="">{defaultStatus}</option>
+                    {activeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                  </>
+                )}
               </select>
             </div>
             {statusFilter === 'READY' && (

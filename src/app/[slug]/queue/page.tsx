@@ -3,7 +3,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import JoinQueueForm from '@/components/modules/queue/JoinQueueForm';
-import BottomNav from '@/components/BottomNav';
+
 
 export default function QueuePage() {
   const params = useParams();
@@ -65,7 +65,7 @@ export default function QueuePage() {
         <JoinQueueForm restaurantId={restaurant.id} />
       </div>
 
-      <BottomNav />
+
     </div>
   );
 }

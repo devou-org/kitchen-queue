@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
-import BottomNav from '@/components/BottomNav';
+
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -234,7 +234,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
           <p style={{ color: '#6B6667', marginBottom: '32px' }}>{error || 'The requested ticket could not be found.'}</p>
           <Link prefetch={false} href={`/${slug}/menu`} className="btn btn-primary btn-lg" style={{ width: '100%', maxWidth: '300px' }}>Go to Menu →</Link>
         </div>
-        <BottomNav />
+
       </div>
     );
   }
@@ -538,7 +538,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
 
       </main>
 
-      <BottomNav />
+
     </div>
   );
 }

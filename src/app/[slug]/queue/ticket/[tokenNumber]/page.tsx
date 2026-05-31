@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { pusherClient } from '@/lib/pusher-client';
-import BottomNav from '@/components/BottomNav';
+
 
 export default function QueueTicketPage() {
   const params = useParams();
@@ -191,7 +191,7 @@ export default function QueueTicketPage() {
         </div>
       </div>
 
-      <BottomNav />
+
     </div>
   );
 }

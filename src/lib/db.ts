@@ -698,17 +698,15 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
   const rows = await sql`
     WITH active_ranks AS (
        SELECT
-         o1.id,
-         (
-           SELECT COUNT(*)::integer
-           FROM orders o2
-           WHERE o2.restaurant_id = o1.restaurant_id
-             AND UPPER(TRIM(o2.status)) IN ('PENDING', 'WAITING', 'PREPARING')
-             AND (o2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (o1.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
-             AND (o2.created_at < o1.created_at OR (o2.created_at = o1.created_at AND o2.ticket_number <= o1.ticket_number))
-         ) as pos
-       FROM orders o1
-       WHERE o1.restaurant_id = ${restaurantId}
+         q.id as queue_id,
+         ROW_NUMBER() OVER (
+           ORDER BY q.created_at ASC, q.token_number ASC
+         )::integer as pos
+       FROM queues q
+       JOIN queue_status qs ON qs.id = q.queue_status_id
+       WHERE q.restaurant_id = ${restaurantId} 
+         AND qs.possible_queue_status IN ('PENDING', 'WAITING', 'PREPARING')
+         AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
     )
     SELECT o.*, 
       COALESCE(ar.pos, 0) as queue_position,
@@ -721,7 +719,7 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
         'product_image', p.image_url
       ) ORDER BY oi.id) as items
     FROM orders o
-    LEFT JOIN active_ranks ar ON ar.id = o.id
+    LEFT JOIN active_ranks ar ON ar.queue_id = o.queue_id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
     WHERE o.restaurant_id = ${restaurantId} AND o.ticket_number = ${ticket_number}
@@ -742,11 +740,13 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
          )::integer as pos
        FROM queues q
        JOIN queue_status qs ON qs.id = q.queue_status_id
-       WHERE q.restaurant_id = ${restaurantId} AND qs.possible_queue_status IN ('PENDING', 'WAITING', 'PREPARING')
+       WHERE q.restaurant_id = ${restaurantId} 
+         AND qs.possible_queue_status IN ('PENDING', 'WAITING', 'PREPARING')
+         AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
     )
     SELECT q.id, q.token_number as ticket_number, q.created_at, q.queue_type,
       o.id as order_id, o.is_paid, o.total_price,
-      qs.possible_queue_status as status,
+      COALESCE(o.status, qs.possible_queue_status) as status,
       qs.color as status_color,
       u.name as customer_name,
       COALESCE(ar.pos, 0) as queue_position,
@@ -773,6 +773,41 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
   `;
   return rows;
 }
+
+export async function getOrdersByPhonePaginated(restaurantId: string, phone: string, page: number = 1, limit: number = 20) {
+  const offset = (page - 1) * limit;
+  
+  const countRows = await sql`
+    SELECT COUNT(*)::integer as total
+    FROM queues q
+    JOIN users u ON u.id = q.user_id
+    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone}
+  `;
+  const total = countRows[0]?.total || 0;
+
+  const rows = await sql`
+    SELECT 
+      q.id, 
+      q.token_number as ticket_number, 
+      q.created_at, 
+      o.total_price,
+      COALESCE(o.status, qs.possible_queue_status) as status,
+      (
+        SELECT COUNT(oi.id)
+        FROM order_items oi 
+        WHERE oi.order_id = o.id
+      )::integer as item_count
+    FROM queues q
+    JOIN users u ON u.id = q.user_id
+    JOIN queue_status qs ON qs.id = q.queue_status_id
+    LEFT JOIN orders o ON o.queue_id = q.id
+    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone}
+    ORDER BY q.created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+  return { data: rows, total, page, totalPages: Math.ceil(total / limit) };
+}
+
 
 export async function createOrder(data: {
   restaurant_id: string;

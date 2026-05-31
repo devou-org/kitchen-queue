@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrdersByPhone, getRestaurantBySlug } from '@/lib/db';
+import { getOrdersByPhonePaginated, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -13,6 +13,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const queryPhone = searchParams.get('phone');
+    
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '20', 10);
     
     // Get token from cookie or header
     const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
@@ -31,8 +34,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Authentication or phone number required' }, { status: 401 });
     }
 
-    const orders = await getOrdersByPhone(restaurant.id, phoneToUse);
-    return NextResponse.json({ success: true, data: orders });
+    const { data, total, page: currentPage, totalPages } = await getOrdersByPhonePaginated(restaurant.id, phoneToUse, page, limit);
+    return NextResponse.json({ success: true, data, total, page: currentPage, totalPages });
   } catch (error) {
     console.error('History fetch error:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch history' }, { status: 500 });

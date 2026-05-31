@@ -45,18 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({
       success: true,
-      data: {
-        id: order.id,
-        ticket_number: order.ticket_number,
-        customer_name: order.customer_name,
-        status: order.status,
-        total_price: order.total_price,
-        items: order.items,
-        created_at: order.created_at,
-        party_size: order.party_size,
-        notes: order.notes,
-        queue_position: order.queue_position,
-      },
+      data: order,
     });
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to fetch order' }, { status: 500 });

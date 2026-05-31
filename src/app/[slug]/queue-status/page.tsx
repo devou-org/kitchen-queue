@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
-import BottomNav from '@/components/BottomNav';
+
 import { pusherClient } from '@/lib/pusher-client';
 import { useRestaurant } from '@/hooks/useRestaurant';
 
@@ -137,7 +137,7 @@ export default function QueueStatusPage() {
             Browse Menu →
           </Link>
         </div>
-        <BottomNav />
+
       </div>
     );
   }
@@ -242,7 +242,7 @@ export default function QueueStatusPage() {
         })}
       </div>
 
-      <BottomNav />
+
     </div>
   );
 }

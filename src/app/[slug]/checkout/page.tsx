@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { CartItem, Order } from '@/types';
 import { authService } from '@/app/services/auth.api';
 import { orderService } from '@/app/services/orders.api';
-import BottomNav from '@/components/BottomNav';
+
 
 // Modular Components
 import OrderSummary from './components/OrderSummary';
@@ -310,7 +310,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       />
 
 
-      <BottomNav />
+
     </div>
   );
 }

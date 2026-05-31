@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
 import { CartItem } from '@/types';
 import { TAX_RATE } from '@/lib/constants';
-import BottomNav from '@/components/BottomNav';
+
 
 import { use } from 'react';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -170,7 +170,7 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
         </Link>
       </div>
 
-      <BottomNav />
+
     </div>
   );
 }

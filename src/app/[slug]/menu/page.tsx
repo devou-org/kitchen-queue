@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
 import { Product, CartItem, ProductStatus } from '@/types';
-import BottomNav from '@/components/BottomNav';
+
 import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { Search, MapPin, ClipboardList } from 'lucide-react';
+import { Search, MapPin, Ticket, ClipboardList } from 'lucide-react';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -675,7 +675,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         `}} />
       )}
       {/* Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href={`/${slug}/menu`} prefetch={false} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
           {restaurant?.logo_url ? (
             <img
@@ -711,6 +711,15 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               </span>
             )}
           </div>
+        </Link>
+        <Link href={`/${slug}/order-status`} prefetch={false} style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+          padding: '6px 12px', borderRadius: '20px',
+          backgroundColor: '#f1f5f9', color: 'var(--text-primary)',
+          textDecoration: 'none', fontWeight: 700, fontSize: '13px'
+        }}>
+          <Ticket size={16} />
+          My Tickets
         </Link>
       </div>
 
@@ -950,7 +959,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         </div>
       )}
 
-      {(showOrdering || showQueue) && <BottomNav />}
+      
     </div>
   );
 }
