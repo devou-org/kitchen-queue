@@ -5,11 +5,12 @@ import { pusherServer } from '@/lib/pusher';
 
 async function requireAdmin(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
+  const staffToken = request.cookies.get('staff_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = adminToken || authHeader;
+  const token = adminToken || staffToken || authHeader;
   if (!token) return null;
   const payload = await verifyToken(token);
-  if (!payload?.isAdmin) return null;
+  if (!payload?.isAdmin && !payload?.isStaff) return null;
   return payload;
 }
 
@@ -70,7 +71,25 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customer_name, phone, items, notes, party_size } = body;
+    const { customer_name, phone, items, notes, party_size, table_number } = body;
+
+    let targetStatus = 'PENDING';
+    let targetSource = 'CUSTOMER';
+    const adminToken = request.cookies.get('admin_token')?.value;
+    const staffToken = request.cookies.get('staff_token')?.value;
+    const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
+    const token = adminToken || staffToken || authHeader;
+    if (token) {
+      try {
+        const payload = await verifyToken(token) as any;
+        if (payload?.isStaff || payload?.isAdmin) {
+          targetStatus = 'PREPARING';
+          targetSource = 'STAFF';
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
 
     if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
@@ -86,6 +105,17 @@ export async function POST(request: NextRequest) {
     }
     total_price = Math.round(total_price * 100) / 100;
 
+    // 2. Ensure user exists to link the order
+    let user_id: string | undefined = undefined;
+    try {
+      const user = await createUser(phone, customer_name.trim());
+      if (user && user.id) {
+        user_id = user.id;
+      }
+    } catch {
+      // Non-critical — don't fail the order if user creation fails
+    }
+
     const order = await createOrder({
       customer_name: customer_name.trim(),
       phone,
@@ -93,13 +123,15 @@ export async function POST(request: NextRequest) {
       notes,
       party_size: party_size || 1,
       items,
+      status: targetStatus,
+      source: targetSource,
+      user_id
     });
 
-    // Persist the customer name back to the users table so checkout can auto-fill it next time
-    try {
-      await createUser(phone, customer_name.trim());
-    } catch {
-      // Non-critical — don't fail the order if this upsert fails
+    if (table_number) {
+      const { updateOrderStatus } = await import('@/lib/db');
+      await updateOrderStatus(order.id, targetStatus, table_number);
+      order.table_number = table_number;
     }
 
     try {

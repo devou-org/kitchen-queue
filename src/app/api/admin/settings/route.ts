@@ -12,14 +12,22 @@ async function ensureColumnExists() {
   }
 }
 
-async function requireAdmin(request: Request) {
+async function requireAdminOrStaff(request: Request) {
   const cookieHeader = request.headers.get('cookie') || '';
   const adminToken = cookieHeader.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1];
+  const staffToken = cookieHeader.split('; ').find(c => c.startsWith('staff_token='))?.split('=')[1];
   
-  if (!adminToken) return null;
-  const payload = await verifyToken(adminToken);
-  if (!payload?.isAdmin) return null;
-  return payload;
+  if (adminToken) {
+    const payload = await verifyToken(adminToken) as any;
+    if (payload?.isAdmin) return payload;
+  }
+  
+  if (staffToken) {
+    const payload = await verifyToken(staffToken) as any;
+    if (payload?.isStaff) return payload;
+  }
+
+  return null;
 }
 
 export async function GET() {
@@ -38,8 +46,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin(request);
-    if (!admin) {
+    const user = await requireAdminOrStaff(request);
+    if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 

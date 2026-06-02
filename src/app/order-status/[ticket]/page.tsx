@@ -12,7 +12,9 @@ import {
   Utensils,
   CircleDollarSign,
   Info,
-  ClipboardEdit
+  ClipboardEdit,
+  Star,
+  X
 } from 'lucide-react';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
@@ -50,6 +52,14 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
   const [showSurveyTip, setShowSurveyTip] = useState(false);
+  
+  // Review state
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   useEffect(() => {
     if (!localStorage.getItem('hideSurveyTip_kdK8Jd')) {
@@ -71,6 +81,10 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
         const data = await orderService.getOrderByTicket(ticket);
         if (data.success && data.data) {
           setOrder(data.data);
+          
+          if (data.data.status === 'PAID' && !localStorage.getItem(`reviewed_${data.data.id}`)) {
+            setShowReviewModal(true);
+          }
         } else if (!silent) {
           setError(data.error || 'Order not found');
           setOrder(null);
@@ -102,6 +116,11 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
             new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { });
           } catch { }
         }
+        
+        if (data.new_status === 'PAID' && currentOrder && !localStorage.getItem(`reviewed_${currentOrder.id}`)) {
+          setShowReviewModal(true);
+        }
+
         setOrder(prev => prev ? { ...prev, status: data.new_status || prev.status, is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : prev.is_paid } : null);
         fetchOrder(true);
       }
@@ -144,6 +163,33 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const stageIndex = getStageIndex(order.status);
   const position = typeof order.queue_position === 'number' ? order.queue_position : 0;
   const displayPosition = position || 1;
+
+  const submitReview = async () => {
+    if (rating === 0) return;
+    setSubmittingReview(true);
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, rating, comment })
+      });
+      const data = await res.json();
+      if (data.success || data.error === 'Review already submitted for this order') {
+        setReviewSubmitted(true);
+        localStorage.setItem(`reviewed_${order.id}`, 'true');
+        setTimeout(() => setShowReviewModal(false), 2000);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const closeReviewModal = () => {
+    setShowReviewModal(false);
+    localStorage.setItem(`reviewed_${order.id}`, 'dismissed');
+  };
 
   return (
     <div style={{ background: '#FDF9FA', minHeight: '100vh', paddingBottom: '120px' }}>
@@ -446,6 +492,76 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
         </div>
 
       </main>
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+          padding: '20px'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '32px 24px', position: 'relative', textAlign: 'center' }}>
+            <button 
+              onClick={closeReviewModal}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+            
+            {reviewSubmitted ? (
+              <div className="animate-fade-in">
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#D1FAE5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                  <CheckCircle2 size={32} />
+                </div>
+                <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px' }}>Thank you!</h2>
+                <p style={{ color: '#6B6667', fontSize: '14px' }}>Your feedback helps us improve.</p>
+              </div>
+            ) : (
+              <div className="animate-fade-in">
+                <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px' }}>How was your food?</h2>
+                <p style={{ color: '#6B6667', fontSize: '14px', marginBottom: '24px' }}>We'd love to hear your thoughts!</p>
+                
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '24px' }}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      <Star 
+                        size={36} 
+                        fill={(hoverRating || rating) >= star ? '#F59E0B' : 'transparent'} 
+                        color={(hoverRating || rating) >= star ? '#F59E0B' : '#D1D5DB'} 
+                        style={{ transition: 'all 0.2s' }}
+                      />
+                    </button>
+                  ))}
+                </div>
+
+                <textarea 
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Tell us what you liked or how we can improve (optional)"
+                  className="textarea"
+                  style={{ marginBottom: '24px', minHeight: '100px' }}
+                />
+
+                <button 
+                  className="btn btn-primary w-full" 
+                  onClick={submitReview}
+                  disabled={rating === 0 || submittingReview}
+                  style={{ width: '100%' }}
+                >
+                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>

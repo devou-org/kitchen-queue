@@ -407,9 +407,12 @@ export async function createOrder(data: {
   customer_name: string;
   phone: string;
   total_price: number;
+  status?: string;
   notes?: string;
   party_size?: number;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
+  source?: string;
+  user_id?: string;
 }) {
   const normalized = new Map<string, { quantity: number; price_at_purchase: number }>();
 
@@ -491,11 +494,11 @@ export async function createOrder(data: {
 
     const orderResult = await client.query(
       `
-        INSERT INTO orders (customer_name, phone, total_price, status, is_paid, notes, party_size)
-        VALUES ($1, $2, $3, 'PENDING', false, $4, $5)
+        INSERT INTO orders (customer_name, phone, total_price, status, is_paid, notes, party_size, source, user_id)
+        VALUES ($1, $2, $3, $6, false, $4, $5, $7, $8)
         RETURNING id
       `,
-      [data.customer_name, data.phone, computedTotal, data.notes || null, data.party_size || 1]
+      [data.customer_name, data.phone, computedTotal, data.notes || null, data.party_size || 1, data.status || 'PENDING', data.source || 'CUSTOMER', data.user_id || null]
     );
 
     const orderId = orderResult.rows[0]?.id;
@@ -1019,6 +1022,55 @@ export async function getAdminByEmail(email: string) {
 }
 
 // ============================================
+// STAFF QUERIES
+// ============================================
+
+export async function getStaffs() {
+  return await sql`SELECT id, name, email, phone, role, is_active, created_at, updated_at FROM staffs ORDER BY created_at DESC`;
+}
+
+export async function getStaffByEmail(email: string) {
+  const rows = await sql`SELECT * FROM staffs WHERE email = ${email} LIMIT 1`;
+  return rows[0] || null;
+}
+
+export async function createStaff(data: { name: string; email: string; phone?: string; password?: string; role?: string }) {
+  // Developer setting: limit staff creation to 2
+  const limit = 2;
+  const countRows = await sql`SELECT COUNT(*) as count FROM staffs`;
+  if (parseInt(countRows[0].count) >= limit) {
+    throw new Error(`Staff limit reached (max ${limit})`);
+  }
+  
+  const rows = await sql`
+    INSERT INTO staffs (name, email, phone, password, role) 
+    VALUES (${data.name}, ${data.email}, ${data.phone || null}, ${data.password || null}, ${data.role || 'KITCHEN'}) 
+    RETURNING id, name, email, phone, role, is_active
+  `;
+  return rows[0];
+}
+
+export async function updateStaff(id: string, data: Partial<{ name: string; email: string; phone: string; password?: string; role: string; is_active: boolean }>) {
+  const rows = await sql`
+    UPDATE staffs SET
+      name = COALESCE(${data.name ?? null}, name),
+      email = COALESCE(${data.email ?? null}, email),
+      phone = COALESCE(${data.phone ?? null}, phone),
+      password = COALESCE(${data.password ?? null}, password),
+      role = COALESCE(${data.role ?? null}, role),
+      is_active = COALESCE(${data.is_active ?? null}, is_active),
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING id, name, email, phone, role, is_active
+  `;
+  return rows[0];
+}
+
+export async function deleteStaff(id: string) {
+  await sql`DELETE FROM staffs WHERE id = ${id}`;
+}
+
+// ============================================
 // OTP BILLING QUERIES
 // ============================================
 
@@ -1051,3 +1103,4 @@ export async function getOtpStats(dateFrom: string, dateTo: string) {
   `;
   return rows;
 }
+

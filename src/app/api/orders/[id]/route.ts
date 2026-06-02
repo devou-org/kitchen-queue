@@ -15,11 +15,12 @@ async function requireAdmin(request: NextRequest) {
   }
 
   const adminToken = request.cookies.get('admin_token')?.value;
+  const staffToken = request.cookies.get('staff_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = adminToken || authHeader;
+  const token = adminToken || staffToken || authHeader;
   if (!token) return null;
   const payload = await verifyToken(token);
-  if (!payload?.isAdmin) return null;
+  if (!payload?.isAdmin && !payload?.isStaff) return null;
   return payload;
 }
 
@@ -30,12 +31,13 @@ async function getAuthContext(request: NextRequest) {
   }
 
   const adminToken = request.cookies.get('admin_token')?.value;
+  const staffToken = request.cookies.get('staff_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = adminToken || authHeader;
+  const token = adminToken || staffToken || authHeader;
   if (!token) return { admin: null, customer: null };
-  const payload = await verifyToken(token);
+  const payload = await verifyToken(token) as any;
   if (!payload) return { admin: null, customer: null };
-  if (payload.isAdmin) return { admin: payload, customer: null };
+  if (payload.isAdmin || payload.isStaff) return { admin: payload, customer: null };
   return { admin: null, customer: payload };
 }
 

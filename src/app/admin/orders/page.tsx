@@ -388,7 +388,12 @@ export default function AdminOrders() {
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDateTime(order.created_at)}</div>
                     </td>
                     <td>
-                      <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
+                        {order.source === 'STAFF' && (
+                          <span style={{ fontSize: '10px', background: '#e0e7ff', color: '#4338ca', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>👨‍🍳 STAFF</span>
+                        )}
+                      </div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.phone}</div>
                       {order.table_number && (
                         <div style={{
@@ -480,7 +485,15 @@ export default function AdminOrders() {
 
             <div className="card" style={{ background: '#F9FAFB', padding: '12px 16px', marginBottom: '16px', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div><p className="label">CUSTOMER</p><p style={{ fontWeight: 700 }}>{selectedOrder.customer_name}</p></div>
+                <div>
+                  <p className="label">CUSTOMER</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <p style={{ fontWeight: 700 }}>{selectedOrder.customer_name}</p>
+                    {selectedOrder.source === 'STAFF' && (
+                      <span style={{ fontSize: '10px', background: '#e0e7ff', color: '#4338ca', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>👨‍🍳 STAFF</span>
+                    )}
+                  </div>
+                </div>
                 <div style={{ textAlign: 'right' }}><p className="label">PHONE</p><p style={{ fontWeight: 600 }}>{selectedOrder.phone}</p></div>
               </div>
               <p style={{ fontSize: '13px', color: 'var(--info)', fontWeight: 600 }}>👥 {selectedOrder.party_size || 1} Party</p>

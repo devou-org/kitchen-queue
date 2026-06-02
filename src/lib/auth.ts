@@ -111,6 +111,7 @@ export interface JWTPayload {
   phone?: string;
   email?: string;
   isAdmin: boolean;
+  isStaff?: boolean;
   iat?: number;
   exp?: number;
 }
