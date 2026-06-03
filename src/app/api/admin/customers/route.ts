@@ -36,15 +36,15 @@ export async function GET(request: Request) {
           COALESCE(SUM(o.total_price) FILTER (WHERE o.status = 'PAID' AND o.is_paid = true), 0) as total_spent,
           MAX(o.created_at) as last_order_date
         FROM users u
-        LEFT JOIN orders o ON o.phone = u.phone
-        WHERE u.name ILIKE ${searchPattern} OR u.phone ILIKE ${searchPattern}
+        LEFT JOIN orders o ON o.user_id = u.id OR REPLACE(o.phone, '+91', '') = REPLACE(u.phone, '+91', '')
+        WHERE u.name ILIKE ${searchPattern} OR REPLACE(u.phone, '+91', '') ILIKE ${searchPattern}
         GROUP BY u.id
         ORDER BY total_orders DESC, u.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
       countResult = await sql`
         SELECT COUNT(*) FROM users 
-        WHERE name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern}
+        WHERE name ILIKE ${searchPattern} OR REPLACE(phone, '+91', '') ILIKE ${searchPattern}
       `;
     } else {
       rows = await sql`
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(o.total_price) FILTER (WHERE o.status = 'PAID' AND o.is_paid = true), 0) as total_spent,
           MAX(o.created_at) as last_order_date
         FROM users u
-        LEFT JOIN orders o ON o.phone = u.phone
+        LEFT JOIN orders o ON o.user_id = u.id OR REPLACE(o.phone, '+91', '') = REPLACE(u.phone, '+91', '')
         GROUP BY u.id
         ORDER BY total_orders DESC, u.created_at DESC
         LIMIT ${limit} OFFSET ${offset}

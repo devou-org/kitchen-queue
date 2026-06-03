@@ -71,7 +71,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customer_name, phone, items, notes, party_size, table_number } = body;
+    let { customer_name, phone, items, notes, party_size, table_number } = body;
+
+    // Standardize phone number
+    if (phone && phone.startsWith('+91')) {
+      phone = phone.replace('+91', '');
+    }
 
     let targetStatus = 'PENDING';
     let targetSource = 'CUSTOMER';

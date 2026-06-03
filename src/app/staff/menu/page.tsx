@@ -265,7 +265,7 @@ export default function StaffMenuPage() {
 
       {totalItems > 0 && (
         <div style={{ position: 'fixed', bottom: '80px', left: 0, right: 0, padding: '0 16px', zIndex: 40, display: 'flex', justifyContent: 'center' }}>
-          <button 
+          <button
             className="btn btn-primary"
             onClick={() => setCheckoutOpen(true)}
             style={{ width: '100%', maxWidth: '400px', borderRadius: '999px', height: '48px', fontSize: '15px', fontWeight: 700, display: 'flex', justifyContent: 'space-between', padding: '0 20px', boxShadow: '0 8px 20px rgba(0,0,0,0.2)' }}
@@ -301,27 +301,36 @@ export default function StaffMenuPage() {
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div style={{ flex: 1 }}>
                   <label className="label">Table Number *</label>
-                  <input type="text" className="input" placeholder="e.g. 12" value={orderForm.table_number} onChange={e => setOrderForm({...orderForm, table_number: e.target.value})} />
+                  <input type="text" className="input" placeholder="e.g. 12" value={orderForm.table_number} onChange={e => setOrderForm({ ...orderForm, table_number: e.target.value })} />
                 </div>
                 <div style={{ width: '100px' }}>
                   <label className="label">Persons</label>
-                  <input type="number" min="1" className="input" value={orderForm.party_size} onChange={e => setOrderForm({...orderForm, party_size: parseInt(e.target.value) || 1})} />
+                  <select
+                    className="input"
+                    value={orderForm.party_size}
+                    onChange={e => setOrderForm({ ...orderForm, party_size: parseInt(e.target.value) || 1 })}
+                    style={{ paddingRight: '30px' }}
+                  >
+                    {[...Array(10)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              
+
               <div>
                 <label className="label">Customer Name (Optional)</label>
-                <input type="text" className="input" placeholder="Name" value={orderForm.customer_name} onChange={e => setOrderForm({...orderForm, customer_name: e.target.value})} />
+                <input type="text" className="input" placeholder="Name" value={orderForm.customer_name} onChange={e => setOrderForm({ ...orderForm, customer_name: e.target.value })} />
               </div>
 
               <div>
                 <label className="label">Customer Phone (Optional)</label>
-                <input type="text" className="input" placeholder="+91..." value={orderForm.phone} onChange={e => setOrderForm({...orderForm, phone: e.target.value})} />
+                <input type="text" className="input" placeholder="99xxxxxxxx" value={orderForm.phone} onChange={e => setOrderForm({ ...orderForm, phone: e.target.value })} />
               </div>
 
               <div>
                 <label className="label">Notes</label>
-                <input type="text" className="input" placeholder="Less spicy, extra napkins..." value={orderForm.notes} onChange={e => setOrderForm({...orderForm, notes: e.target.value})} />
+                <input type="text" className="input" placeholder="Less spicy, extra napkins..." value={orderForm.notes} onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} />
               </div>
 
               <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '8px' }} disabled={submitting}>
