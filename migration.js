@@ -59,6 +59,20 @@ async function runMigration() {
     `;
     console.log('Created reviews table');
 
+    // Step 7: Create staffs table
+    await sql`
+      CREATE TABLE IF NOT EXISTS staffs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        phone VARCHAR(50),
+        password VARCHAR(255),
+        role VARCHAR(50) DEFAULT 'KITCHEN',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `;
+    console.log('Created staffs table');
+
     console.log('Migration completed successfully.');
   } catch (error) {
     console.error('Migration failed:', error);

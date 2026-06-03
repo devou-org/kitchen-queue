@@ -10,11 +10,11 @@ async function checkAdmin(request: NextRequest) {
   return payload?.isAdmin;
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await checkAdmin(request))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     
     if (body.password) {
@@ -28,11 +28,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await checkAdmin(request))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { id } = params;
+    const { id } = await params;
     await deleteStaff(id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
