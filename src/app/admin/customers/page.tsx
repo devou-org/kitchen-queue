@@ -92,7 +92,9 @@ export default function CustomersAdminPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</td>
+                  <td colSpan={5} style={{ padding: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+                  </td>
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
@@ -103,7 +105,6 @@ export default function CustomersAdminPage() {
                   <tr key={c.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
                     <td style={{ padding: '16px' }}>
                       <div style={{ fontWeight: 600 }}>{c.name || 'Anonymous'}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ID: {c.id.slice(0, 8)}...</div>
                     </td>
                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{c.phone}</td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>

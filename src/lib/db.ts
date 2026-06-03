@@ -1041,7 +1041,7 @@ export async function createStaff(data: { name: string; email: string; phone?: s
   if (parseInt(countRows[0].count) >= limit) {
     throw new Error(`Staff limit reached (max ${limit})`);
   }
-  
+
   const rows = await sql`
     INSERT INTO staffs (name, email, phone, password, role) 
     VALUES (${data.name}, ${data.email}, ${data.phone || null}, ${data.password || null}, ${data.role || 'KITCHEN'}) 
@@ -1077,7 +1077,7 @@ export async function deleteStaff(id: string) {
 export async function incrementOtpCount(phone: string) {
   const localTimezone = 'Asia/Kolkata';
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
-  
+
   // 1. Log the specific OTP request
   await sql`
     INSERT INTO otp_logs (phone, sent_at)

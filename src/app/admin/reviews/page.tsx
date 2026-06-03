@@ -8,6 +8,7 @@ export default function ReviewsAdminPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedReview, setSelectedReview] = useState<any>(null);
 
   const fetchReviews = async (p: number) => {
     setLoading(true);
@@ -70,7 +71,9 @@ export default function ReviewsAdminPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</td>
+                  <td colSpan={5} style={{ padding: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+                  </td>
                 </tr>
               ) : reviews.length === 0 ? (
                 <tr>
@@ -99,9 +102,29 @@ export default function ReviewsAdminPage() {
                       </div>
                     </td>
                     <td style={{ padding: '16px' }}>
-                      <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.5 }}>
-                        {r.comment ? `"${r.comment}"` : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No comment provided</span>}
-                      </p>
+                      {r.comment ? (
+                        <p 
+                          onClick={() => setSelectedReview(r)}
+                          style={{ 
+                            margin: 0, 
+                            fontSize: '14px', 
+                            lineHeight: 1.5,
+                            cursor: 'pointer',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                          title="Click to read full review"
+                        >
+                          "{r.comment}"
+                        </p>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.5 }}>
+                          <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No comment provided</span>
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -137,6 +160,47 @@ export default function ReviewsAdminPage() {
           </div>
         )}
       </div>
+
+      {selectedReview && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+          padding: '24px'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '600px', padding: '32px', position: 'relative' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>
+              Review by {selectedReview.user_name || 'Anonymous'}
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex' }}>
+                {renderStars(selectedReview.rating)}
+              </div>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+                {new Date(selectedReview.created_at).toLocaleString()}
+              </span>
+            </div>
+            
+            <div style={{ 
+              background: '#F8FAFC', 
+              padding: '24px', 
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              maxHeight: '400px',
+              overflowY: 'auto'
+            }}>
+              <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                "{selectedReview.comment}"
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+              <button className="btn btn-secondary" onClick={() => setSelectedReview(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

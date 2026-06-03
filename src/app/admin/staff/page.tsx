@@ -95,8 +95,8 @@ export default function StaffAdminPage() {
     <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 800 }}>Staff Management</h1>
-        <button 
-          className="btn btn-primary" 
+        <button
+          className="btn btn-primary"
           onClick={() => openModal()}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
@@ -105,7 +105,7 @@ export default function StaffAdminPage() {
       </div>
 
       {loading ? (
-        <div>Loading staffs...</div>
+        <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
       ) : (
         <div className="card" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -143,14 +143,14 @@ export default function StaffAdminPage() {
                     </span>
                   </td>
                   <td style={{ padding: '16px', textAlign: 'right' }}>
-                    <button 
-                      onClick={() => openModal(staff)} 
+                    <button
+                      onClick={() => openModal(staff)}
                       style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', marginRight: '16px' }}
                     >
                       <Edit2 size={18} />
                     </button>
-                    <button 
-                      onClick={() => handleDelete(staff.id)} 
+                    <button
+                      onClick={() => handleDelete(staff.id)}
                       style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}
                     >
                       <Trash2 size={18} />
@@ -165,14 +165,14 @@ export default function StaffAdminPage() {
 
       {isModalOpen && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', 
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
         }}>
           <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '24px' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>
               {editingStaff ? 'Edit Staff' : 'Add New Staff'}
             </h2>
-            
+
             {errorMsg && (
               <div style={{ background: '#ef444420', color: '#ef4444', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', gap: '8px' }}>
                 <ShieldAlert size={18} /> {errorMsg}
@@ -182,27 +182,27 @@ export default function StaffAdminPage() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>Name</label>
-                <input 
+                <input
                   type="text" required
-                  value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+                  value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
                   className="input"
                 />
               </div>
-              
+
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>Email</label>
-                <input 
+                <input
                   type="email" required
-                  value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+                  value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
                   className="input"
                 />
               </div>
 
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>Phone (Optional)</label>
-                <input 
+                <input
                   type="text"
-                  value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
+                  value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })}
                   className="input"
                 />
               </div>
@@ -211,22 +211,22 @@ export default function StaffAdminPage() {
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>
                   Password {editingStaff && '(Leave blank to keep current)'}
                 </label>
-                <input 
+                <input
                   type="password" required={!editingStaff}
-                  value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+                  value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
                   className="input"
                 />
               </div>
 
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>Role</label>
-                <select 
-                  value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}
-                  className="select"
-                >
-                  <option value="KITCHEN">Kitchen Staff</option>
-                  <option value="CASHIER">Cashier / Waiter</option>
-                </select>
+                <input
+                  type="text"
+                  value="Kitchen Staff"
+                  disabled
+                  className="input"
+                  style={{ background: '#F3F4F6', color: 'var(--text-secondary)', cursor: 'not-allowed' }}
+                />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
