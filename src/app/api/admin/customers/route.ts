@@ -37,14 +37,16 @@ export async function GET(request: Request) {
           MAX(o.created_at) as last_order_date
         FROM users u
         LEFT JOIN orders o ON o.user_id = u.id OR REPLACE(o.phone, '+91', '') = REPLACE(u.phone, '+91', '')
-        WHERE u.name ILIKE ${searchPattern} OR REPLACE(u.phone, '+91', '') ILIKE ${searchPattern}
+        WHERE (u.name ILIKE ${searchPattern} OR REPLACE(u.phone, '+91', '') ILIKE ${searchPattern})
+          AND REPLACE(u.phone, '+91', '') != '0000000000'
         GROUP BY u.id
         ORDER BY total_orders DESC, u.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
       countResult = await sql`
         SELECT COUNT(*) FROM users 
-        WHERE name ILIKE ${searchPattern} OR REPLACE(phone, '+91', '') ILIKE ${searchPattern}
+        WHERE (name ILIKE ${searchPattern} OR REPLACE(phone, '+91', '') ILIKE ${searchPattern})
+          AND REPLACE(phone, '+91', '') != '0000000000'
       `;
     } else {
       rows = await sql`
@@ -57,11 +59,12 @@ export async function GET(request: Request) {
           MAX(o.created_at) as last_order_date
         FROM users u
         LEFT JOIN orders o ON o.user_id = u.id OR REPLACE(o.phone, '+91', '') = REPLACE(u.phone, '+91', '')
+        WHERE REPLACE(u.phone, '+91', '') != '0000000000'
         GROUP BY u.id
         ORDER BY total_orders DESC, u.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
-      countResult = await sql`SELECT COUNT(*) FROM users`;
+      countResult = await sql`SELECT COUNT(*) FROM users WHERE REPLACE(phone, '+91', '') != '0000000000'`;
     }
 
     const totalCount = parseInt(countResult[0].count, 10);
