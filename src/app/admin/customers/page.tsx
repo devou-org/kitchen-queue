@@ -45,17 +45,17 @@ export default function CustomersAdminPage() {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
             <Contact size={24} /> Customers CRM
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>
             {totalCount} total customers
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ position: 'relative', width: '300px' }}>
+        <div style={{ display: 'flex', gap: '12px', flex: '1 1 300px', minWidth: '0' }}>
+          <div style={{ position: 'relative', width: '100%' }}>
             <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }}>
               <Search size={18} />
             </div>

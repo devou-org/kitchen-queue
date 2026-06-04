@@ -59,17 +59,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Check Service Status FIRST
-    const { default: sql } = await import('@/lib/db');
-    const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE id = 1 LIMIT 1` as {is_service_active: boolean, service_message: string}[];
-    
-    if (settings[0] && !settings[0].is_service_active) {
-      return NextResponse.json({
-        success: false,
-        error: settings[0].service_message || 'Service is not started'
-      }, { status: 403 });
-    }
-
     const body = await request.json();
     let { customer_name, phone, items, notes, party_size, table_number } = body;
 
@@ -80,6 +69,8 @@ export async function POST(request: NextRequest) {
 
     let targetStatus = 'PENDING';
     let targetSource = 'CUSTOMER';
+    let isStaffOrder = false;
+
     const adminToken = request.cookies.get('admin_token')?.value;
     const staffToken = request.cookies.get('staff_token')?.value;
     const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
@@ -88,12 +79,24 @@ export async function POST(request: NextRequest) {
       try {
         const payload = await verifyToken(token) as any;
         if (payload?.isStaff || payload?.isAdmin) {
+          isStaffOrder = true;
           targetStatus = 'PREPARING';
           targetSource = 'STAFF';
         }
       } catch (e) {
         // Ignore
       }
+    }
+
+    // 1. Check Service Status FIRST (but allow staff to bypass)
+    const { default: sql } = await import('@/lib/db');
+    const settings = await sql`SELECT is_service_active, service_message FROM queue_state WHERE id = 1 LIMIT 1` as {is_service_active: boolean, service_message: string}[];
+    
+    if (settings[0] && !settings[0].is_service_active && !isStaffOrder) {
+      return NextResponse.json({
+        success: false,
+        error: settings[0].service_message || 'Service is not started'
+      }, { status: 403 });
     }
 
     if (!customer_name || !phone || !items || !items.length) {
