@@ -39,8 +39,8 @@ export async function POST(request: Request) {
     }
 
     const rows = await sql`
-      INSERT INTO reviews (user_id, order_id, rating, comment)
-      VALUES (${finalUserId}, ${orderId}, 5, ${comment || null})
+      INSERT INTO reviews (user_id, order_id, comment)
+      VALUES (${finalUserId}, ${orderId}, ${comment || null})
       RETURNING *
     `;
 
