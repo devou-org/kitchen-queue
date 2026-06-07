@@ -15,10 +15,10 @@ export async function POST(request: Request) {
       } catch (e) {}
     }
 
-    const { orderId, rating, comment } = await request.json();
+    const { orderId, comment } = await request.json();
 
-    if (!orderId || !rating || rating < 1 || rating > 5) {
-      return NextResponse.json({ success: false, error: 'Invalid input' }, { status: 400 });
+    if (!orderId || !comment || comment.trim() === '') {
+      return NextResponse.json({ success: false, error: 'Feedback text is required' }, { status: 400 });
     }
 
     // Verify the order exists
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     const rows = await sql`
       INSERT INTO reviews (user_id, order_id, rating, comment)
-      VALUES (${finalUserId}, ${orderId}, ${rating}, ${comment || null})
+      VALUES (${finalUserId}, ${orderId}, 5, ${comment || null})
       RETURNING *
     `;
 

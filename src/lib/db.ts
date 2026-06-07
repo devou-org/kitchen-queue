@@ -1001,7 +1001,7 @@ export async function getUserByPhone(phone: string) {
 export async function createUser(phone: string, name?: string) {
   const rows = await sql`
     INSERT INTO users (phone, name) VALUES (${phone}, ${name || null})
-    ON CONFLICT (phone) DO UPDATE SET name = COALESCE(EXCLUDED.name, users.name)
+    ON CONFLICT (phone) DO UPDATE SET name = COALESCE(users.name, EXCLUDED.name)
     RETURNING *
   `;
   return rows[0];

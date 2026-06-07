@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { CartItem, Order } from '@/types';
@@ -29,6 +29,7 @@ export default function CheckoutPage() {
     notes: '',
   });
   const [otpActive, setOtpActive] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -102,8 +103,9 @@ export default function CheckoutPage() {
   // ── PLACE NEW ORDER ──────────────────────────────────────────────
   const handleNewOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (loading) return;
+    if (loading || isSubmittingRef.current) return;
     
+    isSubmittingRef.current = true;
     setLoading(true);
 
     // Use existing user state for verification check
@@ -112,28 +114,33 @@ export default function CheckoutPage() {
     if (!form.customer_name.trim() || form.customer_name.length < 2) {
       toast.error('Please enter your name (min 2 characters)');
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
     const cleanedPhone = form.phone.replace(/\D/g, '');
     if (!cleanedPhone) {
       toast.error('Phone number is required');
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
     if (cleanedPhone.length < 10) {
       toast.error('Please enter a valid 10-digit phone number');
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
     const partySize = parseInt(form.party_size);
     if (!form.party_size || partySize < 1) {
       toast.error('Please select number of persons');
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
     if (items.length === 0) {
       toast.error('Your cart is empty');
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -142,6 +149,7 @@ export default function CheckoutPage() {
     if (!verified) {
       toast.error('Please verify your phone number first.');
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -180,22 +188,26 @@ export default function CheckoutPage() {
       toast.error('Network error. Please try again.');
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
   // ── ADD ITEMS TO EXISTING ORDER ──────────────────────────────────
   const handleAddToOrder = async () => {
-    if (loading) return;
+    if (loading || isSubmittingRef.current) return;
     
+    isSubmittingRef.current = true;
     setLoading(true);
 
     if (!activeOrder) {
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
     if (items.length === 0) {
       toast.error('Your cart is empty');
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -204,6 +216,7 @@ export default function CheckoutPage() {
     if (!user) {
       toast.error('Session expired. Please verify again.');
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -239,6 +252,7 @@ export default function CheckoutPage() {
       toast.error('Network error. Please try again.');
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 

@@ -31,17 +31,7 @@ export default function ReviewsAdminPage() {
     fetchReviews(page);
   }, [page]);
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }).map((_, i) => (
-      <Star 
-        key={i} 
-        size={14} 
-        fill={i < rating ? '#F59E0B' : 'transparent'} 
-        color={i < rating ? '#F59E0B' : '#D1D5DB'} 
-        style={{ marginRight: '2px' }}
-      />
-    ));
-  };
+
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -64,20 +54,20 @@ export default function ReviewsAdminPage() {
                 <th style={{ padding: '16px', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>Date</th>
                 <th style={{ padding: '16px', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>Customer</th>
                 <th style={{ padding: '16px', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>Ticket #</th>
-                <th style={{ padding: '16px', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>Rating</th>
+
                 <th style={{ padding: '16px', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', width: '40%' }}>Comment</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '32px' }}>
+                  <td colSpan={4} style={{ padding: '32px' }}>
                     <div style={{ display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
                   </td>
                 </tr>
               ) : reviews.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No reviews yet.</td>
+                  <td colSpan={4} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No reviews yet.</td>
                 </tr>
               ) : (
                 reviews.map((r) => (
@@ -96,11 +86,7 @@ export default function ReviewsAdminPage() {
                         </span>
                       ) : '-'}
                     </td>
-                    <td style={{ padding: '16px' }}>
-                      <div style={{ display: 'flex' }}>
-                        {renderStars(r.rating)}
-                      </div>
-                    </td>
+
                     <td style={{ padding: '16px' }}>
                       {r.comment ? (
                         <p 
@@ -172,9 +158,6 @@ export default function ReviewsAdminPage() {
               Review by {selectedReview.user_name || 'Anonymous'}
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-              <div style={{ display: 'flex' }}>
-                {renderStars(selectedReview.rating)}
-              </div>
               <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
                 {new Date(selectedReview.created_at).toLocaleString()}
               </span>

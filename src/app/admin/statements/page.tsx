@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
-
+import { Download, History, MessageSquare } from 'lucide-react';
 export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,7 +154,9 @@ export default function AdminStatements() {
         <div className="card animate-slide-up" style={{ padding: '24px', marginBottom: '32px', background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>🔐 OTP Billing Summary</h3>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessageSquare size={20} color="var(--primary)" /> OTP Billing Summary
+              </h3>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Calculated at ₹0.50 per sent SMS</p>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -194,15 +196,42 @@ export default function AdminStatements() {
                 {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 24px' }}>📥 Export Statements (CSV)</button>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button 
+                className="btn" 
+                onClick={exportCSV} 
+                style={{ 
+                  height: '42px', 
+                  background: '#059669', 
+                  color: 'white', 
+                  padding: '0 24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(5, 150, 105, 0.2)',
+                  border: 'none'
+                }}
+              >
+                <Download size={18} /> Export Statements (CSV)
+              </button>
               <button
                 className="btn btn-secondary"
                 onClick={handleExpireOldOrders}
                 disabled={expiring}
-                style={{ height: '42px', padding: '0 20px', color: 'var(--warning)', borderColor: 'var(--warning)' }}
+                style={{ 
+                  height: '42px', 
+                  padding: '0 24px', 
+                  color: '#D97706', 
+                  borderColor: '#FCD34D', 
+                  background: '#FEF3C7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: 600
+                }}
               >
-                {expiring ? 'Expiring...' : '🕖 Expire Old Orders'}
+                <History size={18} /> {expiring ? 'Expiring...' : 'Expire Old Orders'}
               </button>
             </div>
           </div>

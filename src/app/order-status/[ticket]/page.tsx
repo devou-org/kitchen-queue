@@ -55,8 +55,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   
   // Review state
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
@@ -165,13 +163,13 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
   const displayPosition = position || 1;
 
   const submitReview = async () => {
-    if (rating === 0) return;
+    if (comment.trim() === '') return;
     setSubmittingReview(true);
     try {
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, rating, comment })
+        body: JSON.stringify({ orderId: order.id, comment })
       });
       const data = await res.json();
       if (data.success || data.error === 'Review already submitted for this order') {
@@ -520,31 +518,11 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
               <div className="animate-fade-in">
                 <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px' }}>How was your food?</h2>
                 <p style={{ color: '#6B6667', fontSize: '14px', marginBottom: '24px' }}>We'd love to hear your thoughts!</p>
-                
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '24px' }}>
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRating(star)}
-                      onMouseEnter={() => setHoverRating(star)}
-                      onMouseLeave={() => setHoverRating(0)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                    >
-                      <Star 
-                        size={36} 
-                        fill={(hoverRating || rating) >= star ? '#F59E0B' : 'transparent'} 
-                        color={(hoverRating || rating) >= star ? '#F59E0B' : '#D1D5DB'} 
-                        style={{ transition: 'all 0.2s' }}
-                      />
-                    </button>
-                  ))}
-                </div>
 
                 <textarea 
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder="Tell us what you liked or how we can improve (optional)"
+                  placeholder="Tell us your feedback"
                   className="textarea"
                   style={{ marginBottom: '24px', minHeight: '100px' }}
                 />
@@ -552,7 +530,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
                 <button 
                   className="btn btn-primary w-full" 
                   onClick={submitReview}
-                  disabled={rating === 0 || submittingReview}
+                  disabled={comment.trim() === '' || submittingReview}
                   style={{ width: '100%' }}
                 >
                   {submittingReview ? 'Submitting...' : 'Submit Review'}
