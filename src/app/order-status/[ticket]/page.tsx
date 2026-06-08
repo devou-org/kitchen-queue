@@ -81,7 +81,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
           setOrder(data.data);
           
           if (data.data.status === 'READY' && !localStorage.getItem(`reviewed_${data.data.id}`)) {
-            setShowReviewModal(true);
+            setTimeout(() => setShowReviewModal(true), 60000);
           }
         } else if (!silent) {
           setError(data.error || 'Order not found');
@@ -116,7 +116,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
         }
         
         if (data.new_status === 'READY' && currentOrder && !localStorage.getItem(`reviewed_${currentOrder.id}`)) {
-          setShowReviewModal(true);
+          setTimeout(() => setShowReviewModal(true), 60000);
         }
 
         setOrder(prev => prev ? { ...prev, status: data.new_status || prev.status, is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : prev.is_paid } : null);
