@@ -80,8 +80,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
         if (data.success && data.data) {
           setOrder(data.data);
           
-          if (data.data.status === 'READY' && !localStorage.getItem(`reviewed_${data.data.id}`)) {
-            setTimeout(() => setShowReviewModal(true), 500000);
+          if (data.data.status === 'PAID' && !localStorage.getItem(`reviewed_${data.data.id}`)) {
+            setShowReviewModal(true);
           }
         } else if (!silent) {
           setError(data.error || 'Order not found');
@@ -115,8 +115,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ ti
           } catch { }
         }
         
-        if (data.new_status === 'READY' && currentOrder && !localStorage.getItem(`reviewed_${currentOrder.id}`)) {
-          setTimeout(() => setShowReviewModal(true), 500000);
+        if (data.new_status === 'PAID' && currentOrder && !localStorage.getItem(`reviewed_${currentOrder.id}`)) {
+          setShowReviewModal(true);
         }
 
         setOrder(prev => prev ? { ...prev, status: data.new_status || prev.status, is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : prev.is_paid } : null);
