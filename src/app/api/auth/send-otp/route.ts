@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateOTP, generateOTPToken } from '@/lib/auth';
-import { sendOTPviaSMS } from '@/lib/sms';
+import { generateOTP, generateOTPToken, sendOTPviaSMS } from '@/lib/auth';
 import { validatePhone } from '@/lib/validators';
 import { getRestaurantBySlug } from '@/lib/db';
 import sql from '@/lib/db';
