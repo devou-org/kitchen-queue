@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { ClipboardList, ShoppingCart, Ticket, Package, BarChart3, Receipt, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare } from 'lucide-react';
+import { ClipboardList, ShoppingCart, Ticket, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare } from 'lucide-react';
 import 'react-phone-number-input/style.css';
 import PhoneInput from 'react-phone-number-input';
 
@@ -10,9 +10,6 @@ const ALL_MODULES = [
   { key: 'DIGITAL_MENU', label: 'Digital Menu', icon: <ClipboardList size={16} />, desc: 'QR code menu, categories, pricing' },
   { key: 'ONLINE_ORDERING', label: 'Online Ordering', icon: <ShoppingCart size={16} />, desc: 'Cart, checkout, OTP verification' },
   { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', icon: <Ticket size={16} />, desc: 'Token generation, live queue display' },
-  { key: 'INVENTORY', label: 'Inventory', icon: <Package size={16} />, desc: 'Stock tracking, low stock alerts' },
-  { key: 'ANALYTICS', label: 'Analytics', icon: <BarChart3 size={16} />, desc: 'Revenue, peak hours, reports' },
-  { key: 'REPORTS', label: 'Reports', icon: <Receipt size={16} />, desc: 'Statements, billing, exports' },
 ];
 
 type Restaurant = {
