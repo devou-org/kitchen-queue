@@ -1,9 +1,11 @@
-import { neon, Pool } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 
-const sql = neon(process.env.DATABASE_URL!);
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-export default sql;
+export default function sql(strings: TemplateStringsArray, ...values: any[]) {
+  const text = strings.reduce((prev, curr, i) => prev + '$' + i + curr);
+  return pool.query(text, values).then(res => res.rows);
+}
 
 // ============================================
 // RESTAURANT & MODULE QUERIES

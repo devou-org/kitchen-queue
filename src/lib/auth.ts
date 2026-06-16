@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
-import { incrementOtpCount } from './db';
+
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'fallback-secret-change-in-production-32chars!!'
@@ -99,42 +99,4 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
-}
-
-// ============================================
-// FAST2SMS OTP SENDER
-// ============================================
-
-export async function sendOTPviaSMS(phone: string, otp: string, restaurantId?: string): Promise<boolean> {
-  try {
-    const cleanPhone = phone.replace(/^\+91/, '').replace(/\D/g, '');
-
-    const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'authorization': process.env.FAST2SMS_API_KEY || '',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        sender_id: 'DEVOU',
-        message: `Dear User, your OTP for login is ${otp}. This OTP is valid for only 1 minute. Do not share it with anyone. - DEVOU SOLUTIONS`,
-        route: 'dlt_manual',
-        template_id: process.env.FAST2SMS_TEMPLATE_ID || '',
-        entity_id: process.env.FAST2SMS_ENTITY_ID || '',
-        numbers: cleanPhone,
-      }),
-    });
-
-    const data = await response.json();
-    console.log('SMS Response:', data);
-    if (data.return === true) {
-      await incrementOtpCount(phone, restaurantId);
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error('SMS send error:', error);
-    return false;
-  }
 }

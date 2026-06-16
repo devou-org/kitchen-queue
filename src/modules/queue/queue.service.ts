@@ -1,4 +1,4 @@
-import { Pool } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 
 // Note: Use a dedicated Pool instance if transactions are heavily used.
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });

@@ -87,7 +87,7 @@ async function handleSuperAdminRoutes(request: NextRequest, pathname: string) {
   if (pathname.startsWith('/super-admin') && pathname !== '/super-admin/login') {
     const token = request.cookies.get('super_admin_token')?.value;
     if (!token) return NextResponse.redirect(new URL('/super-admin/login', request.url));
-    
+
     const payload = await verifyToken(token);
     if (!payload?.isSuperAdmin) {
       const response = NextResponse.redirect(new URL('/super-admin/login', request.url));
@@ -120,7 +120,7 @@ async function handleRBAC(request: NextRequest, slug: string, subPath: string) {
 async function handleModulePermissions(request: NextRequest, slug: string, subPath: string) {
   // Determine if the route falls under any module rules
   const requiredModule = MODULE_RULES.find(rule => subPath.startsWith(rule.pathPrefix))?.module;
-  
+
   if (requiredModule) {
     try {
       // Fetch restaurant configuration from our API
@@ -129,7 +129,7 @@ async function handleModulePermissions(request: NextRequest, slug: string, subPa
       const res = await fetch(`${origin}/api/restaurant`, {
         headers: { 'x-restaurant-slug': slug },
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.data && data.data.modules) {
@@ -149,7 +149,7 @@ async function handleModulePermissions(request: NextRequest, slug: string, subPa
       // On failure, fail open to prevent blocking the app due to transient API errors
     }
   }
-  
+
   return null;
 }
 

@@ -1,4 +1,4 @@
-import { Pool } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 import { pusherServer } from '@/lib/pusher';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
