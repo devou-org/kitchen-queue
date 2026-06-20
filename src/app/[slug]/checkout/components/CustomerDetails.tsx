@@ -286,23 +286,7 @@ export default function CustomerDetails({
                 <option key={n} value={n}>{n} Party</option>
               ))}
             </select>
-            {form.party_size && totalQty !== undefined && totalQty < parseInt(form.party_size) - 1 && (
-              <div style={{
-                marginTop: '10px',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: '#eff6ff', // light blue
-                border: '1px solid #bfdbfe',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '14px', color: '#3b82f6', marginTop: '2px' }}><Info size={16} /></span>
-                <p style={{ margin: 0, fontSize: '13px', color: '#1e40af', lineHeight: 1.4, fontWeight: 500 }}>
-                  For a party of {form.party_size}, you must order at least {parseInt(form.party_size) - 1} item{parseInt(form.party_size) - 1 > 1 ? 's' : ''}.
-                </p>
-              </div>
-            )}
+
           </div>
         </div>
       </div>

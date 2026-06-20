@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
+import { Download, Clock } from 'lucide-react';
 
 export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -14,27 +15,8 @@ export default function AdminStatements() {
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [stats, setStats] = useState({ totalRevenue: 0, totalPaidRevenue: 0, orderCount: 0, paidCount: 0 });
-  const [otpSummary, setOtpSummary] = useState<{ total_otps: number; total_cost: number } | null>(null);
 
   const { slug } = useParams();
-
-  const fetchOtpStats = async () => {
-    try {
-      const qs = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
-      const res = await fetch(`/api/admin/otp-stats?${qs.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`,
-          'x-restaurant-slug': slug as string
-        }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setOtpSummary(data.summary);
-      }
-    } catch (err) {
-      console.error('Failed to load OTP stats');
-    }
-  };
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -71,7 +53,6 @@ export default function AdminStatements() {
 
   useEffect(() => {
     fetchOrders();
-    fetchOtpStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, statusFilter, page]);
 
@@ -146,49 +127,23 @@ export default function AdminStatements() {
             <h2 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)' }}>{formatPrice(totalRevenue)}</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Exclude cancelled orders</p>
           </div>
-          <div className="card" style={{ padding: '24px', borderLeft: '4px solid #059669' }}>
+          <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--primary)' }}>
             <p className="label" style={{ marginBottom: '8px' }}>Gross Paid</p>
             <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#059669' }}>{formatPrice(totalPaidRevenue)}</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Actual collected amount</p>
           </div>
-          <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--info)' }}>
+          <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--primary)' }}>
             <p className="label" style={{ marginBottom: '8px' }}>Total Orders</p>
             <h2 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)' }}>{orderCount}</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Received in period</p>
           </div>
-          <div className="card" style={{ padding: '24px', borderLeft: '4px solid #6366F1' }}>
+          <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--primary)' }}>
             <p className="label" style={{ marginBottom: '8px' }}>Fulfillment</p>
             <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#6366F1' }}>{paidCount}</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Paid status</p>
           </div>
         </div>
 
-        {/* OTP Billing Section */}
-        <div className="card animate-slide-up" style={{ padding: '24px', marginBottom: '32px', background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', border: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>🔐 OTP Billing Summary</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Calculated at ₹0.50 per sent SMS</p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>
-                {formatPrice(otpSummary?.total_cost || 0)}
-              </div>
-              <p className="label">Total Cost</p>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            <div style={{ background: 'white', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-              <p className="label">OTPs Sent</p>
-              <p style={{ fontSize: '20px', fontWeight: 700 }}>{otpSummary?.total_otps || 0}</p>
-            </div>
-            <div style={{ background: 'white', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-              <p className="label">Rate per SMS</p>
-              <p style={{ fontSize: '20px', fontWeight: 700 }}>₹0.50</p>
-            </div>
-          </div>
-        </div>
 
         <div className="card" style={{ padding: '20px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
@@ -208,14 +163,16 @@ export default function AdminStatements() {
               </select>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 24px' }}>📥 Export Statements (CSV)</button>
+              <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 24px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Download size={16} /> Export Statements (CSV)
+              </button>
               <button
                 className="btn btn-secondary"
                 onClick={handleExpireOldOrders}
                 disabled={expiring}
-                style={{ height: '42px', padding: '0 20px', color: 'var(--warning)', borderColor: 'var(--warning)' }}
+                style={{ height: '42px', padding: '0 20px', color: 'var(--warning)', borderColor: 'var(--warning)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                {expiring ? 'Expiring...' : '🕖 Expire Old Orders'}
+                <Clock size={16} /> {expiring ? 'Expiring...' : 'Expire Old Orders'}
               </button>
             </div>
           </div>

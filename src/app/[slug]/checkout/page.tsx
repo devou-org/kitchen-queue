@@ -305,7 +305,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         ticketNumber={activeOrder?.ticket_number}
         onAddToOrder={handleAddToOrder}
         onSubmitNewOrder={handleNewOrder}
-        isPartySizeValid={addToMode ? true : (items.reduce((s, i) => s + i.quantity, 0) >= parseInt(form.party_size || '1') - 1)}
         hasActiveOrder={!!activeOrder}
       />
 

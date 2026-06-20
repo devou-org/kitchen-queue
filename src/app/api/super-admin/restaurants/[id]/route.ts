@@ -34,15 +34,27 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules } = body;
+    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules, billing_tier, billing_model, billing_status, billing_end_date } = body;
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
       return NextResponse.json({ success: false, error: 'Slug must be lowercase letters, numbers, and hyphens only' }, { status: 400 });
     }
 
+    if (billing_tier && billing_model) {
+      const { validateTierAndModel } = await import('@/lib/billing.constants');
+      const validation = validateTierAndModel(billing_tier, billing_model);
+      if (!validation.valid) {
+        return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
+      }
+    }
+
     // Update restaurant info
-    const restaurant = await updateRestaurant(id, { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description });
+    const restaurant = await updateRestaurant(id, {
+      name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description,
+      billing_tier, billing_model, billing_status, billing_end_date
+    });
     if (!restaurant) return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+
 
     // Update modules if provided
     if (Array.isArray(modules)) {

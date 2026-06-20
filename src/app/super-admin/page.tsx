@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { ClipboardList, ShoppingCart, Ticket, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare } from 'lucide-react';
+import { ClipboardList, ShoppingCart, Ticket, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare, Receipt } from 'lucide-react';
 import 'react-phone-number-input/style.css';
 import PhoneInput from 'react-phone-number-input';
 
@@ -29,7 +29,7 @@ type Restaurant = {
 
 type ModalMode = 'create' | 'edit' | null;
 
-const EMPTY_FORM = { name: '', slug: '', phone: '', address_street: '', address_city: '', address_state: '', address_zip: '', address_country: '', logo_url: '', primary_color: '#800020', secondary_color: '#ecfdf5', modules: ALL_MODULES.map(m => m.key) };
+const EMPTY_FORM = { name: '', slug: '', phone: '', address_street: '', address_city: '', address_state: '', address_zip: '', address_country: '', logo_url: '', primary_color: '#800020', secondary_color: '#ecfdf5', modules: [] as string[] };
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
@@ -42,7 +42,25 @@ export default function SuperAdminDashboard() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
 
+  const [billingTotals, setBillingTotals] = useState<{ total_billed: number } | null>(null);
+  const [billingTotalsLoading, setBillingTotalsLoading] = useState(false);
+
   const authHeaders = { credentials: 'include' as const };
+
+  const fetchBillingTotals = useCallback(async () => {
+    setBillingTotalsLoading(true);
+    try {
+      const res = await fetch('/api/super-admin/billing', authHeaders);
+      const data = await res.json();
+      if (data.success && data.data?.totals) {
+        setBillingTotals(data.data.totals);
+      }
+    } catch {
+      console.error('Failed to load billing totals');
+    } finally {
+      setBillingTotalsLoading(false);
+    }
+  }, []);
 
   const fetchWalletBalance = useCallback(async () => {
     setWalletLoading(true);
@@ -72,7 +90,8 @@ export default function SuperAdminDashboard() {
   useEffect(() => {
     fetchRestaurants();
     fetchWalletBalance();
-  }, [fetchRestaurants, fetchWalletBalance]);
+    fetchBillingTotals();
+  }, [fetchRestaurants, fetchWalletBalance, fetchBillingTotals]);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -147,6 +166,12 @@ export default function SuperAdminDashboard() {
             value: walletLoading ? 'Loading...' : (walletBalance !== null ? `₹${Number(walletBalance).toFixed(2)}` : 'Config Error'),
             icon: <MessageSquare size={24} />,
             color: '#0891b2'
+          },
+          {
+            label: 'Platform Revenue',
+            value: billingTotalsLoading ? 'Loading...' : (billingTotals !== null ? `₹${Number((billingTotals as any).total_billed || 0).toFixed(2)}` : '₹0.00'),
+            icon: <Receipt size={24} />,
+            color: '#8b5cf6'
           },
         ].map(stat => (
           <div key={stat.label} style={S.statCard}>
@@ -329,41 +354,7 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
 
-              {/* Module toggles in modal */}
-              <div>
-                <label style={S.fieldLabel}>Enabled Modules</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
-                  {ALL_MODULES.map(mod => {
-                    const active = form.modules.includes(mod.key);
-                    return (
-                      <button
-                        key={mod.key}
-                        type="button"
-                        onClick={() => toggleFormModule(mod.key)}
-                        style={{
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: `1px solid ${active ? '#10b981' : '#cbd5e1'}`,
-                          background: active ? '#ecfdf5' : '#f8fafc',
-                          color: active ? '#047857' : '#475569',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        <span>{mod.icon}</span>
-                        <span>{mod.label}</span>
-                        {active && <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}><Check size={14} /></span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+
 
               <button type="submit" disabled={saving} style={S.submitBtn}>
                 {saving ? 'Creating...' : 'Create Restaurant'}

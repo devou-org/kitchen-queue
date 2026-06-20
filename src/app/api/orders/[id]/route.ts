@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql, { getOrderById, updateOrderStatus, setOrderPaymentStatus, updateOrderDetails, getRestaurantBySlug } from '@/lib/db';
+import sql, { getOrderById, completeOrderAndBill, updateOrderDetails, getRestaurantBySlug } from '@/lib/db';
 import { Order, OrderItem } from '@/types';
 import { verifyToken } from '@/lib/auth';
 // import { STATUS_TRANSITIONS } from '@/lib/constants';
@@ -247,8 +247,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // ✅ UPDATE STATUS & TABLE NUMBER
-    if (status || table_number) {
+    // ✅ UPDATE STATUS, TABLE NUMBER & PAYMENT STATUS ATOMICALLY
+    const shouldUpdateStatusOrPayment = status || table_number || typeof is_paid === 'boolean';
+    if (shouldUpdateStatusOrPayment) {
       if (status && status !== existing.status) {
         // Fetch queue statuses for the restaurant to validate the new status
         const allowedStatusesRes = await sql`SELECT possible_queue_status FROM queue_status WHERE restaurant_id = ${restaurant.id}` as {possible_queue_status: string}[];
@@ -269,27 +270,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       // ✅ STOCK RESTORATION: If transitioning TO 'CANCELLED' or 'EXPIRED'
       if ((status === 'CANCELLED' || status === 'EXPIRED') && existing.status !== 'CANCELLED' && existing.status !== 'EXPIRED') {
         try {
-          // 1. Get database instance (import sql from lib/db) or use a helper
-          // Actually, let's use a helper in db.ts to keep this clean
           const { restoreOrderStock } = await import('@/lib/db');
           await restoreOrderStock(id);
           console.log(`📦 Restored stock for Cancelled Order #${existing.ticket_number}`);
         } catch (stockErr) {
           console.error("❌ Failed to restore stock during cancellation:", stockErr);
-          // We don't fail the status update, but we log the error
         }
       }
 
-      // Update in DB
-      order = await updateOrderStatus(restaurant.id, id, status || existing.status, table_number);
+      // Update order and trigger billing atomically inside db transaction
+      order = await completeOrderAndBill(restaurant.id, id, status, is_paid, table_number);
 
-      // ✅ AUTO-MARK AS PAID: If status is 'PAID', ensure is_paid is true
-      if (status === 'PAID') {
-        order = await setOrderPaymentStatus(restaurant.id, id, true);
-        console.log(`💰 Auto-marked Order #${existing.ticket_number} as PAID due to status change.`);
-      }
-
-      console.log(`✅ Order Updated: Order #${existing.ticket_number} → Status: ${status || order.status}, Table: ${table_number || order.table_number}`);
+      console.log(`✅ Order Updated: Order #${existing.ticket_number} → Status: ${order.status}, Table: ${order.table_number}, Paid: ${order.is_paid}`);
 
       // 🔔 BROADCAST UPDATE
       try {
@@ -298,37 +290,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           restaurant_id: restaurant.id,
           order_id: id,
           ticket_number: existing.ticket_number,
-          new_status: status || order.status,
-          table_number: table_number || order.table_number,
-          is_paid: (status === 'PAID' || order.is_paid),
+          new_status: order.status,
+          table_number: order.table_number,
+          is_paid: order.is_paid,
           timestamp: new Date().toISOString(),
         });
         console.log(`📤 Pusher event sent: order_update for ticket #${existing.ticket_number}`);
       } catch (pushErr) {
         console.error('❌ Pusher trigger failed (order update):', pushErr);
-      }
-    }
-
-    // ✅ UPDATE PAYMENT STATUS
-    if (typeof is_paid === 'boolean') {
-      order = await setOrderPaymentStatus(restaurant.id, id, is_paid);
-
-      console.log(`✅ Payment updated: Order #${existing.ticket_number} → is_paid: ${is_paid}`);
-
-      // 🔔 BROADCAST PAYMENT CHANGE
-      try {
-        await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'order_update', {
-          type: 'payment_update',
-          restaurant_id: restaurant.id,
-          order_id: id,
-          ticket_number: existing.ticket_number,
-          is_paid: is_paid,
-          timestamp: new Date().toISOString(),
-        });
-        console.log(`📤 Pusher event sent: payment_update for ticket #${existing.ticket_number}`);
-      } catch (pushErr) {
-        console.error('❌ Pusher trigger failed (payment update):', pushErr);
-        // Continue anyway - order was updated in DB
       }
     }
 

@@ -7,7 +7,6 @@ interface CheckoutActionsProps {
   itemsCount: number;
   total: number;
   ticketNumber?: string | number;
-  isPartySizeValid?: boolean;
   hasActiveOrder?: boolean;
   onAddToOrder: () => Promise<void>;
   onSubmitNewOrder: (e: React.FormEvent) => Promise<void>;
@@ -20,7 +19,6 @@ export default function CheckoutActions({
   itemsCount,
   total,
   ticketNumber,
-  isPartySizeValid = true,
   hasActiveOrder = false,
   onAddToOrder,
   onSubmitNewOrder
@@ -79,7 +77,7 @@ export default function CheckoutActions({
             borderRadius: '999px',
             background: 'var(--primary)',
             color: 'white',
-            opacity: (!isVerified || loading || !isPartySizeValid || hasActiveOrder) ? 0.6 : 1,
+            opacity: (!isVerified || loading || hasActiveOrder) ? 0.6 : 1,
             boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
             display: 'flex',
             alignItems: 'center',
@@ -89,7 +87,7 @@ export default function CheckoutActions({
             height: '56px',
             border: 'none'
           }}
-          disabled={loading || !isVerified || !isPartySizeValid || hasActiveOrder}
+          disabled={loading || !isVerified || hasActiveOrder}
         >
           {loading ? (
             <span style={{ fontWeight: 700, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -26,17 +26,17 @@ async function runAutoMigration(sqlConnection: any) {
 
 export async function getRestaurantBySlug(slug: string) {
   try {
-    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date FROM restaurants WHERE slug = ${slug} LIMIT 1`;
     return rows[0] || null;
   } catch (error: any) {
     if (error.message?.includes('column') || error.message?.includes('does not exist')) {
       console.log("Missing menu columns detected in getRestaurantBySlug. Attempting auto-migration...");
       await runAutoMigration(sql);
       try {
-        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date FROM restaurants WHERE slug = ${slug} LIMIT 1`;
         return rows[0] || null;
       } catch (retryError) {
-        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date FROM restaurants WHERE slug = ${slug} LIMIT 1`;
         if (rows[0]) {
           rows[0].menu_title = "Today's Specials";
           rows[0].menu_description = "Hand-curated coastal delicacies prepared with traditional recipes.";
@@ -47,6 +47,7 @@ export async function getRestaurantBySlug(slug: string) {
     throw error;
   }
 }
+
 
 export async function getRestaurantModules(restaurantId: string) {
   const rows = await sql`
@@ -67,12 +68,13 @@ export async function getAllRestaurants() {
     const rows = await sql`
       SELECT 
         r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at,
+        r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date,
         COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
         COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
       FROM restaurants r
       LEFT JOIN orders o ON o.restaurant_id = r.id
       LEFT JOIN products p ON p.restaurant_id = r.id
-      GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at
+      GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date
       ORDER BY r.created_at DESC
     `;
     return rows;
@@ -84,12 +86,13 @@ export async function getAllRestaurants() {
         const rows = await sql`
           SELECT 
             r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at,
+            r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date,
             COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
             COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
           FROM restaurants r
           LEFT JOIN orders o ON o.restaurant_id = r.id
           LEFT JOIN products p ON p.restaurant_id = r.id
-          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at
+          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date
           ORDER BY r.created_at DESC
         `;
         return rows;
@@ -97,12 +100,13 @@ export async function getAllRestaurants() {
         const rows = await sql`
           SELECT 
             r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.created_at,
+            r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date,
             COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
             COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
           FROM restaurants r
           LEFT JOIN orders o ON o.restaurant_id = r.id
           LEFT JOIN products p ON p.restaurant_id = r.id
-          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.created_at
+          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date
           ORDER BY r.created_at DESC
         `;
         return rows.map((r: any) => ({
@@ -116,10 +120,11 @@ export async function getAllRestaurants() {
   }
 }
 
+
 export async function getRestaurantById(id: string) {
   try {
     const rows = await sql`
-      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at
+      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date
       FROM restaurants WHERE id = ${id} LIMIT 1
     `;
     return rows[0] || null;
@@ -129,13 +134,13 @@ export async function getRestaurantById(id: string) {
       await runAutoMigration(sql);
       try {
         const rows = await sql`
-          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at
+          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date
           FROM restaurants WHERE id = ${id} LIMIT 1
         `;
         return rows[0] || null;
       } catch (retryError) {
         const rows = await sql`
-          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, created_at, updated_at
+          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date
           FROM restaurants WHERE id = ${id} LIMIT 1
         `;
         if (rows[0]) {
@@ -148,6 +153,7 @@ export async function getRestaurantById(id: string) {
     throw error;
   }
 }
+
 
 export async function createRestaurant(data: {
   name: string;
@@ -213,8 +219,8 @@ export async function createRestaurant(data: {
 
   // Create queue state for the new restaurant
   await sql`
-    INSERT INTO queue_state (id, restaurant_id, current_queue_number, last_served_number)
-    VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM queue_state), ${restaurant.id}, 1, 0)
+    INSERT INTO queue_state (restaurant_id, current_queue_number, last_served_number)
+    VALUES (${restaurant.id}, 1, 0)
     ON CONFLICT (restaurant_id) DO NOTHING
   `;
 
@@ -232,6 +238,10 @@ export async function updateRestaurant(id: string, data: {
   menu_layout?: string | null;
   menu_title?: string | null;
   menu_description?: string | null;
+  billing_tier?: string;
+  billing_model?: string;
+  billing_status?: string;
+  billing_end_date?: string | null;
 }) {
   try {
     const rows = await sql`
@@ -246,6 +256,10 @@ export async function updateRestaurant(id: string, data: {
         menu_layout = COALESCE(${data.menu_layout ?? null}, menu_layout),
         menu_title = COALESCE(${data.menu_title ?? null}, menu_title),
         menu_description = COALESCE(${data.menu_description ?? null}, menu_description),
+        billing_tier = COALESCE(${data.billing_tier ?? null}, billing_tier),
+        billing_model = COALESCE(${data.billing_model ?? null}, billing_model),
+        billing_status = COALESCE(${data.billing_status ?? null}, billing_status),
+        billing_end_date = COALESCE(${data.billing_end_date ?? null}, billing_end_date),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
@@ -981,6 +995,54 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   return rows[0];
 }
 
+export async function completeOrderAndBill(restaurantId: string, id: string, status: string | undefined, isPaid: boolean | undefined, tableNumber?: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Fetch existing order to verify values
+    const orderRes = await client.query(`
+      SELECT is_paid, status, total_price, ticket_number FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
+    `, [restaurantId, id]);
+    
+    if (orderRes.rows.length === 0) {
+      throw new Error('Order not found');
+    }
+    
+    const existing = orderRes.rows[0];
+    const nextStatus = status || existing.status;
+    const nextIsPaid = (typeof isPaid === 'boolean') ? isPaid : (nextStatus === 'PAID' ? true : existing.is_paid);
+    
+    // Update order
+    const updateRes = await client.query(`
+      UPDATE orders
+      SET status = $1,
+          is_paid = $2,
+          table_number = COALESCE($3, table_number),
+          updated_at = NOW()
+      WHERE restaurant_id = $4 AND id = $5
+      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at
+    `, [nextStatus, nextIsPaid, tableNumber || null, restaurantId, id]);
+    
+    const updatedOrder = updateRes.rows[0];
+    
+    // Process billing if order is now paid/completed (and wasn't paid before)
+    if (nextIsPaid && !existing.is_paid) {
+      const { BillingService } = await import('@/modules/billing/billing.service');
+      await BillingService.processOrderBilling(client, restaurantId, id, Number(existing.total_price));
+    }
+    
+    await client.query('COMMIT');
+    return updatedOrder;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+
 export async function updateOrderDetails(restaurantId: string, id: string, data: {
   customer_name?: string;
   phone?: string;
@@ -1482,25 +1544,48 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
   const localTimezone = 'Asia/Kolkata';
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
 
-  // 1. Log the specific OTP request
-  await sql`
-    INSERT INTO otp_logs (phone, sent_at, restaurant_id)
-    VALUES (${phone}, NOW() AT TIME ZONE ${localTimezone}, ${restaurantId || null})
-  `;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  // 2. Increment daily aggregation (Concurrency Safe via ON CONFLICT)
-  // If restaurantId is null, it's tracked generically for backwards compatibility
-  if (restaurantId) {
-    await sql`
-      INSERT INTO daily_otp_stats (date, count, cost, restaurant_id)
-      VALUES (${today}::date, 1, 0.50, ${restaurantId})
-      ON CONFLICT (date, restaurant_id) DO UPDATE 
-      SET count = daily_otp_stats.count + 1,
-          cost = (daily_otp_stats.count + 1) * 0.50,
-          updated_at = NOW()
-    `;
+    // 1. Log the specific OTP request
+    const logRes = await client.query(`
+      INSERT INTO otp_logs (phone, sent_at, restaurant_id)
+      VALUES ($1, NOW() AT TIME ZONE $2, $3)
+      RETURNING id
+    `, [phone, localTimezone, restaurantId || null]);
+
+    const logId = logRes.rows[0].id;
+
+    // 2. Increment daily aggregation (Concurrency Safe via ON CONFLICT)
+    if (restaurantId) {
+      await client.query(`
+        INSERT INTO daily_otp_stats (date, count, cost, restaurant_id)
+        VALUES ($1::date, 1, 0.50, $2)
+        ON CONFLICT (date, restaurant_id) DO UPDATE 
+        SET count = daily_otp_stats.count + 1,
+            cost = (daily_otp_stats.count + 1) * 0.50,
+            updated_at = NOW()
+      `, [today, restaurantId]);
+
+      // 3. Trigger billing transaction inside the same DB transaction
+      try {
+        const { BillingService } = await import('@/modules/billing/billing.service');
+        await BillingService.processOTPBilling(client, restaurantId, logId);
+      } catch (billingErr) {
+        console.error("❌ Billing processing failed for OTP:", billingErr);
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 }
+
 
 export async function getOtpStats(dateFrom: string, dateTo: string, restaurantId?: string) {
   if (restaurantId) {

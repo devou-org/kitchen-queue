@@ -402,6 +402,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const menuLayout = restaurant?.menu_layout || 'LIST';
   const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
+  const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -658,6 +659,18 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               ))}
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!showDigitalMenu) {
+    return (
+      <div style={{ background: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center', fontFamily: "'Inter', sans-serif" }}>
+        <div style={{ backgroundColor: '#ffffff', padding: '40px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', maxWidth: '400px', width: '100%' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🍽️</div>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>Menu Unavailable</h1>
+          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.5' }}>The digital menu is currently disabled for this restaurant. Please check back later.</p>
         </div>
       </div>
     );

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
-import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart } from 'lucide-react';
+import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart, Receipt } from 'lucide-react';
 type Module = {
   module_name: string;
   is_enabled: boolean;
@@ -40,6 +40,7 @@ export default function RestaurantDetails() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
   
   const [queueStatuses, setQueueStatuses] = useState<any[]>([]);
   
@@ -197,23 +198,28 @@ export default function RestaurantDetails() {
   const handleToggleModule = async (moduleKey: string, isEnabled: boolean) => {
     if (!restaurant) return;
 
-    if (isEnabled && moduleKey === 'ONLINE_ORDERING') {
-      const confirm = window.confirm("Default states 'PAID' and 'CANCELLED' will be added to the statuses. Proceed?");
-      if (!confirm) return;
-    }
-
-    if (isEnabled && moduleKey === 'QUEUE_MANAGEMENT') {
-      const confirm = window.confirm("Default state 'SEATED' will be added to the queue statuses. Proceed?");
-      if (!confirm) return;
-    }
-
-    try {
+    const proceedToggle = async () => {
       const currentModules = restaurant.modules || [];
-      const updatedModules = currentModules.map(m =>
+      let updatedModules = currentModules.map(m =>
         m.module_name === moduleKey ? { ...m, is_enabled: isEnabled } : m
       );
       if (!currentModules.find(m => m.module_name === moduleKey)) {
         updatedModules.push({ module_name: moduleKey, is_enabled: isEnabled });
+      }
+
+      // Mutually exclusive logic
+      if (isEnabled && moduleKey === 'ONLINE_ORDERING') {
+        updatedModules = updatedModules.map(m => m.module_name === 'QUEUE_MANAGEMENT' ? { ...m, is_enabled: false } : m);
+        if (!currentModules.find(m => m.module_name === 'QUEUE_MANAGEMENT')) {
+          updatedModules.push({ module_name: 'QUEUE_MANAGEMENT', is_enabled: false });
+        }
+      }
+
+      if (isEnabled && moduleKey === 'QUEUE_MANAGEMENT') {
+        updatedModules = updatedModules.map(m => m.module_name === 'ONLINE_ORDERING' ? { ...m, is_enabled: false } : m);
+        if (!currentModules.find(m => m.module_name === 'ONLINE_ORDERING')) {
+          updatedModules.push({ module_name: 'ONLINE_ORDERING', is_enabled: false });
+        }
       }
 
       // Optimistic update
@@ -231,22 +237,18 @@ export default function RestaurantDetails() {
         
         // Auto-add statuses if enabled
         if (isEnabled && moduleKey === 'ONLINE_ORDERING') {
-          await fetch(`/api/super-admin/queue/status`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders,
-            body: JSON.stringify({ restaurantId: id, statusEnum: 'PAID', color: '#10b981', priority: 998 })
-          });
-          await fetch(`/api/super-admin/queue/status`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders,
-            body: JSON.stringify({ restaurantId: id, statusEnum: 'CANCELLED', color: '#ef4444', priority: 999 })
-          });
+          await fetch(`/api/super-admin/queue/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders, body: JSON.stringify({ restaurantId: id, statusEnum: 'PENDING', color: '#f59e0b', priority: 1 }) });
+          await fetch(`/api/super-admin/queue/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders, body: JSON.stringify({ restaurantId: id, statusEnum: 'PREPARING', color: '#3b82f6', priority: 2 }) });
+          await fetch(`/api/super-admin/queue/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders, body: JSON.stringify({ restaurantId: id, statusEnum: 'READY', color: '#8b5cf6', priority: 3 }) });
+          await fetch(`/api/super-admin/queue/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders, body: JSON.stringify({ restaurantId: id, statusEnum: 'PAID', color: '#10b981', priority: 4 }) });
+          await fetch(`/api/super-admin/queue/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders, body: JSON.stringify({ restaurantId: id, statusEnum: 'CANCELLED', color: '#ef4444', priority: 5 }) });
           fetchQueueStatuses();
         }
         
         if (isEnabled && moduleKey === 'QUEUE_MANAGEMENT') {
-          await fetch(`/api/super-admin/queue/status`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders,
-            body: JSON.stringify({ restaurantId: id, statusEnum: 'SEATED', color: '#3b82f6', priority: 100 })
-          });
+          await fetch(`/api/super-admin/queue/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders, body: JSON.stringify({ restaurantId: id, statusEnum: 'PENDING', color: '#f59e0b', priority: 1 }) });
+          await fetch(`/api/super-admin/queue/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders, body: JSON.stringify({ restaurantId: id, statusEnum: 'SEATED', color: '#3b82f6', priority: 2 }) });
+          await fetch(`/api/super-admin/queue/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, ...authHeaders, body: JSON.stringify({ restaurantId: id, statusEnum: 'CANCELLED', color: '#ef4444', priority: 3 }) });
           fetchQueueStatuses();
         }
 
@@ -254,10 +256,35 @@ export default function RestaurantDetails() {
         toast.error(data.error || 'Failed to update module');
         fetchRestaurant(); // Rollback
       }
-    } catch {
-      toast.error('Failed to sync module change with server');
-      fetchRestaurant(); // Rollback
+    };
+
+    if (isEnabled && moduleKey === 'ONLINE_ORDERING') {
+      setConfirmModal({
+        isOpen: true,
+        title: "Enable Online Ordering?",
+        message: "This will disable Queue Management (if enabled) and add default statuses: PENDING, PREPARING, READY, PAID, CANCELLED. Proceed?",
+        onConfirm: () => {
+          setConfirmModal(null);
+          proceedToggle();
+        }
+      });
+      return;
     }
+
+    if (isEnabled && moduleKey === 'QUEUE_MANAGEMENT') {
+      setConfirmModal({
+        isOpen: true,
+        title: "Enable Queue Management?",
+        message: "This will disable Online Ordering (if enabled) and add default statuses: PENDING, SEATED, CANCELLED. Proceed?",
+        onConfirm: () => {
+          setConfirmModal(null);
+          proceedToggle();
+        }
+      });
+      return;
+    }
+
+    proceedToggle();
   };
 
   const handleDeleteStatus = async (statusId: string) => {
@@ -348,6 +375,9 @@ export default function RestaurantDetails() {
             <a href={`/${slug}/menu`} target="_blank" rel="noopener noreferrer" style={{...S.secondaryLinkBtn, display: 'flex', alignItems: 'center', gap: '6px'}}>
               <Globe size={16} /> Customer Menu
             </a>
+            <Link href={`/super-admin/restaurants/${id}/billing`} style={{...S.primaryLinkBtn, backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px'}}>
+              <Receipt size={16} /> Billing Console
+            </Link>
             <a href={`/${slug}/admin/products`} target="_blank" rel="noopener noreferrer" style={{...S.primaryLinkBtn, display: 'flex', alignItems: 'center', gap: '6px'}}>
               <Key size={16} /> Admin Portal
             </a>
@@ -584,6 +614,25 @@ export default function RestaurantDetails() {
           </div>
         </div>
       </div>
+
+      {/* Custom Confirm Modal */}
+      {confirmModal?.isOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={() => setConfirmModal(null)}>
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '400px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ color: '#0f172a', fontWeight: 800, fontSize: '18px', margin: 0 }}>{confirmModal.title}</h2>
+              <button onClick={() => setConfirmModal(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer', padding: '4px 8px' }}><X size={20} /></button>
+            </div>
+            <p style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', marginBottom: '24px' }}>
+              {confirmModal.message}
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmModal(null)} style={{ padding: '8px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={confirmModal.onConfirm} style={{ padding: '8px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Proceed</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
