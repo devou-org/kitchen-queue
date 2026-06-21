@@ -1,10 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function StaffLogin() {
   const router = useRouter();
+  const { slug } = useParams();
+  const { restaurant } = useRestaurant();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +28,7 @@ export default function StaffLogin() {
       if (data.success) {
         if (data.token) localStorage.setItem('staff_token', data.token);
         toast.success(`Welcome back, ${data.user.name}!`);
-        router.push('/staff/menu');
+        router.push(`/${slug}/staff/menu`);
       } else {
         toast.error(data.error || 'Invalid credentials');
       }
@@ -50,13 +53,24 @@ export default function StaffLogin() {
             overflow: 'hidden',
             border: '2px solid white'
           }}>
-            <img
-              src="https://ik.imagekit.io/j2q8x5lu0/Renjzkitchen/renjz.jpg"
-              alt="Renjz Kitchen"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+            {restaurant?.logo_url ? (
+              <img
+                src={restaurant.logo_url}
+                alt={restaurant.name}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{
+                width: '100%', height: '100%',
+                backgroundColor: restaurant?.primary_color || 'var(--primary)',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 800, fontSize: '32px'
+              }}>
+                {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
+              </div>
+            )}
           </div>
-          <h2 style={{ fontSize: '24px', fontWeight: 900 }}>Staff POS</h2>
+          <h2 style={{ fontSize: '24px', fontWeight: 900 }}>{restaurant?.name || 'Staff'} POS</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Sign in to Point of Sale</p>
         </div>
 
@@ -87,7 +101,7 @@ export default function StaffLogin() {
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px' }}>
-          <a href="/menu" style={{ color: 'var(--text-secondary)' }}>← Back to Customer Menu</a>
+          <a href={`/${slug}/menu`} style={{ color: 'var(--text-secondary)' }}>← Back to Customer Menu</a>
         </p>
       </div>
     </div>

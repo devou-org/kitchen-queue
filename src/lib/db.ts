@@ -16,7 +16,8 @@ async function runAutoMigration(sqlConnection: any) {
     await sqlConnection`
       ALTER TABLE restaurants 
       ADD COLUMN IF NOT EXISTS menu_title VARCHAR(200) DEFAULT 'Today''s Specials',
-      ADD COLUMN IF NOT EXISTS menu_description TEXT DEFAULT 'Hand-curated coastal delicacies prepared with traditional recipes.';
+      ADD COLUMN IF NOT EXISTS menu_description TEXT DEFAULT 'Hand-curated coastal delicacies prepared with traditional recipes.',
+      ADD COLUMN IF NOT EXISTS billing_period VARCHAR(20) DEFAULT 'MONTHLY';
     `;
     console.log("Auto-migrated menu columns successfully!");
   } catch (err) {
@@ -26,20 +27,21 @@ async function runAutoMigration(sqlConnection: any) {
 
 export async function getRestaurantBySlug(slug: string) {
   try {
-    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period FROM restaurants WHERE slug = ${slug} LIMIT 1`;
     return rows[0] || null;
   } catch (error: any) {
     if (error.message?.includes('column') || error.message?.includes('does not exist')) {
       console.log("Missing menu columns detected in getRestaurantBySlug. Attempting auto-migration...");
       await runAutoMigration(sql);
       try {
-        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period FROM restaurants WHERE slug = ${slug} LIMIT 1`;
         return rows[0] || null;
       } catch (retryError) {
         const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date FROM restaurants WHERE slug = ${slug} LIMIT 1`;
         if (rows[0]) {
           rows[0].menu_title = "Today's Specials";
           rows[0].menu_description = "Hand-curated coastal delicacies prepared with traditional recipes.";
+          rows[0].billing_period = "MONTHLY";
         }
         return rows[0] || null;
       }
@@ -721,8 +723,8 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
        FROM queues q
        JOIN queue_status qs ON qs.id = q.queue_status_id
        WHERE q.restaurant_id = ${restaurantId} 
-         AND qs.possible_queue_status IN ('PENDING', 'WAITING', 'PREPARING')
-         AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+         AND qs.possible_queue_status IN ('PENDING', 'PREPARING')
+         AND (q.created_at AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE
     )
     SELECT o.*, 
       COALESCE(ar.pos, 0) as queue_position,
@@ -757,8 +759,8 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
        FROM queues q
        JOIN queue_status qs ON qs.id = q.queue_status_id
        WHERE q.restaurant_id = ${restaurantId} 
-         AND qs.possible_queue_status IN ('PENDING', 'WAITING', 'PREPARING')
-         AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+         AND qs.possible_queue_status IN ('PENDING', 'PREPARING')
+         AND (q.created_at AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE
     )
     SELECT q.id, q.token_number as ticket_number, q.created_at, q.queue_type,
       o.id as order_id, o.is_paid, o.total_price,
@@ -832,6 +834,8 @@ export async function createOrder(data: {
   total_price: number;
   notes?: string;
   party_size?: number;
+  table_number?: string;
+  is_pos?: boolean;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
 }) {
   const normalized = new Map<string, { quantity: number; price_at_purchase: number }>();
@@ -921,21 +925,27 @@ export async function createOrder(data: {
     `, [data.customer_name || 'Guest', data.phone || '0000000000']);
     const userId = userRes.rows[0].id;
 
-    // 2. Get default first status ID and name
-    const statusRes = await client.query(`
-      SELECT id, possible_queue_status FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC LIMIT 1
-    `, [data.restaurant_id]);
+    // 2. Get status ID and name strictly
+    const targetStatus = data.is_pos ? 'PREPARING' : 'PENDING';
+    
+    let statusRes = await client.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = $2 LIMIT 1`, [data.restaurant_id, targetStatus]);
+    
+    if (statusRes.rows.length === 0) {
+      // Fallback to any valid queue status id just to satisfy foreign key (if required), but force the string name
+      statusRes = await client.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC LIMIT 1`, [data.restaurant_id]);
+    }
+
     const statusId = statusRes.rows[0]?.id;
-    const defaultStatus = statusRes.rows[0]?.possible_queue_status || 'PENDING';
+    const defaultStatus = targetStatus; // Strictly PENDING or PREPARING
 
     // 3. Lock the restaurant to prevent token number race conditions
     await client.query(`SELECT id FROM restaurants WHERE id = $1 FOR UPDATE`, [data.restaurant_id]);
 
-    // 4. Get next token number
+    // 4. Get next token number (continuing from all time)
     const tokenRes = await client.query(`
       SELECT COALESCE(MAX(token_number), 0) + 1 AS next_token 
       FROM queues 
-      WHERE restaurant_id = $1 AND (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+      WHERE restaurant_id = $1
     `, [data.restaurant_id]);
     const nextToken = tokenRes.rows[0].next_token;
 
@@ -951,11 +961,11 @@ export async function createOrder(data: {
 
     const orderResult = await client.query(
       `
-        INSERT INTO orders (restaurant_id, queue_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number)
-        VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9)
+        INSERT INTO orders (restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number, table_number)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11)
         RETURNING id
       `,
-      [data.restaurant_id, queueId, data.customer_name, data.phone, computedTotal, defaultStatus, data.notes || null, data.party_size || 1, nextToken]
+      [data.restaurant_id, queueId, userId, data.customer_name, data.phone, computedTotal, defaultStatus, data.notes || null, data.party_size || 1, nextToken, data.table_number || null]
     );
 
     const orderId = orderResult.rows[0]?.id;
@@ -1534,6 +1544,60 @@ export async function getUserByEmail(email: string) {
 export async function getAdminByEmail(email: string) {
   const rows = await sql`SELECT * FROM admins WHERE email = ${email} LIMIT 1`;
   return rows[0] || null;
+}
+
+// ============================================
+// STAFF QUERIES
+// ============================================
+
+export async function getStaffs(restaurantId: string) {
+  return await sql`SELECT id, name, email, phone, role, is_active, created_at, updated_at FROM staffs WHERE restaurant_id = ${restaurantId} ORDER BY created_at DESC`;
+}
+
+export async function getStaffByEmail(email: string) {
+  const rows = await sql`SELECT * FROM staffs WHERE email = ${email} LIMIT 1`;
+  return rows[0] || null;
+}
+
+export async function getStaffById(restaurantId: string, id: string) {
+  const rows = await sql`SELECT * FROM staffs WHERE restaurant_id = ${restaurantId} AND id = ${id} LIMIT 1`;
+  return rows[0] || null;
+}
+
+export async function createStaff(restaurantId: string, data: { name: string; email: string; phone?: string; password?: string; role?: string; is_active?: boolean }) {
+  // Limit staff creation per restaurant
+  const limit = 10;
+  const countRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId}`;
+  if (countRows[0].count >= limit) {
+    throw new Error(`Staff limit reached (max ${limit} staff members per restaurant)`);
+  }
+
+  const rows = await sql`
+    INSERT INTO staffs (restaurant_id, name, email, phone, password, role, is_active) 
+    VALUES (${restaurantId}, ${data.name}, ${data.email}, ${data.phone || null}, ${data.password || null}, ${data.role || 'STAFF'}, ${data.is_active !== false}) 
+    RETURNING id, name, email, phone, role, is_active
+  `;
+  return rows[0];
+}
+
+export async function updateStaff(restaurantId: string, id: string, data: Partial<{ name: string; email: string; phone: string; password?: string; role: string; is_active: boolean }>) {
+  const rows = await sql`
+    UPDATE staffs SET
+      name = COALESCE(${data.name ?? null}, name),
+      email = COALESCE(${data.email ?? null}, email),
+      phone = COALESCE(${data.phone ?? null}, phone),
+      password = COALESCE(${data.password ?? null}, password),
+      role = COALESCE(${data.role ?? null}, role),
+      is_active = COALESCE(${data.is_active ?? null}, is_active),
+      updated_at = NOW()
+    WHERE restaurant_id = ${restaurantId} AND id = ${id}
+    RETURNING id, name, email, phone, role, is_active
+  `;
+  return rows[0];
+}
+
+export async function deleteStaff(restaurantId: string, id: string) {
+  await sql`DELETE FROM staffs WHERE restaurant_id = ${restaurantId} AND id = ${id}`;
 }
 
 // ============================================

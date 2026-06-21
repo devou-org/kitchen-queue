@@ -246,7 +246,7 @@ export class BillingService {
   /**
    * Processes a subscription payment/charge (e.g. at the start of a cycle).
    */
-  static async processSubscriptionBilling(restaurantId: string): Promise<void> {
+  static async processSubscriptionBilling(restaurantId: string, billingPeriod: string = 'MONTHLY'): Promise<void> {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -268,10 +268,14 @@ export class BillingService {
       }
 
       const pricing = BILLING_PRICING[billing_tier as BillingTier];
-      const amount = pricing.subscriptionMonthly;
+      
+      const multiplier = billingPeriod === 'YEARLY' ? 12 : 1;
+      const amount = pricing.subscriptionMonthly * multiplier;
 
       const { month, year } = this.getCurrentLocalMonthYear();
-      const description = `Monthly Subscription Charge (${billing_tier} tier)`;
+      const description = billingPeriod === 'YEARLY'
+        ? `Yearly Subscription Charge (${billing_tier} tier)`
+        : `Monthly Subscription Charge (${billing_tier} tier)`;
 
       await client.query(`
         INSERT INTO billing_transactions (restaurant_id, transaction_type, amount, description)

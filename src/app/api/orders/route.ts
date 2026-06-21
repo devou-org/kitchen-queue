@@ -5,12 +5,14 @@ import { pusherServer } from '@/lib/pusher';
 
 async function requireAdmin(request: NextRequest) {
   const adminToken = request.cookies.get('admin_token')?.value;
+  const staffToken = request.cookies.get('staff_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = adminToken || authHeader;
+  const token = authHeader || adminToken || staffToken;
   if (!token) return null;
   const payload = await verifyToken(token);
-  if (!payload?.isAdmin) return null;
-  return payload;
+  if (!payload) return null;
+  if (payload.isAdmin || payload.isStaff) return payload;
+  return null;
 }
 
 export async function GET(request: NextRequest) {
@@ -24,6 +26,9 @@ export async function GET(request: NextRequest) {
 
     const admin = await requireAdmin(request);
     if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (admin.isStaff && admin.restaurantId !== restaurant.id) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Wrong restaurant' }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const filters = {
@@ -84,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customer_name, phone, items, notes, party_size } = body;
+    const { customer_name, phone, items, notes, party_size, table_number } = body;
 
     if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
@@ -100,6 +105,9 @@ export async function POST(request: NextRequest) {
     }
     total_price = Math.round(total_price * 100) / 100;
 
+    const admin = await requireAdmin(request);
+    const isPos = !!admin && (admin.isStaff || admin.isAdmin);
+
     const order = await createOrder({
       restaurant_id: restaurant.id,
       customer_name: customer_name.trim(),
@@ -107,6 +115,8 @@ export async function POST(request: NextRequest) {
       total_price,
       notes,
       party_size: party_size || 1,
+      table_number,
+      is_pos: isPos,
       items,
     });
 

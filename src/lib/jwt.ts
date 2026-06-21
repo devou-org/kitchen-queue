@@ -8,8 +8,14 @@ export interface JWTPayload {
   userId: string;
   phone?: string;
   email?: string;
+  name?: string;
   isAdmin: boolean;
   isSuperAdmin?: boolean;
+  restaurantId?: string;
+  restaurantSlug?: string;
+  restaurantName?: string;
+  isStaff?: boolean;
+  role?: string;
   iat?: number;
   exp?: number;
 }

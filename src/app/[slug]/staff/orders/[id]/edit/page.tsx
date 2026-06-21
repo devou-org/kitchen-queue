@@ -7,14 +7,15 @@ import { Order, Product } from '@/types';
 import { formatPrice } from '@/lib/format';
 import { validatePhone } from '@/lib/validators';
 import { orderService } from '@/app/services/orders.api';
+import { productService } from '@/app/services/products.api';
 
 type EditableItem = {
   product_id: string;
   quantity: number;
 };
 
-export default function StaffEditOrderPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function StaffEditOrderPage({ params }: { params: Promise<{ slug: string; id: string }> }) {
+  const { slug, id } = use(params);
   const router = useRouter();
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -36,10 +37,8 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ id: s
       try {
         const [orderRes, productsRes] = await Promise.all([
           orderService.getOrderById(id),
-          fetch('/api/products', { cache: 'no-store' }),
+          productService.getAllProductsAdmin(),
         ]);
-
-        const productsData = await productsRes.json();
 
         if (!orderRes.success || !orderRes.data) {
           toast.error(orderRes.error || 'Order not found');
@@ -62,8 +61,8 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ id: s
         }));
         setItems(initialItems);
 
-        if (productsData.success) {
-          setProducts(productsData.data || []);
+        if (productsRes.success) {
+          setProducts(productsRes.data || []);
         }
       } catch {
         toast.error('Failed to load order data');
@@ -140,11 +139,13 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ id: s
       return;
     }
 
+    const phoneToUse = phone || `+910000000000`;
+
     setSaving(true);
     try {
       const data = await orderService.updateOrder(id, {
         customer_name: customerName,
-        phone,
+        phone: phoneToUse,
         notes: form.notes.trim(),
         party_size: partySize,
         items,
@@ -156,7 +157,7 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ id: s
       }
 
       toast.success('Order updated successfully');
-      router.push('/staff/orders');
+      router.push(`/${slug}/staff/orders`);
     } catch {
       toast.error('Network error while updating order');
     } finally {
@@ -176,7 +177,7 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ id: s
     return (
       <div style={{ textAlign: 'center', padding: '60px' }}>
         <p>Order not found.</p>
-        <Link prefetch={false} href="/staff/orders" className="btn btn-primary" style={{ marginTop: '20px' }}>Back to Orders</Link>
+        <Link prefetch={false} href={`/${slug}/staff/orders`} className="btn btn-primary" style={{ marginTop: '20px' }}>Back to Orders</Link>
       </div>
     );
   }
@@ -184,7 +185,7 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ id: s
   return (
     <div className="animate-fade-in" style={{ position: 'relative', padding: '16px', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px' }}>
       {/* Top Right Close Button */}
-      <Link prefetch={false} href="/staff/orders" 
+      <Link prefetch={false} href={`/${slug}/staff/orders`} 
         style={{ 
           position: 'absolute', 
           top: '16px', 
@@ -209,7 +210,7 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ id: s
       </Link>
 
       <div style={{ marginBottom: '24px', paddingTop: '8px' }}>
-        <Link prefetch={false} href="/staff/orders" style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>
+        <Link prefetch={false} href={`/${slug}/staff/orders`} style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>
           ← Back to Orders
         </Link>
         <h1 style={{ fontSize: '24px', fontWeight: 800 }}>
@@ -394,7 +395,7 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ id: s
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Saving...' : 'Save Order Changes'}
             </button>
-            <Link prefetch={false} href="/staff/orders" className="btn btn-ghost">Cancel</Link>
+            <Link prefetch={false} href={`/${slug}/staff/orders`} className="btn btn-ghost">Cancel</Link>
           </div>
         </form>
       </div>

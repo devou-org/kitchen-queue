@@ -86,7 +86,7 @@ export default function AdminStatements() {
 
   const { totalRevenue, totalPaidRevenue, orderCount, paidCount } = stats;
 
-  const allStatuses = ['PENDING', 'READY', 'PAID', 'CANCELLED'];
+  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
 
   const [expiring, setExpiring] = useState(false);
   const handleExpireOldOrders = async () => {

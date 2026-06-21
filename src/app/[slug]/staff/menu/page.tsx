@@ -5,6 +5,7 @@ import { formatPrice } from '@/lib/format';
 import { Product, CartItem, ProductStatus } from '@/types';
 import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
+import { orderService } from '@/app/services/orders.api';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -176,27 +177,21 @@ export default function StaffMenuPage() {
       const phoneToUse = orderForm.phone || `+910000000000`;
       const nameToUse = orderForm.customer_name || `Table ${orderForm.table_number}`;
 
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_name: nameToUse,
-          phone: phoneToUse,
-          items,
-          table_number: orderForm.table_number,
-          party_size: orderForm.party_size,
-          notes: orderForm.notes
-        })
+      const res = await orderService.createOrder({
+        customer_name: nameToUse,
+        phone: phoneToUse,
+        items,
+        party_size: orderForm.party_size,
+        notes: orderForm.notes
       });
 
-      const data = await res.json();
-      if (data.success) {
-        toast.success(`Order placed successfully! Ticket #${data.data.ticket_number}`);
+      if (res.success && res.data) {
+        toast.success(`Order placed successfully! Ticket #${res.data.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
         setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '' });
       } else {
-        toast.error(data.error || 'Failed to place order');
+        toast.error(res.error || 'Failed to place order');
       }
     } catch (err) {
       toast.error('Network error');

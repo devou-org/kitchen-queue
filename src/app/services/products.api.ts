@@ -3,12 +3,41 @@ import { ApiResponse, Product } from '@/types';
 class ProductService {
   private getAuthHeaders(): Record<string, string> {
     if (typeof window === 'undefined') return {};
-    const token = localStorage.getItem('admin_token') || localStorage.getItem('auth_token');
-    
-    // Extract slug from URL: /[slug]/...
+    let token: string | null = null;
     const path = window.location.pathname;
+
+    if (path.startsWith('/admin')) {
+      token = localStorage.getItem('admin_token');
+    } else if (path.includes('/staff')) {
+      token = localStorage.getItem('staff_token') || localStorage.getItem('admin_token');
+    } else {
+      token = localStorage.getItem('auth_token');
+    }
+
+    if (!token) {
+      token = localStorage.getItem('admin_token') || localStorage.getItem('auth_token') || localStorage.getItem('staff_token');
+    }
+
+    // Extract slug from URL: /[slug]/...
     const segments = path.split('/').filter(Boolean);
-    const slug = segments[0];
+    let slug = segments[0];
+
+    if (slug === 'staff') {
+      const staffToken = localStorage.getItem('staff_token');
+      if (staffToken) {
+        try {
+          const payloadPart = staffToken.split('.')[1];
+          if (payloadPart) {
+            const payload = JSON.parse(atob(payloadPart));
+            if (payload.restaurantSlug) {
+              slug = payload.restaurantSlug;
+            }
+          }
+        } catch (e) {
+          console.error('Error decoding staff token:', e);
+        }
+      }
+    }
 
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;

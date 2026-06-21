@@ -43,7 +43,7 @@ async function run() {
   try {
     // Fetch all active restaurants whose billing period has ended or is uninitialized
     const expiredRes = await client.query(`
-      SELECT id, name, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date
+      SELECT id, name, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period
       FROM restaurants
       WHERE billing_status = 'ACTIVE' 
         AND (billing_end_date IS NULL OR billing_end_date <= CURRENT_DATE)
@@ -55,26 +55,35 @@ async function run() {
       const restaurantId = row.id;
       const billingModel = row.billing_model || 'SUBSCRIPTION';
       const billingTier = row.billing_tier || 'BASIC';
+      const billingPeriod = row.billing_period || 'MONTHLY';
       
       const oldEnd = row.billing_end_date ? new Date(row.billing_end_date) : new Date();
       const newStart = new Date(oldEnd);
       
       const newEnd = new Date(newStart);
-      newEnd.setMonth(newEnd.getMonth() + 1);
+      if (billingPeriod === 'YEARLY') {
+        newEnd.setFullYear(newEnd.getFullYear() + 1);
+      } else {
+        newEnd.setMonth(newEnd.getMonth() + 1);
+      }
 
-      console.log(`🔄 Processing [${row.name}] (${billingTier} - ${billingModel})...`);
+      console.log(`🔄 Processing [${row.name}] (${billingTier} - ${billingModel} - ${billingPeriod})...`);
 
       await client.query('BEGIN');
       try {
         if (billingModel === 'SUBSCRIPTION') {
           const pricing = BILLING_PRICING[billingTier] || BILLING_PRICING.BASIC;
-          const amount = pricing.subscriptionMonthly;
+          const multiplier = billingPeriod === 'YEARLY' ? 12 : 1;
+          const amount = pricing.subscriptionMonthly * multiplier;
 
           // Local time calculations for month/year (Asia/Kolkata)
           const now = new Date();
           const localMonth = parseInt(new Intl.DateTimeFormat('en-US', { month: 'numeric', timeZone: 'Asia/Kolkata' }).format(now));
           const localYear = parseInt(new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'Asia/Kolkata' }).format(now));
-          const description = `Monthly Subscription Charge (${billingTier} tier)`;
+          
+          const description = billingPeriod === 'YEARLY'
+            ? `Yearly Subscription Charge (${billingTier} tier)`
+            : `Monthly Subscription Charge (${billingTier} tier)`;
 
           // 1. Insert billing transaction for the subscription charge
           await client.query(`
@@ -111,6 +120,7 @@ async function run() {
           name: row.name,
           tier: billingTier,
           model: billingModel,
+          period: billingPeriod,
           new_start: newStart.toISOString().split('T')[0],
           new_end: newEnd.toISOString().split('T')[0]
         });

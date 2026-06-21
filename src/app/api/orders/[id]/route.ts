@@ -15,12 +15,14 @@ async function requireAdmin(request: NextRequest) {
   }
 
   const adminToken = request.cookies.get('admin_token')?.value;
+  const staffToken = request.cookies.get('staff_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = adminToken || authHeader;
+  const token = authHeader || adminToken || staffToken;
   if (!token) return null;
   const payload = await verifyToken(token);
-  if (!payload?.isAdmin) return null;
-  return payload;
+  if (!payload) return null;
+  if (payload.isAdmin || payload.isStaff) return payload;
+  return null;
 }
 
 async function getAuthContext(request: NextRequest) {
@@ -30,12 +32,13 @@ async function getAuthContext(request: NextRequest) {
   }
 
   const adminToken = request.cookies.get('admin_token')?.value;
+  const staffToken = request.cookies.get('staff_token')?.value;
   const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = adminToken || authHeader;
+  const token = authHeader || adminToken || staffToken;
   if (!token) return { admin: null, customer: null };
   const payload = await verifyToken(token);
   if (!payload) return { admin: null, customer: null };
-  if (payload.isAdmin) return { admin: payload, customer: null };
+  if (payload.isAdmin || payload.isStaff) return { admin: payload, customer: null };
   return { admin: null, customer: payload };
 }
 
@@ -50,6 +53,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const admin = await requireAdmin(request);
     if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (admin.isStaff && admin.restaurantId !== restaurant.id) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Wrong restaurant' }, { status: 403 });
+    }
 
     const { id } = await params;
     const order = await getOrderById(restaurant.id, id);
@@ -81,6 +87,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!admin && !customer) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (admin && admin.isStaff && admin.restaurantId !== restaurant.id) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Wrong restaurant' }, { status: 403 });
     }
 
     // Customer may ONLY update items, and only when order is PENDING/PREPARING

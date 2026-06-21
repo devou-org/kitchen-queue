@@ -3,118 +3,10 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
-
-const ServiceToggle = () => {
-  const [isActive, setIsActive] = useState(true);
-  const [message, setMessage] = useState('');
-  const [toggling, setToggling] = useState(false);
-  const [showSaved, setShowSaved] = useState(false);
-  const { slug } = useParams();
-
-  useEffect(() => {
-    fetch('/api/admin/settings', {
-      headers: { 'x-restaurant-slug': slug as string }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setIsActive(data.isServiceActive);
-          setMessage(data.serviceMessage || '');
-        }
-      });
-  }, [slug]);
-
-  const updateService = async (newActive: boolean, newMessage?: string) => {
-    setToggling(true);
-    setShowSaved(false);
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-restaurant-slug': slug as string
-        },
-        body: JSON.stringify({ active: newActive, message: newMessage ?? message })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setIsActive(newActive);
-        if (newMessage !== undefined) {
-          setMessage(newMessage);
-          setShowSaved(true);
-          setTimeout(() => setShowSaved(false), 2000);
-        }
-      }
-    } catch {
-      // Fallback
-    } finally {
-      setToggling(false);
-    }
-  };
-
-  return (
-    <div style={{ marginBottom: '16px', marginTop: '-4px' }}>
-      <div className="status-toggle-wrapper" style={{ marginBottom: '12px' }}>
-        <div className="status-toggle-label">
-          <span className="status-label-primary">Service Status</span>
-          <span className="status-label-secondary" style={{ color: isActive ? 'var(--success)' : '#ef4444' }}>
-            {isActive ? 'Online' : 'Offline'}
-          </span>
-        </div>
-        <label className="switch">
-          <input type="checkbox" checked={isActive} onChange={(e) => updateService(e.target.checked)} disabled={toggling} />
-          <span className="slider"></span>
-        </label>
-      </div>
-      
-      {!isActive && (
-        <div className="animate-fade-in" style={{ padding: '0 4px' }}>
-          <label style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block', fontWeight: 600 }}>
-            Offline Reason / Message
-          </label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <input 
-              type="text" 
-              value={message} 
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="e.g. Kitchen Break"
-              style={{
-                width: '100%',
-                background: 'white',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                padding: '10px 12px',
-                color: 'var(--text-primary)',
-                fontSize: '13px'
-              }}
-            />
-            <button 
-              onClick={() => updateService(false, message)}
-              disabled={toggling}
-              style={{
-                background: toggling ? '#E5E7EB' : 'var(--primary)',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '8px',
-                color: toggling ? 'var(--text-secondary)' : 'white',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                textAlign: 'center'
-              }}
-            >
-              {toggling ? 'Saving...' : showSaved ? '✅ Saved!' : 'Update Message'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+import { ServiceToggle } from '@/components/ServiceToggle';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -202,8 +94,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push(`/${slug}/admin/login`);
   };
 
-
-
   const navLinks = [
     ...(showOrdering ? [{ name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
@@ -211,6 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/inventory`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
+    { name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> },
     { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
   ];
 

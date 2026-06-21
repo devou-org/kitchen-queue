@@ -2,16 +2,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function StaffOrders() {
+  const { slug } = useParams();
+  const { restaurant } = useRestaurant();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('PREPARING');
+  const [statusFilter, setStatusFilter] = useState('PENDING');
   const [page, setPage] = useState(1);
   const [mounted, setMounted] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -63,8 +67,9 @@ export default function StaffOrders() {
   }, [fetchOrders]);
 
   useEffect(() => {
-    if (!pusherClient) return;
-    const channel = pusherClient.subscribe('queue-channel');
+    if (!pusherClient || !restaurant) return;
+    const channelName = restaurant.pusher_channel;
+    const channel = pusherClient.subscribe(channelName);
 
     channel.bind('new_order', (data: any) => {
       fetchOrdersDebounced(true);
@@ -108,7 +113,7 @@ export default function StaffOrders() {
       channel.unbind_all();
       channel.unsubscribe();
     };
-  }, [fetchOrdersDebounced, statusFilter]);
+  }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
   const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string) => {
     setModalLoading(true);
@@ -122,7 +127,7 @@ export default function StaffOrders() {
           return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number } : o)
             .filter(o => {
               if (statusFilter) return o.status === statusFilter;
-              return o.status === 'PREPARING';
+              return o.status === 'PENDING';
             });
         });
         setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number } : null);
@@ -137,7 +142,7 @@ export default function StaffOrders() {
     }
   };
 
-  const allStatuses = ['PREPARING', 'READY', 'PAID', 'CANCELLED'];
+  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
 
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
@@ -226,7 +231,7 @@ export default function StaffOrders() {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Link prefetch={false} href={`/staff/orders/${selectedOrder.id}/edit`} className="btn btn-secondary btn-sm" style={{ padding: '0 12px', height: '32px', fontSize: '12px' }}>
+                <Link prefetch={false} href={`/${slug}/staff/orders/${selectedOrder.id}/edit`} className="btn btn-secondary btn-sm" style={{ padding: '0 12px', height: '32px', fontSize: '12px' }}>
                   EDIT
                 </Link>
                 <button onClick={closeModal} className="modal-close-btn">✕</button>

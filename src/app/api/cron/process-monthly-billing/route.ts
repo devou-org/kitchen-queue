@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     // 1. Fetch all active restaurants whose billing cycle has expired or is uninitialized
     // We check if billing_end_date is in the past (or today) and the restaurant is active
     const expiredRes = await client.query(`
-      SELECT id, name, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date
+      SELECT id, name, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period
       FROM restaurants
       WHERE billing_status = 'ACTIVE' 
         AND (billing_end_date IS NULL OR billing_end_date <= CURRENT_DATE)
@@ -26,24 +26,25 @@ export async function GET(request: NextRequest) {
     for (const row of expiredRes.rows) {
       const restaurantId = row.id;
       const billingModel = row.billing_model || 'SUBSCRIPTION';
+      const billingPeriod = row.billing_period || 'MONTHLY';
       
-      // Calculate next cycle range (usually 1 month)
+      // Calculate next cycle range
       const oldEnd = row.billing_end_date ? new Date(row.billing_end_date) : new Date();
       const newStart = new Date(oldEnd);
       
       const newEnd = new Date(newStart);
-      newEnd.setMonth(newEnd.getMonth() + 1);
+      if (billingPeriod === 'YEARLY') {
+        newEnd.setFullYear(newEnd.getFullYear() + 1);
+      } else {
+        newEnd.setMonth(newEnd.getMonth() + 1);
+      }
 
       await client.query('BEGIN');
       try {
-        // If subscription model, charge the monthly fee at the start of the new cycle
+        // If subscription model, charge the fee at the start of the new cycle
         if (billingModel === 'SUBSCRIPTION') {
-          // We can call processSubscriptionBilling within a client's context or pool,
-          // but processSubscriptionBilling connects to pool. Let's make sure we run it.
-          // Since it manages its own transaction inside pool.connect(), we will run it
-          // before the parent transaction or let it handle itself.
-          // To be safe, we run it and then perform the date update in our query.
-          await BillingService.processSubscriptionBilling(restaurantId);
+          // We pass the billingPeriod to processSubscriptionBilling to calculate the correct charge
+          await BillingService.processSubscriptionBilling(restaurantId, billingPeriod);
         }
 
         // Update the restaurant's billing start/end dates
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
         processed.push({
           id: restaurantId,
           name: row.name,
-          old_end: row.billing_end_date || 'None',
+          old_end: row.billing_end_date ? new Date(row.billing_end_date).toISOString().split('T')[0] : 'None',
           new_end: newEnd.toISOString().split('T')[0]
         });
       } catch (err) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPassword, generateAccessToken } from '@/lib/auth';
-import { getStaffByEmail } from '@/lib/db';
+import { getStaffByEmail, getRestaurantById } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,13 +23,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
+    const restaurant = await getRestaurantById(staff.restaurant_id);
+    if (!restaurant) {
+      return NextResponse.json({ success: false, error: 'Associated restaurant not found' }, { status: 404 });
+    }
+
     const token = await generateAccessToken({
       userId: staff.id,
       email: staff.email,
+      name: staff.name,
       isAdmin: false,
       isStaff: true,
-      role: staff.role
-    } as any, '1d');
+      role: staff.role,
+      restaurantId: staff.restaurant_id,
+      restaurantSlug: restaurant.slug,
+      restaurantName: restaurant.name
+    }, '1d');
 
     const response = NextResponse.json({
       success: true,
@@ -40,6 +49,9 @@ export async function POST(request: NextRequest) {
         name: staff.name,
         role: staff.role,
         is_staff: true,
+        restaurant_id: staff.restaurant_id,
+        restaurant_slug: restaurant.slug,
+        restaurant_name: restaurant.name
       },
     });
 
