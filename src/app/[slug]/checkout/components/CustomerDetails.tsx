@@ -75,14 +75,15 @@ export default function CustomerDetails({
 
   const verifyOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpCode.length !== 6) {
+    const cleanCode = otpCode.replace(/ /g, '');
+    if (cleanCode.length !== 6) {
       toast.error('Please enter a valid 6-digit OTP');
       return;
     }
     
     setVerifyingOtp(true);
     try {
-      const data = await authService.verifyOtp(otpCode, otpToken);
+      const data = await authService.verifyOtp(cleanCode, otpToken);
       if (data.success) {
         toast.success('Phone verified successfully!');
         setOtpStep(false);
@@ -186,14 +187,22 @@ export default function CustomerDetails({
                       key={index}
                       id={`otp-input-${index}`}
                       type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
                       maxLength={1}
-                      value={otpCode[index] || ''}
+                      value={otpCode[index]?.trim() || ''}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
                         if (!val && e.target.value !== '') return; // ignore non-numeric
-                        const newOtp = otpCode.split('');
-                        newOtp[index] = val;
-                        setOtpCode(newOtp.join(''));
+                        
+                        // Safely update the string, padding with spaces if needed to prevent index shifting
+                        let currentArray = otpCode.split('');
+                        while (currentArray.length < 6) currentArray.push('');
+                        
+                        currentArray[index] = val;
+                        // Filter out trailing empties but keep internal empties as spaces or let them be empty
+                        // Actually, it's safer to just set an array state, but let's fix the string behavior:
+                        setOtpCode(currentArray.join(''));
                         
                         if (val && index < 5) {
                           const next = document.getElementById(`otp-input-${index + 1}`);
@@ -205,9 +214,10 @@ export default function CustomerDetails({
                           const prev = document.getElementById(`otp-input-${index - 1}`);
                           if (prev) {
                             prev.focus();
-                            const newOtp = otpCode.split('');
-                            newOtp[index - 1] = '';
-                            setOtpCode(newOtp.join(''));
+                            let currentArray = otpCode.split('');
+                            while (currentArray.length < 6) currentArray.push('');
+                            currentArray[index - 1] = '';
+                            setOtpCode(currentArray.join(''));
                           }
                         }
                       }}
@@ -215,6 +225,8 @@ export default function CustomerDetails({
                         e.preventDefault();
                         const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
                         if (pastedData) {
+                          // Pad with empty strings if pasted data is short
+                          const padded = pastedData.padEnd(6, ' ').replace(/ /g, '');
                           setOtpCode(pastedData);
                           const nextIndex = Math.min(pastedData.length, 5);
                           const next = document.getElementById(`otp-input-${nextIndex}`);
@@ -241,7 +253,7 @@ export default function CustomerDetails({
                 <button 
                   type="button" 
                   onClick={verifyOtpSubmit}
-                  disabled={verifyingOtp || otpCode.length !== 6}
+                  disabled={verifyingOtp || otpCode.replace(/ /g, '').length !== 6}
                   style={{ 
                     width: '100%', 
                     padding: '16px', 
@@ -251,8 +263,8 @@ export default function CustomerDetails({
                     fontWeight: 700,
                     fontSize: '15px',
                     border: 'none',
-                    opacity: (verifyingOtp || otpCode.length !== 6) ? 0.7 : 1,
-                    cursor: (verifyingOtp || otpCode.length !== 6) ? 'not-allowed' : 'pointer',
+                    opacity: (verifyingOtp || otpCode.replace(/ /g, '').length !== 6) ? 0.7 : 1,
+                    cursor: (verifyingOtp || otpCode.replace(/ /g, '').length !== 6) ? 'not-allowed' : 'pointer',
                     boxShadow: '0 4px 14px rgba(0,0,0,0.1)'
                   }}
                 >

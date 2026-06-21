@@ -1612,6 +1612,28 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
   try {
     await client.query('BEGIN');
 
+    // Ensure tables exist before inserting (safety net for un-migrated databases)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS otp_logs (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(20) NOT NULL,
+        sent_at TIMESTAMP DEFAULT NOW(),
+        restaurant_id UUID
+      )
+    `);
+    
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS daily_otp_stats (
+        id SERIAL PRIMARY KEY,
+        date DATE NOT NULL,
+        restaurant_id UUID,
+        count INT DEFAULT 0,
+        cost DECIMAL(10,2) DEFAULT 0.00,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(date, restaurant_id)
+      )
+    `);
+
     // 1. Log the specific OTP request
     const logRes = await client.query(`
       INSERT INTO otp_logs (phone, sent_at, restaurant_id)
