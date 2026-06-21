@@ -279,20 +279,7 @@ export default function StaffAdminPage() {
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Role / Permissions</label>
-                <select
-                  value={formData.role} 
-                  onChange={e => setFormData({ ...formData, role: e.target.value })}
-                  className="input"
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'white' }}
-                >
-                  <option value="STAFF">General Staff (POS & Orders)</option>
-                  <option value="KITCHEN">Kitchen Staff (Kitchen Ticket / Statuses)</option>
-                  <option value="WAITER">Waiter / Server (Dining Orders)</option>
-                  <option value="ADMIN">Restaurant Admin (Full Access)</option>
-                </select>
-              </div>
+
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                 <input
