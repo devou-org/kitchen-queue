@@ -21,7 +21,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
   const [isVerified, setIsVerified] = useState(false);
   const [otpStep, setOtpStep] = useState(false);
   const [otpToken, setOtpToken] = useState('');
-  const [otpCode, setOtpCode] = useState('');
+  const [otpCode, setOtpCode] = useState<string[]>(['', '', '', '', '', '']);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
@@ -86,14 +86,15 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
   };
 
   const verifyOtpSubmit = async () => {
-    if (otpCode.length !== 6) {
+    const cleanCode = otpCode.join('').replace(/\D/g, '');
+    if (cleanCode.length !== 6) {
       toast.error('Please enter a valid 6-digit OTP');
       return;
     }
     
     setVerifyingOtp(true);
     try {
-      const data = await authService.verifyOtp(otpCode, otpToken);
+      const data = await authService.verifyOtp(cleanCode, otpToken);
       if (data.success) {
         toast.success('Phone verified successfully!');
         setOtpStep(false);
@@ -227,7 +228,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
                   </span>
                 ) : (
                   otpStep ? (
-                    <button type="button" onClick={() => { setOtpStep(false); setOtpCode(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', padding: '0 8px' }}>
+                    <button type="button" onClick={() => { setOtpStep(false); setOtpCode(['', '', '', '', '', '']); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', padding: '0 8px' }}>
                       Edit
                     </button>
                   ) : (
@@ -255,24 +256,26 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
                         if (!val && e.target.value !== '') return;
-                        const newOtp = otpCode.split('');
+                        const newOtp = [...otpCode];
                         newOtp[index] = val;
-                        setOtpCode(newOtp.join(''));
+                        setOtpCode(newOtp);
                         if (val && index < 5) document.getElementById(`otp-input-${index + 1}`)?.focus();
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
                           document.getElementById(`otp-input-${index - 1}`)?.focus();
-                          const newOtp = otpCode.split('');
+                          const newOtp = [...otpCode];
                           newOtp[index - 1] = '';
-                          setOtpCode(newOtp.join(''));
+                          setOtpCode(newOtp);
                         }
                       }}
                       onPaste={(e) => {
                         e.preventDefault();
                         const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
                         if (pastedData) {
-                          setOtpCode(pastedData);
+                          const newOtp = [...otpCode];
+                          pastedData.split('').forEach((d, i) => newOtp[i] = d);
+                          setOtpCode(newOtp);
                           const nextIndex = Math.min(pastedData.length, 5);
                           document.getElementById(`otp-input-${nextIndex}`)?.focus();
                         }
@@ -286,10 +289,10 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
                   ))}
                 </div>
                 
-                <button type="button" onClick={verifyOtpSubmit} disabled={verifyingOtp || otpCode.length !== 6} style={{ 
+                <button type="button" onClick={verifyOtpSubmit} disabled={verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6} style={{ 
                   width: '100%', padding: '16px', borderRadius: '12px', background: 'var(--primary)', color: 'white', 
-                  fontWeight: 700, fontSize: '15px', border: 'none', opacity: (verifyingOtp || otpCode.length !== 6) ? 0.7 : 1,
-                  cursor: (verifyingOtp || otpCode.length !== 6) ? 'not-allowed' : 'pointer'
+                  fontWeight: 700, fontSize: '15px', border: 'none', opacity: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6) ? 0.7 : 1,
+                  cursor: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6) ? 'not-allowed' : 'pointer'
                 }}>
                   {verifyingOtp ? 'Verifying...' : 'Verify Code'}
                 </button>

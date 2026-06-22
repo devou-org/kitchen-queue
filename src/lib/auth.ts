@@ -111,7 +111,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 // FAST2SMS OTP SENDER (Dynamic import to prevent Edge runtime crash in middleware)
 // ============================================
 
-export async function sendOTPviaSMS(phone: string, otp: string, restaurantId?: string): Promise<boolean> {
+export async function sendOTPviaSMS(phone: string, otp: string, restaurantId?: string): Promise<{ success: boolean; error?: string; data?: any }> {
   try {
     const cleanPhone = phone.replace(/^\+91/, '').replace(/\D/g, '');
 
@@ -134,14 +134,14 @@ export async function sendOTPviaSMS(phone: string, otp: string, restaurantId?: s
 
     const data = await response.json();
     console.log('SMS Response:', data);
-    if (data.return === true) {
+    if (data.return === true || data.return === "true" || data.message) {
       const { incrementOtpCount } = await import('./db');
       await incrementOtpCount(phone, restaurantId);
-      return true;
+      return { success: true };
     }
-    return false;
-  } catch (error) {
+    return { success: false, error: 'Fast2SMS API rejected request', data };
+  } catch (error: any) {
     console.error('SMS send error:', error);
-    return false;
+    return { success: false, error: 'Internal Error: ' + error.message };
   }
 }

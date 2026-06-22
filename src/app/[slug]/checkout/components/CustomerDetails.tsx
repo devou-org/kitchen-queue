@@ -31,7 +31,7 @@ export default function CustomerDetails({
   totalQty
 }: CustomerDetailsProps) {
   const [otpStep, setOtpStep] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
+  const [otpCode, setOtpCode] = useState<string[]>(['', '', '', '', '', '']);
   const [otpToken, setOtpToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
@@ -75,7 +75,7 @@ export default function CustomerDetails({
 
   const verifyOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanCode = otpCode.replace(/ /g, '');
+    const cleanCode = otpCode.join('').replace(/\D/g, '');
     if (cleanCode.length !== 6) {
       toast.error('Please enter a valid 6-digit OTP');
       return;
@@ -144,7 +144,7 @@ export default function CustomerDetails({
                 otpStep ? (
                   <button 
                     type="button" 
-                    onClick={() => { setOtpStep(false); setOtpCode(''); }}
+                    onClick={() => { setOtpStep(false); setOtpCode(['', '', '', '', '', '']); }}
                     style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', padding: '0 8px' }}
                   >
                     Edit
@@ -190,19 +190,13 @@ export default function CustomerDetails({
                       inputMode="numeric"
                       autoComplete="one-time-code"
                       maxLength={1}
-                      value={otpCode[index]?.trim() || ''}
+                      value={otpCode[index] || ''}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
                         if (!val && e.target.value !== '') return; // ignore non-numeric
-                        
-                        // Safely update the string, padding with spaces if needed to prevent index shifting
-                        let currentArray = otpCode.split('');
-                        while (currentArray.length < 6) currentArray.push('');
-                        
-                        currentArray[index] = val;
-                        // Filter out trailing empties but keep internal empties as spaces or let them be empty
-                        // Actually, it's safer to just set an array state, but let's fix the string behavior:
-                        setOtpCode(currentArray.join(''));
+                        const newOtp = [...otpCode];
+                        newOtp[index] = val;
+                        setOtpCode(newOtp);
                         
                         if (val && index < 5) {
                           const next = document.getElementById(`otp-input-${index + 1}`);
@@ -214,10 +208,9 @@ export default function CustomerDetails({
                           const prev = document.getElementById(`otp-input-${index - 1}`);
                           if (prev) {
                             prev.focus();
-                            let currentArray = otpCode.split('');
-                            while (currentArray.length < 6) currentArray.push('');
-                            currentArray[index - 1] = '';
-                            setOtpCode(currentArray.join(''));
+                            const newOtp = [...otpCode];
+                            newOtp[index - 1] = '';
+                            setOtpCode(newOtp);
                           }
                         }
                       }}
@@ -225,9 +218,9 @@ export default function CustomerDetails({
                         e.preventDefault();
                         const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
                         if (pastedData) {
-                          // Pad with empty strings if pasted data is short
-                          const padded = pastedData.padEnd(6, ' ').replace(/ /g, '');
-                          setOtpCode(pastedData);
+                          const newOtp = [...otpCode];
+                          pastedData.split('').forEach((d, i) => newOtp[i] = d);
+                          setOtpCode(newOtp);
                           const nextIndex = Math.min(pastedData.length, 5);
                           const next = document.getElementById(`otp-input-${nextIndex}`);
                           if (next) next.focus();
@@ -253,7 +246,7 @@ export default function CustomerDetails({
                 <button 
                   type="button" 
                   onClick={verifyOtpSubmit}
-                  disabled={verifyingOtp || otpCode.replace(/ /g, '').length !== 6}
+                  disabled={verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6}
                   style={{ 
                     width: '100%', 
                     padding: '16px', 
@@ -263,8 +256,8 @@ export default function CustomerDetails({
                     fontWeight: 700,
                     fontSize: '15px',
                     border: 'none',
-                    opacity: (verifyingOtp || otpCode.replace(/ /g, '').length !== 6) ? 0.7 : 1,
-                    cursor: (verifyingOtp || otpCode.replace(/ /g, '').length !== 6) ? 'not-allowed' : 'pointer',
+                    opacity: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6) ? 0.7 : 1,
+                    cursor: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6) ? 'not-allowed' : 'pointer',
                     boxShadow: '0 4px 14px rgba(0,0,0,0.1)'
                   }}
                 >

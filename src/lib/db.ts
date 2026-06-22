@@ -1612,26 +1612,41 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
   try {
     await client.query('BEGIN');
 
-    // Ensure tables exist before inserting (safety net for un-migrated databases)
+    // Ensure tables exist and are properly migrated before inserting (safety net for un-migrated databases)
     await client.query(`
       CREATE TABLE IF NOT EXISTS otp_logs (
-        id SERIAL PRIMARY KEY,
-        phone VARCHAR(20) NOT NULL,
-        sent_at TIMESTAMP DEFAULT NOW(),
-        restaurant_id UUID
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        restaurant_id UUID REFERENCES restaurants(id) ON DELETE CASCADE,
+        phone TEXT NOT NULL,
+        sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'SENT'
       )
     `);
     
     await client.query(`
       CREATE TABLE IF NOT EXISTS daily_otp_stats (
-        id SERIAL PRIMARY KEY,
-        date DATE NOT NULL,
-        restaurant_id UUID,
-        count INT DEFAULT 0,
-        cost DECIMAL(10,2) DEFAULT 0.00,
-        updated_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(date, restaurant_id)
+        date DATE PRIMARY KEY,
+        count INTEGER DEFAULT 0,
+        cost NUMERIC(10, 2) DEFAULT 0.00,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Migration logic: Ensure correct constraints for multi-tenant daily_otp_stats
+    await client.query(`ALTER TABLE daily_otp_stats DROP CONSTRAINT IF EXISTS daily_otp_stats_pkey CASCADE`);
+    await client.query(`ALTER TABLE daily_otp_stats ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY`);
+    await client.query(`ALTER TABLE daily_otp_stats ADD COLUMN IF NOT EXISTS restaurant_id UUID`);
+    
+    // Add unique constraint if it doesn't exist
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'unique_date_restaurant'
+        ) THEN
+          ALTER TABLE daily_otp_stats ADD CONSTRAINT unique_date_restaurant UNIQUE (date, restaurant_id);
+        END IF;
+      END $$;
     `);
 
     // 1. Log the specific OTP request
@@ -1645,6 +1660,8 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
 
     // 2. Increment daily aggregation (Concurrency Safe via ON CONFLICT)
     if (restaurantId) {
+      // Use the named constraint 'unique_date_restaurant' or fallback to implicit if created manually elsewhere
+      // Actually, standard PG ON CONFLICT (date, restaurant_id) works as long as the unique constraint exists.
       await client.query(`
         INSERT INTO daily_otp_stats (date, count, cost, restaurant_id)
         VALUES ($1::date, 1, 0.50, $2)

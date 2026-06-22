@@ -28,22 +28,10 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Rate Limit check start ---
-    // Ensure table exists
-    await sql`
-      CREATE TABLE IF NOT EXISTS otp_requests (
-        id SERIAL PRIMARY KEY,
-        phone VARCHAR(20) NOT NULL,
-        requested_at TIMESTAMP DEFAULT NOW()
-      )
-    `;
-
-    // Clean up old requests to keep table small
-    await sql`DELETE FROM otp_requests WHERE requested_at < NOW() - INTERVAL '10 minutes'`;
-
     const recentRequests = await sql`
       SELECT COUNT(*) as count 
-      FROM otp_requests 
-      WHERE phone = ${phone} AND requested_at > NOW() - INTERVAL '10 minutes'
+      FROM otp_logs 
+      WHERE phone = ${phone} AND sent_at > NOW() - INTERVAL '10 minutes'
     `;
 
     if (recentRequests[0] && parseInt(recentRequests[0].count) >= 3) {
@@ -54,13 +42,10 @@ export async function POST(request: NextRequest) {
     const otp = generateOTP();
     const otp_token = await generateOTPToken(phone, otp, '1m');
 
-    const smsSent = await sendOTPviaSMS(phone, otp, restaurantId);
-    if (!smsSent) {
-      return NextResponse.json({ success: false, error: 'Failed to send OTP. Please try again.' }, { status: 502 });
+    const smsResult = await sendOTPviaSMS(phone, otp, restaurantId);
+    if (!smsResult.success) {
+      return NextResponse.json({ success: false, error: smsResult.error || 'Failed to send OTP. Please try again.' }, { status: 502 });
     }
-
-    // Log the successful OTP request for rate limiting
-    await sql`INSERT INTO otp_requests (phone) VALUES (${phone})`;
 
 
 
