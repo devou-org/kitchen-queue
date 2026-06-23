@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProductById, updateProduct, softDeleteProduct, getRestaurantBySlug } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { calculateProductStatus } from '@/lib/validators';
 import { pusherServer } from '@/lib/pusher';
-
-async function requireAdmin(request: NextRequest) {
-  const adminToken = request.cookies.get('admin_token')?.value;
-  const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = adminToken || authHeader;
-  if (!token) return null;
-  const payload = await verifyToken(token);
-  if (!payload?.isAdmin) return null;
-  return payload;
-}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

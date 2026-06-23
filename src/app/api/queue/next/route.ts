@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { advanceQueue, getRestaurantBySlug } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
 
 export async function POST(request: NextRequest) {
@@ -12,14 +12,8 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    const adminToken = request.cookies.get('admin_token')?.value;
-    const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-    const token = adminToken || authHeader;
-
-    if (!token) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-
-    const payload = await verifyToken(token);
-    if (!payload?.isAdmin) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    const admin = await requireAdmin(request);
+    if (!admin) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
 
     const state = await advanceQueue(restaurant.id);
 

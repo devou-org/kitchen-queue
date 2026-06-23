@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
 import { Download, Clock } from 'lucide-react';
+import { orderService } from '@/app/services/orders.api';
 
 export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -21,27 +22,19 @@ export default function AdminStatements() {
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const qs = new URLSearchParams({
-        page: page.toString(),
-        per_page: '200',
+      const res = await orderService.getOrders({
+        page,
+        per_page: 200,
+        sort: 'DESC',
         date_from: dateFrom,
         date_to: dateTo,
-        sort: 'DESC'
+        status: statusFilter || undefined
       });
-      if (statusFilter) qs.append('status', statusFilter);
 
-      const res = await fetch(`/api/orders?${qs.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`,
-          'x-restaurant-slug': slug as string
-        }
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setOrders(data.data);
-        if (data.stats) {
-          setStats(data.stats);
+      if (res.success) {
+        setOrders(res.data || []);
+        if ((res as any).stats) {
+          setStats((res as any).stats);
         }
       }
     } catch {

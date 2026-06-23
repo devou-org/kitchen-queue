@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOtpStats, getRestaurantBySlug } from '@/lib/db';
-import { jwtVerify } from 'jose';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'fallback-secret-change-in-production-32chars!!'
-);
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
     // 1. Basic Admin Auth Check
-    const token = request.cookies.get('admin_token')?.value;
-    if (!token) {
+    const admin = await requireAdmin(request);
+    if (!admin || !admin.isAdmin) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    try {
-      await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({ success: false, error: 'Invalid session' }, { status: 401 });
     }
 
     // 2. Get Range from query params

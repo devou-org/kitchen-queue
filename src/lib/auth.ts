@@ -95,6 +95,95 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
   }
 }
 
+export async function requireAdmin(request: Request | any): Promise<JWTPayload | null> {
+  // --- TEST BYPASS (Development only) ---
+  if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
+    return { isAdmin: true, userId: 'test-admin' } as JWTPayload;
+  }
+
+  let adminToken: string | undefined;
+  let staffToken: string | undefined;
+
+  if (request.cookies && typeof request.cookies.get === 'function') {
+    adminToken = request.cookies.get('admin_token')?.value;
+    staffToken = request.cookies.get('staff_token')?.value;
+  } else {
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      const matchAdmin = cookieHeader.match(/admin_token=([^;]+)/);
+      if (matchAdmin) adminToken = matchAdmin[1];
+      const matchStaff = cookieHeader.match(/staff_token=([^;]+)/);
+      if (matchStaff) staffToken = matchStaff[1];
+    }
+  }
+
+  let authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
+  if (authHeader === 'null' || authHeader === 'undefined' || authHeader === '') {
+    authHeader = undefined;
+  }
+
+  const tokensToTry = [authHeader, adminToken, staffToken].filter(Boolean) as string[];
+
+  for (const t of tokensToTry) {
+    const payload = await verifyToken(t);
+    if (payload && (payload.isAdmin || payload.isStaff)) {
+      return payload;
+    }
+  }
+
+  return null;
+}
+
+export async function getAuthContext(request: Request | any): Promise<{ admin: JWTPayload | null, customer: JWTPayload | null }> {
+  // --- TEST BYPASS (Development only) ---
+  if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
+    return { admin: { isAdmin: true, userId: 'test-admin' } as JWTPayload, customer: null };
+  }
+
+  let adminToken: string | undefined;
+  let staffToken: string | undefined;
+  let authToken: string | undefined;
+
+  if (request.cookies && typeof request.cookies.get === 'function') {
+    adminToken = request.cookies.get('admin_token')?.value;
+    staffToken = request.cookies.get('staff_token')?.value;
+    authToken = request.cookies.get('auth_token')?.value;
+  } else {
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      const matchAdmin = cookieHeader.match(/admin_token=([^;]+)/);
+      if (matchAdmin) adminToken = matchAdmin[1];
+      const matchStaff = cookieHeader.match(/staff_token=([^;]+)/);
+      if (matchStaff) staffToken = matchStaff[1];
+      const matchAuth = cookieHeader.match(/auth_token=([^;]+)/);
+      if (matchAuth) authToken = matchAuth[1];
+    }
+  }
+
+  let authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
+  if (authHeader === 'null' || authHeader === 'undefined' || authHeader === '') {
+    authHeader = undefined;
+  }
+
+  const tokensToTry = [authHeader, adminToken, staffToken, authToken].filter(Boolean) as string[];
+
+  let adminPayload: JWTPayload | null = null;
+  let customerPayload: JWTPayload | null = null;
+
+  for (const t of tokensToTry) {
+    const payload = await verifyToken(t);
+    if (payload) {
+      if (payload.isAdmin || payload.isStaff) {
+        if (!adminPayload) adminPayload = payload;
+      } else {
+        if (!customerPayload) customerPayload = payload;
+      }
+    }
+  }
+
+  return { admin: adminPayload, customer: customerPayload };
+}
+
 // ============================================
 // PASSWORD MANAGEMENT
 // ============================================

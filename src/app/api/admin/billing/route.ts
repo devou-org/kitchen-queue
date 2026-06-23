@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { getRestaurantBySlug } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { BILLING_PRICING, BillingTier } from '@/lib/billing.constants';
-
-async function requireAdmin(request: Request) {
-  const cookieHeader = request.headers.get('cookie') || '';
-  const adminToken = cookieHeader.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1];
-  
-  if (!adminToken) return null;
-  const payload = await verifyToken(adminToken);
-  if (!payload?.isAdmin) return null;
-  return payload;
-}
 
 export async function GET(request: NextRequest) {
   try {

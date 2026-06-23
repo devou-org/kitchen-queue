@@ -19,8 +19,40 @@ export interface InventorySummary {
 class InventoryService {
   private getAuthHeaders(): Record<string, string> {
     if (typeof window === 'undefined') return {};
-    const token = localStorage.getItem('admin_token') || localStorage.getItem('auth_token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    const aToken = localStorage.getItem('admin_token');
+    const sToken = localStorage.getItem('staff_token');
+    const authT = localStorage.getItem('auth_token');
+    
+    let token = (aToken && aToken !== 'null' && aToken !== 'undefined') ? aToken : 
+                ((sToken && sToken !== 'null' && sToken !== 'undefined') ? sToken : 
+                ((authT && authT !== 'null' && authT !== 'undefined') ? authT : null));
+                
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const path = window.location.pathname;
+    const segments = path.split('/').filter(Boolean);
+    let slug = segments[0];
+
+    if (slug === 'staff') {
+      const staffToken = localStorage.getItem('staff_token');
+      if (staffToken) {
+        try {
+          const payloadPart = staffToken.split('.')[1];
+          if (payloadPart) {
+            const payload = JSON.parse(atob(payloadPart));
+            if (payload.restaurantSlug) {
+              slug = payload.restaurantSlug;
+            }
+          }
+        } catch (e) {
+          console.error('Error decoding staff token:', e);
+        }
+      }
+    }
+    
+    if (slug) headers['x-restaurant-slug'] = slug;
+    return headers;
   }
 
   async getTopProducts(options: {

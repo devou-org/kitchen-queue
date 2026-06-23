@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDailyAnalytics, getPeakHours, getTopProducts, getDashboardStats, getKitchenSnapshot, getRestaurantBySlug } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
-
-async function requireAdmin(request: NextRequest) {
-  // Allow test bypass in development
-  if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
-    return { isAdmin: true, bypass: true };
-  }
-
-  const adminToken = request.cookies.get('admin_token')?.value;
-  const token = adminToken || request.headers.get('Authorization')?.replace('Bearer ', '');
-  if (!token) return null;
-  const payload = await verifyToken(token);
-  return payload?.isAdmin ? payload : null;
-}
+import { requireAdmin } from '@/lib/auth';
 
 const getDateRange = (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
@@ -31,7 +18,15 @@ export async function GET(request: NextRequest) {
   if (!restaurant) return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
 
   const admin = await requireAdmin(request);
-  if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  if (!admin) {
+    const debug = {
+      cookie_admin: request.cookies?.get('admin_token')?.value ? 'present' : 'missing',
+      cookie_staff: request.cookies?.get('staff_token')?.value ? 'present' : 'missing',
+      authHeader: request.headers.get('Authorization') ? 'present' : 'missing',
+      authHeaderRaw: request.headers.get('Authorization')
+    };
+    return NextResponse.json({ success: false, error: 'Unauthorized', debug }, { status: 401 });
+  }
 
   try {
     const { searchParams } = new URL(request.url);

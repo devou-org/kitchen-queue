@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStaffs, createStaff, getRestaurantBySlug } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
-import { verifyToken } from '@/lib/auth';
-
-async function checkAdmin(request: NextRequest) {
-  const token = request.cookies.get('admin_token')?.value;
-  if (!token) return false;
-  const payload = await verifyToken(token);
-  return payload?.isAdmin;
-}
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  if (!(await checkAdmin(request))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const admin = await requireAdmin(request);
+  if (!admin || !admin.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const slug = request.headers.get('x-restaurant-slug') || 'demo';
@@ -28,7 +22,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await checkAdmin(request))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const admin = await requireAdmin(request);
+  if (!admin || !admin.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const slug = request.headers.get('x-restaurant-slug') || 'demo';

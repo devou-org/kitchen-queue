@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrders, getOrderStats, createOrder, createUser, getRestaurantBySlug } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken, requireAdmin } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
-
-async function requireAdmin(request: NextRequest) {
-  const adminToken = request.cookies.get('admin_token')?.value;
-  const staffToken = request.cookies.get('staff_token')?.value;
-  const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = authHeader || adminToken || staffToken;
-  if (!token) return null;
-  const payload = await verifyToken(token);
-  if (!payload) return null;
-  if (payload.isAdmin || payload.isStaff) return payload;
-  return null;
-}
 
 export async function GET(request: NextRequest) {
   try {

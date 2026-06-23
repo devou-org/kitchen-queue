@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCategories, createCategory } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
-
-async function requireAdmin(request: NextRequest) {
-  const adminToken = request.cookies.get('admin_token')?.value;
-  const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = adminToken || authHeader;
-  if (!token) return null;
-  const payload = await verifyToken(token);
-  if (!payload?.isAdmin) return null;
-  return payload;
-}
-
-
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {

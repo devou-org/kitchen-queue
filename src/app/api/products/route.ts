@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProducts, createProduct, getRestaurantBySlug } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { calculateProductStatus } from '@/lib/validators';
 
 export async function GET(request: NextRequest) {
@@ -29,18 +29,9 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    // Verify admin token
-    const adminToken = request.cookies.get('admin_token')?.value;
-    const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-    const token = adminToken || authHeader;
-
-    if (!token) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const payload = await verifyToken(token);
+    const admin = await requireAdmin(request);
     // Ideally, we should also check if the admin belongs to this restaurant_id
-    if (!payload || !payload.isAdmin) {
+    if (!admin || !admin.isAdmin) {
       return NextResponse.json({ success: false, error: 'Forbidden - Admin only' }, { status: 403 });
     }
 

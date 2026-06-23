@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrderByTicket, getRestaurantBySlug } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { getAuthContext } from '@/lib/auth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ number: string }> }) {
   try {
@@ -24,22 +24,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Security: Verify user has permission to view this order
-    const adminToken = request.cookies.get('admin_token')?.value;
-    const authToken = request.cookies.get('auth_token')?.value;
-    const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-    const token = adminToken || authToken || authHeader;
+    const { admin, customer } = await getAuthContext(request);
 
-    if (!token) {
+    if (!admin && !customer) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const payload = await verifyToken(token);
-    if (!payload) {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
-    }
-
     // If not admin, the token's phone number must match the order's phone number
-    if (!payload.isAdmin && payload.phone !== order.phone) {
+    if (!admin && customer?.phone !== order.phone) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
 

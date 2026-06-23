@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPrice } from '@/lib/format';
 import { inventoryService, InventoryItem } from '@/app/services/inventory.api';
+import { adminService } from '@/app/services/admin.api';
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   'MAIN COURSE': { bg: 'rgba(151,19,69,0.1)', color: '#971345' },
@@ -64,12 +65,7 @@ export default function AdminInventorySummary() {
           date_to: to,
         }),
         inventoryService.getCategories(),
-        fetch(`/api/analytics?type=daily&date_from=${from}&date_to=${to}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('auth_token')}`,
-            'x-restaurant-slug': slug as string
-          }
-        }).then(res => res.json())
+        adminService.getDailyAnalytics(from, to)
       ]);
 
       if (invRes.success && invRes.data) setItems(invRes.data);

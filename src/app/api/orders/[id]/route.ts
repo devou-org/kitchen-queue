@@ -1,46 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { getOrderById, completeOrderAndBill, updateOrderDetails, getRestaurantBySlug } from '@/lib/db';
 import { Order, OrderItem } from '@/types';
-import { verifyToken } from '@/lib/auth';
-// import { STATUS_TRANSITIONS } from '@/lib/constants';
+import { verifyToken, requireAdmin, getAuthContext } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
 import { validatePhone } from '@/lib/validators';
 
 const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
-
-async function requireAdmin(request: NextRequest) {
-  // --- TEST BYPASS (Development only) ---
-  if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
-    return { isAdmin: true, userId: 'test-admin' };
-  }
-
-  const adminToken = request.cookies.get('admin_token')?.value;
-  const staffToken = request.cookies.get('staff_token')?.value;
-  const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = authHeader || adminToken || staffToken;
-  if (!token) return null;
-  const payload = await verifyToken(token);
-  if (!payload) return null;
-  if (payload.isAdmin || payload.isStaff) return payload;
-  return null;
-}
-
-async function getAuthContext(request: NextRequest) {
-  // --- TEST BYPASS (Development only) ---
-  if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
-    return { admin: { isAdmin: true, userId: 'test-admin' }, customer: null };
-  }
-
-  const adminToken = request.cookies.get('admin_token')?.value;
-  const staffToken = request.cookies.get('staff_token')?.value;
-  const authHeader = request.headers.get('Authorization')?.replace('Bearer ', '');
-  const token = authHeader || adminToken || staffToken;
-  if (!token) return { admin: null, customer: null };
-  const payload = await verifyToken(token);
-  if (!payload) return { admin: null, customer: null };
-  if (payload.isAdmin || payload.isStaff) return { admin: payload, customer: null };
-  return { admin: null, customer: payload };
-}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

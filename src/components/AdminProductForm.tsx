@@ -57,7 +57,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token')}`,
           'x-restaurant-slug': slug as string
         },
         body: JSON.stringify({ name: newCategoryName.trim() }),
@@ -111,7 +111,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
         method,
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token')}`,
           'x-restaurant-slug': slug as string
         },
         body: JSON.stringify(payload),

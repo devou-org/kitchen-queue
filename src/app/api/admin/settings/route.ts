@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { getRestaurantBySlug } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken, requireAdmin } from '@/lib/auth';
 
 // Ensure columns exist (one-time migration check)
 async function ensureColumnExists() {
@@ -10,16 +10,6 @@ async function ensureColumnExists() {
   } catch (err) {
     console.error('Migration error:', err);
   }
-}
-
-async function requireAdmin(request: Request) {
-  const cookieHeader = request.headers.get('cookie') || '';
-  const adminToken = cookieHeader.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1];
-  
-  if (!adminToken) return null;
-  const payload = await verifyToken(adminToken);
-  if (!payload?.isAdmin) return null;
-  return payload;
 }
 
 export async function GET(request: NextRequest) {
