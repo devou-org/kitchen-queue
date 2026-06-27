@@ -76,6 +76,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       await setAllRestaurantModules(id, modulesToSet);
+
+      // Auto-update billing tier based on enabled modules
+      const hasOnlineOrdering = modulesToSet.find((m: any) => m.module_name === 'ONLINE_ORDERING')?.is_enabled;
+      const hasQueue = modulesToSet.find((m: any) => m.module_name === 'QUEUE_MANAGEMENT')?.is_enabled;
+      
+      let newTier = 'BASIC';
+      if (hasOnlineOrdering) {
+        newTier = 'COMPLETE';
+      } else if (hasQueue) {
+        newTier = 'PRO';
+      }
+      
+      const currentRestaurant = await getRestaurantWithModules(id);
+      let newModel = currentRestaurant?.billing_model || 'SUBSCRIPTION';
+      
+      if (newTier === 'BASIC' && newModel !== 'SUBSCRIPTION') {
+        newModel = 'SUBSCRIPTION';
+      } else if (newTier === 'PRO' && newModel === 'PER_ORDER') {
+        newModel = 'SUBSCRIPTION';
+      }
+
+      await updateRestaurant(id, { billing_tier: newTier, billing_model: newModel });
     }
 
     const updated = await getRestaurantWithModules(id);

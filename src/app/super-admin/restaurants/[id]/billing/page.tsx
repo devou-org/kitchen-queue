@@ -3,14 +3,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  ArrowLeft, 
-  Receipt, 
-  Settings, 
-  PlusCircle, 
-  CreditCard, 
-  Calendar, 
-  AlertCircle, 
+import {
+  ArrowLeft,
+  Receipt,
+  Settings,
+  PlusCircle,
+  CreditCard,
+  Calendar,
+  AlertCircle,
   CheckCircle,
   Clock,
   TrendingUp,
@@ -117,6 +117,8 @@ export default function SuperAdminRestaurantBilling() {
     fetchBillingData();
   }, [fetchBillingData]);
 
+
+
   const handleUpdateBilling = async (e: React.FormEvent) => {
     e.preventDefault();
     setUpdatingDetails(true);
@@ -212,7 +214,7 @@ export default function SuperAdminRestaurantBilling() {
   return (
     <div style={styles.page}>
       <Toaster position="top-right" />
-      
+
       {/* Top Banner Navigation */}
       <div style={styles.topNav}>
         <Link href={`/super-admin/restaurants/${id}`} style={styles.backBtn}>
@@ -226,7 +228,7 @@ export default function SuperAdminRestaurantBilling() {
       </div>
 
       <div style={styles.container}>
-        
+
         {/* Header */}
         <div style={styles.header}>
           <div>
@@ -257,7 +259,7 @@ export default function SuperAdminRestaurantBilling() {
         <div style={styles.grid}>
           {/* Left Column: Forms */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
+
             {/* Form: Update Billing Parameters */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>
@@ -267,28 +269,36 @@ export default function SuperAdminRestaurantBilling() {
               <form onSubmit={handleUpdateBilling} style={styles.form}>
                 <div style={styles.formRow}>
                   <div style={styles.formField}>
-                    <label style={styles.label}>Pricing Tier</label>
-                    <select 
-                      value={billingTier} 
-                      onChange={e => setBillingTier(e.target.value)} 
-                      style={styles.select}
+                    <label style={styles.label}>Pricing Tier <span style={{ color: '#059669', fontSize: '9px', marginLeft: '4px' }}>(AUTO)</span></label>
+                    <select
+                      value={billingTier}
+                      onChange={e => setBillingTier(e.target.value)}
+                      style={{ ...styles.select, backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }}
+                      disabled
                     >
                       <option value="BASIC">BASIC (₹399/mo, digital menu)</option>
-                      <option value="PRO">PRO (₹999/mo, queue/ordering commissions)</option>
-                      <option value="COMPLETE">COMPLETE (₹1499/mo, queue/ordering commissions)</option>
+                      <option value="PRO">PRO (₹999/mo, queue)</option>
+                      <option value="COMPLETE">COMPLETE (₹1499/mo, queue/ordering)</option>
                     </select>
+                    <span style={{ fontSize: '10px', color: '#64748b', marginTop: '-4px' }}>
+                      Pricing tier is automatically locked to active modules.
+                    </span>
                   </div>
-                  
+
                   <div style={styles.formField}>
                     <label style={styles.label}>Billing Model</label>
-                    <select 
-                      value={billingModel} 
-                      onChange={e => setBillingModel(e.target.value)} 
+                    <select
+                      value={billingModel}
+                      onChange={e => setBillingModel(e.target.value)}
                       style={styles.select}
                     >
                       <option value="SUBSCRIPTION">SUBSCRIPTION</option>
-                      <option value="COMMISSION">COMMISSION</option>
-                      <option value="ONE_TIME">ONE-TIME FEE</option>
+                      {billingTier === 'COMPLETE' && (
+                        <option value="PER_ORDER">COMMISSION (Per-Order)</option>
+                      )}
+                      {(billingTier === 'PRO' || billingTier === 'COMPLETE') && (
+                        <option value="ONE_TIME">ONE-TIME FEE</option>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -296,9 +306,9 @@ export default function SuperAdminRestaurantBilling() {
                 <div style={styles.formRow}>
                   <div style={styles.formField}>
                     <label style={styles.label}>Billing Status</label>
-                    <select 
-                      value={billingStatus} 
-                      onChange={e => setBillingStatus(e.target.value)} 
+                    <select
+                      value={billingStatus}
+                      onChange={e => setBillingStatus(e.target.value)}
                       style={styles.select}
                     >
                       <option value="ACTIVE">ACTIVE</option>
@@ -310,11 +320,11 @@ export default function SuperAdminRestaurantBilling() {
 
                   <div style={styles.formField}>
                     <label style={styles.label}>Billing End Date (Renewal)</label>
-                    <input 
-                      type="date" 
-                      value={billingEndDate} 
-                      onChange={e => setBillingEndDate(e.target.value)} 
-                      style={styles.input} 
+                    <input
+                      type="date"
+                      value={billingEndDate}
+                      onChange={e => setBillingEndDate(e.target.value)}
+                      style={styles.input}
                     />
                   </div>
                 </div>
@@ -332,29 +342,29 @@ export default function SuperAdminRestaurantBilling() {
                 Post Credit / Adjustment
               </h2>
               <p style={styles.cardDesc}>Post a financial adjustment (positive for credits/refunds, negative for additional charges) to the restaurant's current cycle ledger.</p>
-              
+
               <form onSubmit={handleAddAdjustment} style={styles.form}>
                 <div style={styles.formField}>
                   <label style={styles.label}>Adjustment Amount (₹)</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    placeholder="e.g. 150.00 or -50.00" 
-                    value={adjustAmount} 
-                    onChange={e => setAdjustAmount(e.target.value)} 
-                    style={styles.input} 
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 150.00 or -50.00"
+                    value={adjustAmount}
+                    onChange={e => setAdjustAmount(e.target.value)}
+                    style={styles.input}
                     required
                   />
                 </div>
-                
+
                 <div style={styles.formField}>
                   <label style={styles.label}>Description / Reference Reason</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Loyalty Refund or Excess SMS waiver" 
-                    value={adjustDesc} 
-                    onChange={e => setAdjustDesc(e.target.value)} 
-                    style={styles.input} 
+                  <input
+                    type="text"
+                    placeholder="e.g. Loyalty Refund or Excess SMS waiver"
+                    value={adjustDesc}
+                    onChange={e => setAdjustDesc(e.target.value)}
+                    style={styles.input}
                     required
                   />
                 </div>
@@ -369,7 +379,7 @@ export default function SuperAdminRestaurantBilling() {
 
           {/* Right Column: Statement Tables */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
+
             {/* Monthly Statements */}
             <div style={styles.tableCard}>
               <div style={styles.tableHeader}>

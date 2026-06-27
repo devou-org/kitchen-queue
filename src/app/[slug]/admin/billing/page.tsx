@@ -197,75 +197,36 @@ export default function BillingPage() {
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', fontSize: '13px', color: '#4b5563' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '8px' }}>
-              <span>Base Subscription:</span>
-              <strong style={{ color: '#111827' }}>₹{pricingConfig?.subscriptionPrice || 0}/month</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '8px' }}>
-              <span>Cycle Start Date:</span>
-              <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_start_date)}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Renewal/End Date:</span>
-              <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_end_date)}</strong>
-            </div>
-          </div>
-        </div>
-
-        {/* Pricing Policies Card */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          borderRadius: '16px', 
-          border: '1px solid #e5e7eb', 
-          padding: '24px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-        }}>
-          <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Policy & Rates</h2>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px', color: '#4b5563' }}>
-            <div>
-              <span style={{ display: 'block', fontWeight: 600, color: '#111827', marginBottom: '2px' }}>Per Order Commission:</span>
-              {pricingConfig?.perOrderCommission ? (
-                <span>
-                  Average Order Value &lt; ₹{pricingConfig.perOrderCommission.threshold}: <strong>{pricingConfig.perOrderCommission.belowPercent}% of order value</strong><br />
-                  Average Order Value &ge; ₹{pricingConfig.perOrderCommission.threshold}: <strong>Flat ₹{pricingConfig.perOrderCommission.aboveFlat} per order</strong>
-                </span>
-              ) : (
-                <span style={{ color: '#9ca3af' }}>Not Applicable for this tier</span>
-              )}
-            </div>
-
-            <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '10px' }}>
-              <span style={{ display: 'block', fontWeight: 600, color: '#111827', marginBottom: '2px' }}>OTP Delivery Costs:</span>
-              {pricingConfig?.otpCharge !== undefined && pricingConfig?.otpCharge !== null ? (
-                <span><strong>₹{Number(pricingConfig.otpCharge).toFixed(2)}</strong> flat fee per successfully sent SMS OTP.</span>
-              ) : (
-                <span style={{ color: '#9ca3af' }}>OTP verification disabled on this tier</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Features Checklist Card */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          borderRadius: '16px', 
-          border: '1px solid #e5e7eb', 
-          padding: '24px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-        }}>
-          <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Features Included</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {pricingConfig?.features.map((feature, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#374151' }}>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#059669', fontSize: '10px', fontWeight: 'bold' }}>✓</span>
-                <span>{feature}</span>
+            {restaurant.billing_model === 'SUBSCRIPTION' ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '8px' }}>
+                  <span>Base Subscription:</span>
+                  <strong style={{ color: '#111827' }}>₹{pricingConfig?.subscriptionPrice || 0}/month</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '8px' }}>
+                  <span>Cycle Start Date:</span>
+                  <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_start_date)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Renewal/End Date:</span>
+                  <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_end_date)}</strong>
+                </div>
+              </>
+            ) : restaurant.billing_model === 'PER_ORDER' ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px' }}>
+                <span>Commission Structure:</span>
+                <strong style={{ color: '#111827' }}>Pay-Per-Order</strong>
               </div>
-            )) || (
-              <div style={{ color: '#9ca3af', fontSize: '13px' }}>No features configured</div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px' }}>
+                <span>Fee Structure:</span>
+                <strong style={{ color: '#111827' }}>One-Time Payment</strong>
+              </div>
             )}
           </div>
         </div>
+
+
 
         {/* OTP Usage & Accrued Charges Card */}
         <div style={{ 

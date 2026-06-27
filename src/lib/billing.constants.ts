@@ -68,5 +68,9 @@ export function validateTierAndModel(tier: BillingTier, model: BillingModel): { 
     }
   }
 
+  if (tier === 'PRO' && model === 'PER_ORDER') {
+    return { valid: false, error: 'Tier Pro does not support Per Order (Commission) billing.' };
+  }
+
   return { valid: true };
 }
