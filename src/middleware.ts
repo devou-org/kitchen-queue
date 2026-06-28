@@ -52,6 +52,16 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set('x-restaurant-slug', slug);
   const subPath = '/' + pathSegments.slice(1).join('/');
 
+  // 4.5 Protect Order/Queue Status pages with UUID validation
+  if (subPath.startsWith('/order-status/') || subPath.startsWith('/queue-status/')) {
+    const segments = subPath.split('/');
+    const idParam = segments[2];
+    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i;
+    if (idParam && !uuidRegex.test(idParam)) {
+      return NextResponse.redirect(new URL(`/${slug}/menu`, request.url));
+    }
+  }
+
   // 5. Authentication & Role-Based Access Control (RBAC)
   const rbacResponse = await handleRBAC(request, slug, subPath);
   if (rbacResponse) return rbacResponse;

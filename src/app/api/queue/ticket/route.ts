@@ -5,14 +5,13 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const restaurantId = searchParams.get('restaurantId');
-    const tokenNumberStr = searchParams.get('tokenNumber');
+    const id = searchParams.get('id');
     
-    if (!restaurantId || !tokenNumberStr) {
-      return NextResponse.json({ success: false, error: 'Restaurant ID and token number required' }, { status: 400 });
+    if (!restaurantId || !id) {
+      return NextResponse.json({ success: false, error: 'Restaurant ID and ID required' }, { status: 400 });
     }
 
-    const tokenNumber = parseInt(tokenNumberStr, 10);
-    const queueData = await QueueService.getQueueByToken(restaurantId, tokenNumber);
+    const queueData = await QueueService.getQueueById(restaurantId, id);
 
     if (!queueData) {
       return NextResponse.json({ success: false, error: 'Ticket not found for today' }, { status: 404 });

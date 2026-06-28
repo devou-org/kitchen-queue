@@ -117,7 +117,7 @@ export class QueueService {
           restaurant_id, user_id, queue_status_id, token_number, 
           queue_type, party_size, estimated_wait_time, notes
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *
+        RETURNING *, (REPLACE(created_at::text, ' ', 'T') || 'Z') as created_at_iso
       `, [
         restaurantId, userId, waitingStatusId, nextToken,
         queueType, partySize, null, notes
@@ -127,6 +127,10 @@ export class QueueService {
 
       const newQueue = queueRes.rows[0];
       newQueue.position = position;
+      if (newQueue.created_at_iso) {
+        newQueue.created_at = newQueue.created_at_iso;
+        delete newQueue.created_at_iso;
+      }
 
       import('../notifications/pusher.service').then(m => {
         m.PusherService.emitToRestaurant(restaurantId, 'QUEUE', 'queue_updated', { type: 'JOIN', queue: newQueue });
@@ -165,12 +169,16 @@ export class QueueService {
         UPDATE queues 
         SET queue_status_id = $1, updated_at = NOW()
         WHERE id = $2 AND restaurant_id = $3
-        RETURNING *
+        RETURNING *, (REPLACE(created_at::text, ' ', 'T') || 'Z') as created_at_iso
       `, [statusId, queueId, restaurantId]);
 
       await client.query('COMMIT');
 
       const updatedQueue = updateRes.rows[0];
+      if (updatedQueue.created_at_iso) {
+        updatedQueue.created_at = updatedQueue.created_at_iso;
+        delete updatedQueue.created_at_iso;
+      }
       import('../notifications/pusher.service').then(m => {
         m.PusherService.emitToRestaurant(restaurantId, 'QUEUE', 'queue_updated', { type: 'UPDATE', queue: updatedQueue });
       });
@@ -216,11 +224,13 @@ export class QueueService {
    */
   static async getQueues(restaurantId: string) {
     const res = await pool.query(`
-      SELECT q.*, qs.possible_queue_status as queue_status, u.name as user_name, u.phone as user_phone
+      SELECT q.*, qs.possible_queue_status as queue_status, u.name as user_name, u.phone as user_phone,
+             (REPLACE(q.created_at::text, ' ', 'T') || 'Z') as created_at
       FROM queues q
       JOIN queue_status qs ON q.queue_status_id = qs.id
       JOIN users u ON q.user_id = u.id
-      WHERE q.restaurant_id = $1 AND CAST(q.created_at AS DATE) = CURRENT_DATE
+      WHERE q.restaurant_id = $1 
+        AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
       ORDER BY q.token_number ASC
     `, [restaurantId]);
     return res.rows;
@@ -261,12 +271,14 @@ export class QueueService {
   static async getQueueByToken(restaurantId: string, tokenNumber: number) {
     const res = await pool.query(`
       SELECT q.*, qs.possible_queue_status as queue_status, u.name as user_name, u.phone as user_phone,
+             (REPLACE(q.created_at::text, ' ', 'T') || 'Z') as created_at,
       (
         SELECT COUNT(*)
         FROM queues q2
+        JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
-          AND q2.queue_status_id = q.queue_status_id
-          AND CAST(q2.created_at AS DATE) = CURRENT_DATE
+          AND qs2.possible_queue_status = 'WAITING'
+          AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -286,17 +298,50 @@ export class QueueService {
   }
 
   /**
+   * Customer: Get queue status by ID (UUID)
+   */
+  static async getQueueById(restaurantId: string, id: string) {
+    const res = await pool.query(`
+      SELECT q.*, qs.possible_queue_status as queue_status, u.name as user_name, u.phone as user_phone,
+             (REPLACE(q.created_at::text, ' ', 'T') || 'Z') as created_at,
+      (
+        SELECT COUNT(*)
+        FROM queues q2
+        JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
+        WHERE q2.restaurant_id = $1
+          AND qs2.possible_queue_status = 'WAITING'
+          AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+          AND q2.token_number < q.token_number
+      ) as wait_position
+      FROM queues q
+      JOIN queue_status qs ON q.queue_status_id = qs.id
+      JOIN users u ON q.user_id = u.id
+      WHERE q.restaurant_id = $1 
+        AND q.id = $2 
+      LIMIT 1
+    `, [restaurantId, id]);
+
+    if (res.rows.length === 0) return null;
+
+    const queue = res.rows[0];
+    queue.position = parseInt(queue.wait_position, 10) + 1;
+    return queue;
+  }
+
+  /**
    * Customer: Get active queue history by phone
    */
   static async getQueueHistory(restaurantId: string, phone: string) {
     const res = await pool.query(`
       SELECT q.*, qs.possible_queue_status as queue_status, u.name as user_name, u.phone as user_phone,
+             (REPLACE(q.created_at::text, ' ', 'T') || 'Z') as created_at,
       (
         SELECT COUNT(*)
         FROM queues q2
+        JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
-          AND q2.queue_status_id = q.queue_status_id
-        AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+          AND qs2.possible_queue_status = 'WAITING'
+          AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q

@@ -143,16 +143,7 @@ class OrderService {
     }
   }
 
-  async getOrderByTicket(ticket: string): Promise<ApiResponse<Order>> {
-    try {
-      const res = await fetch(`/api/orders/ticket/${ticket}`, {
-        headers: this.getAuthHeaders(),
-      });
-      return await res.json();
-    } catch (error) {
-      return { success: false, error: 'Network error while fetching order by ticket.' };
-    }
-  }
+
 
 }
 

@@ -101,7 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/inventory`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
-    { name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> },
+    ...(showOrdering ? [{ name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
   ];
 

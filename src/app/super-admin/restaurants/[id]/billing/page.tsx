@@ -58,6 +58,13 @@ export default function SuperAdminRestaurantBilling() {
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [paginatedTransactions, setPaginatedTransactions] = useState<Transaction[]>([]);
+  const [totalTxs, setTotalTxs] = useState(0);
+  const [txPage, setTxPage] = useState(1);
+  const [txDateFrom, setTxDateFrom] = useState('');
+  const [txDateTo, setTxDateTo] = useState('');
+  const [txLoading, setTxLoading] = useState(false);
+
   // Form states for updating billing details
   const [billingTier, setBillingTier] = useState('BASIC');
   const [billingModel, setBillingModel] = useState('SUBSCRIPTION');
@@ -98,7 +105,7 @@ export default function SuperAdminRestaurantBilling() {
       const billRes = await fetch(`/api/super-admin/billing`, authHeaders);
       const billData = await billRes.json();
       if (billData.success) {
-        // Filter transactions for this restaurant
+        // Filter transactions for this restaurant (used for current cycle calculation)
         const rTxs = billData.data.transactions.filter((t: any) => t.restaurant_id === id);
         setTransactions(rTxs);
 
@@ -113,9 +120,37 @@ export default function SuperAdminRestaurantBilling() {
     }
   }, [id, router]);
 
+  const fetchTransactions = useCallback(async () => {
+    if (!id) return;
+    setTxLoading(true);
+    try {
+      const url = new URL(window.location.origin + '/api/super-admin/billing');
+      url.searchParams.append('restaurantId', id as string);
+      url.searchParams.append('page', txPage.toString());
+      url.searchParams.append('limit', '10');
+      if (txDateFrom) url.searchParams.append('dateFrom', txDateFrom);
+      if (txDateTo) url.searchParams.append('dateTo', txDateTo);
+
+      const res = await fetch(url.toString(), authHeaders);
+      const data = await res.json();
+      if (data.success) {
+        setPaginatedTransactions(data.data.transactions);
+        setTotalTxs(data.data.totalTransactions || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch transactions', err);
+    } finally {
+      setTxLoading(false);
+    }
+  }, [id, txPage, txDateFrom, txDateTo]);
+
   useEffect(() => {
     fetchBillingData();
   }, [fetchBillingData]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
 
 
@@ -429,11 +464,49 @@ export default function SuperAdminRestaurantBilling() {
 
             {/* Audit Logs */}
             <div style={styles.tableCard}>
-              <div style={styles.tableHeader}>
+              <div style={{...styles.tableHeader, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px'}}>
                 <h3 style={styles.tableTitle}>
                   <TrendingUp size={16} style={{ marginRight: '6px' }} />
                   Recent Billing Operations
                 </h3>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="date"
+                    value={txDateFrom}
+                    onChange={(e) => {
+                      setTxDateFrom(e.target.value);
+                      if (txDateTo && e.target.value > txDateTo) {
+                        toast.error('From Date cannot be later than To Date');
+                        setTxDateTo('');
+                      }
+                      setTxPage(1);
+                    }}
+                    style={{ padding: '6px 10px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                  />
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>to</span>
+                  <input
+                    type="date"
+                    value={txDateTo}
+                    min={txDateFrom}
+                    onChange={(e) => {
+                      if (txDateFrom && e.target.value < txDateFrom) {
+                        toast.error('To Date cannot be earlier than From Date');
+                        return;
+                      }
+                      setTxDateTo(e.target.value);
+                      setTxPage(1);
+                    }}
+                    style={{ padding: '6px 10px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                  />
+                  {(txDateFrom || txDateTo) && (
+                    <button 
+                      onClick={() => { setTxDateFrom(''); setTxDateTo(''); setTxPage(1); }}
+                      style={{ padding: '6px 10px', fontSize: '12px', background: '#f1f5f9', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#475569' }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
               <div style={{ overflowX: 'auto', maxHeight: '420px' }}>
                 <table style={styles.table}>
@@ -446,12 +519,16 @@ export default function SuperAdminRestaurantBilling() {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.length === 0 ? (
+                    {txLoading ? (
                       <tr>
-                        <td colSpan={4} style={styles.tdEmpty}>No transactions logged.</td>
+                        <td colSpan={4} style={styles.tdEmpty}>Loading transactions...</td>
+                      </tr>
+                    ) : paginatedTransactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={styles.tdEmpty}>No transactions found for the selected criteria.</td>
                       </tr>
                     ) : (
-                      transactions.slice(0, 15).map(t => (
+                      paginatedTransactions.map(t => (
                         <tr key={t.id} style={styles.tr}>
                           <td style={styles.td}>{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
                           <td style={styles.td}>
@@ -477,6 +554,31 @@ export default function SuperAdminRestaurantBilling() {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Pagination Controls */}
+              {totalTxs > 10 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                    Showing {(txPage - 1) * 10 + 1} to {Math.min(txPage * 10, totalTxs)} of {totalTxs}
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      onClick={() => setTxPage(p => Math.max(1, p - 1))}
+                      disabled={txPage === 1}
+                      style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: txPage === 1 ? '#e2e8f0' : '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: txPage === 1 ? 'not-allowed' : 'pointer' }}
+                    >
+                      Prev
+                    </button>
+                    <button 
+                      onClick={() => setTxPage(p => Math.min(Math.ceil(totalTxs / 10), p + 1))}
+                      disabled={txPage >= Math.ceil(totalTxs / 10)}
+                      style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: txPage >= Math.ceil(totalTxs / 10) ? '#e2e8f0' : '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: txPage >= Math.ceil(totalTxs / 10) ? 'not-allowed' : 'pointer' }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>

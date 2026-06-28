@@ -145,7 +145,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        router.push(`/${slug}/queue-status/${data.token_number}`);
+        router.push(`/${slug}/queue-status/${data.queue?.id || data.id}`);
       } else {
         toast.error(data.error || 'Failed to join queue');
       }
@@ -183,7 +183,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
             Your current token is <strong>#{activeQueue.token_number}</strong> and your status is <strong style={{ color: 'var(--primary)' }}>{activeQueue.queue_status}</strong>.
             You cannot join the queue again until you are SEATED.
           </p>
-          <button onClick={() => router.push(`/${slug}/queue-status/${activeQueue.token_number}`)} style={{
+          <button onClick={() => router.push(`/${slug}/queue-status/${activeQueue.id}`)} style={{
             width: '100%', padding: '16px', backgroundColor: 'var(--primary)', color: '#ffffff',
             border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer',
           }}>

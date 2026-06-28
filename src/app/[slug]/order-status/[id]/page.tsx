@@ -42,8 +42,8 @@ function getStageIndex(status: string, stages: any[]) {
   return index !== -1 ? index : 0;
 }
 
-export default function OrderStatusTicketPage({ params }: { params: Promise<{ slug: string; ticket: string }> }) {
-  const { slug, ticket } = use(params);
+export default function OrderStatusTicketPage({ params }: { params: Promise<{ slug: string; id: string }> }) {
+  const { slug, id } = use(params);
   const router = useRouter();
   const { restaurant, loading: resLoading } = useRestaurant();
 
@@ -81,7 +81,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
   useEffect(() => {
     const fetchOrder = async (silent = false) => {
       try {
-        const data = await orderService.getOrderByTicket(ticket);
+        const data = await orderService.getOrderById(id);
         if (data.success && data.data) {
           setOrder(data.data);
         } else if (!silent) {
@@ -128,9 +128,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     channel.bind('pusher:subscription_error', () => setIsLive(false));
 
     channel.bind('order_update', (data: any) => {
-      const currentTicketInt = parseInt(ticket);
       const currentOrder = orderRef.current;
-      const isOurOrder = data.ticket_number === currentTicketInt || (currentOrder?.id && data.order_id === currentOrder.id);
+      const isOurOrder = data.order_id === id || (currentOrder?.id && data.order_id === currentOrder.id);
 
       if (isOurOrder) {
         if (data.new_status === 'READY' && currentOrder?.status !== 'READY') {
@@ -145,9 +144,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
 
     channel.bind('queue_updated', (data: any) => {
       if (data.type === 'UPDATE' && data.queue) {
-        const currentTicketInt = parseInt(ticket);
         const currentOrder = orderRef.current;
-        const isOurOrder = data.queue.token_number === currentTicketInt || (currentOrder?.id && data.queue.id === currentOrder.queue_id);
+        const isOurOrder = (currentOrder?.ticket_number && data.queue.token_number === currentOrder.ticket_number) || (currentOrder?.id && data.queue.id === currentOrder.queue_id);
 
         if (isOurOrder) {
           if (data.queue.queue_status === 'READY' && currentOrder?.status !== 'READY') {
@@ -165,7 +163,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
       channel.unbind_all();
       pusherClient?.unsubscribe(channelName);
     };
-  }, [ticket, restaurant]);
+  }, [id, restaurant]);
 
   if (loading) {
     return (

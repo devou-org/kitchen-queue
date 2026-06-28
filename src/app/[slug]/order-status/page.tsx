@@ -207,7 +207,7 @@ export default function OrderStatusPage() {
               </div>
               
               {dateOrders.map(order => (
-                <Link prefetch={false} key={order.id} href={`/${slug}/order-status/${order.ticket_number}`} style={{
+                <Link prefetch={false} key={order.id} href={`/${slug}/order-status/${order.id}`} style={{
                   display: 'flex', flexDirection: 'column',
                   background: 'white',
                   border: '1px solid rgba(0,0,0,0.05)',

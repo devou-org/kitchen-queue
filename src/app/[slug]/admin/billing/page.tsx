@@ -12,6 +12,8 @@ import {
   DollarSign,
   TrendingUp
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import RecentBillingOperations from '@/components/billing/RecentBillingOperations';
 
 interface BillingData {
   restaurant: {
@@ -62,6 +64,13 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [paginatedTransactions, setPaginatedTransactions] = useState<any[]>([]);
+  const [totalTxs, setTotalTxs] = useState(0);
+  const [txPage, setTxPage] = useState(1);
+  const [txDateFrom, setTxDateFrom] = useState('');
+  const [txDateTo, setTxDateTo] = useState('');
+  const [txLoading, setTxLoading] = useState(false);
+
   useEffect(() => {
     fetch('/api/admin/billing', {
       headers: {
@@ -86,6 +95,38 @@ export default function BillingPage() {
         setLoading(false);
       });
   }, [slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+    setTxLoading(true);
+    
+    const url = new URL(window.location.origin + '/api/admin/billing/transactions');
+    url.searchParams.append('page', txPage.toString());
+    url.searchParams.append('limit', '10');
+    if (txDateFrom) url.searchParams.append('dateFrom', txDateFrom);
+    if (txDateTo) url.searchParams.append('dateTo', txDateTo);
+
+    fetch(url.toString(), {
+      headers: {
+        'x-restaurant-slug': slug as string
+      }
+    })
+      .then((res) => res.json())
+      .then((resData) => {
+        if (resData.success) {
+          setPaginatedTransactions(resData.data.transactions);
+          setTotalTxs(resData.data.totalTransactions || 0);
+        } else {
+          toast.error('Failed to load transactions');
+        }
+      })
+      .catch(() => {
+        toast.error('Network error loading transactions');
+      })
+      .finally(() => {
+        setTxLoading(false);
+      });
+  }, [slug, txPage, txDateFrom, txDateTo]);
 
   if (loading) {
     return (
@@ -321,60 +362,18 @@ export default function BillingPage() {
         </div>
 
         {/* Transaction History (Audit Logs) */}
-        <div style={{ backgroundColor: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Info size={18} style={{ color: '#6b7280' }} />
-              Detailed Transaction Logs
-            </h3>
-          </div>
-          
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: 600 }}>
-                  <th style={{ padding: '12px 24px' }}>Date</th>
-                  <th style={{ padding: '12px 24px' }}>Type</th>
-                  <th style={{ padding: '12px 24px' }}>Reference Code</th>
-                  <th style={{ padding: '12px 24px' }}>Description</th>
-                  <th style={{ padding: '12px 24px', textAlign: 'right' }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#9ca3af' }}>
-                      No transaction entries found.
-                    </td>
-                  </tr>
-                ) : (
-                  transactions.map((tx) => (
-                    <tr key={tx.id} style={{ borderBottom: '1px solid #f3f4f6', color: '#374151' }}>
-                      <td style={{ padding: '14px 24px', whiteSpace: 'nowrap' }}>{formatDate(tx.created_at)}</td>
-                      <td style={{ padding: '14px 24px' }}>
-                        <span style={{ 
-                          display: 'inline-block', 
-                          padding: '2px 8px', 
-                          borderRadius: '4px', 
-                          fontSize: '11px', 
-                          fontWeight: 700,
-                          backgroundColor: tx.transaction_type === 'PAYMENT' ? '#ecfdf5' : '#f3f4f6',
-                          color: tx.transaction_type === 'PAYMENT' ? '#059669' : '#374151'
-                        }}>
-                          {tx.transaction_type}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 24px', fontFamily: 'monospace', color: '#6b7280' }}>{tx.reference_id || 'N/A'}</td>
-                      <td style={{ padding: '14px 24px' }}>{tx.description}</td>
-                      <td style={{ padding: '14px 24px', textAlign: 'right', fontWeight: 600 }}>
-                        ₹{parseFloat(tx.amount || '0').toFixed(2)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div style={{ marginTop: '24px' }}>
+          <RecentBillingOperations
+            transactions={paginatedTransactions}
+            totalTxs={totalTxs}
+            txPage={txPage}
+            setTxPage={setTxPage}
+            txDateFrom={txDateFrom}
+            setTxDateFrom={setTxDateFrom}
+            txDateTo={txDateTo}
+            setTxDateTo={setTxDateTo}
+            txLoading={txLoading}
+          />
         </div>
 
       </div>

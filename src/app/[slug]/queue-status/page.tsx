@@ -36,8 +36,8 @@ export default function QueueStatusPage() {
           if (queueTicket) {
             try {
               const parsed = JSON.parse(queueTicket);
-              if (parsed.tokenNumber && parsed.expiresAt > Date.now()) {
-                router.replace(`/${slug}/queue-status/${parsed.tokenNumber}`);
+              if (parsed.id && parsed.expiresAt > Date.now()) {
+                router.replace(`/${slug}/queue-status/${parsed.id}`);
                 return;
               }
             } catch (e) {}
@@ -169,7 +169,7 @@ export default function QueueStatusPage() {
           const pos = isNaN(rawPos) || rawPos === 0 ? 1 : rawPos;
 
           return (
-            <Link prefetch={false} key={order.id} href={`/${slug}/queue-status/${order.token_number}`} style={{
+            <Link prefetch={false} key={order.id} href={`/${slug}/queue-status/${order.id}`} style={{
               display: 'flex',
               background: 'white',
               border: isReady ? '1px solid rgba(6,167,125,0.2)' : '1px solid rgba(0,0,0,0.05)',

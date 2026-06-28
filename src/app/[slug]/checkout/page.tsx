@@ -176,7 +176,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         localStorage.removeItem('cart');
         localStorage.removeItem('add_to_order');
         toast.success('Order placed successfully! 🎉');
-        router.push(`/${slug}/order-status/${data.data.ticket_number}`);
+        router.push(`/${slug}/order-status/${data.data.id}`);
       } else {
         toast.error(data.error || 'Failed to place order');
       }
@@ -228,7 +228,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         localStorage.removeItem('cart');
         localStorage.removeItem('add_to_order');
         toast.success('Items added to your order! 🎉');
-        router.push(`/${slug}/order-status/${activeOrder.ticket_number}`);
+        router.push(`/${slug}/order-status/${activeOrder.id}`);
       } else {
         toast.error(data.error || 'Failed to update order');
       }

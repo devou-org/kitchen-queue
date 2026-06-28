@@ -16,15 +16,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    if (admin.isStaff && admin.restaurantId !== restaurant.id) {
+    const { admin, customer } = await getAuthContext(request);
+    if (!admin && !customer) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (admin && admin.isStaff && admin.restaurantId !== restaurant.id) {
       return NextResponse.json({ success: false, error: 'Forbidden: Wrong restaurant' }, { status: 403 });
     }
 
     const { id } = await params;
     const order = await getOrderById(restaurant.id, id);
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
+
+    if (!admin && customer?.phone !== order.phone) {
+      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+    }
+
     return NextResponse.json({ success: true, data: order });
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to fetch order' }, { status: 500 });

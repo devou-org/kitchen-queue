@@ -37,8 +37,8 @@ const ICONS: Record<string, any> = {
   'SEATED': Utensils,
 };
 
-export default function QueueStatusTicketPage({ params }: { params: Promise<{ slug: string; ticket: string }> }) {
-  const { slug, ticket } = use(params);
+export default function QueueStatusTicketPage({ params }: { params: Promise<{ slug: string; id: string }> }) {
+  const { slug, id } = use(params);
   const router = useRouter();
   const { restaurant, loading: resLoading } = useRestaurant();
 
@@ -78,7 +78,7 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
       if (!restaurant) return;
       try {
         const [ticketRes, statusesRes] = await Promise.all([
-          fetch(`/api/queue/ticket?restaurantId=${restaurant.id}&tokenNumber=${ticket}`),
+          fetch(`/api/queue/ticket?restaurantId=${restaurant.id}&id=${id}`),
           fetch(`/api/queue/statuses`, { headers: { 'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || '' } })
         ]);
 
@@ -121,9 +121,8 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
 
     channel.bind('queue_updated', (data: any) => {
       if (data.type === 'UPDATE' && data.queue) {
-        const currentTicketInt = parseInt(ticket);
         const currentTicket = ticketRef.current;
-        const isOurTicket = data.queue.token_number === currentTicketInt;
+        const isOurTicket = data.queue.id === id;
         
         if (isOurTicket) {
           if (data.queue.queue_status === 'READY' && currentTicket?.queue_status !== 'READY') {
@@ -145,13 +144,13 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
       channel.unbind_all();
       pusherClient?.unsubscribe(channelName);
     };
-  }, [ticket, restaurant]);
+  }, [id, restaurant]);
 
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', background: 'var(--bg-gradient)' }}>
         <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
-        <p style={{ color: '#6B6667' }}>Fetching ticket #{ticket}...</p>
+        <p style={{ color: '#6B6667' }}>Fetching ticket...</p>
       </div>
     );
   }
