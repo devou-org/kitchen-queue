@@ -10,8 +10,6 @@ export default function AdminQueuePage() {
   }
 
   return (
-    <div className="p-4 md:p-8 w-full max-w-7xl mx-auto">
-      <AdminQueueManager restaurantId={restaurant.id} />
-    </div>
+    <AdminQueueManager restaurantId={restaurant.id} />
   );
 }

@@ -104,8 +104,8 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
   });
 
   return (
-    <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+    <div className="page-content-admin animate-fade-in">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Queue Management</h1>
           <p style={{ color: 'var(--text-secondary)' }}>Live waitlist for your restaurant.</p>
