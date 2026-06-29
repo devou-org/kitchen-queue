@@ -42,6 +42,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Name, description, price, and category are required' }, { status: 400 });
     }
 
+    if (parseFloat(price) < 0) {
+      return NextResponse.json({ success: false, error: 'Price cannot be negative' }, { status: 400 });
+    }
+    if (parseInt(stock_quantity) < 0 || parseInt(buffer_quantity) < 0) {
+      return NextResponse.json({ success: false, error: 'Stock and buffer quantities cannot be negative' }, { status: 400 });
+    }
+
+    const trimmedName = name.trim();
+    const existingProducts = await getProducts(restaurant.id);
+    const isDuplicate = existingProducts.some((p: any) => p.name.toLowerCase() === trimmedName.toLowerCase());
+    
+    if (isDuplicate) {
+      return NextResponse.json({ success: false, error: 'A product with this name already exists' }, { status: 400 });
+    }
+
     const stock = parseInt(stock_quantity) || 0;
     const buffer = parseInt(buffer_quantity) || 5;
     const status = calculateProductStatus(stock, buffer);

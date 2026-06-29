@@ -56,6 +56,7 @@ export default function SuperAdminRestaurantBilling() {
   const [restaurant, setRestaurant] = useState<RestaurantBilling | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summaries, setSummaries] = useState<Summary[]>([]);
+  const [summaryYearFilter, setSummaryYearFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   const [paginatedTransactions, setPaginatedTransactions] = useState<Transaction[]>([]);
@@ -111,6 +112,8 @@ export default function SuperAdminRestaurantBilling() {
 
         // Filter summaries for this restaurant
         const rSummaries = billData.data.summaries.filter((s: any) => s.restaurant_id === id);
+
+
         setSummaries(rSummaries);
       }
     } catch (err) {
@@ -417,15 +420,27 @@ export default function SuperAdminRestaurantBilling() {
 
             {/* Monthly Statements */}
             <div style={styles.tableCard}>
-              <div style={styles.tableHeader}>
+              <div style={{...styles.tableHeader, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px'}}>
                 <h3 style={styles.tableTitle}>
                   <Receipt size={16} style={{ marginRight: '6px' }} />
                   Billing Cycles Summary
                 </h3>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <select
+                    value={summaryYearFilter}
+                    onChange={(e) => setSummaryYearFilter(e.target.value)}
+                    style={{ padding: '6px 10px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: 'white', color: '#475569' }}
+                  >
+                    <option value="">All Years</option>
+                    {Array.from(new Set(summaries.map(s => s.year))).sort((a, b) => b - a).map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
                 <table style={styles.table}>
-                  <thead>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                     <tr style={styles.trHead}>
                       <th style={styles.th}>Month</th>
                       <th style={styles.th}>Subscription</th>
@@ -441,8 +456,11 @@ export default function SuperAdminRestaurantBilling() {
                         <td colSpan={6} style={styles.tdEmpty}>No summaries generated.</td>
                       </tr>
                     ) : (
-                      summaries.map(s => {
-                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      [...summaries]
+                        .filter(s => summaryYearFilter ? s.year.toString() === summaryYearFilter : true)
+                        .sort((a, b) => b.year - a.year || b.month - a.month)
+                        .map(s => {
+                          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                         return (
                           <tr key={s.id} style={styles.tr}>
                             <td style={styles.tdHighlight}>{months[s.month - 1]} {s.year}</td>
@@ -621,7 +639,7 @@ const styles: Record<string, React.CSSProperties> = {
   th: { padding: '10px 16px' },
   thAlignRight: { padding: '10px 16px', textAlign: 'right' },
   tr: { borderBottom: '1px solid #f1f5f9', color: '#334155' },
-  tdHighlight: { padding: '12px 16px', fontWeight: 700, color: '#0f172a' },
+  tdHighlight: { padding: '12px 16px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' },
   td: { padding: '12px 16px' },
   tdAlignRight: { padding: '12px 16px', textAlign: 'right' },
   tdAlignRightHighlight: { padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f172a' },

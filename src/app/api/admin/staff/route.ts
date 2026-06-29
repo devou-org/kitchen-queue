@@ -52,7 +52,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: staff });
   } catch (error: any) {
-    if (error.message.includes('limit reached')) {
+    if (error.message?.includes('staffs_email_key')) {
+      return NextResponse.json({ success: false, error: 'User with this email already exists' }, { status: 400 });
+    }
+    if (error.message?.includes('limit reached')) {
       return NextResponse.json({ success: false, error: error.message }, { status: 403 });
     }
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

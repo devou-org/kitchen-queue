@@ -414,22 +414,24 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
   // Load cart from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('cart');
+    if (!slug) return;
+    const saved = localStorage.getItem(`cart_${slug}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         setCart(new Map(Object.entries(parsed)));
       } catch { }
     }
-  }, []);
+  }, [slug]);
 
   // Save cart to localStorage
   const saveCart = useCallback((newCart: Map<string, CartItem>) => {
+    if (!slug) return;
     const obj: Record<string, CartItem> = {};
     newCart.forEach((v, k) => { obj[k] = v; });
-    localStorage.setItem('cart', JSON.stringify(obj));
+    localStorage.setItem(`cart_${slug}`, JSON.stringify(obj));
     setCart(new Map(newCart));
-  }, []);
+  }, [slug]);
 
   // Fetch products & Service Status
   useEffect(() => {
@@ -438,10 +440,16 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         // Fetch products
         const res = await productService.getProducts();
         if (res.success && res.data) {
-          setProducts(res.data);
+          const parsedData = res.data.map((p: any) => ({
+            ...p,
+            price: Number(p.price),
+            stock_quantity: Number(p.stock_quantity),
+            buffer_quantity: Number(p.buffer_quantity)
+          }));
+          setProducts(parsedData);
           // Ensure categories are unique, trimmed, and "All" is not duplicated
           const uniqueCats = Array.from(new Set(
-            res.data
+            parsedData
               .map((p: Product) => p.category?.trim())
               .filter((cat: string) => cat && cat !== 'All')
           ));
@@ -467,21 +475,37 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   }, []);
 
   // Pusher for real-time updates
-  // useEffect(() => {
-  //   if (!pusherClient) return;
-  //   const channel = pusherClient.subscribe('queue-channel');
+  useEffect(() => {
+    if (!pusherClient || !restaurant?.pusher_channel) return;
+    const channelName = restaurant.pusher_channel;
+    const channel = pusherClient.subscribe(channelName);
 
-  //   channel.bind('product_update', (data: any) => {
-  //     setProducts(prev => prev.map(p =>
-  //       p.id === data.product_id ? { ...p, status: data.product_status } : p
-  //     ));
-  //   });
+    channel.bind('product_updated', (updatedProduct: Product) => {
+      const parsedProduct = {
+        ...updatedProduct,
+        price: Number(updatedProduct.price),
+        stock_quantity: Number(updatedProduct.stock_quantity),
+        buffer_quantity: Number(updatedProduct.buffer_quantity)
+      };
+      setProducts(prev => {
+        const exists = prev.find(p => p.id === parsedProduct.id);
+        if (exists) {
+          return prev.map(p => p.id === parsedProduct.id ? { ...p, ...parsedProduct } : p);
+        }
+        return [...prev, parsedProduct];
+      });
+    });
 
-  //   return () => {
-  //     channel.unbind_all();
-  //     channel.unsubscribe();
-  //   };
-  // }, []);
+    channel.bind('product_deleted', (data: { id: string }) => {
+      setProducts(prev => prev.filter(p => p.id !== data.id));
+    });
+
+    return () => {
+      channel.unbind('product_updated');
+      channel.unbind('product_deleted');
+      pusherClient?.unsubscribe(channelName);
+    };
+  }, [restaurant?.pusher_channel]);
 
   // Keep cart aligned with latest product availability and details.
   useEffect(() => {

@@ -23,7 +23,15 @@ export async function POST(request: NextRequest) {
     const { name } = await request.json();
     if (!name) return NextResponse.json({ success: false, error: 'Name is required' }, { status: 400 });
 
-    const category = await createCategory(name);
+    const trimmedName = name.trim();
+    const existingCategories = await getCategories();
+    const isDuplicate = existingCategories.some(c => c.name.toLowerCase() === trimmedName.toLowerCase());
+
+    if (isDuplicate) {
+      return NextResponse.json({ success: false, error: 'Category already exists' }, { status: 400 });
+    }
+
+    const category = await createCategory(trimmedName);
     return NextResponse.json({ success: true, data: category });
   } catch (error: any) {
     console.error('❌ API Error (POST /api/categories):', error);

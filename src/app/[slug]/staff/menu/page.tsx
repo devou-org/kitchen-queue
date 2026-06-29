@@ -6,6 +6,7 @@ import { Product, CartItem, ProductStatus } from '@/types';
 import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
 import { orderService } from '@/app/services/orders.api';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -91,6 +92,7 @@ function ProductCard({ product, quantity, onUpdate }: {
 }
 
 export default function StaffMenuPage() {
+  const { restaurant } = useRestaurant();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -113,9 +115,15 @@ export default function StaffMenuPage() {
       try {
         const res = await productService.getProducts();
         if (res.success && res.data) {
-          setProducts(res.data);
+          const parsedData = res.data.map(p => ({
+            ...p,
+            price: Number(p.price),
+            stock_quantity: Number(p.stock_quantity),
+            buffer_quantity: Number(p.buffer_quantity)
+          }));
+          setProducts(parsedData);
           const uniqueCats = Array.from(new Set(
-            res.data
+            parsedData
               .map((p: Product) => p.category?.trim())
               .filter((cat: string) => cat && cat !== 'All')
           ));
@@ -129,6 +137,84 @@ export default function StaffMenuPage() {
     };
     initPage();
   }, []);
+
+  // Pusher for real-time updates
+  useEffect(() => {
+    if (!pusherClient || !restaurant?.pusher_channel) return;
+    const channelName = restaurant.pusher_channel;
+    const channel = pusherClient.subscribe(channelName);
+
+    channel.bind('product_updated', (updatedProduct: Product) => {
+      const parsedProduct = {
+        ...updatedProduct,
+        price: Number(updatedProduct.price),
+        stock_quantity: Number(updatedProduct.stock_quantity),
+        buffer_quantity: Number(updatedProduct.buffer_quantity)
+      };
+      setProducts(prev => {
+        const exists = prev.find(p => p.id === parsedProduct.id);
+        if (exists) {
+          return prev.map(p => p.id === parsedProduct.id ? { ...p, ...parsedProduct } : p);
+        }
+        return [...prev, parsedProduct];
+      });
+    });
+
+    channel.bind('product_deleted', (data: { id: string }) => {
+      setProducts(prev => prev.filter(p => p.id !== data.id));
+    });
+
+    return () => {
+      channel.unbind('product_updated');
+      channel.unbind('product_deleted');
+      pusherClient?.unsubscribe(channelName);
+    };
+  }, [restaurant?.pusher_channel]);
+
+  // Keep cart aligned with latest product availability and details
+  useEffect(() => {
+    if (products.length === 0 || cart.size === 0) return;
+
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const newCart = new Map(cart);
+    const removedNames: string[] = [];
+    let changed = false;
+
+    for (const [id, item] of cart.entries()) {
+      const product = byId.get(id);
+
+      if (!product || product.status === 'OUT_OF_STOCK') {
+        newCart.delete(id);
+        removedNames.push(item.name);
+        changed = true;
+        continue;
+      }
+
+      if (
+        item.status !== product.status ||
+        item.price !== product.price ||
+        item.name !== product.name ||
+        item.image_url !== product.image_url
+      ) {
+        newCart.set(id, {
+          ...item,
+          status: product.status,
+          price: product.price,
+          name: product.name,
+          image_url: product.image_url,
+        });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setCart(newCart);
+    }
+
+    if (removedNames.length > 0) {
+      toast.error(`${removedNames.join(', ')} removed from cart (out of stock/deleted)`);
+    }
+  }, [products, cart]);
 
   const handleUpdate = (id: string, delta: number) => {
     const product = products.find(p => p.id === id);

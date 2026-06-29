@@ -24,6 +24,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const updated = await updateStaff(restaurant.id, id, body);
     return NextResponse.json({ success: true, data: updated });
   } catch (error: any) {
+    if (error.message?.includes('staffs_email_key')) {
+      return NextResponse.json({ success: false, error: 'User with this email already exists' }, { status: 400 });
+    }
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

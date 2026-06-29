@@ -50,7 +50,14 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
   };
 
   const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+
+    if (categories.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('Category already exists');
+      return;
+    }
+
     setAddingCategory(true);
     try {
       const res = await fetch('/api/categories', {
@@ -84,6 +91,10 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
     e.preventDefault();
     if (!form.name || !form.price || !form.category) {
       return toast.error('Name, Category, and Price are required');
+    }
+    
+    if (parseFloat(form.price) < 0) {
+      return toast.error('Price cannot be negative');
     }
 
     setLoading(true);
@@ -206,7 +217,7 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
           </div>
           <div style={{ width: '150px' }}>
             <label className="label">Price (₹) *</label>
-            <input type="number" step="0.01" className="input" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" required />
+            <input type="number" step="0.01" min="0" className="input" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" required />
           </div>
         </div>
 
@@ -223,11 +234,11 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
           <div style={{ display: 'flex', gap: '16px' }}>
             <div style={{ flex: 1 }}>
               <label className="label">Stock Quantity</label>
-              <input type="number" className="input" value={form.stock_quantity} onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))} placeholder="0" />
+              <input type="number" min="0" className="input" value={form.stock_quantity} onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))} placeholder="0" />
             </div>
             <div style={{ flex: 1 }}>
               <label className="label">Buffer Quantity</label>
-              <input type="number" className="input" value={form.buffer_quantity} onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))} placeholder="0" />
+              <input type="number" min="0" className="input" value={form.buffer_quantity} onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))} placeholder="0" />
             </div>
           </div>
         )}
