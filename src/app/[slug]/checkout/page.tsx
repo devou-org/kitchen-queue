@@ -61,7 +61,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   useEffect(() => {
     const init = async () => {
       // 1. Load Cart
-      const saved = localStorage.getItem('cart');
+      if (!slug) return;
+      const saved = localStorage.getItem(`cart_${slug}`);
       if (saved) {
         try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch { }
       }
@@ -173,8 +174,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             localStorage.setItem('user', JSON.stringify({ ...u, name: form.customer_name.trim() }));
           } catch { }
         }
-        localStorage.removeItem('cart');
-        localStorage.removeItem('add_to_order');
+        localStorage.removeItem(`cart_${slug}`);
+        localStorage.removeItem(`add_to_order_${slug}`);
         toast.success('Order placed successfully! 🎉');
         router.push(`/${slug}/order-status/${data.data.id}`);
       } else {
@@ -225,8 +226,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       const data = await orderService.updateOrder(activeOrder.id, { items: mergedItems });
 
       if (data.success) {
-        localStorage.removeItem('cart');
-        localStorage.removeItem('add_to_order');
+        localStorage.removeItem(`cart_${slug}`);
+        localStorage.removeItem(`add_to_order_${slug}`);
         toast.success('Items added to your order! 🎉');
         router.push(`/${slug}/order-status/${activeOrder.id}`);
       } else {

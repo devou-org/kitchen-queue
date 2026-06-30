@@ -24,16 +24,18 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
   }, [restaurant, resLoading, router, slug]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('cart');
+    if (!slug) return;
+    const saved = localStorage.getItem(`cart_${slug}`);
     if (saved) {
       try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch {}
     }
-  }, []);
+  }, [slug]);
 
   const saveCart = (newCart: Map<string, CartItem>) => {
+    if (!slug) return;
     const obj: Record<string, CartItem> = {};
     newCart.forEach((v, k) => { obj[k] = v; });
-    localStorage.setItem('cart', JSON.stringify(obj));
+    localStorage.setItem(`cart_${slug}`, JSON.stringify(obj));
     setCart(new Map(newCart));
   };
 

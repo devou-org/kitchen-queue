@@ -38,42 +38,35 @@ export default function SuperAdminLoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d1b2a 100%)',
+      background: '#ffffff',
       fontFamily: "'Inter', sans-serif",
       padding: '20px',
     }}>
       <div style={{
         width: '100%',
-        maxWidth: '420px',
+        maxWidth: '400px',
       }}>
         {/* Logo area */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{
-            width: '64px', height: '64px',
-            borderRadius: '16px',
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '28px',
-            margin: '0 auto 16px',
-            boxShadow: '0 8px 32px rgba(99,102,241,0.4)',
-          }}>
-            ⚡
-          </div>
-          <h1 style={{ color: 'white', fontSize: '24px', fontWeight: 800, margin: 0 }}>Super Admin</h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px', marginTop: '6px' }}>Devou Platform Control</p>
+          <img 
+            src="https://ik.imagekit.io/j2q8x5lu0/qdine/qdine-logo-rotated.png" 
+            alt="Qdine Logo" 
+            style={{ height: '80px', width: '80px', objectFit: 'cover', margin: '0 auto 24px', borderRadius: '50%', border: '1px solid #e5e5e5' }} 
+          />
+          <h1 style={{ color: '#000000', fontSize: '24px', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>Super Admin Login</h1>
+          <p style={{ color: '#666666', fontSize: '14px', marginTop: '6px' }}>System Control & Management</p>
         </div>
 
-        {/* Card */}
+        {/* Form Container */}
         <div style={{
-          background: 'rgba(255,255,255,0.05)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '20px',
+          background: '#ffffff',
+          border: '1px solid #e5e5e5',
+          borderRadius: '12px',
           padding: '32px',
         }}>
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <label style={{ display: 'block', color: '#000000', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
                 Email Address
               </label>
               <input
@@ -81,21 +74,24 @@ export default function SuperAdminLoginPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                placeholder="admin@devou.com"
+                placeholder="admin@qdine.com"
                 style={{
                   width: '100%', padding: '12px 16px',
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: '10px',
-                  color: 'white',
+                  background: '#f9fafb',
+                  border: '1px solid #e5e5e5',
+                  borderRadius: '8px',
+                  color: '#000000',
                   fontSize: '14px',
                   outline: 'none',
                   boxSizing: 'border-box',
+                  transition: 'border-color 0.2s',
                 }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#000000'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = '#e5e5e5'; }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <label style={{ display: 'block', color: '#000000', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
                 Password
               </label>
               <input
@@ -106,26 +102,29 @@ export default function SuperAdminLoginPage() {
                 placeholder="••••••••"
                 style={{
                   width: '100%', padding: '12px 16px',
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: '10px',
-                  color: 'white',
+                  background: '#f9fafb',
+                  border: '1px solid #e5e5e5',
+                  borderRadius: '8px',
+                  color: '#000000',
                   fontSize: '14px',
                   outline: 'none',
                   boxSizing: 'border-box',
+                  transition: 'border-color 0.2s',
                 }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#000000'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = '#e5e5e5'; }}
               />
             </div>
 
             {error && (
               <div style={{
-                background: 'rgba(239,68,68,0.15)',
-                border: '1px solid rgba(239,68,68,0.3)',
+                background: '#fef2f2',
+                border: '1px solid #fee2e2',
                 borderRadius: '8px',
-                padding: '10px 14px',
-                color: '#fca5a5',
-                fontSize: '13px',
-                fontWeight: 600,
+                padding: '12px 16px',
+                color: '#dc2626',
+                fontSize: '14px',
+                fontWeight: 500,
               }}>
                 {error}
               </div>
@@ -135,23 +134,29 @@ export default function SuperAdminLoginPage() {
               type="submit"
               disabled={loading}
               style={{
-                padding: '13px',
-                background: loading ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                padding: '14px',
+                background: loading ? '#666666' : '#000000',
                 border: 'none',
-                borderRadius: '10px',
-                color: 'white',
+                borderRadius: '8px',
+                color: '#ffffff',
                 fontSize: '15px',
-                fontWeight: 700,
+                fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',
-                marginTop: '4px',
-                boxShadow: '0 4px 20px rgba(99,102,241,0.3)',
-                transition: 'all 0.2s',
+                marginTop: '8px',
+                transition: 'background 0.2s ease',
               }}
+              onMouseOver={(e) => { if(!loading) e.currentTarget.style.background = '#333333'; }}
+              onMouseOut={(e) => { if(!loading) e.currentTarget.style.background = '#000000'; }}
             >
-              {loading ? 'Signing in...' : '⚡ Access Platform'}
+              {loading ? 'Authenticating...' : 'Sign In'}
             </button>
           </form>
         </div>
+        
+        {/* Footer Text */}
+        <p style={{ textAlign: 'center', color: '#999999', fontSize: '12px', marginTop: '32px' }}>
+          &copy; {new Date().getFullYear()} Qdine Platform. All rights reserved.
+        </p>
       </div>
     </div>
   );
