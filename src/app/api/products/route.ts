@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, description, price, image_url, stock_quantity, buffer_quantity, category, dietary_preference } = body;
 
-    if (!name || !description || !price || !category) {
-      return NextResponse.json({ success: false, error: 'Name, description, price, and category are required' }, { status: 400 });
+    if (!name || !price || !category) {
+      return NextResponse.json({ success: false, error: 'Name, price, and category are required' }, { status: 400 });
     }
 
     if (parseFloat(price) < 0) {
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     const product = await createProduct({
       restaurant_id: restaurant.id,
       name: name.trim(),
-      description: description.trim(),
+      description: description?.trim() || '',
       price: parseFloat(price),
       image_url: image_url?.trim() || '',
       stock_quantity: stock,

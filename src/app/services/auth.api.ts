@@ -131,16 +131,24 @@ class AuthService {
     }
   }
 
-  logout() {
+  logout(type?: 'admin' | 'customer') {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('user');
+      if (!type || type === 'customer') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+      }
+      if (!type || type === 'admin') {
+        localStorage.removeItem('admin_token');
+      }
     }
     if (typeof document !== 'undefined') {
-      document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      if (!type || type === 'customer') {
+        document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      }
+      if (!type || type === 'admin') {
+        document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      }
     }
   }
 

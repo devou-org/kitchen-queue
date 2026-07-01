@@ -72,7 +72,11 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     localStorage.removeItem('staff_token');
     document.cookie = 'staff_token=; Max-Age=0; path=/';
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'staff' })
+      });
     } catch (err) {
       console.error('Logout API failed:', err);
     }
