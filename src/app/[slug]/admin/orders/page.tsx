@@ -143,12 +143,12 @@ export default function AdminOrders() {
     const channelName = restaurant.pusher_channel;
     const channel = pusherClient.subscribe(channelName);
 
-    channel.bind('new_order', (data: any) => {
+    const handleNewOrder = (data: any) => {
       toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
       fetchOrdersDebounced(true);
-    });
+    };
 
-    channel.bind('order_update', (data: any) => {
+    const handleOrderUpdate = (data: any) => {
       // 1. PATCH LOCAL STATE (The "incremental" way)
       // This makes the UI update INSTANTLY without a network request
       setOrders(prev => {
@@ -177,9 +177,10 @@ export default function AdminOrders() {
       });
 
       // 2. HIGHLIGHT & LOG ADDITIONS
-      // Only log and highlight if items were actually added to an existing order which is currently in PREPARING or READY status
+      // Only log and highlight if items were actually added to an active order
       const currentStatus = data.new_status || 'PENDING';
-      if (data.items_updated && data.added_items && (currentStatus === 'PREPARING' || currentStatus === 'READY')) {
+      const isTerminal = currentStatus === 'PAID' || currentStatus === 'CANCELLED' || currentStatus === 'EXPIRED';
+      if (data.items_updated && data.added_items && !isTerminal) {
 
         const newUpdate: OrderUpdateLog = {
           id: Math.random().toString(),
@@ -216,13 +217,15 @@ export default function AdminOrders() {
           }
         }).catch(() => {});
       }
-    });
+    };
 
+    channel.bind('new_order', handleNewOrder);
+    channel.bind('order_update', handleOrderUpdate);
 
     return () => {
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
-      channel.unbind_all();
-      channel.unsubscribe();
+      channel.unbind('new_order', handleNewOrder);
+      channel.unbind('order_update', handleOrderUpdate);
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 

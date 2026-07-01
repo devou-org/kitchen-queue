@@ -118,17 +118,7 @@ class SocketClientWrapper {
         }
       });
       
-      // Also register generic event listeners just in case backend emits them directly
-      const fallbackEvents = ['queue_updated', 'order_update', 'new_order', 'new_ticket'];
-      fallbackEvents.forEach(event => {
-        this.socket?.on(event, (data) => {
-          console.log(`[Socket.io Client] Direct fallback event received: "${event}"`, data);
-          // Dispatch to any channel currently listening to this event type
-          for (const channelWrapper of this.channels.values()) {
-            channelWrapper.dispatch(event, data);
-          }
-        });
-      });
+      // Fallback events removed to prevent double-firing because the server emits both `channel-event` and the specific event.
     }
   }
 

@@ -11,6 +11,7 @@ export interface CreateOrderData {
   notes?: string;
   party_size: number;
   table_number?: string;
+  is_pos?: boolean;
 }
 
 export interface UpdateOrderData {

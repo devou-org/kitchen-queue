@@ -88,9 +88,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     authService.logout();
     document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'; document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout API failed:', err);
+    }
     router.push(`/${slug}/admin/login`);
   };
 

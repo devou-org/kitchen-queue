@@ -94,7 +94,9 @@ export async function POST(request: NextRequest) {
     total_price = Math.round(total_price * 100) / 100;
 
     const admin = await requireAdmin(request);
-    const isPos = !!admin && (admin.isStaff || admin.isAdmin);
+    const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
+    // Only trust is_pos if the user is verified staff/admin. Prevents token leakage into customer UI.
+    const isPos = hasAdminRights && body.is_pos === true;
 
     const order = await createOrder({
       restaurant_id: restaurant.id,

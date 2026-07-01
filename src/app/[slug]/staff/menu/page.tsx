@@ -268,7 +268,8 @@ export default function StaffMenuPage() {
         phone: phoneToUse,
         items,
         party_size: orderForm.party_size,
-        notes: orderForm.notes
+        notes: orderForm.notes,
+        is_pos: true
       });
 
       if (res.success && res.data) {

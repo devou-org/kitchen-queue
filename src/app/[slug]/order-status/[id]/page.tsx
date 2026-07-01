@@ -423,14 +423,40 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
           </div>
         )}
 
+        {['CANCELLED', 'EXPIRED'].includes((order.status || '').trim().toUpperCase()) && (
+          <div style={{
+            background: '#FEF2F2',
+            borderRadius: '18px',
+            padding: '16px',
+            display: 'flex',
+            gap: '12px',
+            alignItems: 'flex-start',
+            marginBottom: '20px',
+            border: '1px solid #FCA5A5'
+          }}>
+            <div style={{ padding: '4px' }}>
+              <Info size={20} color="#EF4444" />
+            </div>
+            <div>
+              <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#991B1B', marginBottom: '2px', textTransform: 'capitalize' }}>
+                Order {order.status.toLowerCase()}
+              </h4>
+              <p style={{ fontSize: '12px', color: '#B91C1C', lineHeight: 1.4, fontWeight: 500 }}>
+                This order is no longer active. Please contact staff for assistance.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Queue Progress Card */}
-        <div style={{
-          background: 'white',
-          borderRadius: '24px',
-          padding: '24px',
-          marginBottom: '20px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-        }}>
+        {!['CANCELLED', 'EXPIRED'].includes((order.status || '').trim().toUpperCase()) && (
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: '24px',
+            marginBottom: '20px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+          }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F' }}>Queue Progress</h3>
           </div>
@@ -494,6 +520,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             })}
           </div>
         </div>
+        )}
 
         {/* Order Details Card */}
         <div style={{

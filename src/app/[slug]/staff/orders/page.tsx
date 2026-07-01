@@ -71,11 +71,11 @@ export default function StaffOrders() {
     const channelName = restaurant.pusher_channel;
     const channel = pusherClient.subscribe(channelName);
 
-    channel.bind('new_order', (data: any) => {
+    const handleNewOrder = (data: any) => {
       fetchOrdersDebounced(true);
-    });
+    };
 
-    channel.bind('order_update', (data: any) => {
+    const handleOrderUpdate = (data: any) => {
       setOrders(prev => {
         const orderIndex = prev.findIndex(o => o.id === data.order_id);
         if (orderIndex === -1) return prev;
@@ -106,12 +106,15 @@ export default function StaffOrders() {
           }
         }).catch(() => {});
       }
-    });
+    };
+
+    channel.bind('new_order', handleNewOrder);
+    channel.bind('order_update', handleOrderUpdate);
 
     return () => {
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
-      channel.unbind_all();
-      channel.unsubscribe();
+      channel.unbind('new_order', handleNewOrder);
+      channel.unbind('order_update', handleOrderUpdate);
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 

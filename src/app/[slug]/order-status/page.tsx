@@ -81,11 +81,22 @@ export default function OrderStatusPage() {
     const channelName = restaurant.pusher_channel;
     const channel = pusherClient.subscribe(channelName);
     setIsLive(true);
-    channel.bind('order_update', () => fetchOrders(1, true));
-    channel.bind('new_order', () => fetchOrders(1, true));
-    channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
-    channel.bind('pusher:subscription_error', () => setIsLive(false));
-    return () => { channel.unbind_all(); channel.unsubscribe(); };
+    const handleOrderUpdate = () => fetchOrders(1, true);
+    const handleNewOrder = () => fetchOrders(1, true);
+    const handleSubSuccess = () => setIsLive(true);
+    const handleSubError = () => setIsLive(false);
+
+    channel.bind('order_update', handleOrderUpdate);
+    channel.bind('new_order', handleNewOrder);
+    channel.bind('pusher:subscription_succeeded', handleSubSuccess);
+    channel.bind('pusher:subscription_error', handleSubError);
+
+    return () => { 
+      channel.unbind('order_update', handleOrderUpdate);
+      channel.unbind('new_order', handleNewOrder);
+      channel.unbind('pusher:subscription_succeeded', handleSubSuccess);
+      channel.unbind('pusher:subscription_error', handleSubError);
+    };
   }, [restaurant]);
 
   const Header = () => (

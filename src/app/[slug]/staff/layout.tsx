@@ -68,9 +68,14 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     return <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>{loading ? null : children}</div>;
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('staff_token');
     document.cookie = 'staff_token=; Max-Age=0; path=/';
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout API failed:', err);
+    }
     router.push(`/${slug}/staff/login`);
   };
 

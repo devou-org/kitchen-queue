@@ -26,7 +26,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { id } = await params;
-    const order = await getOrderById(restaurant.id, id);
+    let order = null;
+    
+    // Check if ID is a numeric ticket number or a UUID
+    if (/^\d+$/.test(id)) {
+      const { getOrderByTicket } = await import('@/lib/db');
+      order = await getOrderByTicket(restaurant.id, parseInt(id, 10));
+    } else {
+      order = await getOrderById(restaurant.id, id);
+    }
+    
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
     if (!admin && customer?.phone !== order.phone) {

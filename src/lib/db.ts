@@ -805,7 +805,8 @@ export async function getOrdersByPhonePaginated(restaurantId: string, phone: str
 
   const rows = await sql`
     SELECT 
-      q.id, 
+      COALESCE(o.id, q.id) as id,
+      q.id as queue_id,
       q.token_number as ticket_number, 
       q.created_at, 
       o.total_price,
@@ -900,6 +901,7 @@ export async function createOrder(data: {
           FROM req r
           WHERE p.id = r.product_id
             AND p.stock_quantity >= r.qty
+            AND p.is_active = true
           RETURNING p.id
         )
         SELECT
@@ -913,7 +915,7 @@ export async function createOrder(data: {
     const updatedCount = Number(reserveResult.rows[0]?.updated_count || 0);
 
     if (updatedCount !== requestedCount) {
-      throw new Error('Insufficient stock for one or more items.');
+      throw new Error('One or more items are out of stock or no longer available.');
     }
 
     // 1. Ensure user exists
@@ -1097,7 +1099,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
 
     const targetProductIds = nextItems.map((item) => item.product_id);
     const productRows = await sql`
-      SELECT id, name, price, stock_quantity, buffer_quantity
+      SELECT id, name, price, stock_quantity, buffer_quantity, is_active
       FROM products
       WHERE id = ANY(${targetProductIds})
     `;
@@ -1112,6 +1114,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
       price: number;
       stock_quantity: number;
       buffer_quantity: number;
+      is_active: boolean;
     }>();
 
     for (const row of productRows) {
@@ -1121,6 +1124,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
         price: Number(row.price),
         stock_quantity: Number(row.stock_quantity),
         buffer_quantity: Number(row.buffer_quantity),
+        is_active: Boolean(row.is_active),
       });
     }
 
@@ -1138,6 +1142,9 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
       const product = productById.get(productId);
       if (!product) {
         throw new Error('A selected product is invalid');
+      }
+      if (!product.is_active) {
+        throw new Error(`${product.name} is no longer available.`);
       }
       if (product.stock_quantity < delta) {
         throw new Error(`Insufficient stock for ${product.name}. Need ${delta}, available ${product.stock_quantity}.`);
