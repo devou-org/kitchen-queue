@@ -9,6 +9,7 @@ import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import { User, Users } from 'lucide-react';
 
 interface OrderUpdateLog {
   id: string;
@@ -48,6 +49,17 @@ export default function AdminOrders() {
   const { restaurant } = useRestaurant();
 
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`kitchenQueue_liveAdditions_${Array.isArray(slug) ? slug[0] : slug}`);
+      if (stored) {
+        setRecentUpdates(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error('Failed to load live additions', e);
+    }
+  }, [slug]);
+
+  useEffect(() => {
     const fetchStatuses = async () => {
       try {
         const res = await fetch('/api/queue/statuses', {
@@ -71,7 +83,11 @@ export default function AdminOrders() {
   }, [slug]);
 
   const dismissUpdate = (id: string) => {
-    setRecentUpdates(prev => prev.filter(u => u.id !== id));
+    setRecentUpdates(prev => {
+      const updated = prev.filter(u => u.id !== id);
+      localStorage.setItem(`kitchenQueue_liveAdditions_${Array.isArray(slug) ? slug[0] : slug}`, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const loadKitchenSnapshot = async () => {
@@ -194,7 +210,11 @@ export default function AdminOrders() {
         };
         
         // FCFS: Add to the end, oldest stays at index 0
-        setRecentUpdates(up => [...up, newUpdate].slice(-10));
+        setRecentUpdates(up => {
+          const updated = [...up, newUpdate].slice(-10);
+          localStorage.setItem(`kitchenQueue_liveAdditions_${Array.isArray(slug) ? slug[0] : slug}`, JSON.stringify(updated));
+          return updated;
+        });
         
         toast(
           `🛒 Customer added items to order #${String(data.ticket_number).padStart(3, '0')}`,
@@ -432,6 +452,11 @@ export default function AdminOrders() {
                         transition: 'color 0.4s ease',
                       }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDateTime(order.created_at)}</div>
+                      {order.staff_name && (
+                        <div style={{ fontSize: '10px', color: 'white', background: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', fontWeight: 700 }}>
+                          <User size={12} /> {order.staff_name.split(' ')[0]}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
@@ -454,9 +479,10 @@ export default function AdminOrders() {
                     <td>
                       <span style={{
                         fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)',
-                        background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '4px'
+                        background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '4px',
+                        display: 'inline-flex', alignItems: 'center', gap: '6px'
                       }}>
-                        👤 {order.party_size || 1} Party
+                        <Users size={14} /> {order.party_size || 1} Party
                       </span>
                     </td>
                     <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>
@@ -527,9 +553,14 @@ export default function AdminOrders() {
             <div className="card" style={{ background: '#F9FAFB', padding: '12px 16px', marginBottom: '16px', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div><p className="label">CUSTOMER</p><p style={{ fontWeight: 700 }}>{selectedOrder.customer_name}</p></div>
+                {selectedOrder.staff_name && (
+                  <div style={{ textAlign: 'center' }}><p className="label">TAKEN BY</p><p style={{ fontWeight: 600, color: 'var(--primary)' }}>{selectedOrder.staff_name.split(' ')[0]}</p></div>
+                )}
                 <div style={{ textAlign: 'right' }}><p className="label">PHONE</p><p style={{ fontWeight: 600 }}>{selectedOrder.phone}</p></div>
               </div>
-              <p style={{ fontSize: '13px', color: 'var(--info)', fontWeight: 600 }}>👥 {selectedOrder.party_size || 1} Party</p>
+              <p style={{ fontSize: '13px', color: 'var(--info)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Users size={14} /> {selectedOrder.party_size || 1} Party
+              </p>
               {selectedOrder.notes && <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', fontStyle: 'italic' }}>📝 {selectedOrder.notes}</p>}
             </div>
 

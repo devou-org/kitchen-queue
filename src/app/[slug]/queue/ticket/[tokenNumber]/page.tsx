@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { pusherClient } from '@/lib/pusher-client';
+import { Users } from 'lucide-react';
 
 
 export default function QueueTicketPage() {
@@ -181,7 +182,7 @@ export default function QueueTicketPage() {
              </div>
              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span style={{ color: '#64748b', fontWeight: 600, fontSize: '14px' }}>Party Size</span>
-                <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '14px' }}>👤 {ticket.party_size}</span>
+                <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}><Users size={14} /> {ticket.party_size}</span>
              </div>
              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span style={{ color: '#64748b', fontWeight: 600, fontSize: '14px' }}>Joined</span>

@@ -7,6 +7,7 @@ import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import { Search } from 'lucide-react';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -305,14 +306,17 @@ export default function StaffMenuPage() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px' }}>
       <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-        <input
-          type="search"
-          className="input"
-          placeholder="Search products..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ flex: 1 }}
-        />
+        <div style={{ position: 'relative', width: '100%', flex: 1 }}>
+          <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          <input
+            type="search"
+            className="input"
+            placeholder="Search item name..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', paddingLeft: '40px' }}
+          />
+        </div>
       </div>
 
       {/* Categories */}

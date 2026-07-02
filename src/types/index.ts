@@ -57,6 +57,7 @@ export interface Order {
   items?: OrderItem[];
   queue_position?: number;
   queue_id?: string;
+  staff_name?: string;
 }
 
 export interface QueueState {

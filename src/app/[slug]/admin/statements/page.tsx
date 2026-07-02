@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime } from '@/lib/format';
-import { Download, Clock } from 'lucide-react';
+import { Download, Clock, User, Hourglass, Check } from 'lucide-react';
 import { orderService } from '@/app/services/orders.api';
 
 export default function AdminStatements() {
@@ -156,14 +156,14 @@ export default function AdminStatements() {
               </select>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 24px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 20px', display: 'inline-flex', alignItems: 'center', gap: '8px', border: 'none' }}>
                 <Download size={16} /> Export Statements (CSV)
               </button>
               <button
-                className="btn btn-secondary"
+                className="btn"
                 onClick={handleExpireOldOrders}
                 disabled={expiring}
-                style={{ height: '42px', padding: '0 20px', color: 'var(--warning)', borderColor: 'var(--warning)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                style={{ height: '42px', background: '#DC2626', color: 'white', padding: '0 20px', display: 'inline-flex', alignItems: 'center', gap: '8px', border: 'none' }}
               >
                 <Clock size={16} /> {expiring ? 'Expiring...' : 'Expire Old Orders'}
               </button>
@@ -194,6 +194,11 @@ export default function AdminStatements() {
                       <td>
                         <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.phone}</div>
+                        {order.staff_name && (
+                          <div style={{ fontSize: '10px', color: 'white', background: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', fontWeight: 700 }}>
+                            <User size={12} /> {order.staff_name.split(' ')[0]}
+                          </div>
+                        )}
                       </td>
                       <td style={{ fontWeight: 600 }}>{formatPrice(order.total_price)}</td>
                       <td>
@@ -204,7 +209,7 @@ export default function AdminStatements() {
                           background: order.status == "PAID" ? 'rgba(5,150,105,0.1)' : 'rgba(255,165,0,0.1)',
                           padding: '2px 8px', borderRadius: 'var(--radius-full)',
                         }}>
-                          {order.status == "PAID" ? '✓ PAID' : '⏳ PENDING'}
+                          {order.status == "PAID" ? <><Check size={12} strokeWidth={3} /> PAID</> : <><Hourglass size={12} strokeWidth={2.5} /> PENDING</>}
                         </span>
                       </td>
                       <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>
@@ -246,6 +251,9 @@ export default function AdminStatements() {
             <div className="card" style={{ background: '#F9FAFB', padding: '14px 16px', marginBottom: '20px', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div><p className="label">CUSTOMER</p><p style={{ fontWeight: 700 }}>{selectedOrder.customer_name}</p></div>
+                {selectedOrder.staff_name && (
+                  <div style={{ textAlign: 'center' }}><p className="label">TAKEN BY</p><p style={{ fontWeight: 600, color: 'var(--primary)' }}>{selectedOrder.staff_name.split(' ')[0]}</p></div>
+                )}
                 <div style={{ textAlign: 'right' }}><p className="label">PHONE</p><p style={{ fontWeight: 600 }}>{selectedOrder.phone}</p></div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>

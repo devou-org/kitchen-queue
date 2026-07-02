@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
       party_size: party_size || 1,
       table_number,
       is_pos: isPos,
+      staff_id: isPos ? admin?.userId : undefined,
       items,
     });
 

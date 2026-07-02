@@ -26,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <script dangerouslySetInnerHTML={{ __html: "try { localStorage.removeItem('user_mobile'); localStorage.removeItem('user_data'); } catch(e) {}" }} />
         {children}
         <Toaster
           position="top-right"

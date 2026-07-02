@@ -7,6 +7,7 @@ import { Order, Product } from '@/types';
 import { formatPrice } from '@/lib/format';
 import { validatePhone } from '@/lib/validators';
 import { orderService } from '@/app/services/orders.api';
+import { Search } from 'lucide-react';
 
 type EditableItem = {
   product_id: string;
@@ -22,6 +23,8 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [newProductId, setNewProductId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const [form, setForm] = useState({
     customer_name: '',
@@ -106,13 +109,17 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
   };
 
   const addItem = () => {
-    if (!newProductId) return;
+    if (!newProductId) {
+       toast.error('Please select a product first');
+       return;
+    }
     if (items.some((item) => item.product_id === newProductId)) {
       toast.error('Product already added');
       return;
     }
     setItems((prev) => [...prev, { product_id: newProductId, quantity: 1 }]);
     setNewProductId('');
+    setSearchQuery('');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -274,21 +281,50 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
             <p className="label" style={{ marginBottom: '8px' }}>Order Items *</p>
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <select
-                className="input"
-                value={newProductId}
-                onChange={(e) => setNewProductId(e.target.value)}
-                style={{ flex: 1 }}
-              >
-                <option value="">Select product to add</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} ({formatPrice(product.price)})
-                  </option>
-                ))}
-              </select>
-              <button type="button" className="btn btn-secondary" onClick={addItem}>Add Item</button>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'flex-start' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input 
+                     type="text" 
+                     className="input" 
+                     placeholder="Search and select product..." 
+                     value={searchQuery}
+                     onChange={e => { 
+                       setSearchQuery(e.target.value); 
+                       setShowDropdown(true); 
+                       setNewProductId(''); 
+                     }}
+                     onFocus={() => setShowDropdown(true)}
+                     onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                     style={{ width: '100%', paddingLeft: '40px' }}
+                  />
+                </div>
+                {showDropdown && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', maxHeight: '200px', overflowY: 'auto', zIndex: 50, marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+                      <div style={{ padding: '12px', color: 'var(--text-secondary)', fontSize: '14px' }}>No products found.</div>
+                    ) : (
+                      products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map(product => (
+                         <div 
+                           key={product.id} 
+                           style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: '14px', background: newProductId === product.id ? '#f0fdf4' : 'transparent' }}
+                           onMouseDown={(e) => {
+                              e.preventDefault(); // Prevent blur from firing before mouse down
+                              setNewProductId(product.id);
+                              setSearchQuery(`${product.name}`);
+                              setShowDropdown(false);
+                           }}
+                         >
+                           <div style={{ fontWeight: 600, color: newProductId === product.id ? 'var(--success)' : 'inherit' }}>{product.name}</div>
+                           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{formatPrice(product.price)}</div>
+                         </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <button type="button" className="btn btn-secondary" onClick={addItem} style={{ height: '42px' }}>Add Item</button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

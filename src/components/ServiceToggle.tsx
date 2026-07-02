@@ -78,7 +78,7 @@ export const ServiceToggle = ({ variant = 'default' }: { variant?: 'default' | '
   return (
     <div style={{ marginBottom: variant === 'light' ? 0 : '16px', marginTop: variant === 'light' ? 0 : '-4px' }}>
       <div className="status-toggle-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div className="status-toggle-label" style={{ display: variant === 'light' ? 'none' : 'block' }}>
+        <div className="status-toggle-label" style={{ display: variant === 'light' ? 'none' : 'flex' }}>
           <span className="status-label-primary">Service Status</span>
           <span className="status-label-secondary" style={{ color: isActive ? 'var(--success)' : '#ef4444' }}>
             {isActive ? 'Online' : 'Offline'}

@@ -43,7 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const isUnauthorizedPath = 
         pathname.startsWith(`/${slug}/admin/orders`) || 
         pathname.startsWith(`/${slug}/admin/statements`) || 
-        pathname.startsWith(`/${slug}/admin/inventory`);
+        pathname.startsWith(`/${slug}/admin/sales`);
       if (isUnauthorizedPath) {
         const target = showQueue ? 'queue' : 'products';
         router.replace(`/${slug}/admin/${target}`);
@@ -90,6 +90,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     authService.logout('admin');
+    const slugStr = Array.isArray(slug) ? slug[0] : slug;
+    localStorage.removeItem(`kitchenQueue_liveAdditions_${slugStr}`);
     document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'; document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     try {
       await fetch('/api/auth/logout', { 
@@ -108,9 +110,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
-    ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/inventory`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
-    { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
+    ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/sales`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
+    { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
     { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
   ];
 

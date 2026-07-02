@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { formatPrice } from '@/lib/format';
 import { inventoryService, InventoryItem } from '@/app/services/inventory.api';
 import { adminService } from '@/app/services/admin.api';
+import { Search } from 'lucide-react';
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   'MAIN COURSE': { bg: 'rgba(151,19,69,0.1)', color: '#971345' },
@@ -166,14 +167,17 @@ export default function AdminInventorySummary() {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <input
-          type="search"
-          className="input"
-          placeholder="🔍 Search item name..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-          style={{ maxWidth: '280px' }}
-        />
+        <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+          <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          <input
+            type="search"
+            className="input"
+            placeholder="Search item name..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{ width: '100%', paddingLeft: '40px' }}
+          />
+        </div>
         <select
           className="input"
           value={categoryFilter}

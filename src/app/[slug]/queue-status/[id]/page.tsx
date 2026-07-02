@@ -12,7 +12,8 @@ import {
   Utensils,
   CircleDollarSign,
   Info,
-  ClipboardEdit
+  ClipboardEdit,
+  Users
 } from 'lucide-react';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
@@ -449,8 +450,8 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Party Size</span>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
-                👤 {ticketData.party_size}
+              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Users size={14} /> {ticketData.party_size}
               </span>
             </div>
             

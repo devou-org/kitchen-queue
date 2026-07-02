@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { pusherClient } from '@/lib/pusher-client';
+import { Users } from 'lucide-react';
 
 export default function QueueBoardPage() {
   const { slug } = useParams();
@@ -118,7 +119,7 @@ export default function QueueBoardPage() {
               </div>
               
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                👤 {q.party_size}
+                <Users size={18} /> {q.party_size}
               </div>
               
               <div style={{ fontSize: '18px', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right' }}>
