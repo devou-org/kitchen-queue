@@ -24,10 +24,10 @@ export class BillingService {
 
     const { commissionPercent, flatLimit, flatCharge } = pricing.perOrder;
     if (orderValue < flatLimit) {
+      return flatCharge;
+    } else {
       // Calculate commission percentage, round to 2 decimal places
       return Math.round(orderValue * commissionPercent * 100) / 100;
-    } else {
-      return flatCharge;
     }
   }
 
@@ -76,34 +76,7 @@ export class BillingService {
       return; // Skip or throw error. We skip to avoid blocking orders due to admin setup issues.
     }
 
-    // Fetch current cycle's Average Order Value (AOV) of PAID orders
-    const aovRes = await client.query(`
-      SELECT COALESCE(AVG(total_price), 0) as avg_value
-      FROM orders
-      WHERE restaurant_id = $1
-        AND status = 'PAID'
-        AND created_at >= (
-          SELECT COALESCE(billing_start_date, created_at) FROM restaurants WHERE id = $1 LIMIT 1
-        )
-    `, [restaurantId]);
-
-    let aov = parseFloat(aovRes.rows[0].avg_value || '0');
-    if (aov === 0) {
-      aov = orderValue; // Fallback to current order value if no other paid orders exist
-    }
-
-    const pricing = BILLING_PRICING[tier];
-    if (!pricing || !pricing.perOrder) {
-      return;
-    }
-
-    const { commissionPercent, flatLimit, flatCharge } = pricing.perOrder;
-    let chargeAmount = 0;
-    if (aov < flatLimit) {
-      chargeAmount = Math.round(orderValue * commissionPercent * 100) / 100;
-    } else {
-      chargeAmount = flatCharge;
-    }
+    const chargeAmount = this.calculateOrderCharge(tier, orderValue);
 
     if (chargeAmount <= 0) {
       return;
