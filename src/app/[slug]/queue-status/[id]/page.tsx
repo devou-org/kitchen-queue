@@ -68,6 +68,8 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
   };
 
   const executeLeaveQueue = async () => {
+    if (!restaurant) return;
+    
     setCancelling(true);
     setShowConfirmModal(false);
     try {
