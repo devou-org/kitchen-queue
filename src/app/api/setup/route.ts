@@ -22,6 +22,10 @@ export async function GET() {
         billing_status VARCHAR(50) DEFAULT 'ACTIVE',
         billing_start_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         billing_end_date TIMESTAMP WITH TIME ZONE,
+        timezone VARCHAR(50) DEFAULT 'Asia/Kolkata',
+        opening_time TIME DEFAULT '09:00:00',
+        closing_time TIME DEFAULT '22:00:00',
+        rollover_time TIME DEFAULT '00:00:00',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -104,6 +108,7 @@ export async function GET() {
         party_size INT DEFAULT 1,
         estimated_wait_time INT,
         notes TEXT,
+        business_date DATE DEFAULT CURRENT_DATE,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
@@ -125,6 +130,7 @@ export async function GET() {
         notes TEXT,
         user_id UUID REFERENCES users(id) ON DELETE SET NULL,
         queue_id UUID REFERENCES queues(id) ON DELETE SET NULL,
+        business_date DATE DEFAULT CURRENT_DATE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );

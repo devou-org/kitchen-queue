@@ -15,6 +15,10 @@ export type RestaurantContext = {
   menu_description?: string;
   pusher_channel: string;
   modules?: Record<string, boolean>;
+  timezone?: string;
+  opening_time?: string;
+  closing_time?: string;
+  rollover_time?: string;
 };
 
 let cached: RestaurantContext | null = null;

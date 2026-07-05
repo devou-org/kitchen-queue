@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
+import Script from 'next/script';
 
 export const metadata: Metadata = {
   title: "Renjz Kitchen | Taste of Home in every bite",
@@ -26,7 +27,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <script dangerouslySetInnerHTML={{ __html: "try { localStorage.removeItem('user_mobile'); localStorage.removeItem('user_data'); } catch(e) {}" }} />
+        <Script id="cleanup-legacy" strategy="beforeInteractive">
+          {`try { localStorage.removeItem('user_mobile'); localStorage.removeItem('user_data'); } catch(e) {}`}
+        </Script>
         {children}
         <Toaster
           position="top-right"

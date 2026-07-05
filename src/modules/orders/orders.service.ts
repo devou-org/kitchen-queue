@@ -24,14 +24,20 @@ export class OrdersService {
     try {
       await client.query('BEGIN');
 
-      // 1. Lock the restaurant row to prevent concurrent token number generation
-      await client.query(`SELECT id FROM restaurants WHERE id = $1 FOR UPDATE`, [restaurantId]);
+      // 1. Lock the restaurant row and calculate current business date
+      const configRes = await client.query(`
+        SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) as current_business_date
+        FROM restaurants 
+        WHERE id = $1 FOR UPDATE
+      `, [restaurantId]);
+      
+      const currentBusinessDate = configRes.rows[0].current_business_date;
 
       const ticketRes = await client.query(`
         SELECT COALESCE(MAX(ticket_number), 0) + 1 AS next_ticket 
         FROM orders 
-        WHERE restaurant_id = $1 AND CAST(created_at AS DATE) = CURRENT_DATE
-      `, [restaurantId]);
+        WHERE restaurant_id = $1 AND business_date = $2
+      `, [restaurantId, currentBusinessDate]);
       
       const ticketNumber = ticketRes.rows[0].next_ticket;
 
@@ -39,12 +45,12 @@ export class OrdersService {
       const orderRes = await client.query(`
         INSERT INTO orders (
           restaurant_id, user_id, queue_id, ticket_number, 
-          total_price, is_paid, table_number, notes, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
+          total_price, is_paid, table_number, notes, status, business_date
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9)
         RETURNING *
       `, [
         restaurantId, userId || null, queueId || null, ticketNumber, 
-        totalPrice, isPaid, tableNumber, notes
+        totalPrice, isPaid, tableNumber, notes, currentBusinessDate
       ]);
 
       const orderId = orderRes.rows[0].id;

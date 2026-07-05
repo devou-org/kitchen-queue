@@ -92,7 +92,11 @@ export async function PUT(request: NextRequest) {
       secondary_color, 
       menu_layout, 
       menu_title, 
-      menu_description 
+      menu_description,
+      timezone,
+      opening_time,
+      closing_time,
+      rollover_time
     } = body;
 
     if (!name) {
@@ -111,6 +115,10 @@ export async function PUT(request: NextRequest) {
         menu_layout = ${menu_layout},
         menu_title = ${menu_title || null},
         menu_description = ${menu_description || null},
+        timezone = ${timezone || null},
+        opening_time = ${opening_time || null},
+        closing_time = ${closing_time || null},
+        rollover_time = ${rollover_time || null},
         updated_at = NOW()
       WHERE id = ${restaurant.id}
     `;

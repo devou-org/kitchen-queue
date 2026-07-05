@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
           slug: restaurant.slug,
           billing_tier: restaurant.billing_tier,
           billing_model: restaurant.billing_model,
+          billing_period: restaurant.billing_period,
           billing_status: restaurant.billing_status,
           billing_start_date: restaurant.billing_start_date,
           billing_end_date: restaurant.billing_end_date,

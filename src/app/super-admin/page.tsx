@@ -29,7 +29,7 @@ type Restaurant = {
 
 type ModalMode = 'create' | 'edit' | null;
 
-const EMPTY_FORM = { name: '', slug: '', phone: '', address_street: '', address_city: '', address_state: '', address_zip: '', address_country: '', logo_url: '', primary_color: '#800020', secondary_color: '#ecfdf5', modules: [] as string[] };
+const EMPTY_FORM = { name: '', slug: '', phone: '', address_street: '', address_city: '', address_state: '', address_zip: '', address_country: '', logo_url: '', primary_color: '#800020', secondary_color: '#ecfdf5', timezone: 'Asia/Kolkata', opening_time: '09:00:00', closing_time: '22:00:00', rollover_time: '00:00:00', modules: [] as string[] };
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
@@ -110,6 +110,10 @@ export default function SuperAdminDashboard() {
         logo_url: form.logo_url,
         primary_color: form.primary_color,
         secondary_color: form.secondary_color,
+        timezone: form.timezone,
+        opening_time: form.opening_time,
+        closing_time: form.closing_time,
+        rollover_time: form.rollover_time,
         modules: form.modules,
       };
       const res = await fetch('/api/super-admin/restaurants', {
@@ -311,6 +315,45 @@ export default function SuperAdminDashboard() {
                 <label style={S.fieldLabel}>Logo URL</label>
                 <input type="url" value={form.logo_url} onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))} placeholder="https://..." style={S.input} />
               </div>
+
+              {/* Business Hours Configuration */}
+              <div>
+                <label style={S.fieldLabel}>Timezone</label>
+                <select 
+                  value={form.timezone} 
+                  onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))} 
+                  style={{ ...S.input, appearance: 'auto', backgroundColor: '#ffffff' }}
+                >
+                  <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                  <option value="America/New_York">America/New_York (EST/EDT)</option>
+                  <option value="America/Chicago">America/Chicago (CST/CDT)</option>
+                  <option value="America/Denver">America/Denver (MST/MDT)</option>
+                  <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
+                  <option value="Europe/London">Europe/London (GMT/BST)</option>
+                  <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+                  <option value="Australia/Sydney">Australia/Sydney (AEST/AEDT)</option>
+                  <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+                  <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                  <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={S.fieldLabel}>Opening Time</label>
+                  <input type="time" value={form.opening_time} onChange={e => setForm(f => ({ ...f, opening_time: e.target.value }))} style={S.input} />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>Closing Time</label>
+                  <input type="time" value={form.closing_time} onChange={e => setForm(f => ({ ...f, closing_time: e.target.value }))} style={S.input} />
+                </div>
+              </div>
+
+              <div>
+                <label style={S.fieldLabel}>Rollover Time (Business Day End)</label>
+                <input type="time" value={form.rollover_time} onChange={e => setForm(f => ({ ...f, rollover_time: e.target.value }))} style={S.input} />
+              </div>
+
               {/* Color Configuration */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>

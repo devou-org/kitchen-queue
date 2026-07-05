@@ -25,6 +25,7 @@ interface RestaurantBilling {
   billing_tier: string;
   billing_model: string;
   billing_status: string;
+  billing_period: string;
   billing_start_date: string | null;
   billing_end_date: string | null;
 }
@@ -69,6 +70,7 @@ export default function SuperAdminRestaurantBilling() {
   // Form states for updating billing details
   const [billingTier, setBillingTier] = useState('BASIC');
   const [billingModel, setBillingModel] = useState('SUBSCRIPTION');
+  const [billingPeriod, setBillingPeriod] = useState('MONTHLY');
   const [billingStatus, setBillingStatus] = useState('ACTIVE');
   const [billingEndDate, setBillingEndDate] = useState('');
   const [updatingDetails, setUpdatingDetails] = useState(false);
@@ -99,6 +101,7 @@ export default function SuperAdminRestaurantBilling() {
       setRestaurant(r);
       setBillingTier(r.billing_tier || 'BASIC');
       setBillingModel(r.billing_model || 'SUBSCRIPTION');
+      setBillingPeriod(r.billing_period || 'MONTHLY');
       setBillingStatus(r.billing_status || 'ACTIVE');
       setBillingEndDate(r.billing_end_date ? r.billing_end_date.split('T')[0] : '');
 
@@ -157,6 +160,22 @@ export default function SuperAdminRestaurantBilling() {
 
 
 
+  const handleBillingPeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newPeriod = e.target.value;
+    setBillingPeriod(newPeriod);
+    
+    if (restaurant) {
+      const baseDate = restaurant.billing_start_date ? new Date(restaurant.billing_start_date) : new Date();
+      const newEndDate = new Date(baseDate);
+      if (newPeriod === 'YEARLY') {
+        newEndDate.setFullYear(newEndDate.getFullYear() + 1);
+      } else {
+        newEndDate.setMonth(newEndDate.getMonth() + 1);
+      }
+      setBillingEndDate(newEndDate.toISOString().split('T')[0]);
+    }
+  };
+
   const handleUpdateBilling = async (e: React.FormEvent) => {
     e.preventDefault();
     setUpdatingDetails(true);
@@ -168,6 +187,7 @@ export default function SuperAdminRestaurantBilling() {
         body: JSON.stringify({
           billing_tier: billingTier,
           billing_model: billingModel,
+          billing_period: billingPeriod,
           billing_status: billingStatus,
           billing_end_date: billingEndDate || null,
         }),
@@ -284,6 +304,10 @@ export default function SuperAdminRestaurantBilling() {
               <span style={styles.headerStatVal}>{restaurant.billing_model || 'SUBSCRIPTION'}</span>
             </div>
             <div style={styles.headerStat}>
+              <span style={styles.headerStatLabel}>Period</span>
+              <span style={styles.headerStatVal}>{restaurant.billing_period || 'MONTHLY'}</span>
+            </div>
+            <div style={styles.headerStat}>
               <span style={styles.headerStatLabel}>Cycle OTPs</span>
               <span style={styles.headerStatVal}>{currentOtpCount} SMS (₹{currentOtpAmount.toFixed(2)})</span>
             </div>
@@ -337,6 +361,17 @@ export default function SuperAdminRestaurantBilling() {
                       {(billingTier === 'PRO' || billingTier === 'COMPLETE') && (
                         <option value="ONE_TIME">ONE-TIME FEE</option>
                       )}
+                    </select>
+                  </div>
+                  <div style={styles.formField}>
+                    <label style={styles.label}>Billing Period</label>
+                    <select
+                      value={billingPeriod}
+                      onChange={handleBillingPeriodChange}
+                      style={styles.select}
+                    >
+                      <option value="MONTHLY">MONTHLY</option>
+                      <option value="YEARLY">YEARLY</option>
                     </select>
                   </div>
                 </div>
@@ -442,7 +477,7 @@ export default function SuperAdminRestaurantBilling() {
                 <table style={styles.table}>
                   <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                     <tr style={styles.trHead}>
-                      <th style={styles.th}>Month</th>
+                      <th style={styles.th}>Billing Cycle</th>
                       <th style={styles.th}>Subscription</th>
                       <th style={styles.th}>Commissions</th>
                       <th style={styles.th}>OTP Charges</th>
@@ -460,10 +495,20 @@ export default function SuperAdminRestaurantBilling() {
                         .filter(s => summaryYearFilter ? s.year.toString() === summaryYearFilter : true)
                         .sort((a, b) => b.year - a.year || b.month - a.month)
                         .map(s => {
-                          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                          const cycleDay = restaurant.billing_start_date ? new Date(restaurant.billing_start_date).getDate() : 1;
+                          const start = new Date(s.year, s.month - 1, cycleDay);
+                          const end = new Date(start);
+                          if (restaurant.billing_period === 'YEARLY') {
+                            end.setFullYear(end.getFullYear() + 1);
+                          } else {
+                            end.setMonth(end.getMonth() + 1);
+                          }
+                          const startStr = start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                          const endStr = end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
                         return (
                           <tr key={s.id} style={styles.tr}>
-                            <td style={styles.tdHighlight}>{months[s.month - 1]} {s.year}</td>
+                            <td style={styles.tdHighlight}>{startStr} to {endStr}</td>
                             <td style={styles.td}>₹{parseFloat(s.subscription_charges || '0').toFixed(2)}</td>
                             <td style={styles.td}>₹{parseFloat(s.order_charges || '0').toFixed(2)}</td>
                             <td style={styles.td}>₹{parseFloat(s.otp_charges || '0').toFixed(2)}</td>

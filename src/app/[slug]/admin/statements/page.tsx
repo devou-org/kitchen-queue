@@ -3,21 +3,31 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
-import { formatPrice, formatDateTime } from '@/lib/format';
+import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/format';
 import { Download, Clock, User, Hourglass, Check } from 'lucide-react';
 import { orderService } from '@/app/services/orders.api';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
-  const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [stats, setStats] = useState({ totalRevenue: 0, totalPaidRevenue: 0, orderCount: 0, paidCount: 0 });
 
   const { slug } = useParams();
+  const { restaurant } = useRestaurant();
+
+  useEffect(() => {
+    if (restaurant && !dateFrom && !dateTo) {
+      const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
+      setDateFrom(bDate);
+      setDateTo(bDate);
+    }
+  }, [restaurant, dateFrom, dateTo]);
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -45,7 +55,9 @@ export default function AdminStatements() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    if (dateFrom && dateTo) {
+      fetchOrders();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, statusFilter, page]);
 

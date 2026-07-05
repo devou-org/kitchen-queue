@@ -26,14 +26,10 @@ export default function StaffOrders() {
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-      
       const data = await orderService.getOrders({
         page,
         per_page: 100,
         sort: 'ASC',
-        date_from: today,
-        date_to: today,
         status: statusFilter
       });
 

@@ -70,3 +70,16 @@ export function calculateTax(subtotal: number, rate = 0.10): number {
 export function calculateTotal(subtotal: number, taxRate = 0.10): number {
   return Math.round((subtotal + calculateTax(subtotal, taxRate)) * 100) / 100;
 }
+
+export function getCurrentBusinessDate(timezone: string = 'Asia/Kolkata', rolloverTime: string = '00:00:00'): string {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-GB', { timeZone: timezone });
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone });
+  let localDateStr = dateFormatter.format(now);
+  if (rolloverTime !== '00:00:00' && timeStr < rolloverTime) {
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    localDateStr = dateFormatter.format(yesterday);
+  }
+  return localDateStr;
+}
+

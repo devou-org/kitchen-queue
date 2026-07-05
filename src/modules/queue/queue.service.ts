@@ -25,7 +25,20 @@ export class QueueService {
     try {
       await client.query('BEGIN');
 
-      // 1. Insert or get user
+      // 1. Fetch config, calculate business date, and lock the restaurant row
+      const configRes = await client.query(`
+        SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) as current_business_date
+        FROM restaurants 
+        WHERE id = $1 FOR UPDATE
+      `, [restaurantId]);
+      
+      if (configRes.rows.length === 0) {
+        throw new Error('Restaurant not found');
+      }
+      
+      const currentBusinessDate = configRes.rows[0].current_business_date;
+
+      // 2. Insert or get user
       // We use FOR UPDATE on the user row if we need to lock it, but INSERT ON CONFLICT DO UPDATE is safer for concurrency
       const userRes = await client.query(`
         INSERT INTO users (name, phone, role)
@@ -44,9 +57,9 @@ export class QueueService {
         WHERE q.user_id = $1 
           AND q.restaurant_id = $2 
           AND q.queue_type = $3
-          AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+          AND q.business_date = $4
         ORDER BY q.created_at DESC LIMIT 1
-      `, [userId, restaurantId, queueType]);
+      `, [userId, restaurantId, queueType, currentBusinessDate]);
 
       if (existingQueueRes.rows.length > 0) {
         const existingQueue = existingQueueRes.rows[0];
@@ -63,9 +76,9 @@ export class QueueService {
               AND qs.possible_queue_status = (
                 SELECT possible_queue_status FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC LIMIT 1
               )
-              AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
-              AND q.token_number < $2
-          `, [restaurantId, existingQueue.token_number]);
+              AND q.business_date = $2
+              AND q.token_number < $3
+          `, [restaurantId, currentBusinessDate, existingQueue.token_number]);
 
           const queueLength = parseInt(waitTimeRes.rows[0].queue_length, 10);
           existingQueue.position = existingQueue.queue_status_id ? (queueLength + 1) : 0;
@@ -89,15 +102,14 @@ export class QueueService {
 
       const waitingStatusId = statusRes.rows[0].id;
 
-      // Lock the restaurant row to prevent concurrent token number generation
-      await client.query(`SELECT id FROM restaurants WHERE id = $1 FOR UPDATE`, [restaurantId]);
+
 
       // 3. Get next token number
       const tokenRes = await client.query(`
         SELECT COALESCE(MAX(token_number), 0) + 1 AS next_token 
         FROM queues 
-        WHERE restaurant_id = $1 AND (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
-      `, [restaurantId]);
+        WHERE restaurant_id = $1 AND business_date = $2
+      `, [restaurantId, currentBusinessDate]);
 
       const nextToken = tokenRes.rows[0].next_token;
 
@@ -105,8 +117,8 @@ export class QueueService {
       const waitTimeRes = await client.query(`
         SELECT COUNT(*) as queue_length 
         FROM queues 
-        WHERE restaurant_id = $1 AND queue_status_id = $2 AND (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
-      `, [restaurantId, waitingStatusId]);
+        WHERE restaurant_id = $1 AND queue_status_id = $2 AND business_date = $3
+      `, [restaurantId, waitingStatusId, currentBusinessDate]);
 
       const queueLength = parseInt(waitTimeRes.rows[0].queue_length, 10);
       const position = queueLength + 1; // Their position in the queue
@@ -115,12 +127,12 @@ export class QueueService {
       const queueRes = await client.query(`
         INSERT INTO queues (
           restaurant_id, user_id, queue_status_id, token_number, 
-          queue_type, party_size, estimated_wait_time, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          queue_type, party_size, estimated_wait_time, notes, business_date
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *, (REPLACE(created_at::text, ' ', 'T') || 'Z') as created_at_iso
       `, [
         restaurantId, userId, waitingStatusId, nextToken,
-        queueType, partySize, null, notes
+        queueType, partySize, null, notes, currentBusinessDate
       ]);
 
       await client.query('COMMIT');
@@ -230,7 +242,7 @@ export class QueueService {
       JOIN queue_status qs ON q.queue_status_id = qs.id
       JOIN users u ON q.user_id = u.id
       WHERE q.restaurant_id = $1 
-        AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+        AND DATE((q.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval)
       ORDER BY q.token_number ASC
     `, [restaurantId]);
     return res.rows;
@@ -278,7 +290,7 @@ export class QueueService {
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
           AND qs2.possible_queue_status = 'WAITING'
-          AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+          AND DATE((q2.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -310,7 +322,7 @@ export class QueueService {
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
           AND qs2.possible_queue_status = 'WAITING'
-          AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+          AND DATE((q2.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -341,7 +353,7 @@ export class QueueService {
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
           AND qs2.possible_queue_status = 'WAITING'
-          AND (q2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+          AND DATE((q2.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -350,7 +362,7 @@ export class QueueService {
       WHERE q.restaurant_id = $1 
         AND u.phone = $2
         AND q.queue_type = 'WALK_IN'
-        AND (q.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::DATE
+        AND DATE((q.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval)
       ORDER BY q.created_at DESC
     `, [restaurantId, phone]);
 

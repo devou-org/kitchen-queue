@@ -111,15 +111,12 @@ export default function AdminOrders() {
     if (!statusesLoaded) return;
     if (!silent) setLoading(true);
     try {
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
       const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
       
       const data = await orderService.getOrders({
         page,
         per_page: 100,
         sort: 'ASC',
-        date_from: today,
-        date_to: today,
         status: statusFilter || currentDefault
       });
 

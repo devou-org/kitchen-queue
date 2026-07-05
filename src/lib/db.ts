@@ -17,7 +17,11 @@ async function runAutoMigration(sqlConnection: any) {
       ALTER TABLE restaurants 
       ADD COLUMN IF NOT EXISTS menu_title VARCHAR(200) DEFAULT 'Today''s Specials',
       ADD COLUMN IF NOT EXISTS menu_description TEXT DEFAULT 'Hand-curated coastal delicacies prepared with traditional recipes.',
-      ADD COLUMN IF NOT EXISTS billing_period VARCHAR(20) DEFAULT 'MONTHLY';
+      ADD COLUMN IF NOT EXISTS billing_period VARCHAR(20) DEFAULT 'MONTHLY',
+      ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Asia/Kolkata',
+      ADD COLUMN IF NOT EXISTS opening_time TIME DEFAULT '09:00:00',
+      ADD COLUMN IF NOT EXISTS closing_time TIME DEFAULT '22:00:00',
+      ADD COLUMN IF NOT EXISTS rollover_time TIME DEFAULT '00:00:00';
     `;
     console.log("Auto-migrated menu columns successfully!");
   } catch (err) {
@@ -27,7 +31,7 @@ async function runAutoMigration(sqlConnection: any) {
 
 export async function getRestaurantBySlug(slug: string) {
   try {
-    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time FROM restaurants WHERE slug = ${slug} LIMIT 1`;
     return rows[0] || null;
   } catch (error: any) {
     if (error.message?.includes('column') || error.message?.includes('does not exist')) {
@@ -168,13 +172,17 @@ export async function createRestaurant(data: {
   menu_layout?: string;
   menu_title?: string;
   menu_description?: string;
+  timezone?: string;
+  opening_time?: string;
+  closing_time?: string;
+  rollover_time?: string;
   modules?: string[];
 }) {
   let restaurant: any = null;
   try {
     const rows = await sql`
-      INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description)
-      VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
+      INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, timezone, opening_time, closing_time, rollover_time)
+      VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'}, ${data.timezone || 'Asia/Kolkata'}, ${data.opening_time || '09:00:00'}, ${data.closing_time || '22:00:00'}, ${data.rollover_time || '00:00:00'})
       RETURNING *
     `;
     restaurant = rows[0];
@@ -244,6 +252,11 @@ export async function updateRestaurant(id: string, data: {
   billing_model?: string;
   billing_status?: string;
   billing_end_date?: string | null;
+  billing_period?: string;
+  timezone?: string | null;
+  opening_time?: string | null;
+  closing_time?: string | null;
+  rollover_time?: string | null;
 }) {
   try {
     const rows = await sql`
@@ -262,6 +275,11 @@ export async function updateRestaurant(id: string, data: {
         billing_model = COALESCE(${data.billing_model ?? null}, billing_model),
         billing_status = COALESCE(${data.billing_status ?? null}, billing_status),
         billing_end_date = COALESCE(${data.billing_end_date ?? null}, billing_end_date),
+        billing_period = COALESCE(${data.billing_period ?? null}, billing_period),
+        timezone = COALESCE(${data.timezone ?? null}, timezone),
+        opening_time = COALESCE(${data.opening_time ?? null}, opening_time),
+        closing_time = COALESCE(${data.closing_time ?? null}, closing_time),
+        rollover_time = COALESCE(${data.rollover_time ?? null}, rollover_time),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
@@ -481,11 +499,10 @@ export async function getOrders(restaurantId: string, filters: {
       if (sort === 'DESC') {
         return await sql`
           SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-          WHERE o.restaurant_id = ${restaurantId} AND o.status = ${filters.status} 
-            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-          ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) DESC,
+          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.status = ${filters.status} 
+            AND o.business_date >= ${filters.date_from}::date
+            AND o.business_date <= ${filters.date_to}::date
+          ORDER BY o.business_date DESC,
                    o.created_at DESC,
                    o.ticket_number DESC
           LIMIT ${per_page} OFFSET ${offset}
@@ -493,11 +510,10 @@ export async function getOrders(restaurantId: string, filters: {
       }
       return await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-        WHERE o.restaurant_id = ${restaurantId} AND o.status = ${filters.status} 
-          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ASC,
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.status = ${filters.status} 
+          AND o.business_date >= ${filters.date_from}::date
+          AND o.business_date <= ${filters.date_to}::date
+        ORDER BY o.business_date ASC,
                  o.created_at ASC,
                  o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
@@ -507,11 +523,10 @@ export async function getOrders(restaurantId: string, filters: {
       if (sort === 'DESC') {
         return await sql`
           SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-          WHERE o.restaurant_id = ${restaurantId} AND o.status = ANY(${statuses})
-            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-          ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) DESC,
+          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.status = ANY(${statuses})
+            AND o.business_date >= ${filters.date_from}::date
+            AND o.business_date <= ${filters.date_to}::date
+          ORDER BY o.business_date DESC,
                    o.created_at DESC,
                    o.ticket_number DESC
           LIMIT ${per_page} OFFSET ${offset}
@@ -519,11 +534,10 @@ export async function getOrders(restaurantId: string, filters: {
       }
       return await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-        WHERE o.restaurant_id = ${restaurantId} AND o.status = ANY(${statuses})
-          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ASC,
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.status = ANY(${statuses})
+          AND o.business_date >= ${filters.date_from}::date
+          AND o.business_date <= ${filters.date_to}::date
+        ORDER BY o.business_date ASC,
                  o.created_at ASC,
                  o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
@@ -532,10 +546,9 @@ export async function getOrders(restaurantId: string, filters: {
       if (sort === 'DESC') {
         return await sql`
           SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-          WHERE o.restaurant_id = ${restaurantId} AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-            AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-          ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) DESC,
+          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.business_date >= ${filters.date_from}::date
+            AND o.business_date <= ${filters.date_to}::date
+          ORDER BY o.business_date DESC,
                    o.created_at DESC,
                    o.ticket_number DESC
           LIMIT ${per_page} OFFSET ${offset}
@@ -543,10 +556,9 @@ export async function getOrders(restaurantId: string, filters: {
       }
       return await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-        WHERE o.restaurant_id = ${restaurantId} AND DATE(o.created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-          AND DATE(o.created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
-        ORDER BY DATE(o.created_at AT TIME ZONE ${localTimezone}) ASC,
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.business_date >= ${filters.date_from}::date
+          AND o.business_date <= ${filters.date_to}::date
+        ORDER BY o.business_date ASC,
                  o.created_at ASC,
                  o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
@@ -558,15 +570,13 @@ export async function getOrders(restaurantId: string, filters: {
     if (sort === 'DESC') {
       return await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-        WHERE o.restaurant_id = ${restaurantId} AND o.status = ${filters.status}
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.status = ${filters.status}
         ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
       `;
     }
     return await sql`
       SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-      FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-      WHERE o.restaurant_id = ${restaurantId} AND o.status = ${filters.status}
+      FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.status = ${filters.status}
       ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
     `;
   }
@@ -576,15 +586,13 @@ export async function getOrders(restaurantId: string, filters: {
     if (sort === 'DESC') {
       return await sql`
           SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-          WHERE o.restaurant_id = ${restaurantId} AND o.status = ANY(${statuses})
+          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.status = ANY(${statuses})
           ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
         `;
     }
     return await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-        WHERE o.restaurant_id = ${restaurantId} AND o.status = ANY(${statuses})
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND o.status = ANY(${statuses})
         ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
       `;
   }
@@ -592,15 +600,13 @@ export async function getOrders(restaurantId: string, filters: {
   if (sort === 'DESC') {
     return await sql`
       SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-      FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-      WHERE o.restaurant_id = ${restaurantId}
+      FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId}
       ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
     `;
   }
   return await sql`
     SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-    FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-    WHERE o.restaurant_id = ${restaurantId}
+    FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId}
     ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
   `;
 }
@@ -623,10 +629,9 @@ export async function getOrderStats(restaurantId: string, filters: {
           COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
           COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
-        FROM orders
-        WHERE restaurant_id = ${restaurantId} AND status = ${filters.status}
-          AND DATE(created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-          AND DATE(created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND status = ${filters.status}
+          AND orders.business_date >= ${filters.date_from}::date
+          AND orders.business_date <= ${filters.date_to}::date
       `;
     } else if (filters.status_in) {
       const statuses = filters.status_in.split(',');
@@ -636,10 +641,9 @@ export async function getOrderStats(restaurantId: string, filters: {
           COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
           COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
-        FROM orders
-        WHERE restaurant_id = ${restaurantId} AND status = ANY(${statuses})
-          AND DATE(created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-          AND DATE(created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND status = ANY(${statuses})
+          AND orders.business_date >= ${filters.date_from}::date
+          AND orders.business_date <= ${filters.date_to}::date
       `;
     } else {
       return await sql`
@@ -648,9 +652,8 @@ export async function getOrderStats(restaurantId: string, filters: {
           COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
           COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
-        FROM orders
-        WHERE restaurant_id = ${restaurantId} AND DATE(created_at AT TIME ZONE ${localTimezone}) >= ${filters.date_from}::date
-          AND DATE(created_at AT TIME ZONE ${localTimezone}) <= ${filters.date_to}::date
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND orders.business_date >= ${filters.date_from}::date
+          AND orders.business_date <= ${filters.date_to}::date
       `;
     }
   }
@@ -662,8 +665,7 @@ export async function getOrderStats(restaurantId: string, filters: {
         COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
         COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
         COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
-      FROM orders
-      WHERE restaurant_id = ${restaurantId} AND status = ${filters.status}
+      FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND status = ${filters.status}
     `;
   }
 
@@ -675,8 +677,7 @@ export async function getOrderStats(restaurantId: string, filters: {
         COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
         COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
         COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
-      FROM orders
-      WHERE restaurant_id = ${restaurantId} AND status = ANY(${statuses})
+      FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND status = ANY(${statuses})
     `;
   }
 
@@ -686,8 +687,7 @@ export async function getOrderStats(restaurantId: string, filters: {
       COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
       COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
       COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue
-    FROM orders
-    WHERE restaurant_id = ${restaurantId}
+    FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId}
   `;
 }
 
@@ -724,7 +724,7 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
        JOIN queue_status qs ON qs.id = q.queue_status_id
        WHERE q.restaurant_id = ${restaurantId} 
          AND qs.possible_queue_status IN ('PENDING', 'PREPARING')
-         AND (q.created_at AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE
+         AND q.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = q.restaurant_id)
     )
     SELECT o.*, s.name as staff_name, 
       COALESCE(ar.pos, 0) as queue_position,
@@ -760,7 +760,7 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
        JOIN queue_status qs ON qs.id = q.queue_status_id
        WHERE q.restaurant_id = ${restaurantId} 
          AND qs.possible_queue_status IN ('PENDING', 'PREPARING')
-         AND (q.created_at AT TIME ZONE 'Asia/Kolkata')::DATE = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE
+         AND q.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = q.restaurant_id)
     )
     SELECT q.id, q.token_number as ticket_number, q.created_at, q.queue_type,
       o.id as order_id, o.is_paid, o.total_price,
@@ -1276,14 +1276,13 @@ export async function setOrderPaymentStatus(restaurantId: string, id: string, is
 }
 
 export async function expireOldOrders() {
-  const localTimezone = 'Asia/Kolkata';
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
-
-  // 1. Get IDs of orders to expire
+  // 1. Get IDs of orders to expire based on restaurant-specific business date
   const toExpire = await sql`
-    SELECT id, restaurant_id FROM orders 
-    WHERE status IN ('PENDING', 'PREPARING')
-      AND DATE(created_at AT TIME ZONE ${localTimezone}) < ${today}::date
+    SELECT o.id, o.restaurant_id 
+    FROM orders o
+    JOIN restaurants r ON r.id = o.restaurant_id
+    WHERE o.status IN ('PENDING', 'PREPARING', 'READY')
+      AND o.business_date < DATE((CURRENT_TIMESTAMP AT TIME ZONE COALESCE(r.timezone, 'Asia/Kolkata')) - COALESCE(r.rollover_time, '00:00:00')::interval)
   `;
 
   if (toExpire.length === 0) return { expiredCount: 0 };
@@ -1320,7 +1319,7 @@ export async function getQueueState(restaurantId: string) {
 }
 
 export async function advanceQueue(restaurantId: string) {
-  const maxOrderRows = await sql`SELECT MAX(ticket_number) as max_ticket FROM orders WHERE restaurant_id = ${restaurantId}`;
+  const maxOrderRows = await sql`SELECT MAX(ticket_number) as max_ticket FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = `;
   const maxTicket = maxOrderRows[0]?.max_ticket || 0;
 
   const currentState = await sql`SELECT current_queue_number FROM queue_state WHERE restaurant_id = ${restaurantId}`;
@@ -1392,11 +1391,10 @@ export async function getDailyAnalytics(restaurantId: string, dateFrom: string, 
       SUM(total_price) as revenue,
       AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as avg_wait_time,
       MODE() WITHIN GROUP (ORDER BY EXTRACT(HOUR FROM created_at)) as peak_hour
-    FROM orders
-    WHERE restaurant_id = ${restaurantId}
-      AND DATE(created_at) BETWEEN ${dateFrom} AND ${dateTo}
+    FROM orders WHERE restaurant_id = ${restaurantId}
+      AND business_date BETWEEN ${dateFrom} AND ${dateTo}
       AND is_paid = true AND status = 'PAID'
-    GROUP BY DATE(created_at)
+    GROUP BY business_date
     ORDER BY date ASC
   `;
   return rows;
@@ -1408,9 +1406,8 @@ export async function getPeakHours(restaurantId: string, dateFrom: string, dateT
       EXTRACT(HOUR FROM created_at) as hour,
       COUNT(*) as order_count,
       SUM(total_price) as revenue
-    FROM orders
-    WHERE restaurant_id = ${restaurantId}
-      AND DATE(created_at) BETWEEN ${dateFrom} AND ${dateTo}
+    FROM orders WHERE restaurant_id = ${restaurantId}
+      AND business_date BETWEEN ${dateFrom} AND ${dateTo}
       AND is_paid = true AND status = 'PAID'
     GROUP BY EXTRACT(HOUR FROM created_at)
     ORDER BY hour ASC
@@ -1432,7 +1429,7 @@ export async function getTopProducts(restaurantId: string, dateFrom: string, dat
     JOIN products p ON p.id = oi.product_id
     JOIN orders o ON o.id = oi.order_id
     WHERE o.restaurant_id = ${restaurantId}
-      AND DATE(o.created_at) BETWEEN ${dateFrom} AND ${dateTo}
+      AND o.business_date BETWEEN ${dateFrom} AND ${dateTo}
       AND o.is_paid = true AND o.status = 'PAID'
     GROUP BY p.id, p.name, p.category, p.price, p.image_url
     ORDER BY total_quantity DESC
@@ -1442,15 +1439,13 @@ export async function getTopProducts(restaurantId: string, dateFrom: string, dat
 }
 
 export async function getDashboardStats(restaurantId: string) {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   const statsRows = await sql`
     SELECT 
-      COALESCE(SUM(total_price) FILTER (WHERE DATE(created_at) = ${today} AND is_paid = true AND status = 'PAID'), 0) as revenue_today,
-      COUNT(*) FILTER (WHERE DATE(created_at) = ${today} AND is_paid = true AND status = 'PAID') as orders_today,
-      COALESCE(AVG(total_price) FILTER (WHERE DATE(created_at) = ${today} AND is_paid = true AND status = 'PAID'), 0) as avg_order_value,
+      COALESCE(SUM(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID'), 0) as revenue_today,
+      COUNT(*) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID') as orders_today,
+      COALESCE(AVG(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID'), 0) as avg_order_value,
       COUNT(*) FILTER (WHERE status = 'PENDING') as pending_orders
-    FROM orders
-    WHERE restaurant_id = ${restaurantId}
+    FROM orders WHERE restaurant_id = ${restaurantId}
   `;
   const stockRows = await sql`SELECT COUNT(*) as low_stock_items FROM products WHERE restaurant_id = ${restaurantId} AND status IN ('LOW_STOCK', 'OUT_OF_STOCK') AND is_active = true`;
   const queueRows = await sql`SELECT current_queue_number FROM queue_state WHERE restaurant_id = ${restaurantId}`;
@@ -1483,7 +1478,7 @@ export async function getKitchenSnapshot(restaurantId: string) {
     JOIN orders o ON oi.order_id = o.id
     JOIN products p ON oi.product_id = p.id
     WHERE o.restaurant_id = ${restaurantId}
-      AND DATE(o.created_at AT TIME ZONE ${localTimezone}) = ${today}::date
+      AND o.business_date = ${today}::date
       AND UPPER(o.status) IN ('PENDING', 'PREPARING')
     GROUP BY p.id, p.name, p.category, p.image_url, p.stock_quantity
     ORDER BY p.name ASC
@@ -1627,9 +1622,12 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
         restaurant_id UUID REFERENCES restaurants(id) ON DELETE CASCADE,
         phone TEXT NOT NULL,
         sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        status TEXT DEFAULT 'SENT'
+        status TEXT DEFAULT 'SENT',
+        business_date DATE DEFAULT CURRENT_DATE
       )
     `);
+
+    await client.query(`ALTER TABLE otp_logs ADD COLUMN IF NOT EXISTS business_date DATE DEFAULT CURRENT_DATE`);
     
     await client.query(`
       CREATE TABLE IF NOT EXISTS daily_otp_stats (
@@ -1657,14 +1655,20 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
       END $$;
     `);
 
+    let businessDateQuery = 'CURRENT_DATE';
+    if (restaurantId) {
+      businessDateQuery = '(SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = $3)';
+    }
+
     // 1. Log the specific OTP request
     const logRes = await client.query(`
-      INSERT INTO otp_logs (phone, sent_at, restaurant_id)
-      VALUES ($1, NOW() AT TIME ZONE $2, $3)
-      RETURNING id
+      INSERT INTO otp_logs (phone, sent_at, restaurant_id, business_date)
+      VALUES ($1, NOW() AT TIME ZONE $2, $3, ${businessDateQuery})
+      RETURNING id, business_date
     `, [phone, localTimezone, restaurantId || null]);
 
     const logId = logRes.rows[0].id;
+    const businessDate = logRes.rows[0].business_date;
 
     // 2. Increment daily aggregation (Concurrency Safe via ON CONFLICT)
     if (restaurantId) {
@@ -1677,7 +1681,7 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
         SET count = daily_otp_stats.count + 1,
             cost = (daily_otp_stats.count + 1) * 0.50,
             updated_at = NOW()
-      `, [today, restaurantId]);
+      `, [businessDate, restaurantId]);
 
       // 3. Trigger billing transaction inside the same DB transaction
       try {

@@ -3,6 +3,10 @@ import toast from 'react-hot-toast';
 import { authService } from '@/app/services/auth.api';
 import { User, BadgeCheck, Info } from 'lucide-react';
 
+const COUNTRY_CODES = [
+  { code: '+91', label: 'IN +91', country: 'India' },
+];
+
 interface CustomerDetailsProps {
   form: {
     customer_name: string;
@@ -36,6 +40,33 @@ export default function CustomerDetails({
   const [loading, setLoading] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+
+  const [countryCode, setCountryCode] = useState('+91');
+  const [phoneDigits, setPhoneDigits] = useState('');
+
+  // Sync from parent when populated
+  useEffect(() => {
+    if (form.phone) {
+      if (form.phone.startsWith('+91')) {
+        setCountryCode('+91');
+        setPhoneDigits(form.phone.replace('+91', ''));
+      } else {
+        setPhoneDigits(form.phone.replace(/\D/g, ''));
+      }
+    }
+  }, [form.phone]);
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '');
+    setPhoneDigits(val);
+    setForm(f => ({ ...f, phone: `${countryCode}${val}` }));
+  };
+
+  const handleCountryCodeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const code = e.target.value;
+    setCountryCode(code);
+    setForm(f => ({ ...f, phone: `${code}${phoneDigits}` }));
+  };
 
   // Countdown timer for Resend OTP
   useEffect(() => {
@@ -122,15 +153,27 @@ export default function CustomerDetails({
           <div>
             <label className="label">Phone Number *</label>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <select
+                className="select"
+                value={countryCode}
+                onChange={handleCountryCodeChange}
+                style={{ width: '100px', flexShrink: 0, paddingLeft: '8px', paddingRight: '28px' }}
+                disabled={otpStep || isVerified}
+              >
+                {COUNTRY_CODES.map(c => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
               <input
                 type="tel"
                 className="input"
-                placeholder="+91 9xxxxxxxxx"
-                value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                placeholder="9xxxxxxxxx"
+                value={phoneDigits}
+                onChange={handlePhoneChange}
+                maxLength={10}
                 style={{ flex: 1 }}
                 required
-                disabled={otpStep}
+                disabled={otpStep || isVerified}
               />
               {isVerified ? (
                 <span style={{ 
@@ -177,7 +220,7 @@ export default function CustomerDetails({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>ENTER 6-DIGIT OTP</span>
                   <span style={{ background: 'white', padding: '4px 12px', borderRadius: '16px', fontSize: '11px', color: '#9ca3af', fontWeight: 500 }}>
-                    Sent to +91 {form.phone.slice(-4).padStart(10, '*')}
+                    Sent to {countryCode} {phoneDigits.slice(-4).padStart(10, '*')}
                   </span>
                 </div>
                 

@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     // 1. Fetch all active restaurants whose billing cycle has expired or is uninitialized
     // We check if billing_end_date is in the past (or today) and the restaurant is active
     const expiredRes = await client.query(`
-      SELECT id, name, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period
+      SELECT id, name, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, timezone, rollover_time
       FROM restaurants
       WHERE billing_status = 'ACTIVE' 
-        AND (billing_end_date IS NULL OR billing_end_date <= CURRENT_DATE)
+        AND (billing_end_date IS NULL OR billing_end_date <= DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval))
     `);
 
     for (const row of expiredRes.rows) {
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         // If subscription model, charge the fee at the start of the new cycle
         if (billingModel === 'SUBSCRIPTION') {
           // We pass the billingPeriod to processSubscriptionBilling to calculate the correct charge
-          await BillingService.processSubscriptionBilling(restaurantId, billingPeriod);
+          await BillingService.processSubscriptionBilling(restaurantId, billingPeriod, newStart, newEnd);
         }
 
         // Update the restaurant's billing start/end dates

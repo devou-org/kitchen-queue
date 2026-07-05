@@ -75,19 +75,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
           phone: user.phone || f.phone, 
           customer_name: user.name || f.customer_name 
         }));
-      }
-      setCheckingActive(false);
-    };
 
-    init();
-  }, [checkAuth]);
-
-  // 3. Check for Active Order when user is known
-  useEffect(() => {
-    const fetchActive = async () => {
-      if (currentUser?.phone) {
+        // 3. Check for Active Order
         try {
-          const data = await orderService.getHistory(currentUser.phone);
+          const data = await orderService.getHistory(user.phone);
           if (data.success && data.data) {
             const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
             const active = (data.data as Order[]).find(o => {
@@ -100,9 +91,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
           }
         } catch (e) {}
       }
+      setCheckingActive(false);
     };
-    fetchActive();
-  }, [currentUser]);
+
+    init();
+  }, [checkAuth, slug]);
 
   const items = Array.from(cart.values());
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);

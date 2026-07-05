@@ -27,6 +27,12 @@ export default function AdminSettings() {
   const [menuLayout, setMenuLayout] = useState<'LIST' | 'GRID'>('LIST');
   const [menuTitle, setMenuTitle] = useState("Today's Specials");
   const [menuDescription, setMenuDescription] = useState("Hand-curated coastal delicacies prepared with traditional recipes.");
+  
+  // Business Hours State
+  const [timezone, setTimezone] = useState('Asia/Kolkata');
+  const [openingTime, setOpeningTime] = useState('09:00:00');
+  const [closingTime, setClosingTime] = useState('22:00:00');
+  const [rolloverTime, setRolloverTime] = useState('00:00:00');
 
   useEffect(() => {
     if (restaurant) {
@@ -44,6 +50,10 @@ export default function AdminSettings() {
       setMenuLayout((restaurant as any).menu_layout || 'LIST');
       setMenuTitle(restaurant.menu_title || "Today's Specials");
       setMenuDescription(restaurant.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes.");
+      setTimezone(restaurant.timezone || 'Asia/Kolkata');
+      setOpeningTime(restaurant.opening_time || '09:00:00');
+      setClosingTime(restaurant.closing_time || '22:00:00');
+      setRolloverTime(restaurant.rollover_time || '00:00:00');
     }
   }, [restaurant]);
 
@@ -71,6 +81,10 @@ export default function AdminSettings() {
           menu_layout: menuLayout,
           menu_title: menuTitle || null,
           menu_description: menuDescription || null,
+          timezone,
+          opening_time: openingTime,
+          closing_time: closingTime,
+          rollover_time: rolloverTime,
         }),
       });
       const data = await res.json();
@@ -213,6 +227,49 @@ export default function AdminSettings() {
                   <span style={{ fontSize: '20px' }}>☷</span>
                   <span style={{ fontWeight: 800, fontSize: '13px' }}>2-Column Grid</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Business Hours Configuration */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div>
+                <label style={S.label}>Timezone</label>
+                <select 
+                  value={timezone} 
+                  onChange={e => setTimezone(e.target.value)} 
+                  style={{ ...S.input, appearance: 'auto', backgroundColor: '#ffffff' }}
+                >
+                  <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                  <option value="America/New_York">America/New_York (EST/EDT)</option>
+                  <option value="America/Chicago">America/Chicago (CST/CDT)</option>
+                  <option value="America/Denver">America/Denver (MST/MDT)</option>
+                  <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
+                  <option value="Europe/London">Europe/London (GMT/BST)</option>
+                  <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+                  <option value="Australia/Sydney">Australia/Sydney (AEST/AEDT)</option>
+                  <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+                  <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                  <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={S.label}>Opening Time</label>
+                  <input type="time" value={openingTime} onChange={e => setOpeningTime(e.target.value)} style={S.input} />
+                </div>
+                <div>
+                  <label style={S.label}>Closing Time</label>
+                  <input type="time" value={closingTime} onChange={e => setClosingTime(e.target.value)} style={S.input} />
+                </div>
+              </div>
+
+              <div>
+                <label style={S.label}>Rollover Time (Business Day End)</label>
+                <p style={{ fontSize: '11px', color: '#64748b', marginTop: '-4px', marginBottom: '8px' }}>
+                  Orders placed before this time will count towards the previous day's sales (useful if open past midnight). Default is 00:00.
+                </p>
+                <input type="time" value={rolloverTime} onChange={e => setRolloverTime(e.target.value)} style={S.input} />
               </div>
             </div>
 

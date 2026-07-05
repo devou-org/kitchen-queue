@@ -35,6 +35,10 @@ export async function GET(request: NextRequest) {
         menu_description: restaurant.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes.",
         address: restaurant.address,
         phone: restaurant.phone,
+        timezone: restaurant.timezone,
+        opening_time: restaurant.opening_time,
+        closing_time: restaurant.closing_time,
+        rollover_time: restaurant.rollover_time,
         // Derived channel name so clients don't have to construct it themselves
         pusher_channel: `queue-channel-${restaurant.id}`,
         modules,

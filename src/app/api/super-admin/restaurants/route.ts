@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules } = body;
+    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, timezone, opening_time, closing_time, rollover_time, modules } = body;
 
     if (!name || !slug) {
       return NextResponse.json({ success: false, error: 'Name and slug are required' }, { status: 400 });
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Slug must be lowercase letters, numbers, and hyphens only' }, { status: 400 });
     }
 
-    const restaurant = await createRestaurant({ name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules });
+    const restaurant = await createRestaurant({ name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, timezone, opening_time, closing_time, rollover_time, modules });
     return NextResponse.json({ success: true, data: restaurant }, { status: 201 });
   } catch (error: any) {
     console.error('Create restaurant error:', error);
