@@ -1718,3 +1718,31 @@ export async function getOtpStats(dateFrom: string, dateTo: string, restaurantId
     ORDER BY date ASC
   `;
 }
+
+export async function autoCloseRestaurants() {
+  const client = await pool.connect();
+  try {
+    await client.query(`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS last_auto_closed_date DATE`);
+    
+    const result = await client.query(`
+      UPDATE restaurants 
+      SET is_service_active = false,
+          last_auto_closed_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE COALESCE(timezone, 'Asia/Kolkata')) - COALESCE(rollover_time, '00:00:00')::interval)
+      WHERE 
+        is_service_active = true 
+        AND (
+          last_auto_closed_date IS NULL OR 
+          last_auto_closed_date < DATE((CURRENT_TIMESTAMP AT TIME ZONE COALESCE(timezone, 'Asia/Kolkata')) - COALESCE(rollover_time, '00:00:00')::interval)
+        )
+      RETURNING id
+    `);
+    
+    return { closedCount: result.rowCount };
+  } catch (err) {
+    console.error('Failed to auto-close restaurants:', err);
+    return { closedCount: 0 };
+  } finally {
+    client.release();
+  }
+}
+

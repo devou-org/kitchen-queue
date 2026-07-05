@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
-import { formatPrice, formatDateTime } from '@/lib/format';
+import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
@@ -108,15 +108,18 @@ export default function AdminOrders() {
   };
 
   const fetchOrders = useCallback(async (silent = false) => {
-    if (!statusesLoaded) return;
+    if (!statusesLoaded || !restaurant) return;
     if (!silent) setLoading(true);
     try {
       const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
+      const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
       
       const data = await orderService.getOrders({
         page,
         per_page: 100,
         sort: 'ASC',
+        date_from: bDate,
+        date_to: bDate,
         status: statusFilter || currentDefault
       });
 
@@ -129,7 +132,7 @@ export default function AdminOrders() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, statusFilter, queueStatuses, statusesLoaded]);
+  }, [page, statusFilter, queueStatuses, statusesLoaded, restaurant]);
 
   useEffect(() => {
     fetchOrders();

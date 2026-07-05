@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
-import { formatPrice, formatDateTime } from '@/lib/format';
+import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -24,12 +24,16 @@ export default function StaffOrders() {
   const [tempTableNumber, setTempTableNumber] = useState('');
 
   const fetchOrders = useCallback(async (silent = false) => {
+    if (!restaurant) return;
     if (!silent) setLoading(true);
     try {
+      const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
       const data = await orderService.getOrders({
         page,
         per_page: 100,
         sort: 'ASC',
+        date_from: bDate,
+        date_to: bDate,
         status: statusFilter
       });
 
@@ -41,7 +45,7 @@ export default function StaffOrders() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, restaurant]);
 
   useEffect(() => {
     fetchOrders();

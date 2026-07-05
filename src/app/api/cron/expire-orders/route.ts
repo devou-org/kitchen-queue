@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { expireOldOrders } from '@/lib/db';
+import { expireOldOrders, autoCloseRestaurants } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -12,9 +12,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await expireOldOrders();
+    const closedRes = await autoCloseRestaurants();
+    
     return NextResponse.json({
       success: true,
-      message: `Successfully expired ${result.expiredCount} old orders.`,
+      message: `Successfully expired ${result.expiredCount} old orders. Auto-closed ${closedRes.closedCount} restaurants.`,
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
