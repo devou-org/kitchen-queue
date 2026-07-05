@@ -38,7 +38,7 @@ export default function QueuePage() {
   }
 
   return (
-    <div style={{ background: 'var(--bg, #f8fafc)', minHeight: '100vh' }}>
+    <div style={{ background: 'var(--bg, #f8fafc)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {restaurant?.primary_color && (
         <style dangerouslySetInnerHTML={{ __html: `
           :root {
@@ -61,8 +61,17 @@ export default function QueuePage() {
         </Link>
       </div>
 
-      <div style={{ padding: '24px 16px', maxWidth: '480px', margin: '0 auto', paddingBottom: '100px' }}>
-        <JoinQueueForm restaurantId={restaurant.id} />
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        padding: '24px 16px', 
+        paddingBottom: '80px' 
+      }}>
+        <div style={{ width: '100%', maxWidth: '420px' }}>
+          <JoinQueueForm restaurantId={restaurant.id} />
+        </div>
       </div>
 
 

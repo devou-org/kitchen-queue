@@ -23,3 +23,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const restaurantId = searchParams.get('restaurantId');
+    const id = searchParams.get('id');
+    
+    if (!restaurantId || !id) {
+      return NextResponse.json({ success: false, error: 'Restaurant ID and ID required' }, { status: 400 });
+    }
+
+    const updated = await QueueService.updateQueueStatus(id, 'CANCELLED', restaurantId);
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error: any) {
+    console.error('Cancel Queue Ticket Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

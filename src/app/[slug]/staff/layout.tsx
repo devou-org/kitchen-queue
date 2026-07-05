@@ -124,7 +124,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <ServiceToggle variant="light" />
+          {/* <ServiceToggle variant="light" /> */}
           <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, fontSize: '14px' }}>
             <LogOut size={18} /> <span className="hidden sm:inline">Logout</span>
           </button>

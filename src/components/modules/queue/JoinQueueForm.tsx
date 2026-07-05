@@ -4,6 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { authService } from '@/app/services/auth.api';
 import toast from 'react-hot-toast';
+import { User, BadgeCheck } from 'lucide-react';
+
+const COUNTRY_CODES = [
+  { code: '+91', label: 'IN +91', country: 'India' },
+];
 
 export default function JoinQueueForm({ restaurantId }: { restaurantId: string }) {
   const params = useParams();
@@ -12,8 +17,9 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
 
   // Join form state
   const [name, setName] = useState('');
+  const [countryCode, setCountryCode] = useState('+91');
   const [phone, setPhone] = useState('');
-  const [partySize, setPartySize] = useState(1);
+  const [partySize, setPartySize] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -40,7 +46,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
         if (data.success && data.data.length > 0) {
           // If the most recent one is not SEATED, they can't join again
           const latest = data.data[0];
-          if (latest.queue_status !== 'SEATED') {
+          if (latest.queue_status !== 'SEATED' && latest.queue_status !== 'CANCELLED') {
             setActiveQueue(latest);
           }
         }
@@ -52,7 +58,12 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
 
     const user = authService.getUser();
     if (user && user.phone) {
-      setPhone(user.phone);
+      if (user.phone.startsWith('+91')) {
+        setCountryCode('+91');
+        setPhone(user.phone.replace('+91', ''));
+      } else {
+        setPhone(user.phone);
+      }
       if (user.name) setName(user.name);
       setIsVerified(true);
       checkActiveQueue(user.phone);
@@ -63,14 +74,26 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
 
   const handleSendOTP = async () => {
     const cleanedPhone = phone.replace(/\D/g, '');
-    if (!cleanedPhone || cleanedPhone.length < 10) {
+    
+    if (!cleanedPhone) {
+      toast.error('Please enter your phone number');
+      return;
+    }
+
+    if (countryCode === '+91' && cleanedPhone.length !== 10) {
       toast.error('Please enter a valid 10-digit phone number');
       return;
     }
     
+    if (cleanedPhone.length < 7 || cleanedPhone.length > 15) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
+    
+    const fullPhone = `${countryCode}${cleanedPhone}`;
     setSendingOtp(true);
     try {
-      const data = await authService.sendOtp(phone);
+      const data = await authService.sendOtp(fullPhone);
       if (data.success && data.otp_token) {
         setOtpToken(data.otp_token);
         setOtpStep(true);
@@ -99,21 +122,22 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
         toast.success('Phone verified successfully!');
         setOtpStep(false);
         setIsVerified(true);
-        // After verify, check active queue
-        setCheckingActive(true);
-        try {
-          const res = await fetch(`/api/queue/history?phone=${phone}`, {
-            headers: { 'x-restaurant-slug': slug }
-          });
-          const historyData = await res.json();
+        
+        // After verify, check active queue silently without blocking UI
+        const fullPhone = `${countryCode}${phone.replace(/\D/g, '')}`;
+        fetch(`/api/queue/history?phone=${fullPhone}`, {
+          headers: { 'x-restaurant-slug': slug }
+        })
+        .then(res => res.json())
+        .then(historyData => {
           if (historyData.success && historyData.data.length > 0) {
             const latest = historyData.data[0];
-            if (latest.queue_status !== 'SEATED') {
+            if (latest.queue_status !== 'SEATED' && latest.queue_status !== 'CANCELLED') {
               setActiveQueue(latest);
             }
           }
-        } catch {}
-        setCheckingActive(false);
+        })
+        .catch(() => {});
       } else {
         toast.error(data.error || 'Invalid OTP');
       }
@@ -135,13 +159,18 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
       toast.error('Please enter a valid name');
       return;
     }
+    if (!partySize) {
+      toast.error('Please select number of persons');
+      return;
+    }
 
     setLoading(true);
+    const fullPhone = `${countryCode}${phone.replace(/\D/g, '')}`;
     try {
       const res = await fetch(`/api/queue/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId, name, phone, partySize, notes })
+        body: JSON.stringify({ restaurantId, name, phone: fullPhone, partySize, notes })
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -158,18 +187,17 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
 
   return (
     <div style={{
-      padding: '36px 28px',
+      padding: '32px 28px',
       backgroundColor: '#ffffff',
-      borderRadius: '24px',
-      boxShadow: '0 20px 40px -15px rgba(0,0,0,0.08)',
-      border: '1px solid #f1f5f9',
-      maxWidth: '420px',
-      margin: '0 auto',
+      borderRadius: '12px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
+      border: '1px solid #e2e8f0',
+      width: '100%',
       position: 'relative',
       overflow: 'hidden',
       fontFamily: "'Inter', sans-serif"
     }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '8px', backgroundColor: 'var(--primary)' }} />
+      {/* Remove top colored border to match UI */}
       
       {checkingActive ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
@@ -192,47 +220,54 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
         </div>
       ) : (
       <form onSubmit={handleJoinSubmit}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
+            <User size={22} color="#1e293b" />
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#1e293b', margin: 0 }}>Your Details</h2>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: '#334155', marginBottom: '8px' }}>Full Name *</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>Full Name *</label>
               <input 
                 type="text" required minLength={2} maxLength={50}
                 value={name} onChange={e => setName(e.target.value)}
-                style={{
-                  width: '100%', padding: '16px', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0',
-                  borderRadius: '14px', fontSize: '15px', color: '#0f172a', outline: 'none', transition: 'all 0.2s',
-                  borderBottomColor: name ? 'var(--primary)' : '#e2e8f0',
-                  boxSizing: 'border-box', fontWeight: 500
-                }}
+                className="input"
                 placeholder="John Doe"
               />
             </div>
             
             <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: '#334155', marginBottom: '8px' }}>Phone Number *</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>Phone Number *</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <select
+                  className="select"
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  style={{ width: '100px', flexShrink: 0, paddingLeft: '8px', paddingRight: '28px' }}
+                  disabled={otpStep || isVerified}
+                >
+                  {COUNTRY_CODES.map(c => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
                 <input 
                   type="tel" required disabled={otpStep || isVerified}
-                  value={phone} onChange={e => setPhone(e.target.value)}
-                  style={{
-                    flex: 1, padding: '16px', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0',
-                    borderRadius: '14px', fontSize: '15px', color: '#0f172a', outline: 'none', transition: 'all 0.2s',
-                    borderBottomColor: phone ? 'var(--primary)' : '#e2e8f0',
-                    boxSizing: 'border-box', fontWeight: 500
-                  }}
-                  placeholder="+91 9xxxxxxxxx"
+                  value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  className="input"
+                  style={{ flex: 1 }}
+                  placeholder="9xxxxxxxxx"
                 />
                 {isVerified ? (
-                  <span style={{ color: '#10B981', background: 'rgba(16, 185, 129, 0.1)', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 }}>
-                    ✅ Verified
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669', background: '#ecfdf5', padding: '8px 14px', borderRadius: '8px', fontSize: '14px', fontWeight: 700 }}>
+                    <BadgeCheck size={18} color="#059669" />
+                    Verified
                   </span>
                 ) : (
                   otpStep ? (
-                    <button type="button" onClick={() => { setOtpStep(false); setOtpCode(['', '', '', '', '', '']); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', padding: '0 8px' }}>
+                    <button type="button" onClick={() => { setOtpStep(false); setOtpCode(['', '', '', '', '', '']); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '14px', fontWeight: 700, cursor: 'pointer', padding: '0 4px' }}>
                       Edit
                     </button>
                   ) : (
-                    <button type="button" onClick={handleSendOTP} disabled={sendingOtp || phone.replace(/\D/g, '').length < 10} style={{ background: 'none', border: 'none', color: (sendingOtp || phone.replace(/\D/g, '').length < 10) ? '#ccc' : 'var(--primary)', fontSize: '13px', fontWeight: 700, cursor: (sendingOtp || phone.replace(/\D/g, '').length < 10) ? 'not-allowed' : 'pointer', padding: '0 8px', whiteSpace: 'nowrap' }}>
+                    <button type="button" onClick={handleSendOTP} disabled={sendingOtp || phone.length !== 10} style={{ background: 'none', border: 'none', color: (sendingOtp || phone.length !== 10) ? '#cbd5e1' : 'var(--primary)', fontSize: '14px', fontWeight: 700, cursor: (sendingOtp || phone.length !== 10) ? 'not-allowed' : 'pointer', padding: '0 4px', whiteSpace: 'nowrap', transition: 'color 0.2s' }}>
                       {sendingOtp ? 'Sending...' : 'Send OTP'}
                     </button>
                   )
@@ -300,21 +335,18 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
             )}
 
             <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: '#334155', marginBottom: '8px' }}>Party Size</label>
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '14px', padding: '8px'
-              }}>
-                <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))} style={{
-                  width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0', color: '#64748b', fontSize: '24px', fontWeight: 700, cursor: 'pointer'
-                }}>−</button>
-                <span style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>{partySize}</span>
-                <button type="button" onClick={() => setPartySize(partySize + 1)} style={{
-                  width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0', color: '#64748b', fontSize: '24px', fontWeight: 700, cursor: 'pointer'
-                }}>+</button>
-              </div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>Number of Persons *</label>
+              <select
+                value={partySize}
+                onChange={e => setPartySize(Number(e.target.value))}
+                className="select"
+                style={{ width: '100%', color: partySize ? '#0f172a' : '#94a3b8' }}
+              >
+                <option value="" disabled>Select persons</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => (
+                  <option key={num} value={num}>{num} {num === 1 ? 'Person' : 'Persons'}</option>
+                ))}
+              </select>
             </div>
 
             <button type="submit" disabled={loading || !isVerified} style={{

@@ -21,6 +21,7 @@ import { Order } from '@/types';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import toast from 'react-hot-toast';
 
 type QueueState = {
   type: string;
@@ -56,9 +57,36 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
   const [ticketData, setTicketData] = useState<any>(null);
   const [stages, setStages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
   const [showSurveyTip, setShowSurveyTip] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const handleLeaveClick = () => {
+    setShowConfirmModal(true);
+  };
+
+  const executeLeaveQueue = async () => {
+    setCancelling(true);
+    setShowConfirmModal(false);
+    try {
+      const res = await fetch(`/api/queue/ticket?restaurantId=${restaurant.id}&id=${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("You have left the waitlist.");
+        // We do not redirect immediately; let the pusher event update the UI or let the user see the cancelled state.
+      } else {
+        toast.error(data.error || "Failed to leave queue.");
+      }
+    } catch (err) {
+      toast.error("An error occurred. Please try again.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   useEffect(() => {
     if (!localStorage.getItem('hideSurveyTip_kdK8Jd')) {
@@ -282,18 +310,6 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
 
       <main style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
 
-        {/* Edit Order Info at Top */}
-        <p style={{
-          textAlign: 'center',
-          color: '#9CA3AF',
-          fontSize: '12px',
-          marginBottom: '24px',
-          fontWeight: 500,
-          padding: '0 20px',
-          lineHeight: 1.5
-        }}>
-          If you want to edit the order, please contact nearby staff.
-        </p>
 
         {/* Ticket Card */}
         <div style={{
@@ -313,27 +329,29 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
           </h1>
 
           {/* Queue Position Sub-card */}
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '12px',
-            background: 'rgba(0,0,0,0.03)',
-            padding: '12px 24px',
-            borderRadius: '16px',
-            marginTop: '16px'
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                QUEUE POSITION
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
-                <span style={{ fontSize: '28px', fontWeight: 800, color: '#33322F' }}>
-                  {formatOrdinal(displayPosition)}
-                </span>
+          {ticketData.queue_status !== 'SEATED' && ticketData.queue_status !== 'CANCELLED' && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              background: 'rgba(0,0,0,0.03)',
+              padding: '12px 24px',
+              borderRadius: '16px',
+              marginTop: '16px'
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  QUEUE POSITION
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
+                  <span style={{ fontSize: '28px', fontWeight: 800, color: '#33322F' }}>
+                    {formatOrdinal(displayPosition)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Notification Banner - Only for PENDING/WAITING status */}
@@ -361,75 +379,77 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
         )}
 
         {/* Queue Progress Card */}
-        <div style={{
-          background: 'white',
-          borderRadius: '24px',
-          padding: '24px',
-          marginBottom: '20px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F' }}>Queue Progress</h3>
-          </div>
+        {ticketData.queue_status !== 'CANCELLED' && (
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: '24px',
+            marginBottom: '20px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F' }}>Queue Progress</h3>
+            </div>
 
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {/* Connecting Lines */}
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              left: '10%',
-              right: '10%',
-              height: '2px',
-              background: '#F3F4F6',
-              zIndex: 0
-            }} />
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              left: '10%',
-              width: stages.length > 1 ? `${(currentStageIndex / (stages.length - 1)) * 80}%` : '0%',
-              height: '2px',
-              background: 'var(--primary)',
-              zIndex: 0,
-              transition: 'width 0.5s ease'
-            }} />
+            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Connecting Lines */}
+              <div style={{
+                position: 'absolute',
+                top: '20px',
+                left: '10%',
+                right: '10%',
+                height: '2px',
+                background: '#F3F4F6',
+                zIndex: 0
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '20px',
+                left: '10%',
+                width: stages.length > 1 ? `${(currentStageIndex / (stages.length - 1)) * 80}%` : '0%',
+                height: '2px',
+                background: 'var(--primary)',
+                zIndex: 0,
+                transition: 'width 0.5s ease'
+              }} />
 
-            {stages.map((stage, i) => {
-              const Icon = stage.icon;
-              const isCompleted = currentStageIndex > i || (currentStageIndex === i && i === stages.length - 1);
-              const isCurrent = currentStageIndex === i && i !== stages.length - 1;
-              const isPending = currentStageIndex < i;
+              {stages.map((stage, i) => {
+                const Icon = stage.icon;
+                const isCompleted = currentStageIndex > i || (currentStageIndex === i && i === stages.length - 1);
+                const isCurrent = currentStageIndex === i && i !== stages.length - 1;
+                const isPending = currentStageIndex < i;
 
-              return (
-                <div key={stage.key} style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flex: 1 }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    background: isPending ? 'white' : (isCurrent ? 'white' : 'var(--primary)'),
-                    border: isPending ? '1px solid #F3F4F6' : (isCurrent ? '2px solid var(--primary)' : 'none'),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isPending ? '#D1D5DB' : (isCurrent ? 'var(--primary)' : 'white'),
-                    boxShadow: isCurrent ? '0 0 0 4px rgba(0, 0, 0, 0.04)' : 'none',
-                    transition: 'all 0.3s ease'
-                  }}>
-                    {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />}
+                return (
+                  <div key={stage.key} style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flex: 1 }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: isPending ? 'white' : (isCurrent ? 'white' : 'var(--primary)'),
+                      border: isPending ? '1px solid #F3F4F6' : (isCurrent ? '2px solid var(--primary)' : 'none'),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isPending ? '#D1D5DB' : (isCurrent ? 'var(--primary)' : 'white'),
+                      boxShadow: isCurrent ? '0 0 0 4px rgba(0, 0, 0, 0.04)' : 'none',
+                      transition: 'all 0.3s ease'
+                    }}>
+                      {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />}
+                    </div>
+                    <span style={{
+                      fontSize: '9px',
+                      fontWeight: 800,
+                      color: isPending ? '#9CA3AF' : 'var(--primary)',
+                      letterSpacing: '0.02em'
+                    }}>
+                      {stage.label}
+                    </span>
                   </div>
-                  <span style={{
-                    fontSize: '9px',
-                    fontWeight: 800,
-                    color: isPending ? '#9CA3AF' : 'var(--primary)',
-                    letterSpacing: '0.02em'
-                  }}>
-                    {stage.label}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Waitlist Details Card */}
         <div style={{
@@ -471,18 +491,110 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
               </span>
             </div>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Current Position</span>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
-                {displayPosition}
-              </span>
-            </div>
+            {ticketData.queue_status !== 'SEATED' && ticketData.queue_status !== 'CANCELLED' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Current Position</span>
+                <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
+                  {displayPosition}
+                </span>
+              </div>
+            )}
 
           </div>
         </div>
 
+        {ticketData.queue_status !== 'SEATED' && ticketData.queue_status !== 'CANCELLED' && (
+          <button 
+            onClick={handleLeaveClick}
+            disabled={cancelling}
+            style={{
+              width: '100%',
+              padding: '16px',
+              marginTop: '20px',
+              backgroundColor: '#FFF0F2',
+              color: '#E11D48',
+              border: '1px solid #FFE4E6',
+              borderRadius: '16px',
+              fontSize: '15px',
+              fontWeight: 700,
+              cursor: cancelling ? 'not-allowed' : 'pointer',
+              opacity: cancelling ? 0.7 : 1,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {cancelling ? 'Leaving...' : 'Leave Waitlist'}
+          </button>
+        )}
+
       </main>
 
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '320px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+            textAlign: 'center',
+            animation: 'slideUp 0.2s ease-out'
+          }}>
+            <div style={{ width: '48px', height: '48px', background: '#FFF0F2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Info size={24} color="#E11D48" />
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#33322F', marginBottom: '8px' }}>Leave Waitlist?</h3>
+            <p style={{ fontSize: '14px', color: '#6B6667', marginBottom: '24px', lineHeight: 1.5 }}>
+              Are you sure you want to leave? You will lose your spot in the queue and this cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#F3F4F6',
+                  color: '#4B5563',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeLeaveQueue}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#E11D48',
+                  color: 'white',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
