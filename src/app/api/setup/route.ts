@@ -227,6 +227,7 @@ export async function GET() {
         subscription_charges DECIMAL(10,2) DEFAULT 0.00,
         adjustments DECIMAL(10,2) DEFAULT 0.00,
         total_amount DECIMAL(10,2) DEFAULT 0.00,
+        status VARCHAR(20) DEFAULT 'UNPAID',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT uq_restaurant_month_year UNIQUE (restaurant_id, month, year)
       );

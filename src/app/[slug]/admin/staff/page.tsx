@@ -116,7 +116,7 @@ export default function StaffAdminPage() {
           <button
             className="btn btn-primary"
             onClick={() => openModal()}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', fontWeight: 600 }}
           >
             <Plus size={18} /> Add Staff
           </button>

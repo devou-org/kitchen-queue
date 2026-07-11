@@ -149,3 +149,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+// PUT /api/super-admin/billing - mark statement as paid
+export async function PUT(request: NextRequest) {
+  const admin = await requireSuperAdmin(request);
+  if (!admin) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { action, summary_id } = await request.json();
+    if (action !== 'mark_paid' || !summary_id) {
+      return NextResponse.json({ success: false, error: 'Invalid action or missing summary_id.' }, { status: 400 });
+    }
+
+    const { pool } = await import('@/lib/db');
+    
+    // Update the status
+    const updateRes = await pool.query(`
+      UPDATE monthly_billing_summary
+      SET status = 'PAID'
+      WHERE id = $1
+      RETURNING *
+    `, [summary_id]);
+
+    if (updateRes.rowCount === 0) {
+      return NextResponse.json({ success: false, error: 'Statement not found.' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: 'Statement marked as paid.' });
+  } catch (error: any) {
+    console.error('Error marking statement as paid:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

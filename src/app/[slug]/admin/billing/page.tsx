@@ -46,6 +46,7 @@ interface BillingData {
     subscription_charges: string;
     adjustments: string;
     total_amount: string;
+    status?: string;
     created_at: string;
   }>;
   pricingConfig: {
@@ -325,6 +326,7 @@ export default function BillingPage() {
                   <th style={{ padding: '12px 24px' }}>OTP Delivery Costs</th>
                   <th style={{ padding: '12px 24px' }}>Adjustments</th>
                   <th style={{ padding: '12px 24px', textAlign: 'right' }}>Total Amount</th>
+                  <th style={{ padding: '12px 24px', textAlign: 'center' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -361,6 +363,19 @@ export default function BillingPage() {
                         </td>
                         <td style={{ padding: '14px 24px', textAlign: 'right', fontWeight: 700, color: '#111827' }}>
                           ₹{parseFloat(summary.total_amount || '0').toFixed(2)}
+                        </td>
+                        <td style={{ padding: '14px 24px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: summary.status === 'PAID' ? '#dcfce7' : '#fee2e2',
+                            color: summary.status === 'PAID' ? '#166534' : '#991b1b',
+                            border: `1px solid ${summary.status === 'PAID' ? '#bbf7d0' : '#fecaca'}`
+                          }}>
+                            {summary.status || 'UNPAID'}
+                          </span>
                         </td>
                       </tr>
                     );

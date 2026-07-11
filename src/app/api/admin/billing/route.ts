@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Fetch monthly billing summaries
     const summaries = await sql`
-      SELECT id, month, year, order_charges, otp_charges, subscription_charges, adjustments, total_amount, created_at
+      SELECT id, month, year, order_charges, otp_charges, subscription_charges, adjustments, total_amount, status, created_at
       FROM monthly_billing_summary
       WHERE restaurant_id = ${restaurant.id}
       ORDER BY year DESC, month DESC

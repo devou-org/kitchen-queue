@@ -48,6 +48,7 @@ interface Summary {
   subscription_charges: string;
   adjustments: string;
   total_amount: string;
+  status?: string;
   created_at: string;
 }
 
@@ -246,6 +247,27 @@ export default function SuperAdminRestaurantBilling() {
     }
   };
 
+  const handleMarkPaid = async (summaryId: string) => {
+    if (!confirm('Are you sure you want to mark this billing cycle as PAID?')) return;
+    try {
+      const res = await fetch('/api/super-admin/billing', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        ...authHeaders,
+        body: JSON.stringify({ action: 'mark_paid', summary_id: summaryId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Statement marked as PAID');
+        fetchBillingData();
+      } else {
+        toast.error(data.error || 'Failed to update statement');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -363,6 +385,9 @@ export default function SuperAdminRestaurantBilling() {
                       )}
                     </select>
                   </div>
+                </div>
+
+                <div style={styles.formRow}>
                   <div style={styles.formField}>
                     <label style={styles.label}>Billing Period</label>
                     <select
@@ -374,9 +399,7 @@ export default function SuperAdminRestaurantBilling() {
                       <option value="YEARLY">YEARLY</option>
                     </select>
                   </div>
-                </div>
 
-                <div style={styles.formRow}>
                   <div style={styles.formField}>
                     <label style={styles.label}>Billing Status</label>
                     <select
@@ -390,16 +413,16 @@ export default function SuperAdminRestaurantBilling() {
                       <option value="SUSPENDED">SUSPENDED</option>
                     </select>
                   </div>
+                </div>
 
-                  <div style={styles.formField}>
-                    <label style={styles.label}>Billing End Date (Renewal)</label>
-                    <input
-                      type="date"
-                      value={billingEndDate}
-                      onChange={e => setBillingEndDate(e.target.value)}
-                      style={styles.input}
-                    />
-                  </div>
+                <div style={{ ...styles.formField, marginTop: '8px' }}>
+                  <label style={styles.label}>Billing End Date (Renewal)</label>
+                  <input
+                    type="date"
+                    value={billingEndDate}
+                    onChange={e => setBillingEndDate(e.target.value)}
+                    style={{ ...styles.input, maxWidth: '100%' }}
+                  />
                 </div>
 
                 <button type="submit" disabled={updatingDetails} style={styles.submitBtn}>
@@ -483,6 +506,8 @@ export default function SuperAdminRestaurantBilling() {
                       <th style={styles.th}>OTP Charges</th>
                       <th style={styles.th}>Adjustments</th>
                       <th style={styles.thAlignRight}>Total Due</th>
+                      <th style={{ ...styles.th, textAlign: 'center' }}>Status</th>
+                      <th style={{ ...styles.th, textAlign: 'center' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -508,7 +533,12 @@ export default function SuperAdminRestaurantBilling() {
 
                         return (
                           <tr key={s.id} style={styles.tr}>
-                            <td style={styles.tdHighlight}>{startStr} to {endStr}</td>
+                            <td style={styles.tdHighlight}>
+                              <div style={{ fontWeight: 600 }}>{startStr} to {endStr}</div>
+                              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                                (Based on {s.year}/{s.month.toString().padStart(2, '0')} summary)
+                              </div>
+                            </td>
                             <td style={styles.td}>₹{parseFloat(s.subscription_charges || '0').toFixed(2)}</td>
                             <td style={styles.td}>₹{parseFloat(s.order_charges || '0').toFixed(2)}</td>
                             <td style={styles.td}>₹{parseFloat(s.otp_charges || '0').toFixed(2)}</td>
@@ -516,6 +546,40 @@ export default function SuperAdminRestaurantBilling() {
                               ₹{parseFloat(s.adjustments || '0').toFixed(2)}
                             </td>
                             <td style={styles.tdAlignRightHighlight}>₹{parseFloat(s.total_amount || '0').toFixed(2)}</td>
+                            <td style={{ ...styles.td, textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                background: s.status === 'PAID' ? '#dcfce7' : '#fee2e2',
+                                color: s.status === 'PAID' ? '#166534' : '#991b1b',
+                                border: `1px solid ${s.status === 'PAID' ? '#bbf7d0' : '#fecaca'}`
+                              }}>
+                                {s.status || 'UNPAID'}
+                              </span>
+                            </td>
+                            <td style={{ ...styles.td, textAlign: 'center' }}>
+                              {(!s.status || s.status === 'UNPAID') ? (
+                                <button
+                                  onClick={() => handleMarkPaid(s.id)}
+                                  style={{
+                                    padding: '4px 10px',
+                                    fontSize: '11px',
+                                    background: '#0f172a',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  Mark Paid
+                                </button>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '11px' }}>Paid</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })
@@ -544,7 +608,7 @@ export default function SuperAdminRestaurantBilling() {
                       }
                       setTxPage(1);
                     }}
-                    style={{ padding: '6px 10px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ padding: '6px 24px 6px 10px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
                   />
                   <span style={{ fontSize: '12px', color: '#64748b' }}>to</span>
                   <input
@@ -559,7 +623,7 @@ export default function SuperAdminRestaurantBilling() {
                       setTxDateTo(e.target.value);
                       setTxPage(1);
                     }}
-                    style={{ padding: '6px 10px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ padding: '6px 24px 6px 10px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
                   />
                   {(txDateFrom || txDateTo) && (
                     <button 
@@ -673,8 +737,8 @@ const styles: Record<string, React.CSSProperties> = {
   formRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
   formField: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' },
-  input: { width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' },
-  select: { width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', backgroundColor: 'white', fontSize: '14px', outline: 'none', boxSizing: 'border-box' },
+  input: { width: '100%', padding: '10px 12px', paddingRight: '32px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '13px', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box', textOverflow: 'ellipsis' },
+  select: { width: '100%', padding: '10px 12px', paddingRight: '28px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', backgroundColor: 'white', fontSize: '13px', outline: 'none', boxSizing: 'border-box', textOverflow: 'ellipsis' },
   submitBtn: { padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(16,185,129,0.2)', transition: 'all 0.2s' },
   tableCard: { backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' },
   tableHeader: { padding: '16px 20px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' },
