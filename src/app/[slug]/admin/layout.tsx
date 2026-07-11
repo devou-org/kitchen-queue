@@ -174,7 +174,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             );
           })}
         </nav>
-        <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
+        <div style={{ padding: '20px', borderTop: '1px solid var(--border)', flexShrink: 0, marginTop: 'auto' }}>
           {(showOrdering || showDigitalMenu) && <ServiceToggle />}
           <button 
             className="btn" 

@@ -620,13 +620,15 @@ tr:hover td {
   top: 0;
   bottom: 0;
   left: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   z-index: 60;
   border-right: 1px solid var(--border);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
 }
 
 .sidebar-header {
+  flex-shrink: 0;
   padding: 24px 20px;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
@@ -634,6 +636,8 @@ tr:hover td {
 
 .sidebar-nav {
   padding: 16px 0;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .sidebar-link {
