@@ -6,6 +6,8 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { Store, Eye } from 'lucide-react';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 
 export default function AdminSettings() {
   const params = useParams();
@@ -103,9 +105,12 @@ export default function AdminSettings() {
   if (loading) return null;
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1080px', margin: '0 auto', paddingBottom: '100px' }}>
+    <AdminContentWrapper style={{ paddingBottom: '100px' }}>
       <Toaster position="top-right" />
-      <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '24px' }}>Settings & Branding</h1>
+      <AdminPageHeader
+        title="Settings & Branding"
+        description="Manage your restaurant profile, business hours, and visual theme."
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 3fr) minmax(300px, 2fr)', gap: '20px', alignItems: 'start' }}>
         {/* Left Panel: Profile Configurations */}
@@ -362,7 +367,7 @@ export default function AdminSettings() {
           </div>
         </div>
       </div>
-    </div>
+    </AdminContentWrapper>
   );
 }
 

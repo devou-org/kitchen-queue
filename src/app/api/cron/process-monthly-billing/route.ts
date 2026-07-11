@@ -34,9 +34,17 @@ export async function GET(request: NextRequest) {
       
       const newEnd = new Date(newStart);
       if (billingPeriod === 'YEARLY') {
+        const expectedMonth = newEnd.getMonth();
         newEnd.setFullYear(newEnd.getFullYear() + 1);
+        if (newEnd.getMonth() !== expectedMonth) {
+          newEnd.setDate(0); // Clamp to last day of previous month
+        }
       } else {
+        const expectedMonth = (newEnd.getMonth() + 1) % 12;
         newEnd.setMonth(newEnd.getMonth() + 1);
+        if (newEnd.getMonth() !== expectedMonth) {
+          newEnd.setDate(0); // Clamp to last day of previous month
+        }
       }
 
       await client.query('BEGIN');

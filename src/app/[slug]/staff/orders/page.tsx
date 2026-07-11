@@ -10,6 +10,8 @@ import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { User, Users } from 'lucide-react';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 
 export default function StaffOrders() {
   const { slug } = useParams();
@@ -158,10 +160,10 @@ export default function StaffOrders() {
   };
 
   return (
-    <div className="animate-fade-in" style={{ padding: '16px', maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '16px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 800 }}>Orders</h1>
-      </div>
+    <AdminContentWrapper>
+      <AdminPageHeader
+        title="Orders"
+      />
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
@@ -326,6 +328,6 @@ export default function StaffOrders() {
         </div>,
         document.body
       )}
-    </div>
+    </AdminContentWrapper>
   );
 }

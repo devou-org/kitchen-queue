@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Plus, Trash2, Edit2, ShieldAlert, Key, UserCheck, UserX, Smartphone, Mail, Shield } from 'lucide-react';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 
 export default function StaffAdminPage() {
   const { slug } = useParams();
@@ -106,22 +108,20 @@ export default function StaffAdminPage() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>Staff Management</h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Manage your kitchen staff, waiters, and general restaurant operators.
-          </p>
-        </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => openModal()}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}
-        >
-          <Plus size={18} /> Add Staff
-        </button>
-      </div>
+    <AdminContentWrapper>
+      <AdminPageHeader
+        title="Staff Management"
+        description="Manage your kitchen staff, waiters, and general restaurant operators."
+        action={
+          <button
+            className="btn btn-primary"
+            onClick={() => openModal()}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}
+          >
+            <Plus size={18} /> Add Staff
+          </button>
+        }
+      />
 
       {loading ? (
         <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
@@ -306,6 +306,6 @@ export default function StaffAdminPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminContentWrapper>
   );
 }

@@ -4,6 +4,8 @@ import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/format';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { Download, Clock, User, Hourglass, Check } from 'lucide-react';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -116,70 +118,67 @@ export default function AdminStatements() {
 
   return (
     <>
-      <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Financial Statements</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Analyze revenue and historical orders. Click any record to view or edit details.</p>
-        </div>
+      <AdminContentWrapper>
+        <AdminPageHeader
+          title="Financial Statements"
+          description="Analyze revenue and historical orders. Click any record to view or edit details."
+        />
 
         {/* ... (rest of the content remains inside the animated container) */}
 
-        {/* I will truncate some parts here but keep the structure */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-          {/* Summary Cards */}
-          <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--primary)' }}>
-            <p className="label" style={{ marginBottom: '8px' }}>Total Revenue</p>
-            <h2 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)' }}>{formatPrice(totalRevenue)}</h2>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Exclude cancelled orders</p>
+        {/* Date Range Filter */}
+        <div className="card" style={{ marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div>
+            <label className="label">From</label>
+            <input type="date" className="input" value={dateFrom} max={dateTo} onChange={e => setDateFrom(e.target.value)} style={{ width: '160px' }} />
           </div>
-          <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--primary)' }}>
-            <p className="label" style={{ marginBottom: '8px' }}>Gross Paid</p>
-            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#059669' }}>{formatPrice(totalPaidRevenue)}</h2>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Actual collected amount</p>
+          <div>
+            <label className="label">To</label>
+            <input type="date" className="input" value={dateTo} min={dateFrom} onChange={e => setDateTo(e.target.value)} style={{ width: '160px' }} />
           </div>
-          <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--primary)' }}>
-            <p className="label" style={{ marginBottom: '8px' }}>Total Orders</p>
-            <h2 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-primary)' }}>{orderCount}</h2>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Received in period</p>
+          <div>
+            <label className="label">Status</label>
+            <select className="input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: '160px' }}>
+              <option value="">All Statuses</option>
+              {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
-          <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--primary)' }}>
-            <p className="label" style={{ marginBottom: '8px' }}>Fulfillment</p>
-            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#6366F1' }}>{paidCount}</h2>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Paid status</p>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost" onClick={exportCSV} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#059669', background: 'rgba(5, 150, 105, 0.1)' }}>
+              <Download size={16} /> Export (CSV)
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={handleExpireOldOrders}
+              disabled={expiring}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#DC2626', background: 'rgba(220, 38, 38, 0.1)' }}
+            >
+              <Clock size={16} /> {expiring ? 'Expiring...' : 'Expire Old'}
+            </button>
           </div>
         </div>
 
-
-        <div className="card" style={{ padding: '20px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
-            <div style={{ flex: '1', minWidth: '140px' }}>
-              <label className="label">From Date</label>
-              <input type="date" className="input" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ height: '42px' }} />
-            </div>
-            <div style={{ flex: '1', minWidth: '140px' }}>
-              <label className="label">To Date</label>
-              <input type="date" className="input" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ height: '42px' }} />
-            </div>
-            <div style={{ flex: '1', minWidth: '140px' }}>
-              <label className="label">Status</label>
-              <select className="input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ height: '42px' }}>
-                <option value="">All Statuses</option>
-                {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button className="btn" onClick={exportCSV} style={{ height: '42px', background: '#059669', color: 'white', padding: '0 20px', display: 'inline-flex', alignItems: 'center', gap: '8px', border: 'none' }}>
-                <Download size={16} /> Export Statements (CSV)
-              </button>
-              <button
-                className="btn"
-                onClick={handleExpireOldOrders}
-                disabled={expiring}
-                style={{ height: '42px', background: '#DC2626', color: 'white', padding: '0 20px', display: 'inline-flex', alignItems: 'center', gap: '8px', border: 'none' }}
-              >
-                <Clock size={16} /> {expiring ? 'Expiring...' : 'Expire Old Orders'}
-              </button>
-            </div>
+        {/* Summary Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          <div className="stat-card">
+            <p className="stat-label">Total Revenue</p>
+            <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(totalRevenue)}</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Exclude cancelled orders</p>
+          </div>
+          <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
+            <p className="stat-label">Gross Paid</p>
+            <h3 className="stat-value" style={{ color: '#059669' }}>{formatPrice(totalPaidRevenue)}</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Actual collected amount</p>
+          </div>
+          <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
+            <p className="stat-label">Total Orders</p>
+            <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>{orderCount}</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Received in period</p>
+          </div>
+          <div className="stat-card" style={{ borderLeftColor: '#6366F1' }}>
+            <p className="stat-label">Fulfillment</p>
+            <h3 className="stat-value" style={{ color: '#6366F1' }}>{paidCount}</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Paid status</p>
           </div>
         </div>
 
@@ -244,7 +243,7 @@ export default function AdminStatements() {
             </div>
           </div>
         </div>
-      </div>
+      </AdminContentWrapper>
 
       {selectedOrder && (
         <div className="modal-backdrop" onClick={() => setSelectedOrder(null)} style={{ display: 'flex' }}>

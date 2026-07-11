@@ -5,6 +5,8 @@ import toast from 'react-hot-toast';
 import { Product, ProductStatus } from '@/types';
 import { formatPrice } from '@/lib/format';
 import { productService } from '@/app/services/products.api';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -86,14 +88,12 @@ export default function AdminProducts() {
   const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="page-content-admin animate-fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Products Inventory</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Manage your menu items and stock levels.</p>
-        </div>
-        <Link prefetch={false} href={`/${slug}/admin/products/new`} className="btn btn-primary">+ Add Product</Link>
-      </div>
+    <AdminContentWrapper>
+      <AdminPageHeader
+        title="Products Inventory"
+        description="Manage your menu items and stock levels."
+        action={<Link prefetch={false} href={`/${slug}/admin/products/new`} className="btn btn-primary">+ Add Product</Link>}
+      />
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
@@ -214,6 +214,6 @@ export default function AdminProducts() {
           )}
         </div>
       </div>
-    </div>
+    </AdminContentWrapper>
   );
 }

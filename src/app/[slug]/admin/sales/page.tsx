@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { formatPrice } from '@/lib/format';
 import { inventoryService, InventoryItem } from '@/app/services/inventory.api';
 import { adminService } from '@/app/services/admin.api';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { Search } from 'lucide-react';
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
@@ -112,15 +114,14 @@ export default function AdminInventorySummary() {
   const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
 
   return (
-    <div className="page-content-admin animate-fade-in">
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Sales Summary</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Detailed sales and revenue performance by item.</p>
-        </div>
-        <Link prefetch={false} href={`/${slug}/admin/products`} className="btn btn-secondary">← Back to Products</Link>
-      </div>
+    <AdminContentWrapper>
+      <AdminPageHeader
+        title="Sales Summary"
+        description="Detailed sales and revenue performance by item."
+        action={
+          <Link prefetch={false} href={`/${slug}/admin/products`} className="btn btn-secondary">← Back to Products</Link>
+        }
+      />
 
       {/* Date Range Filter */}
       <div className="card" style={{ marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -130,6 +131,7 @@ export default function AdminInventorySummary() {
             type="date"
             className="input"
             value={dateFrom}
+            max={dateTo}
             onChange={e => setDateFrom(e.target.value)}
             style={{ width: '160px' }}
           />
@@ -140,6 +142,7 @@ export default function AdminInventorySummary() {
             type="date"
             className="input"
             value={dateTo}
+            min={dateFrom}
             onChange={e => setDateTo(e.target.value)}
             style={{ width: '160px' }}
           />
@@ -151,17 +154,17 @@ export default function AdminInventorySummary() {
 
       {/* Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div className="stat-card">
+        <div className="stat-card" style={{ borderLeftColor: 'var(--primary)' }}>
           <p className="stat-label">Total Revenue</p>
           <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(totalRevenue)}</h3>
         </div>
-        <div className="stat-card">
+        <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
           <p className="stat-label">Units Sold</p>
-          <h3 className="stat-value">{totalUnits.toLocaleString()}</h3>
+          <h3 className="stat-value" style={{ color: '#059669' }}>{totalUnits.toLocaleString()}</h3>
         </div>
-        <div className="stat-card">
+        <div className="stat-card" style={{ borderLeftColor: '#6366F1' }}>
           <p className="stat-label">Avg Order Value</p>
-          <h3 className="stat-value">{formatPrice(avgOrderValue)}</h3>
+          <h3 className="stat-value" style={{ color: '#6366F1' }}>{formatPrice(avgOrderValue)}</h3>
         </div>
       </div>
 
@@ -310,6 +313,7 @@ export default function AdminInventorySummary() {
           </div>
         )}
       </div>
-    </div>
+    </AdminContentWrapper>
   );
 }
+

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order, Product } from '@/types';
 import { formatPrice } from '@/lib/format';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { validatePhone } from '@/lib/validators';
 import { orderService } from '@/app/services/orders.api';
 import { Search } from 'lucide-react';
@@ -176,25 +178,25 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
 
   if (loading) {
     return (
-      <div className="page-content-admin" style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
-        <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
-      </div>
+    <AdminContentWrapper style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
+      <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
+    </AdminContentWrapper>
     );
   }
 
   if (!order) {
     return (
-      <div className="page-content-admin">
-        <div style={{ textAlign: 'center', padding: '60px' }}>
-          <p>Order not found.</p>
-          <Link prefetch={false} href={`/${slug}/admin/orders`} className="btn btn-primary" style={{ marginTop: '20px' }}>Back to Orders</Link>
-        </div>
+    <AdminContentWrapper>
+      <div style={{ textAlign: 'center', padding: '60px' }}>
+        <p>Order not found.</p>
+        <Link prefetch={false} href={`/${slug}/admin/orders`} className="btn btn-primary" style={{ marginTop: '20px' }}>Back to Orders</Link>
       </div>
+    </AdminContentWrapper>
     );
   }
 
   return (
-    <div className="page-content-admin animate-fade-in" style={{ position: 'relative' }}>
+    <AdminContentWrapper style={{ position: 'relative' }}>
       {/* Top Right Close Button */}
       <Link prefetch={false} href={`/${slug}/admin/orders`} 
         style={{ 
@@ -220,14 +222,14 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
         ×
       </Link>
 
-      <div style={{ marginBottom: '24px', paddingTop: '8px' }}>
-        <Link prefetch={false} href={`/${slug}/admin/orders`} style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>
-          ← Back to Orders
-        </Link>
-        <h1 style={{ fontSize: '28px', fontWeight: 800 }}>
-          Edit Order #{String(order.ticket_number).padStart(3, '0')}
-        </h1>
-      </div>
+      <AdminPageHeader
+        title={`Edit Order #${String(order.ticket_number).padStart(3, '0')}`}
+        backLink={
+          <Link prefetch={false} href={`/${slug}/admin/orders`} style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none', display: 'inline-block', marginBottom: '12px' }}>
+            ← Back to Orders
+          </Link>
+        }
+      />
 
       <div className="card" style={{ maxWidth: '760px' }}>
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -439,6 +441,6 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
           </div>
         </form>
       </div>
-    </div>
+    </AdminContentWrapper>
   );
 }

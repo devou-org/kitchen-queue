@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
 import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/format';
@@ -310,16 +312,16 @@ export default function AdminOrders() {
   };
 
   return (
-    <div className="page-content-admin animate-fade-in" style={{ padding: '32px' }}>
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Active Order Queue</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)</p>
-        </div>
-        <button className="btn btn-primary" onClick={loadKitchenSnapshot} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>🍳</span> Kitchen Snapshot
-        </button>
-      </div>
+    <AdminContentWrapper>
+      <AdminPageHeader
+        title="Active Order Queue"
+        description="Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)"
+        action={
+          <button className="btn btn-primary" onClick={loadKitchenSnapshot} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>🍳</span> Kitchen Snapshot
+          </button>
+        }
+      />
 
       {recentUpdates.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
@@ -708,6 +710,6 @@ export default function AdminOrders() {
         </div>,
         document.body
       )}
-    </div>
+    </AdminContentWrapper>
   );
 }

@@ -5,6 +5,8 @@ import toast from 'react-hot-toast';
 import { pusherClient } from '@/lib/pusher-client';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { Users } from 'lucide-react';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 
 export default function AdminQueueManager({ restaurantId }: { restaurantId: string }) {
   const [queues, setQueues] = useState<any[]>([]);
@@ -104,30 +106,30 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
   });
 
   return (
-    <div className="page-content-admin animate-fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 800 }}>Queue Management</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Live waitlist for your restaurant.</p>
-        </div>
-        <button 
-          onClick={() => window.open(`/${restaurant?.slug || restaurantId}/queue-board`, '_blank')}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '8px',
-            padding: '10px 16px', background: 'var(--primary)', color: 'white',
-            borderRadius: '8px', fontWeight: 700, fontSize: '13px',
-            border: 'none', cursor: 'pointer', textDecoration: 'none',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <line x1="10" y1="14" x2="21" y2="3"></line>
-          </svg>
-          Open Public Screen
-        </button>
-      </div>
+    <AdminContentWrapper>
+      <AdminPageHeader
+        title="Queue Management"
+        description="Live waitlist for your restaurant."
+        action={
+          <button 
+            onClick={() => window.open(`/${restaurant?.slug || restaurantId}/queue-board`, '_blank')}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '10px 16px', background: 'var(--primary)', color: 'white',
+              borderRadius: '8px', fontWeight: 700, fontSize: '13px',
+              border: 'none', cursor: 'pointer', textDecoration: 'none',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            Open Public Screen
+          </button>
+        }
+      />
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
@@ -223,6 +225,6 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
           )}
         </div>
       </div>
-    </div>
+    </AdminContentWrapper>
   );
 }

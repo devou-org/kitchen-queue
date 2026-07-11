@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import RecentBillingOperations from '@/components/billing/RecentBillingOperations';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 
 interface BillingData {
   restaurant: {
@@ -194,32 +196,30 @@ export default function BillingPage() {
   const statusStyle = getStatusColor(restaurant.billing_status || 'ACTIVE');
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'inherit' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#111827', letterSpacing: '-0.02em', marginBottom: '4px' }}>Billing & Invoices</h1>
-          <p style={{ color: '#4b5563', fontSize: '14px' }}>Manage subscription tiers, view commission rates, and review past statement logs.</p>
-        </div>
-        
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          padding: '8px 16px', 
-          borderRadius: '9999px', 
-          backgroundColor: statusStyle.bg, 
-          color: statusStyle.text,
-          border: `1px solid ${statusStyle.border}`,
-          fontWeight: 700,
-          fontSize: '14px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em'
-        }}>
-          {restaurant.billing_status === 'ACTIVE' ? <ShieldCheck size={16} /> : <AlertCircle size={16} />}
-          {restaurant.billing_status || 'ACTIVE'} STATUS
-        </div>
-      </div>
+    <AdminContentWrapper style={{ fontFamily: 'inherit' }}>
+      <AdminPageHeader
+        title="Billing & Invoices"
+        description="Manage subscription tiers, view commission rates, and review past statement logs."
+        action={
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            padding: '8px 16px', 
+            borderRadius: '9999px', 
+            backgroundColor: statusStyle.bg, 
+            color: statusStyle.text,
+            border: `1px solid ${statusStyle.border}`,
+            fontWeight: 700,
+            fontSize: '14px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
+          }}>
+            {restaurant.billing_status === 'ACTIVE' ? <ShieldCheck size={16} /> : <AlertCircle size={16} />}
+            {restaurant.billing_status || 'ACTIVE'} STATUS
+          </div>
+        }
+      />
 
       {/* Pricing and Tier Overview Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px', marginBottom: '32px' }}>
@@ -387,6 +387,6 @@ export default function BillingPage() {
         </div>
 
       </div>
-    </div>
+    </AdminContentWrapper>
   );
 }
