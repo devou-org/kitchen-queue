@@ -11,7 +11,7 @@ import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { User, Users } from 'lucide-react';
+import { User, Users, ChefHat } from 'lucide-react';
 
 interface OrderUpdateLog {
   id: string;
@@ -318,7 +318,7 @@ export default function AdminOrders() {
         description="Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)"
         action={
           <button className="btn btn-primary" onClick={loadKitchenSnapshot} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>🍳</span> Kitchen Snapshot
+            <ChefHat size={18} /> Kitchen Snapshot
           </button>
         }
       />
@@ -651,10 +651,12 @@ export default function AdminOrders() {
           <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '95%', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '24px', background: 'rgba(151,19,69,0.1)', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px' }}>🍳</span>
+                <span style={{ fontSize: '24px', background: 'rgba(151,19,69,0.1)', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px', color: 'var(--primary)' }}>
+                  <ChefHat size={24} />
+                </span>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.1 }}>Kitchen Snapshot <span style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 600 }}>(Live)</span></h2>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Today's consolidated demand vs available stock.</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Current consolidated demand vs available stock.</p>
                 </div>
               </div>
               <button onClick={() => setShowKitchenSnapshot(false)} style={{ background: 'none', border: 'none', fontSize: '24px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}>✕</button>
