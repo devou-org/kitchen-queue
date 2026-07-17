@@ -26,19 +26,27 @@ export default function SwipeButton({
   const [confirmed, setConfirmed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasConfirmed = useRef(false); // Guard against duplicate submissions
+  const prevLoading = useRef(false);  // Track loading transitions
   const isCompleted = confirmed || success;
 
   useEffect(() => {
-    if (!loading && !success && !isDragging) {
+    // Only reset if loading just finished (true→false) without success.
+    // This handles failed requests (e.g. network error) so the user can retry.
+    // We deliberately do NOT reset on isDragging change — that caused the
+    // immediate-reset glitch (effect saw !loading && !success && !isDragging
+    // all true right after handleConfirm set isDragging=false).
+    if (prevLoading.current && !loading && !success) {
       setConfirmed(false);
       setSliderWidth(0);
-      hasConfirmed.current = false; // Reset guard on reset
+      hasConfirmed.current = false;
     }
+    prevLoading.current = loading;
+
     if (success) {
       setSliderWidth(100);
       setConfirmed(true);
     }
-  }, [loading, success, isDragging]);
+  }, [loading, success]);
 
   const handleStart = (clientX: number) => {
     if (disabled || loading || isCompleted) return;
