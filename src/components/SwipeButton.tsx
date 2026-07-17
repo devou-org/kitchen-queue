@@ -25,12 +25,14 @@ export default function SwipeButton({
   const [isDragging, setIsDragging] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasConfirmed = useRef(false); // Guard against duplicate submissions
   const isCompleted = confirmed || success;
 
   useEffect(() => {
     if (!loading && !success && !isDragging) {
       setConfirmed(false);
       setSliderWidth(0);
+      hasConfirmed.current = false; // Reset guard on reset
     }
     if (success) {
       setSliderWidth(100);
@@ -73,6 +75,8 @@ export default function SwipeButton({
   };
 
   const handleConfirm = () => {
+    if (hasConfirmed.current) return; // Prevent duplicate calls
+    hasConfirmed.current = true;
     setIsDragging(false);
     setSliderWidth(100);
     setConfirmed(true);
@@ -195,7 +199,6 @@ export default function SwipeButton({
 
       <div
         onPointerDown={(e) => handleStart(e.clientX)}
-        onTouchStart={(e) => handleStart(e.touches[0].clientX)}
         style={{
           position: 'absolute',
           left: `calc(3px + (100% - 54px) * (${sliderWidth} / 100))`, // 3px padding on left/right for symmetry
