@@ -166,9 +166,11 @@ export default function StaffAdminPage() {
       {isModalOpen && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+          zIndex: 100,
+          overflowY: 'auto'
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '24px' }}>
+          <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+            <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '24px' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>
               {editingStaff ? 'Edit Staff' : 'Add New Staff'}
             </h2>
@@ -238,6 +240,7 @@ export default function StaffAdminPage() {
                 </button>
               </div>
             </form>
+          </div>
           </div>
         </div>
       )}

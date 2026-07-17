@@ -50,6 +50,13 @@ export default function CustomerDetails({
       if (form.phone.startsWith('+91')) {
         setCountryCode('+91');
         setPhoneDigits(form.phone.replace('+91', ''));
+      } else if (!form.phone.startsWith('+')) {
+        const cleanDigits = form.phone.replace(/\D/g, '');
+        setPhoneDigits(cleanDigits);
+        // Correct the parent state to include the country code
+        if (cleanDigits) {
+           setForm(f => ({ ...f, phone: `+91${cleanDigits}` }));
+        }
       } else {
         setPhoneDigits(form.phone.replace(/\D/g, ''));
       }

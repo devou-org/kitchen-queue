@@ -1,3 +1,4 @@
+import SwipeButton from '@/components/SwipeButton';
 import { formatPrice } from '@/lib/format';
 
 interface CheckoutActionsProps {
@@ -23,6 +24,22 @@ export default function CheckoutActions({
   onAddToOrder,
   onSubmitNewOrder
 }: CheckoutActionsProps) {
+  
+  const handleConfirm = () => {
+    if (addToMode) {
+      onAddToOrder();
+    } else {
+      const form = document.getElementById('new-order-form') as HTMLFormElement;
+      if (form) {
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      }
+    }
+  };
+
   return (
     <div style={{
       position: 'fixed',
@@ -38,69 +55,33 @@ export default function CheckoutActions({
       gap: '8px',
     }}>
       {addToMode ? (
-        <button
-          type="button"
-          className="btn btn-primary btn-lg"
-          style={{ 
-            width: '100%', 
-            borderRadius: '999px',
-            background: 'var(--primary)',
-            color: 'white',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '12px',
-            padding: '16px',
-            height: '56px',
-            border: 'none'
-          }}
+        <SwipeButton 
+          onConfirm={handleConfirm}
           disabled={loading || itemsCount === 0}
-          onClick={onAddToOrder}
-        >
-          {loading ? (
-            <span style={{ fontWeight: 700, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Adding...
-            </span>
-          ) : (
-            <span style={{ fontWeight: 700, fontSize: '16px' }}>Add to Order #{String(ticketNumber || '').padStart(3, '0')}</span>
-          )}
-          <span style={{ fontWeight: 800, fontSize: '16px' }}>{formatPrice(total)}</span>
-        </button>
+          loading={loading}
+          text={
+            <>
+              <span>Add to Order #{String(ticketNumber || '').padStart(3, '0')}</span>
+              <span style={{ fontWeight: 800, marginLeft: '8px' }}>{formatPrice(total)}</span>
+            </>
+          }
+        />
       ) : (
-        <button
-          type="submit"
-          form="new-order-form"
-          className="btn btn-primary btn-lg"
-          style={{ 
-            width: '100%', 
-            borderRadius: '999px',
-            background: 'var(--primary)',
-            color: 'white',
-            opacity: (!isVerified || loading || hasActiveOrder) ? 0.6 : 1,
-            boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '12px',
-            padding: '16px',
-            height: '56px',
-            border: 'none'
-          }}
+        <SwipeButton
+          onConfirm={handleConfirm}
           disabled={loading || !isVerified || hasActiveOrder}
-        >
-          {loading ? (
-            <span style={{ fontWeight: 700, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="loader" style={{ width: 18, height: 18, borderWidth: 2 }} /> Processing...
-            </span>
-          ) : !isVerified ? (
-            <span style={{ fontWeight: 700, fontSize: '16px' }}>⚠️ Verify Phone to Order</span>
-          ) : (
-            <span style={{ fontWeight: 700, fontSize: '16px' }}>Place Order →</span>
-          )}
-
-          <span style={{ fontWeight: 800, fontSize: '16px' }}>{formatPrice(total)}</span>
-        </button>
+          loading={loading}
+          text={
+            !isVerified ? (
+              <span>⚠️ Verify Phone to Order</span>
+            ) : (
+              <>
+                <span>Slide to Place Order</span>
+                <span style={{ fontWeight: 800, marginLeft: '8px' }}>{formatPrice(total)}</span>
+              </>
+            )
+          }
+        />
       )}
     </div>
   );

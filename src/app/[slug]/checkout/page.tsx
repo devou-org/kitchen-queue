@@ -70,11 +70,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       // 2. Check Auth & Load User
       const user = await checkAuth();
       if (user) {
-        setForm(f => ({ 
-          ...f, 
-          phone: user.phone || f.phone, 
-          customer_name: user.name || f.customer_name 
-        }));
+        setForm(f => {
+          let loadedPhone = user.phone || f.phone;
+          if (loadedPhone && !loadedPhone.startsWith('+')) {
+            loadedPhone = `+91${loadedPhone}`;
+          }
+          return {
+            ...f, 
+            phone: loadedPhone, 
+            customer_name: user.name || f.customer_name 
+          };
+        });
 
         // 3. Check for Active Order
         try {

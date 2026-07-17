@@ -108,6 +108,7 @@ export default function StaffAdminPage() {
   };
 
   return (
+    <>
     <AdminContentWrapper>
       <AdminPageHeader
         title="Staff Management"
@@ -211,101 +212,105 @@ export default function StaffAdminPage() {
           </table>
         </div>
       )}
-
-      {isModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-          backdropFilter: 'blur(4px)'
-        }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '24px', borderRadius: '16px', background: 'white', border: '1px solid var(--border)' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
-              {editingStaff ? 'Edit Staff Member' : 'Add Staff Member'}
-            </h2>
-
-            {errorMsg && (
-              <div style={{ background: '#ef444415', color: '#ef4444', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '14px' }}>
-                <ShieldAlert size={18} /> {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Full Name</label>
-                <input
-                  type="text" required
-                  value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  className="input"
-                  placeholder="e.g. John Doe"
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Email Address</label>
-                <input
-                  type="email" required
-                  value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
-                  className="input"
-                  placeholder="e.g. john@restaurant.com"
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Phone Number (Optional)</label>
-                <input
-                  type="text"
-                  value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  className="input"
-                  placeholder="e.g. +919876543210"
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  Password {editingStaff ? '(Leave blank to keep current)' : ''}
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="password" required={!editingStaff}
-                    value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
-                    className="input"
-                    placeholder={editingStaff ? '••••••••' : 'Password'}
-                    style={{ width: '100%', padding: '10px 10px 10px 32px', borderRadius: '8px', border: '1px solid var(--border)' }}
-                  />
-                  <Key size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                </div>
-              </div>
-
-
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <label htmlFor="is_active" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  Active Account (Allows logging in)
-                </label>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setIsModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px' }}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}>
-                  {editingStaff ? 'Save Changes' : 'Create Staff'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </AdminContentWrapper>
+
+    {isModalOpen && (
+      <div style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        zIndex: 100,
+        backdropFilter: 'blur(4px)',
+        overflowY: 'auto'
+      }}>
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '24px', borderRadius: '16px', background: 'white', border: '1px solid var(--border)' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
+            {editingStaff ? 'Edit Staff Member' : 'Add Staff Member'}
+          </h2>
+
+          {errorMsg && (
+            <div style={{ background: '#ef444415', color: '#ef4444', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '14px' }}>
+              <ShieldAlert size={18} /> {errorMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Full Name</label>
+              <input
+                type="text" required
+                value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
+                className="input"
+                placeholder="e.g. John Doe"
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Email Address</label>
+              <input
+                type="email" required
+                value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
+                className="input"
+                placeholder="e.g. john@restaurant.com"
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Phone Number (Optional)</label>
+              <input
+                type="text"
+                value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                className="input"
+                placeholder="e.g. +919876543210"
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                Password {editingStaff ? '(Leave blank to keep current)' : ''}
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="password" required={!editingStaff}
+                  value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })}
+                  className="input"
+                  placeholder={editingStaff ? '••••••••' : 'Password'}
+                  style={{ width: '100%', padding: '10px 10px 10px 32px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+                <Key size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+              </div>
+            </div>
+
+
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <input
+                type="checkbox"
+                id="is_active"
+                checked={formData.is_active}
+                onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <label htmlFor="is_active" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', cursor: 'pointer' }}>
+                Active Account (Allows logging in)
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setIsModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px' }}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}>
+                {editingStaff ? 'Save Changes' : 'Create Staff'}
+              </button>
+            </div>
+          </form>
+        </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

@@ -9,7 +9,7 @@ import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/forma
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { User, Users } from 'lucide-react';
+import { User, Users, StickyNote } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 
@@ -257,7 +257,7 @@ export default function StaffOrders() {
                 )}
                 <div style={{ textAlign: 'right' }}><p className="label">PHONE</p><p style={{ fontWeight: 600 }}>{selectedOrder.phone}</p></div>
               </div>
-              {selectedOrder.notes && <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', fontStyle: 'italic' }}>📝 {selectedOrder.notes}</p>}
+              {selectedOrder.notes && <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', fontStyle: 'italic', display: 'flex', alignItems: 'flex-start', gap: '6px' }}><StickyNote size={14} style={{ marginTop: '2px', flexShrink: 0 }} /> <span>{selectedOrder.notes}</span></p>}
             </div>
 
             <div style={{ marginBottom: '16px' }}>

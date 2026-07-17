@@ -11,7 +11,7 @@ import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { User, Users, ChefHat } from 'lucide-react';
+import { User, Users, ChefHat, StickyNote } from 'lucide-react';
 
 interface OrderUpdateLog {
   id: string;
@@ -563,7 +563,7 @@ export default function AdminOrders() {
               <p style={{ fontSize: '13px', color: 'var(--info)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Users size={14} /> {selectedOrder.party_size || 1} Party
               </p>
-              {selectedOrder.notes && <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', fontStyle: 'italic' }}>📝 {selectedOrder.notes}</p>}
+              {selectedOrder.notes && <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', fontStyle: 'italic', display: 'flex', alignItems: 'flex-start', gap: '6px' }}><StickyNote size={14} style={{ marginTop: '2px', flexShrink: 0 }} /> <span>{selectedOrder.notes}</span></p>}
             </div>
 
             <div style={{ marginBottom: '16px' }}>
