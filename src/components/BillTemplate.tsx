@@ -96,7 +96,7 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
       const filename = `Bill_${ticketNum}_${restaurant.name.replace(/\s+/g, '_')}.pdf`;
 
       const opt = {
-        margin:       [0.5, 0.5, 0.5, 0.5],
+        margin:       [0.5, 0.5, 0.5, 0.5] as [number, number, number, number],
         filename:     filename,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
