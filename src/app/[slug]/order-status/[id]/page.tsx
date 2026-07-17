@@ -12,7 +12,8 @@ import {
   Utensils,
   CircleDollarSign,
   Info,
-  ClipboardEdit
+  ClipboardEdit,
+  Receipt
 } from 'lucide-react';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
@@ -20,6 +21,7 @@ import { Order } from '@/types';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import BillTemplate from '@/components/BillTemplate';
 
 type QueueState = {
   type: string;
@@ -62,6 +64,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
   const [showSurveyTip, setShowSurveyTip] = useState(false);
+  const [showBill, setShowBill] = useState(false);
   const [stages, setStages] = useState(DEFAULT_STAGES);
 
   useEffect(() => {
@@ -561,8 +564,59 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
           </div>
         </div>
 
+        {/* Print Bill Button — Only shown after payment */}
+        {order.is_paid && (
+          <div style={{ marginTop: '20px' }}>
+            <button
+              onClick={() => setShowBill(true)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                padding: '16px 24px',
+                borderRadius: '16px',
+                border: 'none',
+                background: 'white',
+                color: 'var(--primary)',
+                fontSize: '15px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.03)';
+              }}
+            >
+              <Receipt size={18} />
+              Print Bill
+            </button>
+          </div>
+        )}
+
       </main>
 
+      {/* Bill Template Modal */}
+      {showBill && order && restaurant && (
+        <BillTemplate
+          order={order}
+          restaurant={{
+            name: restaurant.name,
+            logo_url: restaurant.logo_url,
+            address: restaurant.address,
+            phone: restaurant.phone,
+            primary_color: restaurant.primary_color,
+          }}
+          onClose={() => setShowBill(false)}
+        />
+      )}
 
     </div>
   );
