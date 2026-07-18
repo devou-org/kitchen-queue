@@ -526,7 +526,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         continue;
       }
 
-      const pStatus = showOrdering 
+      const pStatus = showOrdering
         ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
         : product.status;
 
@@ -567,7 +567,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     const product = products.find(p => p.id === id);
     if (!product) return;
 
-    const pStatus = showOrdering 
+    const pStatus = showOrdering
       ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
       : product.status;
 
@@ -884,7 +884,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       {totalItems > 0 && isServiceActive && showOrdering && (
         <div style={{
           position: 'fixed',
-          bottom: '24px',
+          bottom: '8px',
           left: 0,
           right: 0,
           background: 'transparent',
@@ -998,7 +998,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         </div>
       )}
 
-      
+
     </div>
   );
 }
