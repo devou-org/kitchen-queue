@@ -27,14 +27,10 @@ export default function CheckoutActions({
   
   const handleConfirm = () => {
     if (addToMode) {
-      return onAddToOrder();
+      onAddToOrder();
     } else {
       const form = document.getElementById('new-order-form') as HTMLFormElement;
       if (form) {
-        if (!form.checkValidity()) {
-          form.reportValidity();
-          return false;
-        }
         if (typeof form.requestSubmit === 'function') {
           form.requestSubmit();
         } else {
@@ -87,7 +83,6 @@ export default function CheckoutActions({
           }
         />
       )}
-      <div style={{ height: '32px' }} aria-hidden="true" />
     </div>
   );
 }

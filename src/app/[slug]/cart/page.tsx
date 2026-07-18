@@ -27,7 +27,7 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
     if (!slug) return;
     const saved = localStorage.getItem(`cart_${slug}`);
     if (saved) {
-      try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch { }
+      try { setCart(new Map(Object.entries(JSON.parse(saved)))); } catch {}
     }
   }, [slug]);
 
@@ -139,10 +139,10 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
         flexDirection: 'column',
         gap: '8px',
       }}>
-        <Link prefetch={false} href={`/${slug}/checkout`}
-          className="btn btn-primary btn-lg"
-          style={{
-            width: '100%',
+        <Link prefetch={false} href={`/${slug}/checkout`} 
+          className="btn btn-primary btn-lg" 
+          style={{ 
+            width: '100%', 
             borderRadius: '999px',
             background: 'var(--primary)',
             color: 'white',
@@ -156,9 +156,9 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
             textDecoration: 'none'
           }}
         >
-          <div style={{
-            width: '44px', height: '44px',
-            borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+          <div style={{ 
+            width: '44px', height: '44px', 
+            borderRadius: '50%', background: 'rgba(255,255,255,0.2)', 
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 800, fontSize: '15px', color: 'white'
           }}>

@@ -956,16 +956,16 @@ export async function createOrder(data: {
     const queueRes = await client.query(`
       INSERT INTO queues (
         restaurant_id, user_id, queue_status_id, token_number, 
-        queue_type, party_size, notes, business_date
-      ) VALUES ($1, $2, $3, $4, 'ORDER', $5, $6, (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = $1))
+        queue_type, party_size, notes
+      ) VALUES ($1, $2, $3, $4, 'ORDER', $5, $6)
       RETURNING id
     `, [data.restaurant_id, userId, statusId, nextToken, data.party_size || 1, data.notes || '']);
     const queueId = queueRes.rows[0].id;
 
     const orderResult = await client.query(
       `
-        INSERT INTO orders (restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number, table_number, staff_id, business_date)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12, (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = $1))
+        INSERT INTO orders (restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number, table_number, staff_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12)
         RETURNING id
       `,
       [data.restaurant_id, queueId, userId, data.customer_name, data.phone, computedTotal, defaultStatus, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, data.staff_id || null]
