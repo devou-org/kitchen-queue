@@ -169,7 +169,7 @@ export default function SwipeButton({
           left: 0,
           top: 0,
           bottom: 0,
-          width: `calc(56px + (100% - 56px) * (${sliderWidth} / 100))`,
+          width: `calc(56px + (100% - 56px) * ${sliderWidth / 100})`,
           backgroundColor: 'white',
           borderRadius: '999px',
           transition: isDragging ? 'none' : 'width 0.3s ease-out',
@@ -214,7 +214,7 @@ export default function SwipeButton({
         style={{
           position: 'relative',
           zIndex: 2,
-          color: sliderWidth > 50 ? color : 'white',
+          color: sliderWidth > 50 ? '#10b981' : 'white',
           fontWeight: 700,
           transition: 'color 0.2s',
           pointerEvents: 'none',

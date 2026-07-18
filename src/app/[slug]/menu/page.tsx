@@ -526,7 +526,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         continue;
       }
 
-      const pStatus = showOrdering 
+      const pStatus = showOrdering
         ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
         : product.status;
 
@@ -567,7 +567,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     const product = products.find(p => p.id === id);
     if (!product) return;
 
-    const pStatus = showOrdering 
+    const pStatus = showOrdering
       ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
       : product.status;
 
@@ -883,122 +883,124 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       {/* Cart Button */}
       {totalItems > 0 && isServiceActive && showOrdering && (
         <div style={{
-          position: 'fixed',
-          bottom: '24px',
+          position: 'relative',
+          bottom: 'calc(24px + env(safe-area-inset-bottom))',
           left: 0,
           right: 0,
-          background: 'transparent',
+          margin: '0 auto',
+          maxWidth: '480px',
           padding: '0 16px',
-          zIndex: 40,
-          pointerEvents: 'none',
           display: 'flex',
-          justifyContent: 'center'
+          flexDirection: 'column',
+          justifyContent: 'flex-end',
+          gap: '8px',
         }}>
           <Link prefetch={false} href={`/${slug}/cart`}
             className="cart-btn"
             style={{
-              pointerEvents: 'auto',
-              width: 'auto',
-              minWidth: '260px',
-              maxWidth: '400px',
-              background: 'var(--primary)',
+              width: '100%',
               borderRadius: '999px',
-              height: '48px',
+              background: 'var(--primary)',
+              color: 'white',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
               display: 'flex',
               alignItems: 'center',
-              padding: '0 20px',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
-              color: 'white',
-              textDecoration: 'none',
-              fontWeight: 800,
-              fontSize: '14px',
-              gap: '12px'
+              justifyContent: 'space-between',
+              padding: '4px 20px 4px 6px',
+              height: '56px',
+              border: 'none',
+              textDecoration: 'none'
             }}
           >
-            <span style={{
-              background: 'rgba(255,255,255,0.2)',
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              fontWeight: 900
-            }}>{totalItems}</span>
+            <div style={{
+              width: '44px', height: '44px',
+              borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 800, fontSize: '15px', color: 'white'
+            }}>
+              {totalItems}
+            </div>
             <span>Review & Order →</span>
-            <span style={{ marginLeft: 'auto', opacity: 0.9 }}>{formatPrice(totalPrice)}</span>
+            <span style={{ fontWeight: 800, opacity: 0.9 }}>{formatPrice(totalPrice)}</span>
           </Link>
+          <div style={{ height: '32px' }} aria-hidden="true" />
         </div>
-      )}
+      )
+      }
 
       {/* Join Waitlist Button (if queue enabled but ordering disabled) */}
-      {!showOrdering && showQueue && isServiceActive && (
-        <div style={{
-          position: 'fixed',
-          bottom: '30px',
-          left: 0,
-          right: 0,
-          background: 'transparent',
-          padding: '0 16px',
-          zIndex: 40,
-          pointerEvents: 'none',
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '12px'
-        }}>
-          <Link prefetch={false} href={`/${slug}/queue-status`}
-            className="animate-fade-in"
-            style={{
-              pointerEvents: 'auto',
-              background: 'white',
-              border: '2px solid var(--primary)',
-              borderRadius: '999px',
-              height: '48px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0 20px',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
-              color: 'var(--primary)',
-              textDecoration: 'none',
-              fontWeight: 800,
-              fontSize: '15px',
-              gap: '8px'
-            }}
-          >
-            <Search size={18} />
-            Check Status
-          </Link>
+      {
+        !showOrdering && showQueue && isServiceActive && (
+          <div style={{
+            position: 'fixed',
+            bottom: 'calc(24px + env(safe-area-inset-bottom))',
+            left: 0,
+            right: 0,
+            margin: '0 auto',
+            maxWidth: '480px',
+            padding: '0 16px',
+            zIndex: 40,
+            pointerEvents: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}>
+            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+              <Link prefetch={false} href={`/${slug}/queue-status`}
+                className="animate-fade-in"
+                style={{
+                  pointerEvents: 'auto',
+                  flex: '1',
+                  background: 'white',
+                  border: '2px solid var(--primary)',
+                  borderRadius: '999px',
+                  height: '56px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 20px',
+                  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
+                  color: 'var(--primary)',
+                  textDecoration: 'none',
+                  fontWeight: 800,
+                  fontSize: '15px',
+                  gap: '8px'
+                }}
+              >
+                <Search size={18} />
+                Check Status
+              </Link>
 
-          <Link prefetch={false} href={`/${slug}/queue`}
-            className="animate-fade-in"
-            style={{
-              pointerEvents: 'auto',
-              flex: 1,
-              maxWidth: '220px',
-              background: 'var(--primary)',
-              borderRadius: '999px',
-              height: '48px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0 20px',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
-              color: 'white',
-              textDecoration: 'none',
-              fontWeight: 800,
-              fontSize: '15px',
-              gap: '8px'
-            }}
-          >
-            <ClipboardList size={18} />
-            Join Waitlist
-          </Link>
-        </div>
-      )}
+              <Link prefetch={false} href={`/${slug}/queue`}
+                className="animate-fade-in"
+                style={{
+                  pointerEvents: 'auto',
+                  flex: '1',
+                  background: 'var(--primary)',
+                  borderRadius: '999px',
+                  height: '56px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 20px',
+                  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
+                  color: 'white',
+                  textDecoration: 'none',
+                  fontWeight: 800,
+                  fontSize: '15px',
+                  gap: '8px'
+                }}
+              >
+                <ClipboardList size={18} />
+                Join Waitlist
+              </Link>
+            </div>
+            <div style={{ height: '32px' }} aria-hidden="true" />
+          </div>
+        )
+      }
 
-      
-    </div>
+
+    </div >
   );
 }
