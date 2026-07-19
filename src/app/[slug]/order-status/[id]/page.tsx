@@ -257,7 +257,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
         top: 0,
         zIndex: 10
       }}>
-        <button onClick={() => router.back()} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => router.push(`/${slug}/menu`)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
           <ChevronLeft size={24} color="var(--primary)" />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

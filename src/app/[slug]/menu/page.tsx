@@ -884,7 +884,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       {totalItems > 0 && isServiceActive && showOrdering && (
         <div style={{
           position: 'fixed',
-          bottom: '8px',
+          bottom: 0,
           left: 0,
           right: 0,
           background: 'transparent',
@@ -896,38 +896,32 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         }}>
           <Link prefetch={false} href={`/${slug}/cart`}
             className="cart-btn"
+
             style={{
-              pointerEvents: 'auto',
-              width: 'auto',
-              minWidth: '260px',
-              maxWidth: '400px',
-              background: 'var(--primary)',
-              borderRadius: '999px',
-              height: '48px',
-              display: 'flex',
-              alignItems: 'center',
-              padding: '0 20px',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
-              color: 'white',
-              textDecoration: 'none',
-              fontWeight: 800,
-              fontSize: '14px',
-              gap: '12px'
+              position: "fixed",
+              left: "50%",
+              transform: "translateX(-50%)",
+              bottom: "16px",
+              width: "100%",
+              maxWidth: "410px",
+              padding: '4px 20px 4px 6px',
+              display: "flex",
+              justifyContent: "space-between",
+              zIndex: 1000,
+              pointerEvents: "auto",
             }}
+
           >
-            <span style={{
-              background: 'rgba(255,255,255,0.2)',
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              fontWeight: 900
-            }}>{totalItems}</span>
-            <span>Review & Order →</span>
-            <span style={{ marginLeft: 'auto', opacity: 0.9 }}>{formatPrice(totalPrice)}</span>
+            <div style={{
+              width: '44px', height: '44px',
+              borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 800, fontSize: '15px', color: 'white'
+            }}>
+              {totalItems}
+            </div>
+            <span style={{ fontWeight: 700, fontSize: '16px', color: 'white' }}>Continue →</span>
+            <span style={{ fontWeight: 800, fontSize: '16px', color: 'white' }}>{formatPrice(totalPrice)}</span>
           </Link>
         </div>
       )}
