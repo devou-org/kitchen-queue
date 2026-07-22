@@ -108,9 +108,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navLinks = [
     ...(showOrdering ? [{ name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/sales`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
     { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },

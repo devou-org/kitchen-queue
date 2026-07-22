@@ -7,6 +7,7 @@ export const ServiceToggle = ({ variant = 'default' }: { variant?: 'default' | '
   const [message, setMessage] = useState('');
   const [toggling, setToggling] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [isOperatingHours, setIsOperatingHours] = useState(true);
   
   const params = useParams();
   let slug = params?.slug as string;
@@ -39,6 +40,9 @@ export const ServiceToggle = ({ variant = 'default' }: { variant?: 'default' | '
         if (data.success) {
           setIsActive(data.isServiceActive);
           setMessage(data.serviceMessage || '');
+          if (data.isOperatingHours !== undefined) {
+            setIsOperatingHours(data.isOperatingHours);
+          }
         }
       })
       .catch(() => {});
@@ -78,14 +82,19 @@ export const ServiceToggle = ({ variant = 'default' }: { variant?: 'default' | '
   return (
     <div style={{ marginBottom: variant === 'light' ? 0 : '16px', marginTop: variant === 'light' ? 0 : '-4px' }}>
       <div className="status-toggle-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div className="status-toggle-label" style={{ display: variant === 'light' ? 'none' : 'flex' }}>
+        <div className="status-toggle-label" style={{ display: variant === 'light' ? 'none' : 'flex', flexWrap: 'wrap' }}>
           <span className="status-label-primary">Service Status</span>
           <span className="status-label-secondary" style={{ color: isActive ? 'var(--success)' : '#ef4444' }}>
             {isActive ? 'Online' : 'Offline'}
           </span>
+          {!isOperatingHours && (
+            <span style={{ width: '100%', fontSize: '10px', color: '#ef4444', marginTop: '2px', fontWeight: 500 }}>
+              (Outside operating hours)
+            </span>
+          )}
         </div>
-        <label className="switch">
-          <input type="checkbox" checked={isActive} onChange={(e) => updateService(e.target.checked)} disabled={toggling} />
+        <label className="switch" style={{ opacity: isOperatingHours ? 1 : 0.5, cursor: isOperatingHours ? 'pointer' : 'not-allowed' }}>
+          <input type="checkbox" checked={isActive} onChange={(e) => updateService(e.target.checked)} disabled={toggling || !isOperatingHours} />
           <span className="slider"></span>
         </label>
       </div>

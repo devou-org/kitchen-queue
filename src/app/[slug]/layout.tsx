@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { getRestaurantBySlug } from '@/lib/db';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -38,8 +39,12 @@ export default async function SlugLayout({
   const { slug } = await params;
   const restaurant = await getRestaurantBySlug(slug);
 
-  const primary = restaurant?.primary_color || '#800020';
-  const secondary = restaurant?.secondary_color || '#FDF9FA';
+  if (!restaurant) {
+    notFound();
+  }
+
+  const primary = restaurant.primary_color || '#800020';
+  const secondary = restaurant.secondary_color || '#FDF9FA';
 
   return (
     <>

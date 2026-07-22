@@ -161,6 +161,11 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
               new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { });
             } catch { }
           }
+          if (data.queue.queue_status === 'SEATED' && currentTicket?.queue_status !== 'SEATED') {
+            try {
+              new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { });
+            } catch { }
+          }
           setTicketData((prev: any) => prev ? { ...prev, queue_status: data.queue.queue_status || prev.queue_status } : null);
           fetchTicketAndStatuses(true);
         }
@@ -190,7 +195,7 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
     return (
       <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh' }}>
         <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', background: 'white' }}>
-          <button onClick={() => router.back()} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px' }}>
+          <button onClick={() => router.push(`/${slug}/menu`)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px' }}>
             <ChevronLeft size={24} color="var(--primary)" />
           </button>
         </div>
@@ -223,7 +228,7 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
         top: 0,
         zIndex: 10
       }}>
-        <button onClick={() => router.back()} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => router.push(`/${slug}/menu`)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
           <ChevronLeft size={24} color="var(--primary)" />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

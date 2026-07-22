@@ -8,6 +8,7 @@ import 'react-phone-number-input/style.css';
 import { Store, Eye } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
+import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 
 export default function AdminSettings() {
   const params = useParams();
@@ -365,6 +366,17 @@ export default function AdminSettings() {
               </div>
             </div>
           </div>
+
+          {/* Dynamic QR Code Section */}
+          {typeof window !== 'undefined' && slug && (
+            <QRCodeGenerator 
+              url={`${process.env.NEXT_PUBLIC_URL || window.location.origin}/${slug}/menu`} 
+              title="Menu QR Code" 
+              description="Download and print this QR code to allow customers to easily access your digital menu."
+              primaryColor={primaryColor}
+            />
+          )}
+
         </div>
       </div>
     </AdminContentWrapper>

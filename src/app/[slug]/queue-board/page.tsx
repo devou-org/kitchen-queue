@@ -39,11 +39,11 @@ export default function QueueBoardPage() {
     const channelName = restaurant.pusher_channel;
     const channel = pusherClient.subscribe(channelName);
     setIsLive(true);
-    
+
     channel.bind('queue_updated', () => fetchQueues(true));
     channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
     channel.bind('pusher:subscription_error', () => setIsLive(false));
-    
+
     return () => { channel.unbind_all(); channel.unsubscribe(); };
   }, [restaurant]);
 
@@ -94,34 +94,34 @@ export default function QueueBoardPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Header Row */}
-          <div style={{ 
-            display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr', gap: '24px', 
-            padding: '0 32px', color: '#9ca3af', fontSize: '14px', fontWeight: 800, letterSpacing: '0.05em' 
+          <div style={{
+            display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr', gap: '24px',
+            padding: '0 32px', color: '#9ca3af', fontSize: '14px', fontWeight: 800, letterSpacing: '0.05em'
           }}>
             <div>TICKET</div>
             <div>NAME</div>
             <div>NO OF PERSONS</div>
             <div style={{ textAlign: 'right' }}>JOINED AT</div>
           </div>
-          
+
           {activeQueues.map(q => (
             <div key={q.id} style={{
               background: 'white', padding: '24px 32px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr', 
+              boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr',
               gap: '24px', alignItems: 'center'
             }}>
               <div style={{ fontSize: '32px', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>
                 #{String(q.token_number).padStart(3, '0')}
               </div>
-              
-              <div style={{ fontSize: '28px', fontWeight: 900, color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+
+              <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {q.user_name || 'Guest'}
               </div>
-              
+
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Users size={18} /> {q.party_size}
               </div>
-              
+
               <div style={{ fontSize: '18px', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right' }}>
                 {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', hour12: true }).format(new Date(q.created_at))}
               </div>
