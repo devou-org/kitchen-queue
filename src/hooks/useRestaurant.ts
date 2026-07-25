@@ -19,14 +19,16 @@ export type RestaurantContext = {
   opening_time?: string;
   closing_time?: string;
   rollover_time?: string;
+  billing_status?: string;
 };
 
 let cached: RestaurantContext | null = null;
 let fetchPromise: Promise<RestaurantContext | null> | null = null;
+const listeners = new Set<(data: RestaurantContext | null) => void>();
 
-async function fetchRestaurant(): Promise<RestaurantContext | null> {
-  if (cached) return cached;
-  if (fetchPromise) return fetchPromise;
+export async function fetchRestaurant(force = false): Promise<RestaurantContext | null> {
+  if (!force && cached) return cached;
+  if (!force && fetchPromise) return fetchPromise;
 
   // Extract slug from URL: /[slug]/...
   let slug = '';
@@ -35,43 +37,66 @@ async function fetchRestaurant(): Promise<RestaurantContext | null> {
     slug = segments[0] || '';
   }
 
-  fetchPromise = fetch('/api/restaurant', {
+  const p = fetch('/api/restaurant', {
     headers: slug ? { 'x-restaurant-slug': slug } : {}
   })
     .then(res => res.json())
     .then(data => {
       if (data.success && data.data) {
         cached = data.data;
+        listeners.forEach(fn => fn(cached));
         return cached;
       }
       return null;
     })
     .catch(() => null)
-    .finally(() => { fetchPromise = null; });
+    .finally(() => { 
+      if (fetchPromise === p) fetchPromise = null; 
+    });
 
+  fetchPromise = p;
   return fetchPromise;
 }
 
 /**
  * useRestaurant — lightweight hook that returns the current tenant's info.
  * The data is fetched once from /api/restaurant and module-level cached
- * for the lifetime of the page.
+ * for the lifetime of the page. All mounted hooks will receive updates
+ * when refreshed.
  */
 export function useRestaurant() {
   const [restaurant, setRestaurant] = useState<RestaurantContext | null>(cached);
   const [loading, setLoading] = useState(!cached);
 
+  const refresh = async () => {
+    setLoading(true);
+    const r = await fetchRestaurant(true);
+    setRestaurant(r);
+    setLoading(false);
+    return r;
+  };
+
   useEffect(() => {
+    const handler = (data: RestaurantContext | null) => {
+      setRestaurant(data);
+      setLoading(false);
+    };
+    
+    listeners.add(handler);
+
     if (cached) {
-      setRestaurant(cached);
-      setLoading(false);
-      return;
+      handler(cached);
+    } else {
+      fetchRestaurant().then(r => {
+        // fetchRestaurant already calls listeners, but this ensures initial mount is covered
+        if (!cached) handler(r);
+      });
     }
-    fetchRestaurant().then(r => {
-      setRestaurant(r);
-      setLoading(false);
-    });
+
+    return () => {
+      listeners.delete(handler);
+    };
   }, []);
 
-  return { restaurant, loading };
+  return { restaurant, loading, refresh };
 }

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
@@ -115,6 +115,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
     { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
   ];
+
+  if (restaurant?.billing_status === 'SUSPENDED') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '20px' }}>
+        <div style={{ background: 'white', padding: '40px', borderRadius: '16px', textAlign: 'center', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+          <div style={{ width: '64px', height: '64px', background: '#FEF2F2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+            <AlertTriangle size={32} color="#EF4444" />
+          </div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '16px', color: '#111827' }}>Account Suspended</h2>
+          <p style={{ color: '#4B5563', marginBottom: '24px', lineHeight: 1.6 }}>
+            Your account has been suspended due to pending payments. Please make the payment to restore access to your admin panel.
+          </p>
+          <button 
+            onClick={handleLogout}
+            style={{ width: '100%', padding: '12px', background: '#F3F4F6', color: '#374151', borderRadius: '8px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+          >
+            Log Out
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-layout">

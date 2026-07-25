@@ -8,7 +8,8 @@ import { verifyToken } from '@/lib/jwt';
 
 const RBAC_RULES = [
   { pathPrefix: '/super-admin', role: 'SUPER_ADMIN', exclude: ['/super-admin/login'] },
-  { pathPrefix: '/admin', role: 'ADMIN', exclude: ['/admin/login'] }
+  { pathPrefix: '/admin', role: 'ADMIN', exclude: ['/admin/login'] },
+  { pathPrefix: '/staff', role: 'STAFF', exclude: ['/staff/login'] }
 ];
 
 const MODULE_RULES = [
@@ -120,6 +121,20 @@ async function handleRBAC(request: NextRequest, slug: string, subPath: string) {
           const response = NextResponse.redirect(new URL(`/${slug}/admin/login`, request.url));
           response.cookies.delete('admin_token');
           return response;
+        }
+      } else if (rule.role === 'STAFF') {
+        const token = request.cookies.get('staff_token')?.value;
+        if (!token) return NextResponse.redirect(new URL(`/${slug}/staff/login`, request.url));
+
+        const payload = await verifyToken(token);
+        if (!payload?.isStaff) {
+          const response = NextResponse.redirect(new URL(`/${slug}/staff/login`, request.url));
+          response.cookies.delete('staff_token');
+          return response;
+        }
+        
+        if (payload.restaurantSlug !== slug) {
+          return NextResponse.redirect(new URL(`/${payload.restaurantSlug}/staff/orders`, request.url));
         }
       }
     }

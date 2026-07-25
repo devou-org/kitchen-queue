@@ -13,7 +13,7 @@ import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 export default function AdminSettings() {
   const params = useParams();
   const slug = params?.slug as string;
-  const { restaurant, loading } = useRestaurant();
+  const { restaurant, loading, refresh } = useRestaurant();
   const [saving, setSaving] = useState(false);
 
   // Form Fields State
@@ -30,7 +30,7 @@ export default function AdminSettings() {
   const [menuLayout, setMenuLayout] = useState<'LIST' | 'GRID'>('LIST');
   const [menuTitle, setMenuTitle] = useState("Today's Specials");
   const [menuDescription, setMenuDescription] = useState("Hand-curated coastal delicacies prepared with traditional recipes.");
-  
+
   // Business Hours State
   const [timezone, setTimezone] = useState('Asia/Kolkata');
   const [openingTime, setOpeningTime] = useState('09:00:00');
@@ -70,7 +70,7 @@ export default function AdminSettings() {
     try {
       const res = await fetch(`/api/admin/settings`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'x-restaurant-slug': slug
         },
@@ -92,7 +92,8 @@ export default function AdminSettings() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success('Settings updated successfully! Refresh to see changes.');
+        toast.success('Settings updated successfully!');
+        if (refresh) await refresh();
       } else {
         toast.error(data.error || 'Failed to update settings');
       }
@@ -121,7 +122,7 @@ export default function AdminSettings() {
             Profile & Branding
           </h2>
           <p style={S.cardDesc}>Configure logo URL, phone number, physical address, and theme colors.</p>
-          
+
           <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
             <div>
               <label style={S.label}>Restaurant Name *</label>
@@ -240,9 +241,9 @@ export default function AdminSettings() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <div>
                 <label style={S.label}>Timezone</label>
-                <select 
-                  value={timezone} 
-                  onChange={e => setTimezone(e.target.value)} 
+                <select
+                  value={timezone}
+                  onChange={e => setTimezone(e.target.value)}
                   style={{ ...S.input, appearance: 'auto', backgroundColor: '#ffffff' }}
                 >
                   <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
@@ -313,7 +314,7 @@ export default function AdminSettings() {
               Brand Live Preview
             </h2>
             <p style={S.cardDesc}>Real-time visual rendering of how customers see the menu header.</p>
-            
+
             <div style={{ marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
               {/* Header Mockup */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
@@ -326,12 +327,12 @@ export default function AdminSettings() {
                 )}
                 <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>{name || 'Restaurant Name'}</span>
               </div>
-              
+
               {/* Body Banner Mockup */}
               <div style={{ padding: '24px 18px 12px 18px', background: 'linear-gradient(to bottom right, #fdfdfd, #f8fafc)' }}>
                 <div style={{ height: '8px', width: '120px', borderRadius: '4px', backgroundColor: primaryColor, marginBottom: '8px' }} />
                 <div style={{ height: '6px', width: '220px', borderRadius: '3px', backgroundColor: '#e2e8f0', marginBottom: '16px' }} />
-                
+
                 {/* Category Pill Mockup */}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <div style={{ padding: '6px 14px', borderRadius: '30px', backgroundColor: primaryColor, color: 'white', fontSize: '11px', fontWeight: 700 }}>All Specials</div>
@@ -369,9 +370,9 @@ export default function AdminSettings() {
 
           {/* Dynamic QR Code Section */}
           {typeof window !== 'undefined' && slug && (
-            <QRCodeGenerator 
-              url={`${process.env.NEXT_PUBLIC_URL || window.location.origin}/${slug}/menu`} 
-              title="Menu QR Code" 
+            <QRCodeGenerator
+              url={`${process.env.NEXT_PUBLIC_URL || window.location.origin}/${slug}/menu`}
+              title="Menu QR Code"
               description="Download and print this QR code to allow customers to easily access your digital menu."
               primaryColor={primaryColor}
             />
