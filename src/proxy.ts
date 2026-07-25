@@ -27,7 +27,7 @@ const MODULE_RULES = [
 // MAIN MIDDLEWARE EXPORT
 // ==========================================
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
 
