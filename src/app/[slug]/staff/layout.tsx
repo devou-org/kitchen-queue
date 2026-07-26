@@ -90,6 +90,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: '70px' }}>
+      <link rel="manifest" href={`/api/manifest?slug=${slug}&type=staff`} />
       {/* Top Header */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 50, background: 'var(--card)',

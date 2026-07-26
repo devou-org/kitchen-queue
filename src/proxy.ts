@@ -42,11 +42,23 @@ export async function proxy(request: NextRequest) {
   }
 
   // 3. Extract Tenant Slug
+  const [, slug, section] = pathname.split('/');
+
+  // Redirect exact /slug/admin to /slug/admin/orders
+  if (section === 'admin' && pathname.endsWith('/admin')) {
+    return NextResponse.redirect(new URL(`/${slug}/admin/orders`, request.url));
+  }
+  
+  // Redirect exact /slug/staff to /slug/staff/orders
+  if (section === 'staff' && pathname.endsWith('/staff')) {
+    return NextResponse.redirect(new URL(`/${slug}/staff/orders`, request.url));
+  }
+
   const pathSegments = pathname.split('/').filter(Boolean);
-  const slug = pathSegments[0];
+  const slugValue = pathSegments[0];
 
   // 4. Super Admin Routing
-  if (!slug || slug === 'super-admin') {
+  if (!slugValue || slugValue === 'super-admin') {
     return handleSuperAdminRoutes(request, pathname);
   }
 

@@ -98,6 +98,9 @@ export async function POST(request: NextRequest) {
     // Only trust is_pos if the user is verified staff/admin. Prevents token leakage into customer UI.
     const isPos = hasAdminRights && body.is_pos === true;
 
+    const { getCurrentBusinessDate } = require('@/lib/format');
+    const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
+
     const order = await createOrder({
       restaurant_id: restaurant.id,
       customer_name: customer_name.trim(),
@@ -108,6 +111,7 @@ export async function POST(request: NextRequest) {
       table_number,
       is_pos: isPos,
       staff_id: isPos ? admin?.userId : undefined,
+      business_date,
       items,
     });
 

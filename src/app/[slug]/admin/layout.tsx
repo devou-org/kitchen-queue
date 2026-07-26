@@ -139,9 +139,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="admin-layout">
-      {restaurant?.primary_color && (
-        <style dangerouslySetInnerHTML={{ __html: `
+    <>
+      <link rel="manifest" href={`/api/manifest?slug=${slug}&type=admin`} />
+      <div className="admin-layout">
+        {restaurant?.primary_color && (
+          <style dangerouslySetInnerHTML={{ __html: `
           :root {
             --primary: ${restaurant.primary_color};
             --primary-dark: ${restaurant.primary_color};
@@ -257,5 +259,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
     </div>
+    </>
   );
 }

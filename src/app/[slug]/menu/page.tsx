@@ -702,6 +702,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
+      <link rel="manifest" href={`/api/manifest?slug=${slug}&type=customer`} />
       {restaurant?.primary_color && (
         <style dangerouslySetInnerHTML={{
           __html: `

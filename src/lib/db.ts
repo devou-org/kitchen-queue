@@ -838,6 +838,7 @@ export async function createOrder(data: {
   table_number?: string;
   is_pos?: boolean;
   staff_id?: string;
+  business_date?: string;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
 }) {
   const normalized = new Map<string, { quantity: number; price_at_purchase: number }>();
@@ -964,11 +965,11 @@ export async function createOrder(data: {
 
     const orderResult = await client.query(
       `
-        INSERT INTO orders (restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number, table_number, staff_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12)
+        INSERT INTO orders (restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number, table_number, staff_id, business_date)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12, COALESCE($13, CURRENT_DATE))
         RETURNING id
       `,
-      [data.restaurant_id, queueId, userId, data.customer_name, data.phone, computedTotal, defaultStatus, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, data.staff_id || null]
+      [data.restaurant_id, queueId, userId, data.customer_name, data.phone, computedTotal, defaultStatus, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, data.staff_id || null, data.business_date || null]
     );
 
     const orderId = orderResult.rows[0]?.id;

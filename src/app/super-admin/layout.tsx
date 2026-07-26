@@ -7,6 +7,7 @@ export const metadata: Metadata = {
     shortcut: 'https://ik.imagekit.io/j2q8x5lu0/qdine/qdine-logo-rotated.png',
     apple: 'https://ik.imagekit.io/j2q8x5lu0/qdine/qdine-logo-rotated.png',
   },
+  manifest: '/api/manifest?type=superadmin',
 };
 
 export default function SuperAdminLayout({

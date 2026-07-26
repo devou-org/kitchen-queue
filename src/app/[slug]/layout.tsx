@@ -26,7 +26,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description: restaurant.menu_description || `Welcome to ${restaurant.name}. View our digital menu and order online.`,
       images: restaurant.logo_url ? [{ url: restaurant.logo_url }] : [],
     },
-    manifest: `/api/manifest?slug=${slug}`,
   };
 }
 
