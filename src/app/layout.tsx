@@ -17,7 +17,6 @@ export const metadata: Metadata = {
     description: 'Order food and track your queue in real-time',
     type: 'website',
   },
-  manifest: '/manifest.json',
 };
 
 export const viewport: Viewport = {
@@ -33,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <Script id="cleanup-legacy" strategy="beforeInteractive">
           {`try { localStorage.removeItem('user_mobile'); localStorage.removeItem('user_data'); } catch(e) {}`}
         </Script>

@@ -17,15 +17,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: `${restaurant.name}`,
     description: restaurant.menu_description || `Welcome to ${restaurant.name}. View our digital menu and order online.`,
     icons: restaurant.logo_url ? {
-      icon: restaurant.logo_url,
-      shortcut: restaurant.logo_url,
-      apple: restaurant.logo_url,
+      icon: restaurant.logo_url.includes('imagekit.io') ? `${restaurant.logo_url}?tr=w-32,h-32,f-png` : restaurant.logo_url,
+      shortcut: restaurant.logo_url.includes('imagekit.io') ? `${restaurant.logo_url}?tr=w-192,h-192,f-png` : restaurant.logo_url,
+      apple: restaurant.logo_url.includes('imagekit.io') ? `${restaurant.logo_url}?tr=w-180,h-180,f-png` : restaurant.logo_url,
     } : undefined,
     openGraph: {
       title: restaurant.name,
       description: restaurant.menu_description || `Welcome to ${restaurant.name}. View our digital menu and order online.`,
       images: restaurant.logo_url ? [{ url: restaurant.logo_url }] : [],
     },
+    manifest: `/api/manifest?slug=${slug}`,
   };
 }
 
