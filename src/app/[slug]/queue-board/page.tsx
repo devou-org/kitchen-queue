@@ -95,34 +95,34 @@ export default function QueueBoardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Header Row */}
           <div style={{
-            display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr', gap: '24px',
+            display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between',
             padding: '0 32px', color: '#9ca3af', fontSize: '14px', fontWeight: 800, letterSpacing: '0.05em'
           }}>
-            <div>TICKET</div>
-            <div>NAME</div>
-            <div>NO OF PERSONS</div>
-            <div style={{ textAlign: 'right' }}>JOINED AT</div>
+            <div style={{ flex: '1 1 120px' }}>TICKET</div>
+            <div style={{ flex: '2 1 150px' }}>NAME</div>
+            <div style={{ flex: '1 1 120px' }}>NO OF PERSONS</div>
+            <div style={{ flex: '1 1 120px', textAlign: 'right' }}>JOINED AT</div>
           </div>
 
           {activeQueues.map(q => (
             <div key={q.id} style={{
               background: 'white', padding: '24px 32px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr',
-              gap: '24px', alignItems: 'center'
+              boxShadow: '0 4px 20px rgba(0,0,0,0.03)', display: 'flex', flexWrap: 'wrap',
+              gap: '16px', alignItems: 'center', justifyContent: 'space-between'
             }}>
-              <div style={{ fontSize: '32px', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>
+              <div style={{ flex: '1 1 120px', fontSize: '32px', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>
                 #{String(q.token_number).padStart(3, '0')}
               </div>
 
-              <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ flex: '2 1 150px', fontSize: '16px', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {q.user_name || 'Guest'}
               </div>
 
-              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ flex: '1 1 120px', fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Users size={18} /> {q.party_size}
               </div>
 
-              <div style={{ fontSize: '18px', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right' }}>
+              <div style={{ flex: '1 1 120px', fontSize: '18px', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right' }}>
                 {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', hour12: true }).format(new Date(q.created_at))}
               </div>
             </div>

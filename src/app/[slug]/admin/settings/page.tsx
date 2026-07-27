@@ -108,13 +108,12 @@ export default function AdminSettings() {
 
   return (
     <AdminContentWrapper style={{ paddingBottom: '100px' }}>
-      <Toaster position="top-right" />
       <AdminPageHeader
         title="Settings & Branding"
         description="Manage your restaurant profile, business hours, and visual theme."
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 3fr) minmax(300px, 2fr)', gap: '20px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', alignItems: 'start' }}>
         {/* Left Panel: Profile Configurations */}
         <div className="card">
           <h2 style={S.cardTitle}>
@@ -132,7 +131,7 @@ export default function AdminSettings() {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
               <div>
                 <label style={S.label}>Phone Number</label>
                 <PhoneInput
@@ -172,11 +171,11 @@ export default function AdminSettings() {
               <label style={S.label}>Address</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <input type="text" value={addressStreet} onChange={e => setAddressStreet(e.target.value)} placeholder="Street Address" style={S.input} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
                   <input type="text" value={addressCity} onChange={e => setAddressCity(e.target.value)} placeholder="City" style={S.input} />
                   <input type="text" value={addressState} onChange={e => setAddressState(e.target.value)} placeholder="State / Province" style={S.input} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
                   <input type="text" value={addressZip} onChange={e => setAddressZip(e.target.value)} placeholder="ZIP / Postal Code" style={S.input} />
                   <input type="text" value={addressCountry} onChange={e => setAddressCountry(e.target.value)} placeholder="Country" style={S.input} />
                 </div>
@@ -206,7 +205,7 @@ export default function AdminSettings() {
               <p style={{ fontSize: '11px', color: '#64748b', marginTop: '-4px', marginBottom: '10px' }}>
                 Choose how items are displayed on the customer's mobile menu screen.
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                 <button
                   type="button" onClick={() => setMenuLayout('LIST')}
                   style={{
@@ -260,7 +259,7 @@ export default function AdminSettings() {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
                 <div>
                   <label style={S.label}>Opening Time</label>
                   <input type="time" value={openingTime} onChange={e => setOpeningTime(e.target.value)} style={S.input} />
@@ -281,7 +280,7 @@ export default function AdminSettings() {
             </div>
 
             {/* Theme Colors Configuration */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <div>
                 <label style={S.label}>Primary Color</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
@@ -344,7 +343,7 @@ export default function AdminSettings() {
               <div style={{ padding: '0 18px 18px 18px', backgroundColor: '#f8fafc' }}>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Layout Preview</div>
                 {menuLayout === 'GRID' ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
                     {[1, 2].map(i => (
                       <div key={i} style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <div style={{ height: '50px', backgroundColor: '#f1f5f9', borderRadius: '6px' }} />

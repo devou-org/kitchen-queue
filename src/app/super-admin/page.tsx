@@ -145,7 +145,6 @@ export default function SuperAdminDashboard() {
 
   return (
     <div style={S.page}>
-      <Toaster position="top-right" />
 
       {/* Header */}
       <div style={S.header}>

@@ -336,8 +336,6 @@ export default function RestaurantDetails() {
 
   return (
     <div style={S.page}>
-      <Toaster position="top-right" />
-      
       {/* Top Banner Navigation */}
       <div style={S.topNav}>
         <Link href="/super-admin" style={S.backBtn}>

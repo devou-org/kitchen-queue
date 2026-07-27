@@ -39,7 +39,7 @@ export default function RecentBillingOperations({
     tableCard: { backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' },
     tableHeader: { padding: '20px 24px', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff' },
     tableTitle: { fontSize: '15px', fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center' },
-    table: { width: '100%', borderCollapse: 'collapse' as const, textAlign: 'left' as const },
+    table: { width: '100%', minWidth: '600px', borderCollapse: 'collapse' as const, textAlign: 'left' as const },
     trHead: { backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
     th: { padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
     thAlignRight: { padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.05em', textAlign: 'right' as const },
@@ -56,7 +56,7 @@ export default function RecentBillingOperations({
           <TrendingUp size={16} style={{ marginRight: '6px' }} />
           Recent Billing Operations
         </h3>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             type="date"
             value={txDateFrom}
@@ -144,7 +144,7 @@ export default function RecentBillingOperations({
       
       {/* Pagination Controls */}
       {totalTxs > 10 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexWrap: 'wrap', gap: '12px' }}>
           <span style={{ fontSize: '12px', color: '#64748b' }}>
             Showing {(txPage - 1) * 10 + 1} to {Math.min(txPage * 10, totalTxs)} of {totalTxs}
           </span>

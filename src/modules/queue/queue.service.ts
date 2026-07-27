@@ -242,7 +242,7 @@ export class QueueService {
       JOIN queue_status qs ON q.queue_status_id = qs.id
       JOIN users u ON q.user_id = u.id
       WHERE q.restaurant_id = $1 
-        AND DATE((q.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval)
+        AND q.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval)
       ORDER BY q.token_number ASC
     `, [restaurantId]);
     return res.rows;
@@ -290,7 +290,7 @@ export class QueueService {
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
           AND qs2.possible_queue_status = 'WAITING'
-          AND DATE((q2.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
+          AND q2.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -298,7 +298,7 @@ export class QueueService {
       JOIN users u ON q.user_id = u.id
       WHERE q.restaurant_id = $1 
         AND q.token_number = $2 
-        AND CAST(q.created_at AS DATE) = CURRENT_DATE
+        AND q.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval)
       LIMIT 1
     `, [restaurantId, tokenNumber]);
 
@@ -322,7 +322,7 @@ export class QueueService {
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
           AND qs2.possible_queue_status = 'WAITING'
-          AND DATE((q2.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
+          AND q2.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -353,7 +353,7 @@ export class QueueService {
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
           AND qs2.possible_queue_status = 'WAITING'
-          AND DATE((q2.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
+          AND q2.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position
       FROM queues q
@@ -362,7 +362,7 @@ export class QueueService {
       WHERE q.restaurant_id = $1 
         AND u.phone = $2
         AND q.queue_type = 'WALK_IN'
-        AND DATE((q.created_at AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval) = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval)
+        AND q.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q.restaurant_id)::interval)
       ORDER BY q.created_at DESC
     `, [restaurantId, phone]);
 

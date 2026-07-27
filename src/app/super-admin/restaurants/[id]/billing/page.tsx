@@ -293,7 +293,6 @@ export default function SuperAdminRestaurantBilling() {
 
   return (
     <div style={styles.page}>
-      <Toaster position="top-right" />
 
       {/* Top Banner Navigation */}
       <div style={styles.topNav}>
