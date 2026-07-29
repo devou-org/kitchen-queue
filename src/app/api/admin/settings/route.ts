@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         is_service_active, 
         service_message,
         opening_time,
-        rollover_time,
+        closing_time,
         (CURRENT_TIMESTAMP AT TIME ZONE COALESCE(timezone, 'Asia/Kolkata'))::time as current_time_in_tz
       FROM restaurants 
       WHERE id = ${restaurant.id} 
@@ -36,27 +36,35 @@ export async function GET(request: NextRequest) {
     
     let isOperatingHours = true;
     const row = rows[0];
-    if (row?.opening_time && row?.rollover_time && row?.current_time_in_tz) {
+    if (row?.opening_time && row?.closing_time && row?.current_time_in_tz) {
       const openingTime = row.opening_time;
-      const rolloverTime = row.rollover_time;
+      const closingTime = row.closing_time;
       const currentTime = row.current_time_in_tz;
 
-      if (openingTime < rolloverTime) {
+      if (openingTime < closingTime) {
         // Normal day: e.g. 09:00 to 22:00
-        isOperatingHours = currentTime >= openingTime && currentTime < rolloverTime;
-      } else if (openingTime > rolloverTime) {
+        isOperatingHours = currentTime >= openingTime && currentTime < closingTime;
+      } else if (openingTime > closingTime) {
         // Crosses midnight: e.g. 11:00 to 03:00
-        isOperatingHours = currentTime >= openingTime || currentTime < rolloverTime;
+        isOperatingHours = currentTime >= openingTime || currentTime < closingTime;
       }
+    }
+
+    let isServiceActive = row?.is_service_active ?? true;
+
+    // Automatically turn off the service if outside operating hours
+    if (!isOperatingHours && isServiceActive) {
+      await sql`UPDATE restaurants SET is_service_active = false WHERE id = ${restaurant.id}`;
+      isServiceActive = false;
     }
 
     return NextResponse.json({ 
       success: true, 
-      isServiceActive: row?.is_service_active ?? true,
+      isServiceActive,
       serviceMessage: row?.service_message || '',
       isOperatingHours,
       openingTime: row?.opening_time,
-      rolloverTime: row?.rollover_time
+      closingTime: row?.closing_time
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -87,7 +95,7 @@ export async function POST(request: NextRequest) {
     const rows = await sql`
       SELECT 
         opening_time,
-        rollover_time,
+        closing_time,
         (CURRENT_TIMESTAMP AT TIME ZONE COALESCE(timezone, 'Asia/Kolkata'))::time as current_time_in_tz
       FROM restaurants 
       WHERE id = ${restaurant.id} 
@@ -96,20 +104,20 @@ export async function POST(request: NextRequest) {
     
     let isOperatingHours = true;
     const row = rows[0];
-    if (row?.opening_time && row?.rollover_time && row?.current_time_in_tz) {
+    if (row?.opening_time && row?.closing_time && row?.current_time_in_tz) {
       const openingTime = row.opening_time;
-      const rolloverTime = row.rollover_time;
+      const closingTime = row.closing_time;
       const currentTime = row.current_time_in_tz;
 
-      if (openingTime < rolloverTime) {
-        isOperatingHours = currentTime >= openingTime && currentTime < rolloverTime;
-      } else if (openingTime > rolloverTime) {
-        isOperatingHours = currentTime >= openingTime || currentTime < rolloverTime;
+      if (openingTime < closingTime) {
+        isOperatingHours = currentTime >= openingTime && currentTime < closingTime;
+      } else if (openingTime > closingTime) {
+        isOperatingHours = currentTime >= openingTime || currentTime < closingTime;
       }
     }
 
-    if (!isOperatingHours) {
-      return NextResponse.json({ success: false, error: 'Cannot toggle service outside of operating hours' }, { status: 403 });
+    if (!isOperatingHours && active) {
+      return NextResponse.json({ success: false, error: 'Cannot turn service online outside of operating hours' }, { status: 403 });
     }
     await sql`UPDATE restaurants SET is_service_active = ${active}, service_message = ${message || null} WHERE id = ${restaurant.id}`;
     
