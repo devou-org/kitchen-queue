@@ -55,6 +55,8 @@ export default function AdminInventorySummary() {
   );
   const [orderCount, setOrderCount] = useState(0);
 
+  const [overallRevenue, setOverallRevenue] = useState(0);
+
   const fetchData = useCallback(async (manualFrom?: string, manualTo?: string) => {
     setLoading(true);
     try {
@@ -83,9 +85,12 @@ export default function AdminInventorySummary() {
 
       if (dailyRes.success && dailyRes.data) {
         const totalOrd = (dailyRes.data as any[]).reduce((sum, day) => sum + Number(day.total_orders || 0), 0);
+        const totalRev = (dailyRes.data as any[]).reduce((sum, day) => sum + Number(day.revenue || 0), 0);
         setOrderCount(totalOrd);
+        setOverallRevenue(totalRev);
       } else {
         setOrderCount(0);
+        setOverallRevenue(0);
       }
     } finally {
       setLoading(false);
@@ -109,9 +114,11 @@ export default function AdminInventorySummary() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const totalRevenue = filtered.reduce((s, i) => s + Number(i.total_revenue), 0);
+  const filteredRevenue = filtered.reduce((s, i) => s + Number(i.total_revenue), 0);
   const totalUnits = filtered.reduce((s, i) => s + Number(i.total_quantity), 0);
-  const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
+  
+  const displayRevenue = (search || categoryFilter !== 'All') ? filteredRevenue : overallRevenue;
+  const avgOrderValue = orderCount > 0 ? overallRevenue / orderCount : 0;
 
   return (
     <AdminContentWrapper>
@@ -156,15 +163,18 @@ export default function AdminInventorySummary() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div className="stat-card" style={{ borderLeftColor: 'var(--primary)' }}>
           <p className="stat-label">Total Revenue</p>
-          <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(totalRevenue)}</h3>
+          <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(displayRevenue)}</h3>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Revenue from paid orders</p>
         </div>
         <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
           <p className="stat-label">Units Sold</p>
           <h3 className="stat-value" style={{ color: '#059669' }}>{totalUnits.toLocaleString()}</h3>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Total items purchased</p>
         </div>
         <div className="stat-card" style={{ borderLeftColor: '#6366F1' }}>
           <p className="stat-label">Avg Order Value</p>
           <h3 className="stat-value" style={{ color: '#6366F1' }}>{formatPrice(avgOrderValue)}</h3>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Per completed order</p>
         </div>
       </div>
 

@@ -6,9 +6,10 @@ import { Order } from '@/types';
 import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/format';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
-import { Download, Clock, User, Hourglass, Check } from 'lucide-react';
+import { Download, Clock, User, Hourglass, Check, Receipt } from 'lucide-react';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import BillTemplate from '@/components/BillTemplate';
 
 export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -18,6 +19,7 @@ export default function AdminStatements() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showBill, setShowBill] = useState(false);
   const [stats, setStats] = useState({ totalRevenue: 0, totalPaidRevenue: 0, orderCount: 0, paidCount: 0 });
 
   const { slug } = useParams();
@@ -287,12 +289,47 @@ export default function AdminStatements() {
                 <span>Total Amount</span><span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
               </div>
             </div>
-
-            <div style={{ textAlign: 'center' }}>
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {selectedOrder.is_paid && (
+                <button
+                  onClick={() => setShowBill(true)}
+                  className="btn"
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    padding: '12px',
+                    background: 'white',
+                    color: 'var(--primary)',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <Receipt size={18} />
+                  Print Bill
+                </button>
+              )}
               <button onClick={() => setSelectedOrder(null)} className="btn btn-secondary" style={{ width: '100%' }}>Close Summary</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bill Template Modal */}
+      {showBill && selectedOrder && restaurant && (
+        <BillTemplate
+          order={selectedOrder}
+          restaurant={{
+            name: restaurant.name,
+            logo_url: restaurant.logo_url,
+            address: restaurant.address,
+            phone: restaurant.phone,
+            primary_color: restaurant.primary_color,
+          }}
+          onClose={() => setShowBill(false)}
+        />
       )}
     </>
   );

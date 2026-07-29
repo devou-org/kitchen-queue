@@ -903,7 +903,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               left: "50%",
               transform: "translateX(-50%)",
               bottom: "16px",
-              width: "100%",
+              width: "calc(100% - 32px)",
               maxWidth: "410px",
               padding: '4px 20px 4px 6px',
               display: "flex",

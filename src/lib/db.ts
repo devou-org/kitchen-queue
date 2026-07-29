@@ -1387,7 +1387,7 @@ export async function getPendingQueueOrders() {
 export async function getDailyAnalytics(restaurantId: string, dateFrom: string, dateTo: string) {
   const rows = await sql`
     SELECT 
-      DATE(created_at) as date,
+      business_date as date,
       COUNT(*) as total_orders,
       SUM(total_price) as revenue,
       AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as avg_wait_time,
@@ -1396,7 +1396,7 @@ export async function getDailyAnalytics(restaurantId: string, dateFrom: string, 
       AND business_date BETWEEN ${dateFrom} AND ${dateTo}
       AND is_paid = true AND status = 'PAID'
     GROUP BY business_date
-    ORDER BY date ASC
+    ORDER BY business_date ASC
   `;
   return rows;
 }

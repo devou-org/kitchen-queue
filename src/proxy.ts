@@ -162,8 +162,12 @@ async function handleModulePermissions(request: NextRequest, slug: string, subPa
     try {
       // Fetch restaurant configuration from our API
       // Using absolute URL to avoid edge issues
-      const origin = request.nextUrl.origin;
-      const res = await fetch(`${origin}/api/restaurant`, {
+      let baseUrl = process.env.NEXT_PUBLIC_URL || request.nextUrl.origin;
+      if (baseUrl.startsWith('https://localhost') || baseUrl.startsWith('https://127.0.0.1')) {
+        baseUrl = baseUrl.replace('https://', 'http://');
+      }
+      
+      const res = await fetch(`${baseUrl}/api/restaurant`, {
         headers: { 'x-restaurant-slug': slug },
       });
 
