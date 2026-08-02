@@ -105,7 +105,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
   const items = Array.from(cart.values());
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const total = subtotal;
+  
+  let gstAmount = 0;
+  let total = subtotal;
+  if (restaurant?.gst_type === 'REGULAR') {
+    const rate = Number(restaurant.gst_rate) || 0;
+    gstAmount = Math.round((subtotal * rate / 100) * 100) / 100;
+    total = subtotal + gstAmount;
+  }
 
   const isVerified = currentUser && currentUser.phone === form.phone;
 
@@ -279,6 +286,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         <OrderSummary 
           items={items}
           subtotal={subtotal}
+          gstAmount={gstAmount}
+          gstType={restaurant?.gst_type}
           total={total}
           addToMode={addToMode}
           activeOrder={activeOrder}

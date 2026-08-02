@@ -93,7 +93,12 @@ export default function AdminStatements() {
     document.body.removeChild(link);
   };
 
-  const { totalRevenue, totalPaidRevenue, orderCount, paidCount } = stats;
+    const { totalRevenue, totalPaidRevenue, orderCount, paidCount, totalRegularSubtotal, totalRegularGst, totalCompositionRevenue, totalCompositionGst, totalNoneRevenue } = stats as any;
+
+  const actualRevenue = (totalRegularSubtotal || 0) + (totalCompositionRevenue || 0) + (totalNoneRevenue || 0) || totalRevenue;
+  const gstCollected = totalRegularGst || 0;
+  const gstPayable = totalCompositionGst || 0;
+  const netRevenue = actualRevenue - gstPayable;
 
   const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
 
@@ -126,8 +131,6 @@ export default function AdminStatements() {
           description="Analyze revenue and historical orders. Click any record to view or edit details."
         />
 
-        {/* ... (rest of the content remains inside the animated container) */}
-
         {/* Date Range Filter */}
         <div className="card" style={{ marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div>
@@ -157,6 +160,45 @@ export default function AdminStatements() {
             >
               <Clock size={16} /> {expiring ? 'Expiring...' : 'Expire Old'}
             </button>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          <div className="stat-card">
+            <p className="stat-label">Revenue</p>
+            <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(actualRevenue)}</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Excluding Cancelled</p>
+          </div>
+          
+          {restaurant?.gst_type === 'REGULAR' && (
+            <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
+              <p className="stat-label">GST Collected</p>
+              <h3 className="stat-value" style={{ color: '#059669' }}>{formatPrice(gstCollected)}</h3>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>On behalf of Govt</p>
+            </div>
+          )}
+
+          {restaurant?.gst_type === 'COMPOSITION' && (
+            <div className="stat-card" style={{ borderLeftColor: '#EAB308' }}>
+              <p className="stat-label">GST Payable</p>
+              <h3 className="stat-value" style={{ color: '#EAB308' }}>{formatPrice(gstPayable)}</h3>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Deducted from Revenue</p>
+            </div>
+          )}
+
+          {restaurant?.gst_type === 'NONE' && (
+            <div className="stat-card" style={{ borderLeftColor: '#6B7280' }}>
+              <p className="stat-label">GST</p>
+              <h3 className="stat-value" style={{ color: '#6B7280' }}>{formatPrice(0)}</h3>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>No GST applicable</p>
+            </div>
+          )}
+
+          <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
+            <p className="stat-label">Net Revenue</p>
+            <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>{formatPrice(netRevenue)}</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Final retained earnings</p>
           </div>
         </div>
 
@@ -327,6 +369,7 @@ export default function AdminStatements() {
             address: restaurant.address,
             phone: restaurant.phone,
             primary_color: restaurant.primary_color,
+            gst_number: restaurant.gst_number,
           }}
           onClose={() => setShowBill(false)}
         />

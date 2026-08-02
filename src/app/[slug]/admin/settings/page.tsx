@@ -36,6 +36,10 @@ export default function AdminSettings() {
   const [openingTime, setOpeningTime] = useState('09:00:00');
   const [closingTime, setClosingTime] = useState('22:00:00');
   const [rolloverTime, setRolloverTime] = useState('00:00:00');
+  
+  
+
+
 
   useEffect(() => {
     if (restaurant) {
@@ -57,6 +61,7 @@ export default function AdminSettings() {
       setOpeningTime(restaurant.opening_time || '09:00:00');
       setClosingTime(restaurant.closing_time || '22:00:00');
       setRolloverTime(restaurant.rollover_time || '00:00:00');
+
     }
   }, [restaurant]);
 
@@ -88,6 +93,7 @@ export default function AdminSettings() {
           opening_time: openingTime,
           closing_time: closingTime,
           rollover_time: rolloverTime,
+
         }),
       });
       const data = await res.json();
@@ -279,7 +285,7 @@ export default function AdminSettings() {
               </div>
             </div>
 
-            {/* Theme Colors Configuration */}
+{/* Theme Colors Configuration */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <div>
                 <label style={S.label}>Primary Color</label>

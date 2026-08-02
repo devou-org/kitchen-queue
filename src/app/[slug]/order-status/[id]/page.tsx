@@ -613,6 +613,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             address: restaurant.address,
             phone: restaurant.phone,
             primary_color: restaurant.primary_color,
+            gst_number: restaurant.gst_number,
           }}
           onClose={() => setShowBill(false)}
         />

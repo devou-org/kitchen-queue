@@ -45,13 +45,32 @@ export class BillingService {
   }
 
   /**
+   * Calculates the cycle month/year based on the restaurant's billing start date (anchor day).
+   */
+  static getCycleMonthYear(billingStartDate: string | Date | null, txDate: Date = new Date()): { month: number; year: number } {
+    const cycleDay = billingStartDate ? new Date(billingStartDate).getDate() : 1;
+    const year = txDate.getFullYear();
+    const month = txDate.getMonth() + 1; // 1-12
+    const day = txDate.getDate();
+
+    if (day < cycleDay) {
+      if (month === 1) {
+        return { month: 12, year: year - 1 };
+      } else {
+        return { month: month - 1, year };
+      }
+    }
+    return { month, year };
+  }
+
+  /**
    * Processes the billing charge for a completed order.
    * Must be executed within a database transaction (hence passing PoolClient).
    */
   static async processOrderBilling(client: PoolClient, restaurantId: string, orderId: string, orderValue: number): Promise<void> {
     // 1. Fetch restaurant billing settings with a row-level lock on the restaurant
     const resSettings = await client.query(`
-      SELECT billing_tier, billing_model, billing_status 
+      SELECT billing_tier, billing_model, billing_status, billing_start_date 
       FROM restaurants 
       WHERE id = $1 
       FOR UPDATE
@@ -61,7 +80,7 @@ export class BillingService {
       throw new Error(`Restaurant with ID ${restaurantId} not found.`);
     }
 
-    const { billing_tier, billing_model, billing_status } = resSettings.rows[0];
+    const { billing_tier, billing_model, billing_status, billing_start_date } = resSettings.rows[0];
 
     // If status is inactive or model is not PER_ORDER, do not bill
     if (billing_status !== 'ACTIVE' || billing_model !== 'PER_ORDER') {
@@ -92,7 +111,7 @@ export class BillingService {
       return;
     }
 
-    const { month, year } = this.getCurrentLocalMonthYear();
+    const { month, year } = this.getCycleMonthYear(billing_start_date);
     const description = `Per Order Charge for Order #${orderId} (${tier} tier)`;
 
     // 2. Insert billing transaction
@@ -123,7 +142,7 @@ export class BillingService {
 
     // 1. Fetch restaurant billing tier
     const resSettings = await executor.query(`
-      SELECT billing_tier, billing_status 
+      SELECT billing_tier, billing_status, billing_start_date 
       FROM restaurants 
       WHERE id = $1
     `, [restaurantId]);
@@ -132,7 +151,7 @@ export class BillingService {
       return; // Or throw error
     }
 
-    const { billing_tier, billing_status } = resSettings.rows[0];
+    const { billing_tier, billing_status, billing_start_date } = resSettings.rows[0];
 
     if (billing_status !== 'ACTIVE') {
       return;
@@ -158,9 +177,8 @@ export class BillingService {
       return;
     }
 
-    const { month, year } = this.getCurrentLocalMonthYear();
+    const { month, year } = this.getCycleMonthYear(billing_start_date);
     const description = `OTP SMS charge for request #${otpLogId}`;
-
 
     // 2. Insert billing transaction
     await executor.query(`
@@ -189,7 +207,11 @@ export class BillingService {
     try {
       await client.query('BEGIN');
 
-      const { month, year } = this.getCurrentLocalMonthYear();
+      const resSettings = await client.query(`
+        SELECT billing_start_date FROM restaurants WHERE id = $1
+      `, [restaurantId]);
+
+      const { month, year } = this.getCycleMonthYear(resSettings.rows[0]?.billing_start_date);
 
       await client.query(`
         INSERT INTO billing_transactions (restaurant_id, transaction_type, amount, description)
@@ -225,7 +247,7 @@ export class BillingService {
       await client.query('BEGIN');
 
       const resSettings = await client.query(`
-        SELECT billing_tier, billing_model, billing_status 
+        SELECT billing_tier, billing_model, billing_status, billing_start_date 
         FROM restaurants 
         WHERE id = $1
       `, [restaurantId]);
@@ -234,7 +256,7 @@ export class BillingService {
         throw new Error('Restaurant not found');
       }
 
-      const { billing_tier, billing_model, billing_status } = resSettings.rows[0];
+      const { billing_tier, billing_model, billing_status, billing_start_date } = resSettings.rows[0];
 
       if (billing_status !== 'ACTIVE' || billing_model !== 'SUBSCRIPTION') {
         throw new Error('Subscription billing only applies to active restaurants with subscription model.');
@@ -245,7 +267,7 @@ export class BillingService {
       const multiplier = billingPeriod === 'YEARLY' ? 12 : 1;
       const amount = pricing.subscriptionMonthly * multiplier;
 
-      const { month, year } = this.getCurrentLocalMonthYear();
+      const { month, year } = this.getCycleMonthYear(billing_start_date, cycleStart || new Date());
       let description = '';
       if (cycleStart && cycleEnd) {
         const startStr = cycleStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -291,7 +313,7 @@ export class BillingService {
       await client.query('BEGIN');
 
       const resSettings = await client.query(`
-        SELECT billing_tier, billing_model, billing_status 
+        SELECT billing_tier, billing_model, billing_status, billing_start_date 
         FROM restaurants 
         WHERE id = $1
       `, [restaurantId]);
@@ -300,7 +322,7 @@ export class BillingService {
         throw new Error('Restaurant not found');
       }
 
-      const { billing_tier, billing_model, billing_status } = resSettings.rows[0];
+      const { billing_tier, billing_model, billing_status, billing_start_date } = resSettings.rows[0];
 
       if (billing_status !== 'ACTIVE' || billing_model !== 'ONE_TIME') {
         throw new Error('One-time billing only applies to active restaurants with one-time model.');
@@ -313,7 +335,7 @@ export class BillingService {
       
       const amount = pricing.oneTime;
 
-      const { month, year } = this.getCurrentLocalMonthYear();
+      const { month, year } = this.getCycleMonthYear(billing_start_date);
       const description = `One Time Setup Fee (${billing_tier} tier)`;
 
       await client.query(`

@@ -40,6 +40,9 @@ export async function GET(request: NextRequest) {
         closing_time: restaurant.closing_time,
         rollover_time: restaurant.rollover_time,
         billing_status: restaurant.billing_status,
+        gst_type: restaurant.gst_type,
+        gst_number: restaurant.gst_number,
+        gst_rate: restaurant.gst_rate,
         // Derived channel name so clients don't have to construct it themselves
         pusher_channel: `queue-channel-${restaurant.id}`,
         modules,

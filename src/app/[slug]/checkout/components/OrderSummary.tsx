@@ -5,12 +5,14 @@ import { ClipboardList } from 'lucide-react';
 interface OrderSummaryProps {
   items: CartItem[];
   subtotal: number;
+  gstAmount?: number;
+  gstType?: string;
   total: number;
   addToMode: boolean;
   activeOrder: Order | null;
 }
 
-export default function OrderSummary({ items, subtotal, total, addToMode, activeOrder }: OrderSummaryProps) {
+export default function OrderSummary({ items, subtotal, gstAmount, gstType, total, addToMode, activeOrder }: OrderSummaryProps) {
   return (
     <div className="card" style={{ marginBottom: '16px' }}>
       <h3 style={{ fontWeight: 700, marginBottom: '14px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -45,6 +47,16 @@ export default function OrderSummary({ items, subtotal, total, addToMode, active
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
               <span>Subtotal (new items)</span><span>{formatPrice(subtotal)}</span>
             </div>
+            {gstType === 'REGULAR' && gstAmount !== undefined && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                <span>GST</span><span>{formatPrice(gstAmount)}</span>
+              </div>
+            )}
+            {gstType === 'COMPOSITION' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                <span>GST</span><span>Included</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px', paddingTop: '8px', borderTop: '2px solid var(--border)' }}>
               <span>Total</span>
               <span style={{ color: 'var(--primary)' }}>{formatPrice(total)}</span>

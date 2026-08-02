@@ -17,6 +17,7 @@ export interface BillRestaurantInfo {
   logo_url?: string;
   address?: string;
   phone?: string;
+  gst_number?: string;
   primary_color?: string;
 }
 
@@ -278,7 +279,8 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 {(restaurant.address || restaurant.phone) && (
                   <p style={{ fontSize: '11px', color: '#6b7280', lineHeight: 1.5 }}>
                     {restaurant.address && <>{restaurant.address}<br /></>}
-                    {restaurant.phone && <>Tel: {restaurant.phone}</>}
+                    {restaurant.phone && <><br />Tel: {restaurant.phone}</>}
+                    {restaurant.gst_number && <><br />GSTIN: <span style={{fontWeight: 700}}>{restaurant.gst_number}</span></>}
                   </p>
                 )}
               </div>
@@ -397,6 +399,21 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#374151' }}>{formatPrice(subtotal)}</span>
               </div>
 
+              {/* GST Breakdown */}
+              {(order as any).gst_type === 'REGULAR' && (order as any).gst_amount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', color: '#6b7280' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 500 }}>GST @ {(order as any).gst_rate}%</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600 }}>{formatPrice((order as any).gst_amount)}</span>
+                </div>
+              )}
+              {(order as any).gst_type === 'COMPOSITION' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', color: '#6b7280' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 500, fontStyle: 'italic' }}>(Inclusive of GST)</span>
+                  <span></span>
+                </div>
+              )}
+
+              {/* Grand Total */}
               {/* Grand Total */}
               <div style={{
                 display: 'flex',
