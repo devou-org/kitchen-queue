@@ -157,7 +157,12 @@ export default function SuperAdminDashboard() {
             <p style={S.headerSub}>Super Admin Console</p>
           </div>
         </div>
-        <button onClick={openCreate} style={S.createBtn}>+ New Restaurant</button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button onClick={() => router.push('/super-admin/ai-quota')} style={{ ...S.createBtn, background: 'linear-gradient(135deg, #6366f1, #4f46e5)', boxShadow: '0 4px 14px rgba(99,102,241,0.25)' }}>
+            🤖 AI Quotas & Limits
+          </button>
+          <button onClick={openCreate} style={S.createBtn}>+ New Restaurant</button>
+        </div>
       </div>
 
       {/* Stats Bar */}

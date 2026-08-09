@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
@@ -193,7 +193,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 onClick={() => setSidebarOpen(false)}
               >
                 <span>{link.icon}</span>
-                {link.name}
+                <span>{link.name}</span>
+                {link.name === 'Products' && (
+                  <Sparkles size={14} style={{ marginLeft: 'auto', color: '#ffffff' }} />
+                )}
               </Link>
             );
           })}
@@ -211,7 +214,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               fontWeight: 600,
               fontSize: '14px',
               padding: '10px 16px',
-              borderRadius: '8px'
+              borderRadius: '8px',
+              marginTop: '12px'
             }}
             onClick={handleLogout}
           >

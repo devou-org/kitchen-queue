@@ -40,6 +40,7 @@ export default function RootLayout({
         {children}
         <Toaster
           position="top-right"
+          containerStyle={{ zIndex: 999999 }}
           toastOptions={{
             duration: 3000,
             style: {
