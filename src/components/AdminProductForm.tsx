@@ -226,7 +226,6 @@ export default function AdminProductForm({ initialData }: { initialData?: Produc
           <select className="input" value={form.dietary_preference} onChange={e => setForm(f => ({ ...f, dietary_preference: e.target.value }))}>
             <option value="VEG">Vegetarian</option>
             <option value="NON_VEG">Non-Vegetarian</option>
-            <option value="EGG">Egg</option>
           </select>
         </div>
 

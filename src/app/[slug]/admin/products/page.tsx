@@ -18,6 +18,7 @@ interface ExtractedProduct {
   category: string;
   price: number;
   description: string;
+  dietary_preference: string;
   selected: boolean;
 }
 
@@ -54,18 +55,24 @@ export default function AdminProducts() {
     } finally {
       setLoading(false);
     }
-
-    try {
-      const aiRes = await fetch('/api/ai/status');
-      const aiData = await aiRes.json();
-      if (aiData.success) {
-        setAiEnabled(aiData.is_enabled);
-        setAiDisabledReason(aiData.disabled_reason || null);
-      }
-    } catch {
-      // Default to enabled on network error
-    }
   };
+
+  // Check global AI status when modal opens or on mount
+  useEffect(() => {
+    async function checkAiStatus() {
+      try {
+        const res = await fetch('/api/ai/status', { cache: 'no-store' });
+        const data = await res.json();
+        if (data.success) {
+          setAiEnabled(data.is_enabled);
+          setAiDisabledReason(data.disabled_reason || null);
+        }
+      } catch (err) {
+        console.error('Failed to check AI status:', err);
+      }
+    }
+    checkAiStatus();
+  }, [aiModalOpen]);
 
   const handleToggleStatus = async (id: string, currentStatus: ProductStatus) => {
     const nextStatus: ProductStatus = currentStatus === 'AVAILABLE' ? 'OUT_OF_STOCK' : 'AVAILABLE';
@@ -95,8 +102,8 @@ export default function AdminProducts() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+  const handleDelete = async (id: string, name?: string) => {
+    if (!confirm(`Are you sure you want to delete ${name || 'this product'}?`)) return;
     try {
       const res = await productService.deleteProduct(id);
       if (res.success) {
@@ -165,6 +172,7 @@ export default function AdminProducts() {
         category: p.category || 'General',
         price: parseFloat(p.price) || 0,
         description: p.description || '',
+        dietary_preference: (p.dietary_preference === 'NON_VEG' || p.dietary_preference === 'NON-VEG') ? 'NON_VEG' : 'VEG',
         selected: true
       }));
 
@@ -214,8 +222,9 @@ export default function AdminProducts() {
           category: item.category,
           price: Number(item.price),
           description: item.description,
+          dietary_preference: item.dietary_preference || 'VEG',
           status: 'AVAILABLE' as ProductStatus,
-          is_vegetarian: false,
+          is_vegetarian: item.dietary_preference === 'VEG',
           preparation_time: 15
         };
         const res = await productService.createProduct(payload);
@@ -635,8 +644,9 @@ export default function AdminProducts() {
                         <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em' }}>
                           <th style={{ padding: '12px', width: '44px', textAlign: 'center' }}>Import</th>
                           <th style={{ padding: '12px', width: '22%' }}>Product Name</th>
-                          <th style={{ padding: '12px', width: '20%' }}>Category</th>
-                          <th style={{ padding: '12px', width: '15%' }}>Price (₹)</th>
+                          <th style={{ padding: '12px', width: '18%' }}>Category</th>
+                          <th style={{ padding: '12px', width: '15%' }}>Type</th>
+                          <th style={{ padding: '12px', width: '14%' }}>Price (₹)</th>
                           <th style={{ padding: '12px' }}>Description</th>
                         </tr>
                       </thead>
@@ -666,6 +676,16 @@ export default function AdminProducts() {
                                 onChange={e => handleUpdateExtractedItem(item.id, 'category', e.target.value)}
                                 style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
                               />
+                            </td>
+                            <td style={{ padding: '10px 12px' }}>
+                              <select
+                                value={item.dietary_preference}
+                                onChange={e => handleUpdateExtractedItem(item.id, 'dietary_preference', e.target.value)}
+                                style={{ width: '100%', padding: '8px 8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: 600, color: item.dietary_preference === 'VEG' ? '#16a34a' : '#dc2626' }}
+                              >
+                                <option value="VEG">🟢 Veg</option>
+                                <option value="NON_VEG">🔴 Non-Veg</option>
+                              </select>
                             </td>
                             <td style={{ padding: '10px 12px' }}>
                               <input

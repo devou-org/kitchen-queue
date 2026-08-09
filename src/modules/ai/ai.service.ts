@@ -316,7 +316,8 @@ Categorization Rules:
 1. "category": Extract the specific food section heading where the item appears (e.g. "Appetizers", "Main Course", "Pizza", "Burgers", "Beverages", "Desserts", "Salads", "Starters"). DO NOT use generic document titles or page headings like "Menu", "Menu and Prices", "Food List", "Our Menu", or "Price List". If no specific category header is visible for an item, assign a logical category based on the food item itself (e.g., "Mains", "Drinks", "Snacks").
 2. "name": The clear, concise name of the menu item.
 3. "price": A clean numeric price (e.g. 12.99 or 250). Do NOT include currency symbols like $, ₹, or €.
-4. "description": Extract the printed description or ingredients if visible on the menu. If NO description is printed for an item on the menu, generate a short, delicious, 1-sentence appetizing description for the item based on its name and category.
+4. "dietary_preference": Must be exactly "VEG" or "NON_VEG". If the item contains meat, chicken, beef, pork, fish, seafood, or egg, set to "NON_VEG". For plant-based items, dairy, vegetables, drinks, tea, coffee, or desserts, set to "VEG".
+5. "description": Extract the printed description or ingredients if visible on the menu. If NO description is printed for an item on the menu, generate a short, delicious, 1-sentence appetizing description for the item based on its name and category.
 
 Respond ONLY with a valid JSON array of objects without markdown formatting or code fences:
 [
@@ -324,6 +325,7 @@ Respond ONLY with a valid JSON array of objects without markdown formatting or c
     "name": "Grilled Chicken Caesar Salad",
     "category": "Salads",
     "price": 12.99,
+    "dietary_preference": "NON_VEG",
     "description": "Crispy romaine, grilled chicken breast, parmesan, croutons"
   }
 ]`;
