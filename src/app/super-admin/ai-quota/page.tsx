@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { Cpu, ShieldCheck, ShieldAlert, Sliders, RefreshCw, ArrowLeft, BarChart2, Store, Clock, Zap } from 'lucide-react';
 import Link from 'next/link';
 
@@ -123,7 +123,6 @@ export default function SuperAdminAIQuotaPage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif", paddingBottom: '60px', color: '#0f172a' }}>
-      <Toaster position="top-right" />
 
       {/* Top Header */}
       <div style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '24px 32px' }}>
