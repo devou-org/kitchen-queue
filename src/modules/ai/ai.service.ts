@@ -310,23 +310,24 @@ export class AIService {
     mimeType: string = 'image/jpeg'
   ) {
     const prompt = `You are an expert culinary menu extraction assistant.
-Analyze this menu image carefully and extract all food and beverage products.
+Analyze this menu image carefully and extract EVERY SINGLE food and beverage product across all sections, columns, and headers without omitting any item.
 
-Categorization Rules:
-1. "category": Extract the specific food section heading where the item appears (e.g. "Appetizers", "Main Course", "Pizza", "Burgers", "Beverages", "Desserts", "Salads", "Starters"). DO NOT use generic document titles or page headings like "Menu", "Menu and Prices", "Food List", "Our Menu", or "Price List". If no specific category header is visible for an item, assign a logical category based on the food item itself (e.g., "Mains", "Drinks", "Snacks").
-2. "name": The clear, concise name of the menu item.
-3. "price": A clean numeric price (e.g. 12.99 or 250). Do NOT include currency symbols like $, ₹, or €.
-4. "dietary_preference": Must be exactly "VEG" or "NON_VEG". If the item contains meat, chicken, beef, pork, fish, seafood, or egg, set to "NON_VEG". For plant-based items, dairy, vegetables, drinks, tea, coffee, or desserts, set to "VEG".
-5. "description": Extract the printed description or ingredients if visible on the menu. If NO description is printed for an item on the menu, generate a short, delicious, 1-sentence appetizing description for the item based on its name and category.
+Exhaustive Extraction Rules:
+1. Scan every column (left, right, top, bottom) and every category header (e.g. "Pizza", "Snakes", "Sandwich", "Shakes", "Burger", "Mocktails", "Pasta"). Do NOT skip any section.
+2. "category": Use the exact section heading where the item appears.
+3. "name": The exact item name printed.
+4. "price": A clean numeric price (e.g. 180 or 100). Do NOT include currency symbols or slashes like "/-".
+5. "dietary_preference": Must be exactly "VEG" or "NON_VEG". Set to "NON_VEG" if the item contains meat, chicken, fish, seafood, or egg. Otherwise set to "VEG".
+6. "description": Extract printed description if visible. If no description is printed on the menu image, provide a concise 3-6 word appetizing description. Keep it short so all menu items fit in the response.
 
 Respond ONLY with a valid JSON array of objects without markdown formatting or code fences:
 [
   {
-    "name": "Grilled Chicken Caesar Salad",
-    "category": "Salads",
-    "price": 12.99,
-    "dietary_preference": "NON_VEG",
-    "description": "Crispy romaine, grilled chicken breast, parmesan, croutons"
+    "name": "Spiced Paneer",
+    "category": "Pizza",
+    "price": 180,
+    "dietary_preference": "VEG",
+    "description": "Spicy marinated paneer with herbs and cheese"
   }
 ]`;
 
