@@ -699,7 +699,7 @@ export default function AdminProducts() {
                               <input
                                 type="text"
                                 value={item.description || ''}
-                                placeholder="Generated description..."
+                                placeholder="Enter the product description..."
                                 onChange={e => handleUpdateExtractedItem(item.id, 'description', e.target.value)}
                                 style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', color: '#334155' }}
                               />
