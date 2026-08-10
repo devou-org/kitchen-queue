@@ -88,14 +88,18 @@ export class AIService {
    * Fallback rough estimation of input tokens if countTokens API fails.
    */
   private static estimateTokens(contents: GeminiContent[]): number {
-    let charCount = 0;
+    let textCharCount = 0;
+    let imageCount = 0;
     for (const content of contents) {
       for (const part of content.parts) {
-        if (part.text) charCount += part.text.length;
-        if (part.inlineData) charCount += Math.ceil(part.inlineData.data.length * 0.75); // Image base64 approximation
+        if (part.text) textCharCount += part.text.length;
+        if (part.inlineData) imageCount += 1;
       }
     }
-    return Math.max(1, Math.ceil(charCount / 4));
+    // Text tokens ~4 chars per token. Gemini Vision charges a fixed ~1500 tokens max per image tile.
+    const textTokens = Math.ceil(textCharCount / 4);
+    const imageTokens = imageCount * 1500;
+    return Math.max(1, textTokens + imageTokens);
   }
 
   /**
