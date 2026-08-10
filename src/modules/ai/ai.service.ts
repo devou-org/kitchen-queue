@@ -322,7 +322,7 @@ Exhaustive Extraction Rules:
 3. "name": The exact item name printed.
 4. "price": A clean numeric price (e.g. 180 or 100). Do NOT include currency symbols or slashes like "/-".
 5. "dietary_preference": Must be exactly "VEG" or "NON_VEG". Set to "NON_VEG" if the item contains meat, chicken, fish, seafood, or egg. Otherwise set to "VEG".
-6. "description": Extract printed description if visible. If no description is printed on the menu image, provide a concise 3-6 word appetizing description. Keep it short so all menu items fit in the response.
+6. "description": Extract text descriptions or ingredients ONLY IF explicitly printed on the menu image under or next to the item. If NO description is printed on the image, set "description" to "". Do NOT generate, invent, or fabricate any description.
 
 Respond ONLY with a valid JSON array of objects without markdown formatting or code fences:
 [
@@ -331,7 +331,7 @@ Respond ONLY with a valid JSON array of objects without markdown formatting or c
     "category": "Pizza",
     "price": 180,
     "dietary_preference": "VEG",
-    "description": "Spicy marinated paneer with herbs and cheese"
+    "description": ""
   }
 ]`;
 
