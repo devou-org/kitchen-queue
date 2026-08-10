@@ -314,15 +314,17 @@ export class AIService {
     mimeType: string = 'image/jpeg'
   ) {
     const prompt = `You are an expert culinary menu extraction assistant.
-Analyze this menu image carefully and extract EVERY SINGLE food and beverage product across all sections, columns, and headers without omitting any item.
+Analyze this menu image carefully. IMPORTANT: MENU IMAGES OFTEN HAVE A MULTI-COLUMN LAYOUT (LEFT AND RIGHT COLUMNS). You MUST extract ALL items from BOTH the Left Column AND the Right Column without stopping early.
 
 Exhaustive Extraction Rules:
-1. Scan every column (left, right, top, bottom) and every category header (e.g. "Pizza", "Snakes", "Sandwich", "Shakes", "Burger", "Mocktails", "Pasta"). Do NOT skip any section.
+1. Scan BOTH columns completely:
+   - Left Column sections (e.g., Pizza, Sandwich, Burger)
+   - Right Column sections (e.g., Snacks/Snakes, Shakes, Mocktails, Pasta)
+   DO NOT stop after completing the left column. Extract every single section and item printed on the image.
 2. "category": Use the exact section heading where the item appears.
 3. "name": The exact item name printed.
 4. "price": A clean numeric price (e.g. 180 or 100). Do NOT include currency symbols or slashes like "/-".
 5. "dietary_preference": Must be exactly "VEG" or "NON_VEG". Set to "NON_VEG" if the item contains meat, chicken, fish, seafood, or egg. Otherwise set to "VEG".
-6. "description": Extract text descriptions or ingredients ONLY IF explicitly printed on the menu image under or next to the item. If NO description is printed on the image, set "description" to "". Do NOT generate, invent, or fabricate any description.
 
 Respond ONLY with a valid JSON array of objects without markdown formatting or code fences:
 [
@@ -330,8 +332,7 @@ Respond ONLY with a valid JSON array of objects without markdown formatting or c
     "name": "Spiced Paneer",
     "category": "Pizza",
     "price": 180,
-    "dietary_preference": "VEG",
-    "description": ""
+    "dietary_preference": "VEG"
   }
 ]`;
 
