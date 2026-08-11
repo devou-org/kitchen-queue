@@ -5,7 +5,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Store, Eye } from 'lucide-react';
+import { Store, Eye, Receipt } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
@@ -285,23 +285,6 @@ export default function AdminSettings() {
               </div>
             </div>
 
-            {/* Read-Only GST Information Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <div>
-                <label style={S.label}>GST Type (Super Admin Configured)</label>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
-                  {restaurant?.gst_type || 'NONE'}
-                </div>
-              </div>
-
-              <div>
-                <label style={S.label}>GSTIN</label>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: restaurant?.gst_number ? '#0f172a' : '#94a3b8', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
-                  {restaurant?.gst_number || 'Not Configured'}
-                </div>
-              </div>
-            </div>
-
             {/* Theme Colors Configuration */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <div>
@@ -327,8 +310,32 @@ export default function AdminSettings() {
           </form>
         </div>
 
-        {/* Right Panel: Brand Preview */}
+        {/* Right Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* GST Information Card (Read-Only) */}
+          <div className="card">
+            <h2 style={S.cardTitle}>
+              <Receipt size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '6px' }} />
+              GST Information
+            </h2>
+            <p style={S.cardDesc}>Read-only tax configuration configured by Super Admin.</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginTop: '16px' }}>
+              <div>
+                <label style={S.label}>GST Type</label>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
+                  {restaurant?.gst_type || 'NONE'}
+                </div>
+              </div>
+
+              <div>
+                <label style={S.label}>GSTIN</label>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: restaurant?.gst_number ? '#0f172a' : '#94a3b8', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
+                  {restaurant?.gst_number || 'Not Configured'}
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Dynamic Customer Branding Live Preview */}
           <div className="card">
             <h2 style={S.cardTitle}>
