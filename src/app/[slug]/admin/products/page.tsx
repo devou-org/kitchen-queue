@@ -11,6 +11,7 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { UploadCloud, X, Loader2, Plus, Sparkles } from 'lucide-react';
+import AdminProductForm from '@/components/AdminProductForm';
 
 interface ExtractedProduct {
   id: string;
@@ -40,6 +41,10 @@ export default function AdminProducts() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [aiDisabledReason, setAiDisabledReason] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Product Form Modal state (Add / Edit)
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -217,10 +222,13 @@ export default function AdminProducts() {
 
     for (const item of selected) {
       try {
+        const itemPrice = parseFloat(String(item.price));
+        const cleanPrice = isNaN(itemPrice) ? 0 : Math.round(itemPrice * 100) / 100;
+
         const payload = {
           name: item.name,
           category: item.category,
-          price: Number(item.price),
+          price: cleanPrice,
           description: item.description,
           dietary_preference: item.dietary_preference || 'VEG',
           status: 'AVAILABLE' as ProductStatus,
@@ -296,18 +304,21 @@ export default function AdminProducts() {
             >
               <Sparkles size={16} style={{ color: aiEnabled ? '#ffffff' : '#cbd5e1', animation: aiEnabled ? 'iconPulse 2s infinite ease-in-out' : 'none' }} /> Upload Menu
             </button>
-            <Link
-              prefetch={false}
-              href={`/${slug}/admin/products/new`}
+            <button
+              onClick={() => {
+                setEditingProduct(null);
+                setFormModalOpen(true);
+              }}
               style={{
                 height: '42px',
                 padding: '0 20px',
                 borderRadius: '9999px',
                 backgroundColor: 'var(--primary, #0f172a)',
                 color: '#ffffff',
-                textDecoration: 'none',
+                border: 'none',
                 fontWeight: 700,
                 fontSize: '13px',
+                cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -316,7 +327,7 @@ export default function AdminProducts() {
               }}
             >
               <Plus size={16} /> Add Product
-            </Link>
+            </button>
           </div>
         }
       />
@@ -426,7 +437,15 @@ export default function AdminProducts() {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                        <Link prefetch={false} href={`/${slug}/admin/products/${p.id}/edit`} className="btn btn-secondary btn-sm">Edit</Link>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setEditingProduct(p);
+                            setFormModalOpen(true);
+                          }}
+                        >
+                          Edit
+                        </button>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id, p.name)}>Delete</button>
                       </div>
                     </td>
@@ -690,8 +709,10 @@ export default function AdminProducts() {
                             <td style={{ padding: '10px 12px' }}>
                               <input
                                 type="number"
+                                step="0.01"
                                 value={item.price}
-                                onChange={e => handleUpdateExtractedItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                                onChange={e => handleUpdateExtractedItem(item.id, 'price', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                 style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}
                               />
                             </td>
@@ -770,6 +791,52 @@ export default function AdminProducts() {
               </div>
             )}
 
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Product Add / Edit Modal Popup */}
+      {formModalOpen && mounted && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          overflowY: 'auto'
+        }}>
+          <div style={{
+            backgroundColor: '#f8fafc',
+            borderRadius: '20px',
+            maxWidth: '1050px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            padding: '28px',
+            position: 'relative'
+          }}>
+            <AdminProductForm
+              initialData={editingProduct || undefined}
+              isModal={true}
+              onSuccess={() => {
+                setFormModalOpen(false);
+                setEditingProduct(null);
+                fetchProducts();
+              }}
+              onCancel={() => {
+                setFormModalOpen(false);
+                setEditingProduct(null);
+              }}
+            />
           </div>
         </div>,
         document.body

@@ -55,14 +55,6 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
   return (
     <AdminContentWrapper>
-      <AdminPageHeader
-        title={`Edit Product: ${product.name}`}
-        backLink={
-          <Link prefetch={false} href={`/${slug}/admin/products`} style={{ color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none' }}>
-            ← Back to Products
-          </Link>
-        }
-      />
       <AdminProductForm key={id} initialData={product} />
     </AdminContentWrapper>
   );
