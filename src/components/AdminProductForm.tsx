@@ -175,9 +175,12 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
     <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <style>{`
         .product-form-container {
-          display: grid;
-          grid-template-columns: 1fr;
+          display: flex;
+          flex-direction: column;
           gap: 20px;
+        }
+        .form-col-left, .form-col-right {
+          display: contents;
         }
         .form-card-basic { order: 1; }
         .form-card-inventory { order: 2; }
@@ -189,18 +192,22 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           .product-form-container {
             display: grid;
             grid-template-columns: 1.15fr 0.85fr;
-            grid-template-areas:
-              "basic inventory"
-              "pricing image"
-              "pricing preview";
             gap: 24px;
             align-items: start;
           }
-          .form-card-basic { grid-area: basic; order: unset; }
-          .form-card-inventory { grid-area: inventory; order: unset; }
-          .form-card-pricing { grid-area: pricing; order: unset; }
-          .form-card-image { grid-area: image; order: unset; }
-          .form-card-preview { grid-area: preview; order: unset; }
+          .form-col-left {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+          }
+          .form-col-right {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+          }
+          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-image, .form-card-preview {
+            order: unset;
+          }
         }
       `}</style>
       
@@ -300,7 +307,9 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
       {/* Main Responsive Grid Layout */}
       <div className="product-form-container">
         
-        {/* Card 1: Basic Information */}
+        {/* Left Column: Basic Details & Pricing */}
+        <div className="form-col-left">
+          {/* Card 1: Basic Information */}
         <div className="form-card-basic" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -419,66 +428,6 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           </div>
         </div>
 
-        {/* Card 2: Inventory & Stock Control */}
-        {showOnlineOrdering && (
-          <div className="form-card-inventory" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Boxes size={18} />
-                </div>
-                <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Inventory Control</h2>
-              </div>
-
-              {/* Real-time Status Badge */}
-              <span
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '9999px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  backgroundColor: calculatedStatus === 'AVAILABLE' ? '#dcfce7' : calculatedStatus === 'LOW_STOCK' ? '#fef9c3' : '#fee2e2',
-                  color: calculatedStatus === 'AVAILABLE' ? '#15803d' : calculatedStatus === 'LOW_STOCK' ? '#a16207' : '#b91c1c'
-                }}
-              >
-                {calculatedStatus.replace('_', ' ')}
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Stock Quantity
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={form.stock_quantity}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))}
-                  placeholder="0"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Buffer Threshold
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={form.buffer_quantity}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))}
-                  placeholder="0"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Card 3: Pricing & Dietary Classification */}
         <div className="form-card-pricing" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
@@ -577,6 +526,69 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Right Column: Inventory, Image, & Live Preview */}
+      <div className="form-col-right">
+          {/* Card 2: Inventory & Stock Control */}
+        {showOnlineOrdering && (
+          <div className="form-card-inventory" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Boxes size={18} />
+                </div>
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Inventory Control</h2>
+              </div>
+
+              {/* Real-time Status Badge */}
+              <span
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '9999px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  backgroundColor: calculatedStatus === 'AVAILABLE' ? '#dcfce7' : calculatedStatus === 'LOW_STOCK' ? '#fef9c3' : '#fee2e2',
+                  color: calculatedStatus === 'AVAILABLE' ? '#15803d' : calculatedStatus === 'LOW_STOCK' ? '#a16207' : '#b91c1c'
+                }}
+              >
+                {calculatedStatus.replace('_', ' ')}
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Stock Quantity
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.stock_quantity}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))}
+                  placeholder="0"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Buffer Threshold
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.buffer_quantity}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))}
+                  placeholder="0"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Card 4: Product Image Card */}
         <div className="form-card-image" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -660,12 +672,10 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               )}
             </div>
           </div>
-
         </div>
-
       </div>
-
-    </form>
+    </div>
+  </form>
   );
 }
 
