@@ -548,6 +548,45 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
 
             <div style={{ borderTop: '1px dashed #E5E7EB', margin: '8px 0' }} />
 
+            {/* Subtotal */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Subtotal</span>
+              <span style={{ fontWeight: 700, fontSize: '14px', color: '#33322F' }}>
+                {formatPrice(order.subtotal ?? (order.items || []).reduce((sum, item) => sum + item.price_at_purchase * item.quantity, 0))}
+              </span>
+            </div>
+
+            {/* GST Breakdown for REGULAR */}
+            {((order as any).gst_type === 'REGULAR' || (restaurant?.gst_type === 'REGULAR' && (order as any).gst_type !== 'NONE' && (order as any).gst_type !== 'COMPOSITION')) && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: '#6B6667', fontWeight: 500 }}>
+                    CGST {((order as any).gst_rate || restaurant?.gst_rate || 0) / 2}%
+                  </span>
+                  <span style={{ fontWeight: 600, fontSize: '13px', color: '#4B5563' }}>
+                    {formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: '#6B6667', fontWeight: 500 }}>
+                    SGST {((order as any).gst_rate || restaurant?.gst_rate || 0) / 2}%
+                  </span>
+                  <span style={{ fontWeight: 600, fontSize: '13px', color: '#4B5563' }}>
+                    {formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}
+                  </span>
+                </div>
+                <div style={{ borderTop: '1px dashed #E5E7EB', margin: '4px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '14px', color: '#33322F', fontWeight: 600 }}>
+                    Total GST {((order as any).gst_rate || restaurant?.gst_rate || 0)}%
+                  </span>
+                  <span style={{ fontWeight: 700, fontSize: '14px', color: '#33322F' }}>
+                    {formatPrice((order as any).gst_amount || 0)}
+                  </span>
+                </div>
+              </>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Status</span>
               <span style={{ fontWeight: 800, fontSize: '14px', color: '#EC7951', textTransform: 'uppercase' }}>
@@ -556,7 +595,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '18px', fontWeight: 800, color: '#33322F' }}>Total</span>
+              <span style={{ fontSize: '18px', fontWeight: 800, color: '#33322F' }}>Grand Total</span>
               <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--primary)' }}>
                 {formatPrice(order.total_price)}
               </span>
@@ -613,6 +652,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             address: restaurant.address,
             phone: restaurant.phone,
             primary_color: restaurant.primary_color,
+            gst_number: restaurant.gst_number,
           }}
           onClose={() => setShowBill(false)}
         />

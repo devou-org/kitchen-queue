@@ -162,7 +162,10 @@ export default function BillingPage() {
 
   const currentCycleTransactions = transactions.filter(tx => {
     if (!restaurant.billing_start_date) return true;
-    return new Date(tx.created_at) >= new Date(restaurant.billing_start_date);
+    const txDate = new Date(tx.created_at);
+    const startDate = new Date(restaurant.billing_start_date);
+    const endDate = restaurant.billing_end_date ? new Date(restaurant.billing_end_date) : null;
+    return txDate >= startDate && (!endDate || txDate < endDate);
   });
 
   const otpTxs = currentCycleTransactions.filter(tx => tx.transaction_type === 'OTP');

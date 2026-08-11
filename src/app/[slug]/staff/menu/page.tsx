@@ -289,7 +289,15 @@ export default function StaffMenuPage() {
   };
 
   const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
-  const totalPrice = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
+  let subtotal = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
+  
+  let gstAmount = 0;
+  let totalPrice = subtotal;
+  if (restaurant?.gst_type === 'REGULAR') {
+    const rate = Number(restaurant.gst_rate) || 0;
+    gstAmount = Math.round((subtotal * rate / 100) * 100) / 100;
+    totalPrice = subtotal + gstAmount;
+  }
 
   const filtered = products
     .filter(p => {

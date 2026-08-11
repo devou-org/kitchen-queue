@@ -48,6 +48,12 @@ export default function RestaurantDetails() {
   const [adminPassword, setAdminPassword] = useState('');
   const [savingAdmin, setSavingAdmin] = useState(false);
 
+  // GST State
+  const [gstType, setGstType] = useState<'NONE' | 'REGULAR' | 'COMPOSITION'>('NONE');
+  const [gstNumber, setGstNumber] = useState('');
+  const [gstRate, setGstRate] = useState(5.00);
+  const [savingGst, setSavingGst] = useState(false);
+
   // Form Fields State
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -98,6 +104,11 @@ export default function RestaurantDetails() {
         setMenuLayout((r as any).menu_layout || 'LIST');
         setMenuTitle(r.menu_title || "Today's Specials");
         setMenuDescription(r.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes.");
+        
+        // GST States
+        setGstType((r as any).gst_type || 'NONE');
+        setGstNumber((r as any).gst_number || '');
+        setGstRate(Number((r as any).gst_rate || 0) || ((r as any).gst_type !== 'NONE' ? 5 : 0));
       } else {
         toast.error('Restaurant not found');
         router.push('/super-admin');
@@ -108,6 +119,33 @@ export default function RestaurantDetails() {
       setLoading(false);
     }
   }, [id, router]);
+
+  const handleSaveGst = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingGst(true);
+    try {
+      const res = await fetch(`/api/super-admin/restaurants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        ...authHeaders,
+        body: JSON.stringify({
+          gst_type: gstType,
+          gst_number: gstNumber || null,
+          gst_rate: Number(gstRate),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('GST Configuration updated successfully!');
+      } else {
+        toast.error(data.error || 'Failed to update GST configuration');
+      }
+    } catch {
+      toast.error('Connection error while updating GST');
+    } finally {
+      setSavingGst(false);
+    }
+  };
 
   const fetchAdminDetails = useCallback(async () => {
     if (!id) return;
@@ -584,6 +622,56 @@ export default function RestaurantDetails() {
             </div>
 
 
+
+            {/* GST Settings */}
+            <div style={S.card}>
+              <h2 style={{...S.cardTitle, display: 'flex', alignItems: 'center', gap: '8px'}}><Receipt size={20} /> GST Configuration</h2>
+              <p style={S.cardDesc}>Configure tax rules for this restaurant.</p>
+              
+              <form onSubmit={handleSaveGst} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={S.label}>GST Type</label>
+                  <select 
+                    value={gstType} 
+                    onChange={e => {
+                      setGstType(e.target.value as any);
+                      if (e.target.value === 'NONE') setGstRate(0);
+                      else if (gstRate === 0) setGstRate(5);
+                    }}
+                    style={S.input}
+                  >
+                    <option value="NONE">None (No GST)</option>
+                    <option value="REGULAR">Regular (Show separately)</option>
+                    <option value="COMPOSITION">Composition (Included in price)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={S.label}>GST Number {gstType !== 'NONE' && '*'}</label>
+                  <input 
+                    type="text" 
+                    value={gstNumber} 
+                    onChange={e => setGstNumber(e.target.value)} 
+                    disabled={gstType === 'NONE'} 
+                    style={S.input} 
+                    placeholder="e.g. 29ABCDE1234F1Z5" 
+                  />
+                </div>
+                <div>
+                  <label style={S.label}>GST Rate (%) {gstType !== 'NONE' && '*'}</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={gstRate} 
+                    onChange={e => setGstRate(parseFloat(e.target.value) || 0)} 
+                    disabled={gstType === 'NONE'} 
+                    style={S.input} 
+                  />
+                </div>
+                <button type="submit" style={{ ...S.primaryLinkBtn, border: 'none', cursor: 'pointer', textAlign: 'center' }} disabled={savingGst}>
+                  {savingGst ? 'Saving...' : 'Save GST'}
+                </button>
+              </form>
+            </div>
 
             {/* Danger Zone deletion panel */}
             <div style={{ ...S.card, borderColor: '#fecaca', backgroundColor: '#fff5f5' }}>

@@ -47,7 +47,12 @@ export async function GET(request: NextRequest) {
         totalRevenue: Number(stats.total_revenue),
         totalPaidRevenue: Number(stats.total_paid_revenue),
         orderCount: Number(stats.total_orders),
-        paidCount: Number(stats.paid_orders)
+        paidCount: Number(stats.paid_orders),
+        totalRegularSubtotal: Number(stats.total_regular_subtotal || 0),
+        totalRegularGst: Number(stats.total_regular_gst || 0),
+        totalCompositionRevenue: Number(stats.total_composition_revenue || 0),
+        totalCompositionGst: Number(stats.total_composition_gst || 0),
+        totalNoneRevenue: Number(stats.total_none_revenue || 0)
       }
     });
   } catch (error) {
@@ -86,12 +91,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Calculate total (Tax is 0 as per requirements)
-    let total_price = 0;
+    // Calculate total and GST
+    let subtotal = 0;
     for (const item of items) {
-      total_price += item.price_at_purchase * item.quantity;
+      subtotal += item.price_at_purchase * item.quantity;
     }
-    total_price = Math.round(total_price * 100) / 100;
+    subtotal = Math.round(subtotal * 100) / 100;
+
+    const gst_type = restaurant.gst_type || 'NONE';
+    const gst_rate = Number(restaurant.gst_rate) || 0;
+    let gst_amount = 0;
+    let total_price = subtotal;
+
+    if (gst_type === 'REGULAR') {
+      gst_amount = Math.round((subtotal * gst_rate / 100) * 100) / 100;
+      total_price = subtotal + gst_amount;
+    }
 
     const admin = await requireAdmin(request);
     const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
@@ -106,6 +121,10 @@ export async function POST(request: NextRequest) {
       customer_name: customer_name.trim(),
       phone,
       total_price,
+      subtotal,
+      gst_amount,
+      gst_rate,
+      gst_type,
       notes,
       party_size: party_size || 1,
       table_number,

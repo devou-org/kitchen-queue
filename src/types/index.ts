@@ -46,6 +46,10 @@ export interface Order {
   customer_name: string;
   phone: string;
   total_price: number;
+  subtotal?: number;
+  gst_amount?: number;
+  gst_rate?: number;
+  gst_type?: 'NONE' | 'REGULAR' | 'COMPOSITION' | string;
   status: OrderStatus;
   is_paid: boolean;
   notes?: string;

@@ -36,6 +36,10 @@ export default function AdminSettings() {
   const [openingTime, setOpeningTime] = useState('09:00:00');
   const [closingTime, setClosingTime] = useState('22:00:00');
   const [rolloverTime, setRolloverTime] = useState('00:00:00');
+  
+  
+
+
 
   useEffect(() => {
     if (restaurant) {
@@ -57,6 +61,7 @@ export default function AdminSettings() {
       setOpeningTime(restaurant.opening_time || '09:00:00');
       setClosingTime(restaurant.closing_time || '22:00:00');
       setRolloverTime(restaurant.rollover_time || '00:00:00');
+
     }
   }, [restaurant]);
 
@@ -88,6 +93,7 @@ export default function AdminSettings() {
           opening_time: openingTime,
           closing_time: closingTime,
           rollover_time: rolloverTime,
+
         }),
       });
       const data = await res.json();
@@ -276,6 +282,23 @@ export default function AdminSettings() {
                   Orders placed before this time will count towards the previous day's sales (useful if open past midnight). Default is 00:00.
                 </p>
                 <input type="time" value={rolloverTime} onChange={e => setRolloverTime(e.target.value)} style={S.input} />
+              </div>
+            </div>
+
+            {/* Read-Only GST Information Section */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div>
+                <label style={S.label}>GST Type (Super Admin Configured)</label>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
+                  {restaurant?.gst_type || 'NONE'}
+                </div>
+              </div>
+
+              <div>
+                <label style={S.label}>GSTIN</label>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: restaurant?.gst_number ? '#0f172a' : '#94a3b8', padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
+                  {restaurant?.gst_number || 'Not Configured'}
+                </div>
               </div>
             </div>
 

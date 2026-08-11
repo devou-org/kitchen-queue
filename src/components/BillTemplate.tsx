@@ -17,6 +17,7 @@ export interface BillRestaurantInfo {
   logo_url?: string;
   address?: string;
   phone?: string;
+  gst_number?: string;
   primary_color?: string;
 }
 
@@ -278,7 +279,8 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 {(restaurant.address || restaurant.phone) && (
                   <p style={{ fontSize: '11px', color: '#6b7280', lineHeight: 1.5 }}>
                     {restaurant.address && <>{restaurant.address}<br /></>}
-                    {restaurant.phone && <>Tel: {restaurant.phone}</>}
+                    {restaurant.phone && <><br />Tel: {restaurant.phone}</>}
+                    {restaurant.gst_number && <><br />GSTIN: <span style={{fontWeight: 700}}>{restaurant.gst_number}</span></>}
                   </p>
                 )}
               </div>
@@ -397,6 +399,31 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#374151' }}>{formatPrice(subtotal)}</span>
               </div>
 
+              {/* GST Breakdown */}
+              {(order as any).gst_type === 'REGULAR' && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#4b5563' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 500 }}>CGST {((order as any).gst_rate || 0) / 2}%</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600 }}>{formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#4b5563' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 500 }}>SGST {((order as any).gst_rate || 0) / 2}%</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600 }}>{formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}</span>
+                  </div>
+                  <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '4px 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#1a1a1a' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Total GST {((order as any).gst_rate || 0)}%</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700 }}>{formatPrice((order as any).gst_amount || 0)}</span>
+                  </div>
+                </>
+              )}
+              {(order as any).gst_type === 'COMPOSITION' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', color: '#6b7280' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 500, fontStyle: 'italic' }}>(Inclusive of GST)</span>
+                  <span></span>
+                </div>
+              )}
+
               {/* Grand Total */}
               <div style={{
                 display: 'flex',
@@ -406,7 +433,7 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 marginTop: '4px',
                 borderTop: `2px solid ${primaryColor}`,
               }}>
-                <span style={{ fontSize: '16px', fontWeight: 800, color: '#1a1a1a' }}>Total</span>
+                <span style={{ fontSize: '16px', fontWeight: 800, color: '#1a1a1a' }}>Grand Total</span>
                 <span style={{ fontSize: '18px', fontWeight: 900, color: primaryColor }}>
                   {formatPrice(order.total_price)}
                 </span>

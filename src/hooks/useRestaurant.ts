@@ -19,6 +19,9 @@ export type RestaurantContext = {
   opening_time?: string;
   closing_time?: string;
   rollover_time?: string;
+  gst_type?: 'NONE' | 'REGULAR' | 'COMPOSITION';
+  gst_number?: string;
+  gst_rate?: number;
   billing_status?: string;
 };
 

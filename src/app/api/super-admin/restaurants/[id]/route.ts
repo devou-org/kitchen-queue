@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules, billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time } = body;
+    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules, billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate } = body;
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
       return NextResponse.json({ success: false, error: 'Slug must be lowercase letters, numbers, and hyphens only' }, { status: 400 });
@@ -51,7 +51,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Update restaurant info
     const restaurant = await updateRestaurant(id, {
       name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description,
-      billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time
+      billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time,
+      gst_type, gst_number: gst_number || null, gst_rate: Number(gst_rate) || 0
     });
     if (!restaurant) return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
 
