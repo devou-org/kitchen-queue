@@ -26,12 +26,15 @@ export type RestaurantContext = {
 };
 
 let cached: RestaurantContext | null = null;
+let lastFetchTime = 0;
 let fetchPromise: Promise<RestaurantContext | null> | null = null;
 const listeners = new Set<(data: RestaurantContext | null) => void>();
 
 export async function fetchRestaurant(force = false): Promise<RestaurantContext | null> {
+  const now = Date.now();
   if (!force && cached) return cached;
-  if (!force && fetchPromise) return fetchPromise;
+  if (fetchPromise) return fetchPromise;
+  if (!force && cached && now - lastFetchTime < 1500) return cached;
 
   // Extract slug from URL: /[slug]/...
   let slug = '';
@@ -41,12 +44,14 @@ export async function fetchRestaurant(force = false): Promise<RestaurantContext 
   }
 
   const p = fetch('/api/restaurant', {
-    headers: slug ? { 'x-restaurant-slug': slug } : {}
+    headers: slug ? { 'x-restaurant-slug': slug } : {},
+    cache: 'no-store'
   })
     .then(res => res.json())
     .then(data => {
       if (data.success && data.data) {
         cached = data.data;
+        lastFetchTime = Date.now();
         listeners.forEach(fn => fn(cached));
         return cached;
       }
@@ -63,9 +68,7 @@ export async function fetchRestaurant(force = false): Promise<RestaurantContext 
 
 /**
  * useRestaurant — lightweight hook that returns the current tenant's info.
- * The data is fetched once from /api/restaurant and module-level cached
- * for the lifetime of the page. All mounted hooks will receive updates
- * when refreshed.
+ * Provides stale-while-revalidate data fetching and auto-refreshes on tab focus / navigation.
  */
 export function useRestaurant() {
   const [restaurant, setRestaurant] = useState<RestaurantContext | null>(cached);
@@ -89,15 +92,32 @@ export function useRestaurant() {
 
     if (cached) {
       handler(cached);
-    } else {
-      fetchRestaurant().then(r => {
-        // fetchRestaurant already calls listeners, but this ensures initial mount is covered
-        if (!cached) handler(r);
-      });
     }
+
+    // Always fetch fresh state in background on mount/page navigation (Stale-While-Revalidate)
+    fetchRestaurant(true);
+
+    // Auto-revalidate whenever user switches back to this browser tab or window gains focus
+    const revalidate = () => {
+      const now = Date.now();
+      if (now - lastFetchTime > 1500) {
+        fetchRestaurant(true);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        revalidate();
+      }
+    };
+
+    window.addEventListener('focus', revalidate);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       listeners.delete(handler);
+      window.removeEventListener('focus', revalidate);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 

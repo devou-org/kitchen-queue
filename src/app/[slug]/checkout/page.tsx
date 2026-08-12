@@ -287,6 +287,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
           items={items}
           subtotal={subtotal}
           gstAmount={gstAmount}
+          gstRate={restaurant?.gst_rate}
           gstType={restaurant?.gst_type}
           total={total}
           addToMode={addToMode}

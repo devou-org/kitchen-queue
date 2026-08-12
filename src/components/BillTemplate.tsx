@@ -417,12 +417,6 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                   </div>
                 </>
               )}
-              {(order as any).gst_type === 'COMPOSITION' && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', color: '#6b7280' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 500, fontStyle: 'italic' }}>(Inclusive of GST)</span>
-                  <span></span>
-                </div>
-              )}
 
               {/* Grand Total */}
               <div style={{

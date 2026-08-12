@@ -162,10 +162,7 @@ export async function PUT(request: NextRequest) {
       timezone,
       opening_time,
       closing_time,
-      rollover_time,
-      gst_type,
-      gst_number,
-      gst_rate
+      rollover_time
     } = body;
 
     if (!name) {
@@ -188,9 +185,6 @@ export async function PUT(request: NextRequest) {
         opening_time = ${opening_time || null},
         closing_time = ${closing_time || null},
         rollover_time = ${rollover_time || null},
-        gst_type = ${gst_type || 'NONE'},
-        gst_number = ${gst_number || null},
-        gst_rate = ${gst_rate || 0},
         updated_at = NOW()
       WHERE id = ${restaurant.id}
     `;

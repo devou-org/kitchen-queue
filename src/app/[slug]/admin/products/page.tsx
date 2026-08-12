@@ -10,7 +10,7 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { UploadCloud, X, Loader2, Plus, Sparkles } from 'lucide-react';
+import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import AdminProductForm from '@/components/AdminProductForm';
 
 interface ExtractedProduct {
@@ -30,6 +30,11 @@ export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+
+  // Delete Confirmation Modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // AI Menu Upload Modal state
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -107,16 +112,28 @@ export default function AdminProducts() {
     }
   };
 
-  const handleDelete = async (id: string, name?: string) => {
-    if (!confirm(`Are you sure you want to delete ${name || 'this product'}?`)) return;
+  const handleDeleteClick = (product: Product) => {
+    setDeletingProduct(product);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingProduct) return;
+    setIsDeleting(true);
     try {
-      const res = await productService.deleteProduct(id);
+      const res = await productService.deleteProduct(deletingProduct.id);
       if (res.success) {
-        toast.success('Product deleted');
+        toast.success(`"${deletingProduct.name}" deleted successfully`);
+        setDeleteModalOpen(false);
+        setDeletingProduct(null);
         fetchProducts();
+      } else {
+        toast.error(res.error || 'Failed to delete product');
       }
     } catch {
       toast.error('Failed to delete product');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -446,7 +463,7 @@ export default function AdminProducts() {
                         >
                           Edit
                         </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id, p.name)}>Delete</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteClick(p)}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -837,6 +854,159 @@ export default function AdminProducts() {
                 setEditingProduct(null);
               }}
             />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && deletingProduct && mounted && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => !isDeleting && setDeleteModalOpen(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '10px',
+              maxWidth: '420px',
+              width: '100%',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              border: '1px solid #e2e8f0',
+              position: 'relative'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Top-Right Close Button */}
+            <button
+              type="button"
+              onClick={() => !isDeleting && setDeleteModalOpen(false)}
+              disabled={isDeleting}
+              style={{
+                position: 'absolute',
+                top: '14px',
+                right: '14px',
+                width: '28px',
+                height: '28px',
+                borderRadius: '6px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                color: '#64748b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: isDeleting ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Close"
+            >
+              <X size={15} />
+            </button>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px 24px 20px 24px', textAlign: 'center' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
+                Delete Product?
+              </h3>
+              
+              <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                Are you sure you want to permanently delete this product? This cannot be undone.
+              </p>
+
+              {/* Product Preview Card */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 12px',
+                backgroundColor: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                textAlign: 'left'
+              }}>
+                <img
+                  src={deletingProduct.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
+                  alt={deletingProduct.name}
+                  style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {deletingProduct.name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                    {deletingProduct.category} • <strong style={{ color: '#0f172a' }}>{formatPrice(deletingProduct.price)}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{
+              padding: '14px 24px',
+              backgroundColor: '#f8fafc',
+              borderTop: '1px solid #f1f5f9',
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '9px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '9px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isDeleting ? <Loader2 size={15} style={{ animation: 'spinLoader 1s linear infinite' }} /> : null}
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>,
         document.body

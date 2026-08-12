@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRestaurantBySlug, getRestaurantModules } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/restaurant
  * Returns current tenant's public info (id, name, slug, logo_url).

@@ -6,13 +6,18 @@ interface OrderSummaryProps {
   items: CartItem[];
   subtotal: number;
   gstAmount?: number;
+  gstRate?: number | string;
   gstType?: string;
   total: number;
   addToMode: boolean;
   activeOrder: Order | null;
 }
 
-export default function OrderSummary({ items, subtotal, gstAmount, gstType, total, addToMode, activeOrder }: OrderSummaryProps) {
+export default function OrderSummary({ items, subtotal, gstAmount, gstRate, gstType, total, addToMode, activeOrder }: OrderSummaryProps) {
+  const halfGst = (gstAmount || 0) / 2;
+  const splitGst = Math.round(halfGst * 100) / 100;
+  const halfRate = gstRate ? Number(gstRate) / 2 : undefined;
+
   return (
     <div className="card" style={{ marginBottom: '16px' }}>
       <h3 style={{ fontWeight: 700, marginBottom: '14px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -48,14 +53,16 @@ export default function OrderSummary({ items, subtotal, gstAmount, gstType, tota
               <span>Subtotal (new items)</span><span>{formatPrice(subtotal)}</span>
             </div>
             {gstType === 'REGULAR' && gstAmount !== undefined && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                <span>GST</span><span>{formatPrice(gstAmount)}</span>
-              </div>
-            )}
-            {gstType === 'COMPOSITION' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                <span>GST</span><span>Included</span>
-              </div>
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  <span>CGST {halfRate !== undefined ? `(${halfRate}%)` : ''}</span>
+                  <span>{formatPrice(splitGst)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  <span>SGST {halfRate !== undefined ? `(${halfRate}%)` : ''}</span>
+                  <span>{formatPrice(splitGst)}</span>
+                </div>
+              </>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px', paddingTop: '8px', borderTop: '2px solid var(--border)' }}>
               <span>Total</span>

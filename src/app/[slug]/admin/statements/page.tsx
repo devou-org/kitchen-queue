@@ -165,8 +165,13 @@ export default function AdminStatements() {
 
         {/* Summary Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+           <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
+            <p className="stat-label">Total Revenue</p>
+            <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>{formatPrice(totalRevenue)}</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Revenue + GST</p>
+          </div>
           <div className="stat-card">
-            <p className="stat-label">Revenue</p>
+            <p className="stat-label">Net Revenue</p>
             <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(actualRevenue)}</h3>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Excluding Cancelled</p>
           </div>
@@ -195,20 +200,22 @@ export default function AdminStatements() {
             </div>
           )}
 
-          <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
+          {/* <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
             <p className="stat-label">Net Revenue</p>
             <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>{formatPrice(netRevenue)}</h3>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Final retained earnings</p>
-          </div>
+          </div> */}
+
+         
         </div>
 
         {/* Summary Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          <div className="stat-card">
+          {/* <div className="stat-card">
             <p className="stat-label">Total Revenue</p>
             <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(totalRevenue)}</h3>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Exclude cancelled orders</p>
-          </div>
+          </div> */}
           <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
             <p className="stat-label">Gross Paid</p>
             <h3 className="stat-value" style={{ color: '#059669' }}>{formatPrice(totalPaidRevenue)}</h3>

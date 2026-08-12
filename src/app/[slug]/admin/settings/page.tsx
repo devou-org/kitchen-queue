@@ -93,7 +93,6 @@ export default function AdminSettings() {
           opening_time: openingTime,
           closing_time: closingTime,
           rollover_time: rolloverTime,
-
         }),
       });
       const data = await res.json();
