@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { Product } from '@/types';
 import { inventoryService } from '@/app/services/inventory.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { X, Package, Tag, Plus, Check, ImageIcon, Eye, Boxes, ArrowLeft } from 'lucide-react';
+import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Eye, Layers, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 interface Category {
@@ -225,7 +225,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             </Link>
           ) : (
             <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Package size={20} />
+              <UtensilsCrossed size={20} />
             </div>
           )}
           <div>
@@ -313,7 +313,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
         <div className="form-card-basic" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Package size={18} />
+              <ChefHat size={18} />
             </div>
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Basic Details</h2>
           </div>
@@ -536,7 +536,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Boxes size={18} />
+                  <Layers size={18} />
                 </div>
                 <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Inventory Control</h2>
               </div>
