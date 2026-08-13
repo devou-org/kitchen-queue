@@ -34,6 +34,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   const [checkingActive, setCheckingActive] = useState(true);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [addToMode, setAddToMode] = useState(false); // true = adding to existing order
+  const [inOtpStep, setInOtpStep] = useState(false);
   const [form, setForm] = useState({
     customer_name: '',
     phone: '',
@@ -302,6 +303,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             onVerified={(user) => setCurrentUser(user)}
             onSubmit={handleNewOrder}
             totalQty={items.reduce((s, i) => s + i.quantity, 0)}
+            onOtpStepChange={setInOtpStep}
           />
         )}
       </div>
@@ -310,6 +312,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         addToMode={addToMode}
         loading={loading}
         isVerified={isVerified}
+        inOtpStep={inOtpStep}
         itemsCount={items.length}
         total={total}
         ticketNumber={activeOrder?.ticket_number}

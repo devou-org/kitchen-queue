@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [countryCode, setCountryCode] = useState('+91');
   const [phone, setPhone] = useState('');
   const [otpToken, setOtpToken] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(['', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -63,6 +63,9 @@ export default function LoginPage() {
         setStep('otp');
         setCooldown(60);
         toast.success('OTP sent to your phone!');
+        setTimeout(() => {
+          otpRefs.current[0]?.focus();
+        }, 100);
       } else {
         toast.error(data.error || 'Failed to send OTP');
       }
@@ -80,12 +83,15 @@ export default function LoginPage() {
     // Handle multi-digit input (Android keyboard or browser autofill)
     if (digits.length > 1) {
       const newOtp = [...otp];
-      digits.split('').slice(0, 6 - index).forEach((d, i) => {
+      digits.split('').slice(0, 4 - index).forEach((d, i) => {
         newOtp[index + i] = d;
       });
       setOtp(newOtp);
-      const lastFill = Math.min(index + digits.length - 1, 5);
+      const lastFill = Math.min(index + digits.length - 1, 3);
       otpRefs.current[lastFill]?.focus();
+      if (newOtp.join('').length === 4) {
+        handleVerify(newOtp.join(''));
+      }
       return;
     }
 
@@ -94,21 +100,30 @@ export default function LoginPage() {
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-    if (value && index < 5) {
+    if (value && index < 3) {
       otpRefs.current[index + 1]?.focus();
+    }
+    if (value && index === 3) {
+      const completeCode = newOtp.join('');
+      if (completeCode.length === 4) {
+        handleVerify(completeCode);
+      }
     }
   };
 
   const handleOTPPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
     if (!pasted) return;
-    const newOtp = [...otp];
-    pasted.split('').forEach((digit, i) => { newOtp[i] = digit; });
+    const newOtp = ['', '', '', ''];
+    pasted.split('').forEach((digit, i) => { if (i < 4) newOtp[i] = digit; });
     setOtp(newOtp);
     // Focus last filled box
-    const lastIndex = Math.min(pasted.length - 1, 5);
+    const lastIndex = Math.min(pasted.length - 1, 3);
     otpRefs.current[lastIndex]?.focus();
+    if (pasted.length === 4) {
+      handleVerify(pasted);
+    }
   };
 
   const handleOTPKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -120,7 +135,7 @@ export default function LoginPage() {
   const handleVerify = async (code?: string) => {
     if (loading || isSuccess) return;
     const otpCode = code || otp.join('');
-    if (otpCode.length !== 6) return toast.error('Enter complete 6-digit OTP');
+    if (otpCode.length !== 4) return toast.error('Enter complete 4-digit OTP');
     if (!otpToken) return toast.error('OTP session expired. Please request a new OTP.');
     setLoading(true);
     try {
@@ -234,7 +249,7 @@ export default function LoginPage() {
                 />
               </div>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                We'll send a 6-digit code to verify your account.
+                We'll send a 4-digit code to verify your account.
               </p>
             </div>
 
@@ -268,7 +283,7 @@ export default function LoginPage() {
           {/* OTP Step */}
           <div>
             <p style={{ textAlign: 'center', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-              Enter 6-digit code
+              Enter 4-digit code
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
               {otp.map((digit, i) => (

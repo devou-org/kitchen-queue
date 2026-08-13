@@ -5,6 +5,7 @@ interface CheckoutActionsProps {
   addToMode: boolean;
   loading: boolean;
   isVerified: boolean;
+  inOtpStep?: boolean;
   itemsCount: number;
   total: number;
   ticketNumber?: string | number;
@@ -17,6 +18,7 @@ export default function CheckoutActions({
   addToMode,
   loading,
   isVerified,
+  inOtpStep = false,
   itemsCount,
   total,
   ticketNumber,
@@ -24,6 +26,7 @@ export default function CheckoutActions({
   onAddToOrder,
   onSubmitNewOrder
 }: CheckoutActionsProps) {
+  if (inOtpStep) return null;
   
   const handleConfirm = () => {
     if (addToMode) {

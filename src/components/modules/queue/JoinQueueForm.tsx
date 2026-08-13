@@ -27,7 +27,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
   const [isVerified, setIsVerified] = useState(false);
   const [otpStep, setOtpStep] = useState(false);
   const [otpToken, setOtpToken] = useState('');
-  const [otpCode, setOtpCode] = useState<string[]>(['', '', '', '', '', '']);
+  const [otpCode, setOtpCode] = useState<string[]>(['', '', '', '']);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
@@ -98,6 +98,9 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
         setOtpToken(data.otp_token);
         setOtpStep(true);
         toast.success('OTP sent to your phone');
+        setTimeout(() => {
+          document.getElementById('otp-input-0')?.focus();
+        }, 100);
       } else {
         toast.error(data.error || 'Failed to send OTP');
       }
@@ -108,10 +111,10 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
     }
   };
 
-  const verifyOtpSubmit = async () => {
-    const cleanCode = otpCode.join('').replace(/\D/g, '');
-    if (cleanCode.length !== 6) {
-      toast.error('Please enter a valid 6-digit OTP');
+  const verifyOtpSubmit = async (codeToVerify?: string) => {
+    const cleanCode = (codeToVerify || otpCode.join('')).replace(/\D/g, '');
+    if (cleanCode.length !== 4) {
+      toast.error('Please enter a valid 4-digit OTP');
       return;
     }
     
@@ -263,7 +266,7 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
                   </span>
                 ) : (
                   otpStep ? (
-                    <button type="button" onClick={() => { setOtpStep(false); setOtpCode(['', '', '', '', '', '']); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '14px', fontWeight: 700, cursor: 'pointer', padding: '0 4px' }}>
+                    <button type="button" onClick={() => { setOtpStep(false); setOtpCode(['', '', '', '']); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '14px', fontWeight: 700, cursor: 'pointer', padding: '0 4px' }}>
                       Edit
                     </button>
                   ) : (
@@ -276,17 +279,18 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
             </div>
 
             {otpStep && !isVerified && (
-              <div style={{ padding: '20px', background: '#FFF0F2', borderRadius: '16px', animation: 'slideDown 0.3s ease-out' }}>
+              <div style={{ padding: '20px', background: 'color-mix(in srgb, var(--primary) 8%, white)', borderRadius: '16px', border: '1px solid color-mix(in srgb, var(--primary) 20%, white)', animation: 'slideDown 0.3s ease-out' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>ENTER 6-DIGIT OTP</span>
+                  <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>ENTER 4-DIGIT OTP</span>
                 </div>
                 
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '24px' }}>
+                  {[0, 1, 2, 3].map((index) => (
                     <input
                       key={index}
                       id={`otp-input-${index}`}
                       type="text" maxLength={1}
+                      inputMode="numeric"
                       value={otpCode[index] || ''}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
@@ -294,7 +298,14 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
                         const newOtp = [...otpCode];
                         newOtp[index] = val;
                         setOtpCode(newOtp);
-                        if (val && index < 5) document.getElementById(`otp-input-${index + 1}`)?.focus();
+                        if (val && index < 3) document.getElementById(`otp-input-${index + 1}`)?.focus();
+
+                        if (val && index === 3) {
+                          const completeCode = newOtp.join('');
+                          if (completeCode.length === 4) {
+                            verifyOtpSubmit(completeCode);
+                          }
+                        }
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
@@ -306,28 +317,31 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
                       }}
                       onPaste={(e) => {
                         e.preventDefault();
-                        const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                        const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
                         if (pastedData) {
-                          const newOtp = [...otpCode];
-                          pastedData.split('').forEach((d, i) => newOtp[i] = d);
+                          const newOtp = ['', '', '', ''];
+                          pastedData.split('').forEach((d, i) => { if (i < 4) newOtp[i] = d; });
                           setOtpCode(newOtp);
-                          const nextIndex = Math.min(pastedData.length, 5);
+                          const nextIndex = Math.min(pastedData.length, 3);
                           document.getElementById(`otp-input-${nextIndex}`)?.focus();
+                          if (pastedData.length === 4) {
+                            verifyOtpSubmit(pastedData);
+                          }
                         }
                       }}
                       style={{
-                        width: '100%', aspectRatio: '1/1.1', textAlign: 'center', fontSize: '20px', fontWeight: 700,
-                        borderRadius: '8px', border: '1px solid #fecdd3', background: 'white', color: 'var(--primary)',
-                        outlineColor: 'var(--primary)'
+                        width: '52px', height: '56px', textAlign: 'center', fontSize: '22px', fontWeight: 800,
+                        borderRadius: '12px', border: '1.5px solid color-mix(in srgb, var(--primary) 25%, white)', background: 'white', color: 'var(--primary)',
+                        outlineColor: 'var(--primary)', boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
                       }}
                     />
                   ))}
                 </div>
                 
-                <button type="button" onClick={verifyOtpSubmit} disabled={verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6} style={{ 
+                <button type="button" onClick={() => verifyOtpSubmit()} disabled={verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 4} style={{ 
                   width: '100%', padding: '16px', borderRadius: '12px', background: 'var(--primary)', color: 'white', 
-                  fontWeight: 700, fontSize: '15px', border: 'none', opacity: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6) ? 0.7 : 1,
-                  cursor: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6) ? 'not-allowed' : 'pointer'
+                  fontWeight: 700, fontSize: '15px', border: 'none', opacity: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 4) ? 0.7 : 1,
+                  cursor: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 4) ? 'not-allowed' : 'pointer'
                 }}>
                   {verifyingOtp ? 'Verifying...' : 'Verify Code'}
                 </button>

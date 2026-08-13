@@ -24,6 +24,7 @@ interface CustomerDetailsProps {
   onVerified: (user: any) => void;
   onSubmit: (e: React.FormEvent) => void;
   totalQty?: number;
+  onOtpStepChange?: (inOtpStep: boolean) => void;
 }
 
 export default function CustomerDetails({ 
@@ -32,10 +33,11 @@ export default function CustomerDetails({
   isVerified, 
   onVerified,
   onSubmit,
-  totalQty
+  totalQty,
+  onOtpStepChange
 }: CustomerDetailsProps) {
   const [otpStep, setOtpStep] = useState(false);
-  const [otpCode, setOtpCode] = useState<string[]>(['', '', '', '', '', '']);
+  const [otpCode, setOtpCode] = useState<string[]>(['', '', '', '']);
   const [otpToken, setOtpToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
@@ -43,6 +45,11 @@ export default function CustomerDetails({
 
   const [countryCode, setCountryCode] = useState('+91');
   const [phoneDigits, setPhoneDigits] = useState('');
+
+  // Notify parent whenever otpStep changes
+  useEffect(() => {
+    onOtpStepChange?.(otpStep);
+  }, [otpStep, onOtpStepChange]);
 
   // Sync from parent when populated
   useEffect(() => {
@@ -101,6 +108,9 @@ export default function CustomerDetails({
         setOtpStep(true);
         setResendTimer(60);
         toast.success('OTP sent to your phone');
+        setTimeout(() => {
+          document.getElementById('otp-input-0')?.focus();
+        }, 100);
       } else {
         toast.error(data.error || 'Failed to send OTP');
       }
@@ -111,11 +121,10 @@ export default function CustomerDetails({
     }
   };
 
-  const verifyOtpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanCode = otpCode.join('').replace(/\D/g, '');
-    if (cleanCode.length !== 6) {
-      toast.error('Please enter a valid 6-digit OTP');
+  const verifyOtpSubmit = async (codeToVerify?: string) => {
+    const cleanCode = (codeToVerify || otpCode.join('')).replace(/\D/g, '');
+    if (cleanCode.length !== 4) {
+      toast.error('Please enter a valid 4-digit OTP');
       return;
     }
     
@@ -194,7 +203,7 @@ export default function CustomerDetails({
                 otpStep ? (
                   <button 
                     type="button" 
-                    onClick={() => { setOtpStep(false); setOtpCode(['', '', '', '', '', '']); }}
+                    onClick={() => { setOtpStep(false); setOtpCode(['', '', '', '']); }}
                     style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', padding: '0 8px' }}
                   >
                     Edit
@@ -221,18 +230,18 @@ export default function CustomerDetails({
               )}
             </div>
             
-            {/* NEW OTP FIELD UI */}
+            {/* NEW 4-DIGIT OTP FIELD UI */}
             {otpStep && !isVerified && (
-              <div style={{ marginTop: '16px', padding: '20px', background: '#FFF0F2', borderRadius: '16px', animation: 'slideDown 0.3s ease-out' }}>
+              <div style={{ marginTop: '16px', padding: '20px', background: 'color-mix(in srgb, var(--primary) 8%, white)', borderRadius: '16px', border: '1px solid color-mix(in srgb, var(--primary) 20%, white)', animation: 'slideDown 0.3s ease-out' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>ENTER 6-DIGIT OTP</span>
-                  <span style={{ background: 'white', padding: '4px 12px', borderRadius: '16px', fontSize: '11px', color: '#9ca3af', fontWeight: 500 }}>
+                  <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 800 }}>ENTER 4-DIGIT OTP</span>
+                  <span style={{ background: 'white', padding: '4px 12px', borderRadius: '16px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, border: '1px solid color-mix(in srgb, var(--primary) 15%, white)' }}>
                     Sent to {countryCode} {phoneDigits.slice(-4).padStart(10, '*')}
                   </span>
                 </div>
                 
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '24px' }}>
+                  {[0, 1, 2, 3].map((index) => (
                     <input
                       key={index}
                       id={`otp-input-${index}`}
@@ -248,9 +257,17 @@ export default function CustomerDetails({
                         newOtp[index] = val;
                         setOtpCode(newOtp);
                         
-                        if (val && index < 5) {
+                        if (val && index < 3) {
                           const next = document.getElementById(`otp-input-${index + 1}`);
                           if (next) next.focus();
+                        }
+
+                        // Auto submit when 4th digit is entered
+                        if (val && index === 3) {
+                          const completeCode = newOtp.join('');
+                          if (completeCode.length === 4) {
+                            verifyOtpSubmit(completeCode);
+                          }
                         }
                       }}
                       onKeyDown={(e) => {
@@ -266,27 +283,32 @@ export default function CustomerDetails({
                       }}
                       onPaste={(e) => {
                         e.preventDefault();
-                        const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                        const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
                         if (pastedData) {
-                          const newOtp = [...otpCode];
-                          pastedData.split('').forEach((d, i) => newOtp[i] = d);
+                          const newOtp = ['', '', '', ''];
+                          pastedData.split('').forEach((d, i) => {
+                            if (i < 4) newOtp[i] = d;
+                          });
                           setOtpCode(newOtp);
-                          const nextIndex = Math.min(pastedData.length, 5);
+                          const nextIndex = Math.min(pastedData.length, 3);
                           const next = document.getElementById(`otp-input-${nextIndex}`);
                           if (next) next.focus();
+                          if (pastedData.length === 4) {
+                            verifyOtpSubmit(pastedData);
+                          }
                         }
                       }}
                       style={{
-                        width: '100%',
-                        aspectRatio: '1/1.1',
+                        width: '52px',
+                        height: '56px',
                         textAlign: 'center',
-                        fontSize: '20px',
-                        fontWeight: 700,
-                        borderRadius: '8px',
-                        border: '1px solid #fecdd3', // soft pink border
+                        fontSize: '22px',
+                        fontWeight: 800,
+                        borderRadius: '12px',
+                        border: '1.5px solid color-mix(in srgb, var(--primary) 25%, white)',
                         background: 'white',
                         color: 'var(--primary)',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
                         outlineColor: 'var(--primary)'
                       }}
                     />
@@ -295,8 +317,8 @@ export default function CustomerDetails({
                 
                 <button 
                   type="button" 
-                  onClick={verifyOtpSubmit}
-                  disabled={verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6}
+                  onClick={() => verifyOtpSubmit()}
+                  disabled={verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 4}
                   style={{ 
                     width: '100%', 
                     padding: '16px', 
@@ -306,8 +328,8 @@ export default function CustomerDetails({
                     fontWeight: 700,
                     fontSize: '15px',
                     border: 'none',
-                    opacity: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6) ? 0.7 : 1,
-                    cursor: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 6) ? 'not-allowed' : 'pointer',
+                    opacity: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 4) ? 0.7 : 1,
+                    cursor: (verifyingOtp || otpCode.join('').replace(/\D/g, '').length !== 4) ? 'not-allowed' : 'pointer',
                     boxShadow: '0 4px 14px rgba(0,0,0,0.1)'
                   }}
                 >
@@ -316,12 +338,12 @@ export default function CustomerDetails({
                 
                 <div style={{ marginTop: '20px', textAlign: 'center' }}>
                   {resendTimer > 0 ? (
-                    <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0, fontWeight: 500 }}>
-                      Didn't receive it? <span style={{ color: '#f472b6' }}>Resend in {resendTimer}s</span>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, fontWeight: 500 }}>
+                      Didn't receive it? <span style={{ color: 'var(--primary)', fontWeight: 700 }}>Resend in {resendTimer}s</span>
                     </p>
                   ) : (
-                    <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0, fontWeight: 500 }}>
-                      Didn't receive it? <button type="button" onClick={handleVerifyClick} style={{ background: 'none', border: 'none', color: '#f472b6', fontWeight: 600, cursor: 'pointer', padding: 0 }}>Resend OTP</button>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, fontWeight: 500 }}>
+                      Didn't receive it? <button type="button" onClick={handleVerifyClick} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer', padding: 0 }}>Resend OTP</button>
                     </p>
                   )}
                 </div>

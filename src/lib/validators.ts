@@ -25,8 +25,8 @@ export function validateEmail(email: string): { valid: boolean; message?: string
 }
 
 export function validateOTP(code: string): { valid: boolean; message?: string } {
-  if (!/^\d{6}$/.test(code)) {
-    return { valid: false, message: 'OTP must be 6 digits' };
+  if (!/^\d{4}$/.test(code)) {
+    return { valid: false, message: 'OTP must be 4 digits' };
   }
   return { valid: true };
 }

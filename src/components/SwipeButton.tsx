@@ -77,8 +77,10 @@ export default function SwipeButton({
     if (!isDragging) return;
     setIsDragging(false);
     
-    if (sliderWidth < 98) {
+    if (sliderWidth < 90) {
       setSliderWidth(0);
+    } else {
+      handleConfirm();
     }
   };
 
@@ -98,14 +100,20 @@ export default function SwipeButton({
          return;
       }
       
-      // Auto-reset if validation failed without returning false (no loading state was triggered)
+      // Give a smooth grace period for async loading state to kick in
+      // If after 600ms no loading or success state occurs, reset slider
       setTimeout(() => {
-        if (!loading && !success && !prevLoading.current) {
-          setConfirmed(false);
-          setSliderWidth(0);
-          hasConfirmed.current = false;
-        }
-      }, 50);
+        if (!hasConfirmed.current) return; // already reset
+        // Check current loading/success via DOM or state
+        setConfirmed((currentConfirmed) => {
+          if (currentConfirmed && !success) {
+            setSliderWidth(0);
+            hasConfirmed.current = false;
+            return false;
+          }
+          return currentConfirmed;
+        });
+      }, 600);
 
     } catch (err) {
       setConfirmed(false);
@@ -172,7 +180,7 @@ export default function SwipeButton({
           width: `calc(56px + (100% - 56px) * (${sliderWidth} / 100))`,
           backgroundColor: 'white',
           borderRadius: '999px',
-          transition: isDragging ? 'none' : 'width 0.3s ease-out',
+          transition: isDragging ? 'none' : 'width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
           zIndex: 1,
         }}
       />
@@ -243,7 +251,7 @@ export default function SwipeButton({
           justifyContent: 'center',
           zIndex: 3,
           cursor: disabled || loading || isCompleted ? 'not-allowed' : 'grab',
-          transition: isDragging ? 'none' : 'left 0.3s ease-out',
+          transition: isDragging ? 'none' : 'left 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
           opacity: isCompleted || loading ? 0 : 1,
         }}
       >
