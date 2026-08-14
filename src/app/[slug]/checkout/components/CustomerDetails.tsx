@@ -4,7 +4,7 @@ import { authService } from '@/app/services/auth.api';
 import { User, BadgeCheck, Info } from 'lucide-react';
 
 const COUNTRY_CODES = [
-  { code: '+91', label: 'IN +91', country: 'India' },
+  { code: '+91', label: '+91', country: 'India' },
 ];
 
 interface CustomerDetailsProps {
@@ -173,7 +173,7 @@ export default function CustomerDetails({
                 className="select"
                 value={countryCode}
                 onChange={handleCountryCodeChange}
-                style={{ width: '100px', flexShrink: 0, paddingLeft: '8px', paddingRight: '28px' }}
+                style={{ width: '75px', flexShrink: 0, paddingLeft: '8px', paddingRight: '24px' }}
                 disabled={otpStep || isVerified}
               >
                 {COUNTRY_CODES.map(c => (
@@ -187,15 +187,15 @@ export default function CustomerDetails({
                 value={phoneDigits}
                 onChange={handlePhoneChange}
                 maxLength={10}
-                style={{ flex: 1 }}
+                style={{ flex: 1, minWidth: 0 }}
                 required
                 disabled={otpStep || isVerified}
               />
               {isVerified ? (
                 <span style={{ 
                   color: '#10B981', background: 'rgba(16, 185, 129, 0.1)', 
-                  padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
-                  display: 'flex', alignItems: 'center', gap: '6px'
+                  padding: '0 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
+                  display: 'flex', alignItems: 'center', gap: '6px', height: '44px'
                 }}>
                   <BadgeCheck size={16} /> Verified
                 </span>
