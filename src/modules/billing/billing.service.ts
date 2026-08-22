@@ -140,9 +140,9 @@ export class BillingService {
   static async processOTPBilling(client: PoolClient | null, restaurantId: string, otpLogId: string): Promise<void> {
     const executor = client || pool;
 
-    // 1. Fetch restaurant billing tier
+    // 1. Fetch restaurant billing tier & custom charges
     const resSettings = await executor.query(`
-      SELECT billing_tier, billing_status, billing_start_date 
+      SELECT billing_tier, billing_status, billing_start_date, custom_otp_charge 
       FROM restaurants 
       WHERE id = $1
     `, [restaurantId]);
@@ -151,7 +151,7 @@ export class BillingService {
       return; // Or throw error
     }
 
-    const { billing_tier, billing_status, billing_start_date } = resSettings.rows[0];
+    const { billing_tier, billing_status, billing_start_date, custom_otp_charge } = resSettings.rows[0];
 
     if (billing_status !== 'ACTIVE') {
       return;
@@ -160,12 +160,16 @@ export class BillingService {
     const tier = billing_tier as BillingTier;
     const pricing = BILLING_PRICING[tier];
 
-    // Check if OTP service is supported and get charge
-    if (!pricing || pricing.otpCharge === null) {
-      throw new Error(`Tier ${tier} does not support OTP Service.`);
+    let chargeAmount = 0;
+    if (custom_otp_charge !== null && custom_otp_charge !== undefined) {
+      chargeAmount = parseFloat(custom_otp_charge);
+    } else {
+      // Check if OTP service is supported and get charge
+      if (!pricing || pricing.otpCharge === null) {
+        throw new Error(`Tier ${tier} does not support OTP Service.`);
+      }
+      chargeAmount = pricing.otpCharge;
     }
-
-    const chargeAmount = pricing.otpCharge;
 
     // Check if duplicate transaction exists
     const txCheck = await executor.query(`
@@ -247,7 +251,7 @@ export class BillingService {
       await client.query('BEGIN');
 
       const resSettings = await client.query(`
-        SELECT billing_tier, billing_model, billing_status, billing_start_date 
+        SELECT billing_tier, billing_model, billing_status, billing_start_date, custom_subscription_charge 
         FROM restaurants 
         WHERE id = $1
       `, [restaurantId]);
@@ -256,7 +260,7 @@ export class BillingService {
         throw new Error('Restaurant not found');
       }
 
-      const { billing_tier, billing_model, billing_status, billing_start_date } = resSettings.rows[0];
+      const { billing_tier, billing_model, billing_status, billing_start_date, custom_subscription_charge } = resSettings.rows[0];
 
       if (billing_status !== 'ACTIVE' || billing_model !== 'SUBSCRIPTION') {
         throw new Error('Subscription billing only applies to active restaurants with subscription model.');
@@ -265,7 +269,13 @@ export class BillingService {
       const pricing = BILLING_PRICING[billing_tier as BillingTier];
       
       const multiplier = billingPeriod === 'YEARLY' ? 12 : 1;
-      const amount = pricing.subscriptionMonthly * multiplier;
+      let baseMonthly = 0;
+      if (custom_subscription_charge !== null && custom_subscription_charge !== undefined) {
+        baseMonthly = parseFloat(custom_subscription_charge);
+      } else {
+        baseMonthly = pricing?.subscriptionMonthly || 0;
+      }
+      const amount = baseMonthly * multiplier;
 
       const { month, year } = this.getCycleMonthYear(billing_start_date, cycleStart || new Date());
       let description = '';

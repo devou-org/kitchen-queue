@@ -15,6 +15,7 @@ export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
@@ -42,7 +43,8 @@ export default function AdminStatements() {
         sort: 'DESC',
         date_from: dateFrom,
         date_to: dateTo,
-        status: statusFilter || undefined
+        status: statusFilter || undefined,
+        payment_method: paymentMethodFilter || undefined
       });
 
       if (res.success) {
@@ -63,7 +65,7 @@ export default function AdminStatements() {
       fetchOrders();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, statusFilter, page]);
+  }, [dateFrom, dateTo, statusFilter, paymentMethodFilter, page]);
 
   const exportCSV = () => {
     if (orders.length === 0) {
@@ -77,7 +79,7 @@ export default function AdminStatements() {
       `"${order.phone}"`,
       `"${(order.items || []).map(i => `${i.product_name} (x${i.quantity})`).join('; ')}"`,
       order.total_price,
-      order.is_paid ? 'PAID' : 'PENDING',
+      order.is_paid ? `PAID${order.payment_method ? ` (${order.payment_method})` : ''}` : 'PENDING',
       order.status,
       `"${formatDateTime(order.created_at)}"`
     ]);
@@ -146,6 +148,15 @@ export default function AdminStatements() {
             <select className="input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: '160px' }}>
               <option value="">All Statuses</option>
               {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Payment</label>
+            <select className="input" value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)} style={{ width: '140px' }}>
+              <option value="">All Methods</option>
+              <option value="UPI">UPI</option>
+              <option value="CASH">Cash</option>
+              <option value="CARD">Card</option>
             </select>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
@@ -271,7 +282,7 @@ export default function AdminStatements() {
                           background: order.status == "PAID" ? 'rgba(5,150,105,0.1)' : 'rgba(255,165,0,0.1)',
                           padding: '2px 8px', borderRadius: 'var(--radius-full)',
                         }}>
-                          {order.status == "PAID" ? <><Check size={12} strokeWidth={3} /> PAID</> : <><Hourglass size={12} strokeWidth={2.5} /> PENDING</>}
+                          {order.status == "PAID" ? <><Check size={12} strokeWidth={3} /> PAID {order.payment_method ? `(${order.payment_method})` : ''}</> : <><Hourglass size={12} strokeWidth={2.5} /> PENDING</>}
                         </span>
                       </td>
                       <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>
@@ -320,7 +331,7 @@ export default function AdminStatements() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                 <div><p className="label">TABLE</p><p style={{ fontWeight: 700 }}>{selectedOrder.table_number || 'N/A'}</p></div>
-                <div style={{ textAlign: 'right' }}><p className="label">PAYMENT</p><p style={{ fontWeight: 700, color: selectedOrder.is_paid ? '#059669' : 'var(--warning)' }}>{selectedOrder.is_paid ? 'PAID' : 'PENDING'}</p></div>
+                <div style={{ textAlign: 'right' }}><p className="label">PAYMENT</p><p style={{ fontWeight: 700, color: selectedOrder.is_paid ? '#059669' : 'var(--warning)' }}>{selectedOrder.is_paid ? `PAID ${selectedOrder.payment_method ? `(${selectedOrder.payment_method})` : ''}` : 'PENDING'}</p></div>
               </div>
             </div>
 

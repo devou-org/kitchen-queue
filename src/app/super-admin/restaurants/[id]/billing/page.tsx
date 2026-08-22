@@ -28,6 +28,8 @@ interface RestaurantBilling {
   billing_period: string;
   billing_start_date: string | null;
   billing_end_date: string | null;
+  custom_subscription_charge?: string | number | null;
+  custom_otp_charge?: string | number | null;
 }
 
 interface Transaction {
@@ -74,6 +76,8 @@ export default function SuperAdminRestaurantBilling() {
   const [billingPeriod, setBillingPeriod] = useState('MONTHLY');
   const [billingStatus, setBillingStatus] = useState('ACTIVE');
   const [billingEndDate, setBillingEndDate] = useState('');
+  const [customSubscriptionCharge, setCustomSubscriptionCharge] = useState('');
+  const [customOtpCharge, setCustomOtpCharge] = useState('');
   const [updatingDetails, setUpdatingDetails] = useState(false);
 
   // Form states for new adjustment
@@ -105,6 +109,8 @@ export default function SuperAdminRestaurantBilling() {
       setBillingPeriod(r.billing_period || 'MONTHLY');
       setBillingStatus(r.billing_status || 'ACTIVE');
       setBillingEndDate(r.billing_end_date ? r.billing_end_date.split('T')[0] : '');
+      setCustomSubscriptionCharge(r.custom_subscription_charge !== null && r.custom_subscription_charge !== undefined ? String(r.custom_subscription_charge) : '');
+      setCustomOtpCharge(r.custom_otp_charge !== null && r.custom_otp_charge !== undefined ? String(r.custom_otp_charge) : '');
 
       // 2. Fetch all transactions and summaries from super-admin billing endpoint
       const billRes = await fetch(`/api/super-admin/billing`, authHeaders);
@@ -165,8 +171,8 @@ export default function SuperAdminRestaurantBilling() {
     const newPeriod = e.target.value;
     setBillingPeriod(newPeriod);
     
-    if (restaurant) {
-      const baseDate = restaurant.billing_start_date ? new Date(restaurant.billing_start_date) : new Date();
+    if (restaurant && restaurant.billing_end_date) {
+      const baseDate = new Date(restaurant.billing_start_date || new Date());
       const newEndDate = new Date(baseDate);
       if (newPeriod === 'YEARLY') {
         newEndDate.setFullYear(newEndDate.getFullYear() + 1);
@@ -191,6 +197,8 @@ export default function SuperAdminRestaurantBilling() {
           billing_period: billingPeriod,
           billing_status: billingStatus,
           billing_end_date: billingEndDate || null,
+          custom_subscription_charge: customSubscriptionCharge.trim() === '' ? null : parseFloat(customSubscriptionCharge),
+          custom_otp_charge: customOtpCharge.trim() === '' ? null : parseFloat(customOtpCharge),
         }),
       });
       const data = await res.json();
@@ -362,9 +370,9 @@ export default function SuperAdminRestaurantBilling() {
                       style={{ ...styles.select, backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }}
                       disabled
                     >
-                      <option value="BASIC">BASIC (₹399/mo, digital menu)</option>
-                      <option value="PRO">PRO (₹999/mo, queue)</option>
-                      <option value="COMPLETE">COMPLETE (₹1499/mo, queue/ordering)</option>
+                      <option value="BASIC">BASIC (₹{billingTier === 'BASIC' && customSubscriptionCharge ? customSubscriptionCharge : '399'}/mo, digital menu)</option>
+                      <option value="PRO">PRO (₹{billingTier === 'PRO' && customSubscriptionCharge ? customSubscriptionCharge : '999'}/mo, queue)</option>
+                      <option value="COMPLETE">COMPLETE (₹{billingTier === 'COMPLETE' && customSubscriptionCharge ? customSubscriptionCharge : '1499'}/mo, queue/ordering)</option>
                     </select>
                     <span style={{ fontSize: '10px', color: '#64748b', marginTop: '-4px' }}>
                       Pricing tier is automatically locked to active modules.
@@ -425,6 +433,43 @@ export default function SuperAdminRestaurantBilling() {
                     onChange={e => setBillingEndDate(e.target.value)}
                     style={{ ...styles.input, maxWidth: '100%' }}
                   />
+                </div>
+
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Custom Billing Overrides
+                  </div>
+                  <div style={styles.formRow}>
+                    <div style={styles.formField}>
+                      <label style={styles.label}>Custom Subscription (₹/mo)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="e.g. 499 (Default if empty)"
+                        value={customSubscriptionCharge}
+                        onChange={e => setCustomSubscriptionCharge(e.target.value)}
+                        style={styles.input}
+                      />
+                      <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                        Overrides default monthly rate.
+                      </span>
+                    </div>
+
+                    <div style={styles.formField}>
+                      <label style={styles.label}>Custom OTP Rate (₹/SMS)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="e.g. 0.25 (Default if empty)"
+                        value={customOtpCharge}
+                        onChange={e => setCustomOtpCharge(e.target.value)}
+                        style={styles.input}
+                      />
+                      <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                        Overrides default per-SMS charge.
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <button type="submit" disabled={updatingDetails} style={styles.submitBtn}>
@@ -722,7 +767,7 @@ const styles: Record<string, React.CSSProperties> = {
   page: { minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif", paddingBottom: '80px', color: '#0f172a' },
   topNav: { display: 'flex', alignItems: 'center', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 32px' },
   backBtn: { fontSize: '13px', color: '#059669', textDecoration: 'none', fontWeight: 700 },
-  container: { maxWidth: '1200px', margin: '0 auto', padding: '24px 20px 0' },
+  container: { maxWidth: '1400px', margin: '0 auto', padding: '24px 20px 0' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px', backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' },
   badge: { display: 'inline-block', padding: '3px 8px', borderRadius: '6px', backgroundColor: '#f1f5f9', color: '#475569', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' },
   title: { fontSize: '28px', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' },
@@ -731,15 +776,15 @@ const styles: Record<string, React.CSSProperties> = {
   headerStat: { display: 'flex', flexDirection: 'column', padding: '8px 16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' },
   headerStatLabel: { fontSize: '10px', textTransform: 'uppercase', fontWeight: 700, color: '#64748b', letterSpacing: '0.04em' },
   headerStatVal: { fontSize: '16px', fontWeight: 800, color: '#0f172a', marginTop: '2px' },
-  grid: { display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '24px', alignItems: 'start' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '24px', alignItems: 'start' },
   card: { backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' },
   cardTitle: { fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '0 0 16px', display: 'flex', alignItems: 'center' },
   cardDesc: { fontSize: '12px', color: '#64748b', marginTop: '-8px', marginBottom: '16px', lineHeight: '1.5' },
   form: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  formRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
+  formRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' },
   formField: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' },
-  input: { width: '100%', padding: '10px 12px', paddingRight: '32px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '13px', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box', textOverflow: 'ellipsis' },
+  input: { width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '13px', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' },
   select: { width: '100%', padding: '10px 12px', paddingRight: '28px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', backgroundColor: 'white', fontSize: '13px', outline: 'none', boxSizing: 'border-box', textOverflow: 'ellipsis' },
   submitBtn: { padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(16,185,129,0.2)', transition: 'all 0.2s' },
   tableCard: { backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' },

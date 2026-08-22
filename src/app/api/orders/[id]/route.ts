@@ -59,7 +59,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items } = body;
+    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items, payment_method } = body;
 
     const existing = await getOrderById(restaurant.id, id);
     if (!existing) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
@@ -271,7 +271,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       // Update order and trigger billing atomically inside db transaction
-      order = await completeOrderAndBill(restaurant.id, id, status, is_paid, table_number);
+      order = await completeOrderAndBill(restaurant.id, id, status, is_paid, table_number, payment_method);
 
       console.log(`✅ Order Updated: Order #${existing.ticket_number} → Status: ${order.status}, Table: ${order.table_number}, Paid: ${order.is_paid}`);
 

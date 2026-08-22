@@ -55,6 +55,7 @@ export interface Order {
   notes?: string;
   party_size?: number;
   table_number?: string;
+  payment_method?: string;
   created_at: string;
   completed_at: string | null;
   updated_at: string;
@@ -160,6 +161,7 @@ export interface OrderFilters {
   date_from?: string;
   date_to?: string;
   phone?: string;
+  payment_method?: string;
   sort?: 'ASC' | 'DESC';
   page?: number;
   per_page?: number;
