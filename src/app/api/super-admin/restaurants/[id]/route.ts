@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules, billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate } = body;
+    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules, billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge } = body;
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
       return NextResponse.json({ success: false, error: 'Slug must be lowercase letters, numbers, and hyphens only' }, { status: 400 });
@@ -52,7 +52,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const restaurant = await updateRestaurant(id, {
       name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description,
       billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time,
-      gst_type, gst_number: gst_number || null, gst_rate: Number(gst_rate) || 0
+      gst_type, gst_number: gst_number || null, gst_rate: Number(gst_rate) || 0,
+      custom_subscription_charge: custom_subscription_charge !== undefined ? (custom_subscription_charge === null || custom_subscription_charge === '' ? null : Number(custom_subscription_charge)) : undefined,
+      custom_otp_charge: custom_otp_charge !== undefined ? (custom_otp_charge === null || custom_otp_charge === '' ? null : Number(custom_otp_charge)) : undefined
     });
     if (!restaurant) return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
 

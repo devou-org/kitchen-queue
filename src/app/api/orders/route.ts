@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       date_from: searchParams.get('date_from') || undefined,
       date_to: searchParams.get('date_to') || undefined,
       phone: searchParams.get('phone') || undefined,
+      payment_method: searchParams.get('payment_method') || undefined,
       sort: (searchParams.get('sort') as 'ASC' | 'DESC') || undefined,
       page: parseInt(searchParams.get('page') || '1'),
       per_page: parseInt(searchParams.get('per_page') || '50'),

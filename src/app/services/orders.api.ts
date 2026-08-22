@@ -23,6 +23,7 @@ export interface UpdateOrderData {
   notes?: string | null;
   party_size?: number;
   items?: { product_id: string; quantity: number }[];
+  payment_method?: string;
 }
 
 class OrderService {

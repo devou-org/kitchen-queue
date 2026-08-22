@@ -26,9 +26,9 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
 
-    // 1. Fetch all restaurants with basic billing info
+    // 1. Fetch all restaurants with basic billing info & custom charge overrides
     let restQuery = `
-      SELECT id, name, slug, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date
+      SELECT id, name, slug, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, custom_subscription_charge, custom_otp_charge
       FROM restaurants
     `;
     const restParams: any[] = [];

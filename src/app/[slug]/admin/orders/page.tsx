@@ -37,6 +37,8 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [tempTableNumber, setTempTableNumber] = useState('');
+  const [tempStatus, setTempStatus] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const ordersRef = useRef<Order[]>([]);
 
   // Kitchen Snapshot States
@@ -251,25 +253,27 @@ export default function AdminOrders() {
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
-  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string) => {
+  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string) => {
     setModalLoading(true);
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
-        table_number: tableNumber
+        table_number: tableNumber,
+        payment_method: pMethod || undefined
       });
       if (data.success) {
         // Success feedback handled by Pusher event to avoid duplicates
         // Update local state instantly for UI responsiveness
         setOrders(prev => {
           const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
-          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number } : o)
+          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number, payment_method: pMethod ?? o.payment_method } : o)
             .filter(o => {
               if (statusFilter) return o.status === statusFilter;
               return o.status === currentDefault;
             });
         });
-        setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number } : null);
+        setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number, payment_method: pMethod ?? prev.payment_method } : null);
+        setTempStatus(newStatus);
 
         // Always close modal after successful update to streamline workflow
         setTimeout(closeModal, 400);
@@ -305,6 +309,8 @@ export default function AdminOrders() {
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
     setTempTableNumber(order.table_number || '');
+    setTempStatus(order.status);
+    setPaymentMethod(order.payment_method || '');
   };
   const closeModal = () => {
     setSelectedOrder(null);
@@ -587,18 +593,52 @@ export default function AdminOrders() {
             <div style={{ background: '#F9FAFB', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
               <div>
                 <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Order Status</p>
-                <select
-                  className="select"
-                  style={{ width: '100%' }}
-                  value={selectedOrder.status}
-                  disabled={modalLoading}
-                  onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value, tempTableNumber)}
-                >
-                  {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="select"
+                    style={{ flex: 1 }}
+                    value={tempStatus}
+                    disabled={modalLoading}
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      setTempStatus(newStatus);
+                      if (newStatus !== 'PAID') {
+                        handleStatusChange(selectedOrder.id, newStatus, tempTableNumber, paymentMethod);
+                      }
+                    }}
+                  >
+                    {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                {tempStatus === 'PAID' && (
+                  <div style={{ marginTop: '12px', padding: '12px', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    <p style={{ fontWeight: 700, fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>Select Payment Method</p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select
+                        className="select"
+                        style={{ flex: 1 }}
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                      >
+                        <option value="">Choose Method</option>
+                        <option value="UPI">UPI</option>
+                        <option value="CASH">Cash</option>
+                        <option value="CARD">Card</option>
+                      </select>
+                      <button 
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleStatusChange(selectedOrder.id, tempStatus, tempTableNumber, paymentMethod)}
+                        disabled={modalLoading || !paymentMethod || (tempStatus === selectedOrder.status && paymentMethod === (selectedOrder.payment_method || ''))}
+                        style={{ minWidth: '80px' }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {(selectedOrder.status === 'PREPARING' || selectedOrder.status === 'PENDING') && (
+              {(tempStatus === 'PREPARING' || tempStatus === 'PENDING') && (
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                   <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Assign Table Number</p>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -613,8 +653,8 @@ export default function AdminOrders() {
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => {
-                        const nextStatus = selectedOrder.status === defaultStatus && activeStatuses.length > 0 ? activeStatuses[0] : selectedOrder.status;
-                        handleStatusChange(selectedOrder.id, nextStatus, tempTableNumber);
+                        const nextStatus = tempStatus === defaultStatus && activeStatuses.length > 0 ? activeStatuses[0] : tempStatus;
+                        handleStatusChange(selectedOrder.id, nextStatus, tempTableNumber, paymentMethod);
                       }}
                       disabled={modalLoading || !tempTableNumber}
                     >
