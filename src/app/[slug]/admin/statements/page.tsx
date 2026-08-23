@@ -145,14 +145,14 @@ export default function AdminStatements() {
           </div>
           <div>
             <label className="label">Status</label>
-            <select className="input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: '160px' }}>
+            <select className="select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: '160px' }}>
               <option value="">All Statuses</option>
               {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
             <label className="label">Payment</label>
-            <select className="input" value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)} style={{ width: '140px' }}>
+            <select className="select" value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)} style={{ width: '140px' }}>
               <option value="">All Methods</option>
               <option value="UPI">UPI</option>
               <option value="CASH">Cash</option>

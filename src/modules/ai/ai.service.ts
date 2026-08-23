@@ -6,6 +6,14 @@ export interface GeminiContentPart {
     mimeType: string;
     data: string;
   };
+  functionCall?: {
+    name: string;
+    args?: any;
+  };
+  functionResponse?: {
+    name: string;
+    response?: any;
+  };
 }
 
 export interface GeminiContent {

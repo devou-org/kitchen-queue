@@ -36,7 +36,41 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS gst_type VARCHAR(20) DEFAULT 'NONE',
       ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);
     `;
-    console.log("Auto-migrated menu and GST columns successfully!");
+    await sqlConnection`
+      INSERT INTO gemini_request_config (request_type, max_output_tokens)
+      VALUES ('BUSINESS_ANALYST_CHAT', 10000)
+      ON CONFLICT (request_type) DO UPDATE SET max_output_tokens = 10000;
+    `;
+    await sqlConnection`
+      UPDATE gemini_config
+      SET model = 'gemini-3.5-flash',
+          rpm_limit = 15,
+          rpd_limit = 1500,
+          updated_at = CURRENT_TIMESTAMP;
+    `;
+    await sqlConnection`
+      CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          title VARCHAR(255) NOT NULL DEFAULT 'Business Analysis Chat',
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    await sqlConnection`
+      CREATE TABLE IF NOT EXISTS ai_chat_messages (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          session_id UUID NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          role VARCHAR(20) NOT NULL,
+          content TEXT NOT NULL,
+          tool_calls JSONB NULL,
+          tool_results JSONB NULL,
+          tokens_used INTEGER DEFAULT 0,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    console.log("Auto-migrated menu, GST, and AI analyst chat columns/tables successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
