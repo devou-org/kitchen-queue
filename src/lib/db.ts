@@ -645,6 +645,7 @@ export async function getOrderStats(restaurantId: string, filters: {
   date_from?: string;
   date_to?: string;
   phone?: string;
+  payment_method?: string;
   search?: string;
 } = {}) {
   const localTimezone = 'Asia/Kolkata';
