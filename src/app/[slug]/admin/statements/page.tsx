@@ -145,14 +145,14 @@ export default function AdminStatements() {
           </div>
           <div>
             <label className="label">Status</label>
-            <select className="input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: '160px' }}>
+            <select className="select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: '160px' }}>
               <option value="">All Statuses</option>
               {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
             <label className="label">Payment</label>
-            <select className="input" value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)} style={{ width: '140px' }}>
+            <select className="select" value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)} style={{ width: '140px' }}>
               <option value="">All Methods</option>
               <option value="UPI">UPI</option>
               <option value="CASH">Cash</option>
@@ -331,7 +331,12 @@ export default function AdminStatements() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                 <div><p className="label">TABLE</p><p style={{ fontWeight: 700 }}>{selectedOrder.table_number || 'N/A'}</p></div>
-                <div style={{ textAlign: 'right' }}><p className="label">PAYMENT</p><p style={{ fontWeight: 700, color: selectedOrder.is_paid ? '#059669' : 'var(--warning)' }}>{selectedOrder.is_paid ? `PAID ${selectedOrder.payment_method ? `(${selectedOrder.payment_method})` : ''}` : 'PENDING'}</p></div>
+                <div style={{ textAlign: 'right' }}>
+                  <p className="label">PAYMENT</p>
+                  <p style={{ fontWeight: 700, color: (selectedOrder.status === 'PAID' || selectedOrder.is_paid) ? '#059669' : 'var(--warning)' }}>
+                    {(selectedOrder.status === 'PAID' || selectedOrder.is_paid) ? `PAID ${selectedOrder.payment_method ? `(${selectedOrder.payment_method})` : ''}` : 'PENDING'}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -350,7 +355,7 @@ export default function AdminStatements() {
               </div>
             </div>
             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {selectedOrder.is_paid && (
+              {(selectedOrder.status === 'PAID' || selectedOrder.is_paid) && (
                 <button
                   onClick={() => setShowBill(true)}
                   className="btn"

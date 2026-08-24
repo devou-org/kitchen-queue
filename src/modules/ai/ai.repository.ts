@@ -49,11 +49,11 @@ export class AIRepository {
       // Fallback default if missing
       return {
         id: '',
-        model: 'gemini-flash-latest',
-        rpm_limit: 10,
+        model: 'gemini-3.5-flash',
+        rpm_limit: 15,
         tpm_limit: 200000,
-        rpd_limit: 200,
-        max_output_tokens: 1000,
+        rpd_limit: 1500,
+        max_output_tokens: 2000,
         is_enabled: true
       };
     }
@@ -176,9 +176,9 @@ export class AIRepository {
       }
 
       // 3. Pre-Request Limit Check
-      // Check 5-minute rolling window for rate limiting
+      // Check 1-minute rolling window for rate limiting
       const rpmRes = await client.query(
-        `SELECT COUNT(*)::int as count FROM gemini_usage WHERE created_at >= NOW() - INTERVAL '5 minutes'`
+        `SELECT COUNT(*)::int as count FROM gemini_usage WHERE created_at >= NOW() - INTERVAL '1 minute'`
       );
       const currentRpm = rpmRes.rows[0]?.count || 0;
 
@@ -325,6 +325,20 @@ export class AIRepository {
           [restaurantId, year, month, inputTokens, outputTokens, totalTokens, isSuccess, isError]
         );
       }
+
+      // 3. Keep gemini_daily_usage tokens in sync with actual total tokens logged today
+      const todayStr = new Date().toISOString().split('T')[0];
+      await client.query(
+        `UPDATE gemini_daily_usage
+         SET input_tokens = (
+           SELECT COALESCE(SUM(total_tokens), 0)::bigint
+           FROM gemini_usage
+           WHERE created_at >= CURRENT_DATE
+         ),
+         updated_at = CURRENT_TIMESTAMP
+         WHERE usage_date = $1`,
+        [todayStr]
+      );
 
       await client.query('COMMIT');
     } catch (err) {

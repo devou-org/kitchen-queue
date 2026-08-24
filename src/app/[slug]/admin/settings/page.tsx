@@ -5,7 +5,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Store, Eye, Receipt } from 'lucide-react';
+import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
@@ -31,15 +31,69 @@ export default function AdminSettings() {
   const [menuTitle, setMenuTitle] = useState("Today's Specials");
   const [menuDescription, setMenuDescription] = useState("Hand-curated coastal delicacies prepared with traditional recipes.");
 
+  // Geo-location & AI Context State
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [country, setCountry] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [detectingLoc, setDetectingLoc] = useState(false);
+  const [hasPromptedGeo, setHasPromptedGeo] = useState(false);
+
   // Business Hours State
   const [timezone, setTimezone] = useState('Asia/Kolkata');
   const [openingTime, setOpeningTime] = useState('09:00:00');
   const [closingTime, setClosingTime] = useState('22:00:00');
   const [rolloverTime, setRolloverTime] = useState('00:00:00');
-  
-  
 
+  const handleDetectLocation = (isAutoPrompt = false) => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      if (!isAutoPrompt) toast.error('Geolocation is not supported by your browser');
+      return;
+    }
 
+    setDetectingLoc(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setLatitude(lat.toFixed(7));
+        setLongitude(lng.toFixed(7));
+
+        try {
+          const geoRes = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
+          );
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData.city || geoData.locality) setCity(geoData.city || geoData.locality);
+            if (geoData.principalSubdivision) setState(geoData.principalSubdivision);
+            if (geoData.countryName) setCountry(geoData.countryName);
+          }
+        } catch (err) {
+          console.warn('Reverse geocode failed:', err);
+        }
+
+        setDetectingLoc(false);
+        toast.success(
+          isAutoPrompt
+            ? '📍 Restaurant location auto-detected! Click Save to update profile.'
+            : '📍 Coordinates detected successfully!'
+        );
+      },
+      (error) => {
+        setDetectingLoc(false);
+        if (!isAutoPrompt) {
+          if (error.code === error.PERMISSION_DENIED) {
+            toast.error('Location permission was denied by your browser');
+          } else {
+            toast.error('Unable to retrieve GPS coordinates');
+          }
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   useEffect(() => {
     if (restaurant) {
@@ -62,8 +116,22 @@ export default function AdminSettings() {
       setClosingTime(restaurant.closing_time || '22:00:00');
       setRolloverTime(restaurant.rollover_time || '00:00:00');
 
+      // Location fields
+      setCity((restaurant as any).city || '');
+      setState((restaurant as any).state || '');
+      setCountry((restaurant as any).country || '');
+      const latVal = (restaurant as any).latitude;
+      const lngVal = (restaurant as any).longitude;
+      setLatitude(latVal != null ? String(latVal) : '');
+      setLongitude(lngVal != null ? String(lngVal) : '');
+
+      // Auto-trigger location permission ONCE if lat & long are null in database
+      if ((latVal == null || lngVal == null) && !hasPromptedGeo) {
+        setHasPromptedGeo(true);
+        handleDetectLocation(true);
+      }
     }
-  }, [restaurant]);
+  }, [restaurant, hasPromptedGeo]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +161,11 @@ export default function AdminSettings() {
           opening_time: openingTime,
           closing_time: closingTime,
           rollover_time: rolloverTime,
+          city: city || null,
+          state: state || null,
+          country: country || null,
+          latitude: latitude !== '' ? Number(latitude) : null,
+          longitude: longitude !== '' ? Number(longitude) : null,
         }),
       });
       const data = await res.json();
@@ -241,7 +314,91 @@ export default function AdminSettings() {
               </div>
             </div>
 
-            {/* Business Hours Configuration */}
+            {/* Geo-Location & AI Business Context */}
+            <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <label style={{ ...S.label, margin: 0, display: 'flex', alignItems: 'center', gap: '6px', color: '#0f172a' }}>
+                    <MapPin size={15} color={primaryColor || '#10b981'} /> Geo-Location & AI Business Context
+                  </label>
+                  <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0 0' }}>
+                    Used by AI Business Analyst for Open-Meteo weather intelligence and regional holiday detection.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleDetectLocation(false)}
+                  disabled={detectingLoc}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: primaryColor || '#10b981',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.08)'
+                  }}
+                >
+                  {detectingLoc ? <Loader2 size={13} className="animate-spin" /> : <Navigation size={13} />}
+                  {detectingLoc ? 'Detecting...' : 'Detect GPS Location'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                <div>
+                  <label style={S.label}>Latitude °</label>
+                  <input
+                    type="number" step="any" value={latitude} onChange={e => setLatitude(e.target.value)}
+                    placeholder="e.g. 11.7750435" style={{ ...S.input, backgroundColor: '#ffffff' }}
+                  />
+                </div>
+                <div>
+                  <label style={S.label}>Longitude °</label>
+                  <input
+                    type="number" step="any" value={longitude} onChange={e => setLongitude(e.target.value)}
+                    placeholder="e.g. 75.4968640" style={{ ...S.input, backgroundColor: '#ffffff' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
+                <div>
+                  <label style={S.label}>City</label>
+                  <input
+                    type="text" value={city} onChange={e => setCity(e.target.value)}
+                    placeholder="Thalassery" style={{ ...S.input, backgroundColor: '#ffffff' }}
+                  />
+                </div>
+                <div>
+                  <label style={S.label}>State</label>
+                  <input
+                    type="text" value={state} onChange={e => setState(e.target.value)}
+                    placeholder="Kerala" style={{ ...S.input, backgroundColor: '#ffffff' }}
+                  />
+                </div>
+                <div>
+                  <label style={S.label}>Country</label>
+                  <input
+                    type="text" value={country} onChange={e => setCountry(e.target.value)}
+                    placeholder="India" style={{ ...S.input, backgroundColor: '#ffffff' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ fontSize: '11px', color: latitude && longitude ? '#15803d' : '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: latitude && longitude ? '#22c55e' : '#f59e0b', display: 'inline-block' }} />
+                {latitude && longitude
+                  ? `Coordinates Saved: ${latitude}, ${longitude}`
+                  : 'Coordinates missing: AI weather intelligence will default to city location.'}
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <div>
                 <label style={S.label}>Timezone</label>
@@ -405,7 +562,6 @@ export default function AdminSettings() {
               primaryColor={primaryColor}
             />
           )}
-
         </div>
       </div>
     </AdminContentWrapper>

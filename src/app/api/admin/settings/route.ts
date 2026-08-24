@@ -162,7 +162,15 @@ export async function PUT(request: NextRequest) {
       timezone,
       opening_time,
       closing_time,
-      rollover_time
+      rollover_time,
+      country,
+      country_code,
+      state,
+      state_code,
+      district,
+      city,
+      latitude,
+      longitude
     } = body;
 
     if (!name) {
@@ -185,6 +193,14 @@ export async function PUT(request: NextRequest) {
         opening_time = ${opening_time || null},
         closing_time = ${closing_time || null},
         rollover_time = ${rollover_time || null},
+        country = COALESCE(${country || null}, country),
+        country_code = COALESCE(${country_code || null}, country_code),
+        state = COALESCE(${state || null}, state),
+        state_code = COALESCE(${state_code || null}, state_code),
+        district = COALESCE(${district || null}, district),
+        city = COALESCE(${city || null}, city),
+        latitude = CASE WHEN ${latitude !== undefined && latitude !== null} THEN ${Number(latitude)} ELSE latitude END,
+        longitude = CASE WHEN ${longitude !== undefined && longitude !== null} THEN ${Number(longitude)} ELSE longitude END,
         updated_at = NOW()
       WHERE id = ${restaurant.id}
     `;

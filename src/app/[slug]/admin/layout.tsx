@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
+import { AIAnalystWidget } from '@/components/ai/AIAnalystWidget';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -261,6 +262,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
         {children}
+        <AIAnalystWidget />
       </main>
     </div>
     </>

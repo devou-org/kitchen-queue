@@ -570,11 +570,7 @@ export default function SuperAdminRestaurantBilling() {
                           const cycleDay = restaurant.billing_start_date ? new Date(restaurant.billing_start_date).getDate() : 1;
                           const start = new Date(s.year, s.month - 1, cycleDay);
                           const end = new Date(start);
-                          if (restaurant.billing_period === 'YEARLY') {
-                            end.setFullYear(end.getFullYear() + 1);
-                          } else {
-                            end.setMonth(end.getMonth() + 1);
-                          }
+                          end.setMonth(end.getMonth() + 1);
                           const startStr = start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
                           const endStr = end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 

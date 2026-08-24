@@ -34,16 +34,24 @@ export async function GET(request: NextRequest) {
       ORDER BY year DESC, month DESC
     `;
 
-    // 3. Get pricing config for current tier
+    // 3. Get pricing config for current tier (respecting custom overrides if set)
     const tier = (restaurant.billing_tier || 'BASIC') as BillingTier;
     const rawConfig = BILLING_PRICING[tier] || null;
     let pricingConfig = null;
     if (rawConfig) {
+      const subPrice = restaurant.custom_subscription_charge !== null && restaurant.custom_subscription_charge !== undefined
+        ? Number(restaurant.custom_subscription_charge)
+        : rawConfig.subscriptionMonthly;
+
+      const otpCharge = restaurant.custom_otp_charge !== null && restaurant.custom_otp_charge !== undefined
+        ? Number(restaurant.custom_otp_charge)
+        : rawConfig.otpCharge;
+
       pricingConfig = {
         name: rawConfig.name,
-        subscriptionPrice: rawConfig.subscriptionMonthly,
+        subscriptionPrice: subPrice,
         features: rawConfig.features,
-        otpCharge: rawConfig.otpCharge,
+        otpCharge: otpCharge,
         perOrderCommission: rawConfig.perOrder ? {
           threshold: rawConfig.perOrder.flatLimit,
           belowPercent: rawConfig.perOrder.commissionPercent * 100,

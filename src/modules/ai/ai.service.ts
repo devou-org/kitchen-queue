@@ -6,6 +6,14 @@ export interface GeminiContentPart {
     mimeType: string;
     data: string;
   };
+  functionCall?: {
+    name: string;
+    args?: any;
+  };
+  functionResponse?: {
+    name: string;
+    response?: any;
+  };
 }
 
 export interface GeminiContent {
@@ -254,6 +262,7 @@ export class AIService {
 
       // Extract usageMetadata from Gemini response
       const usageMetadata = resJson.usageMetadata || {};
+      console.log('📊 Gemini API usageMetadata:', JSON.stringify(usageMetadata, null, 2));
       const actualInputTokens = usageMetadata.promptTokenCount || inputTokens;
       const actualOutputTokens = usageMetadata.candidatesTokenCount || 0;
       const actualTotalTokens = usageMetadata.totalTokenCount || (actualInputTokens + actualOutputTokens);
