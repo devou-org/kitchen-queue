@@ -112,7 +112,6 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
   };
 
   const handleClearHistory = async () => {
-    if (!confirm('Clear AI chat history?')) return;
     try {
       const headers: Record<string, string> = slugStr ? { 'x-restaurant-slug': slugStr } : {};
       await fetch('/api/ai/chat', {
