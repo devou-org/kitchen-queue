@@ -13,112 +13,113 @@ const ANALYST_TOOLS_DECLARATIONS = [
     functionDeclarations: [
       {
         name: 'getSalesSummary',
-        description: 'Returns verified numerical sales summary metrics including gross revenue, paid revenue, total orders count, paid orders, net subtotal, GST collected, AOV, and cancellation rate.',
+        description: 'Returns gross & paid revenue, order counts, subtotal, GST, AOV, cancellation rate, and payment method breakdown (CASH, UPI, CARD, etc.).',
         parameters: {
           type: 'OBJECT',
           properties: {
-            date_from: { type: 'STRING', description: 'YYYY-MM-DD starting business date' },
-            date_to: { type: 'STRING', description: 'YYYY-MM-DD ending business date' }
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start date' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end date' }
           }
         }
       },
       {
         name: 'getSalesTrend',
-        description: 'Returns daily or period sales breakdown with date, order counts, total revenue, and average order value.',
+        description: 'Returns daily/weekly/monthly sales trend, order counts, and revenue breakdown.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            period: { type: 'STRING', enum: ['daily', 'weekly', 'monthly'], description: 'Granularity of trend data' },
-            date_from: { type: 'STRING', description: 'YYYY-MM-DD starting date' },
-            date_to: { type: 'STRING', description: 'YYYY-MM-DD ending date' }
+            period: { type: 'STRING', enum: ['daily', 'weekly', 'monthly'], description: 'Trend granularity' },
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
           }
         }
       },
       {
         name: 'getHourlySales',
-        description: 'Returns sales and order counts grouped by hour of day (0-23) to identify peak rush hours and slow periods.',
+        description: 'Returns hourly sales and order counts (0-23) for peak rush analysis.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            date_from: { type: 'STRING', description: 'YYYY-MM-DD starting business date' },
-            date_to: { type: 'STRING', description: 'YYYY-MM-DD ending business date' }
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
           }
         }
       },
       {
         name: 'getTopProducts',
-        description: 'Returns the highest performing products sorted by total quantity sold and total revenue generated.',
+        description: 'Returns highest performing products by quantity sold and revenue.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            date_from: { type: 'STRING', description: 'YYYY-MM-DD starting business date' },
-            date_to: { type: 'STRING', description: 'YYYY-MM-DD ending business date' },
-            limit: { type: 'INTEGER', description: 'Maximum number of top products to return (default 10)' }
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' },
+            limit: { type: 'INTEGER', description: 'Max items to return (default 10)' }
           }
         }
       },
       {
         name: 'getBottomProducts',
-        description: 'Returns lowest performing menu items or items with 0 sales to help analyze menu reduction or slow-moving items.',
+        description: 'Returns lowest performing menu items or zero sales items.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            date_from: { type: 'STRING', description: 'YYYY-MM-DD starting business date' },
-            date_to: { type: 'STRING', description: 'YYYY-MM-DD ending business date' },
-            limit: { type: 'INTEGER', description: 'Maximum number of items to return (default 10)' }
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' },
+            limit: { type: 'INTEGER', description: 'Max items to return (default 10)' }
           }
         }
       },
       {
         name: 'getCategoryPerformance',
-        description: 'Returns sales performance breakdown categorized by menu sections (e.g. Starter, Main Course, Beverages).',
+        description: 'Returns sales breakdown by menu section/category.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            date_from: { type: 'STRING', description: 'YYYY-MM-DD starting business date' },
-            date_to: { type: 'STRING', description: 'YYYY-MM-DD ending business date' }
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
           }
         }
       },
       {
         name: 'getAverageOrderValue',
-        description: 'Returns Average Order Value (AOV) metrics and total revenue over a period.',
+        description: 'Returns Average Order Value (AOV) and revenue over a date range.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            date_from: { type: 'STRING', description: 'YYYY-MM-DD starting business date' },
-            date_to: { type: 'STRING', description: 'YYYY-MM-DD ending business date' }
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
           }
         }
       },
+
       {
         name: 'getCancellationRate',
-        description: 'Returns order cancellation statistics, total cancelled orders count, cancellation %, and total revenue lost.',
+        description: 'Returns cancellation stats, cancelled order count, % and revenue lost. Defaults to today date if date_from and date_to are omitted.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            date_from: { type: 'STRING', description: 'YYYY-MM-DD starting business date' },
-            date_to: { type: 'STRING', description: 'YYYY-MM-DD ending business date' }
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start date (optional, defaults to today)' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end date (optional, defaults to today)' }
           }
         }
       },
       {
         name: 'comparePeriods',
-        description: 'Compares revenue, order volume, AOV, and cancellations between two distinct date ranges (e.g. this week vs last week, or this Monday vs previous Monday) and returns variance percentage.',
+        description: 'Compares revenue, order volume, AOV between two date ranges with variance %.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            period1_from: { type: 'STRING', description: 'Period 1 (Current/Primary) YYYY-MM-DD start' },
-            period1_to: { type: 'STRING', description: 'Period 1 (Current/Primary) YYYY-MM-DD end' },
-            period2_from: { type: 'STRING', description: 'Period 2 (Comparison/Previous) YYYY-MM-DD start' },
-            period2_to: { type: 'STRING', description: 'Period 2 (Comparison/Previous) YYYY-MM-DD end' }
+            period1_from: { type: 'STRING', description: 'Period 1 YYYY-MM-DD start' },
+            period1_to: { type: 'STRING', description: 'Period 1 YYYY-MM-DD end' },
+            period2_from: { type: 'STRING', description: 'Period 2 YYYY-MM-DD start' },
+            period2_to: { type: 'STRING', description: 'Period 2 YYYY-MM-DD end' }
           },
           required: ['period1_from', 'period1_to', 'period2_from', 'period2_to']
         }
       },
       {
         name: 'getInventorySummary',
-        description: 'Returns current inventory status including available items count, low stock count, out-of-stock count, and specific low stock items.',
+        description: 'Returns current inventory status, low stock count, and out-of-stock items.',
         parameters: {
           type: 'OBJECT',
           properties: {}
@@ -126,12 +127,37 @@ const ANALYST_TOOLS_DECLARATIONS = [
       },
       {
         name: 'searchRestaurantKnowledge',
-        description: 'Returns general restaurant details such as restaurant name, timezone, current business date, operating hours, active staff count, and menu categories.',
+        description: 'Returns general restaurant configuration, operating hours, active staff count, and menu categories.',
         parameters: {
           type: 'OBJECT',
           properties: {
-            query: { type: 'STRING', description: 'Specific knowledge or configuration parameter to query' }
+            query: { type: 'STRING', description: 'Knowledge field to query' }
           }
+        }
+      },
+      {
+        name: 'getHolidays',
+        description: 'Returns public, national, and state holidays within date range.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            startDate: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            endDate: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          },
+          required: ['startDate', 'endDate']
+        }
+      },
+      {
+        name: 'getWeather',
+        description: 'Returns weather metrics (temperature, rainfall, conditions) using Open-Meteo.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            startDate: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            endDate: { type: 'STRING', description: 'YYYY-MM-DD end' },
+            includeHourly: { type: 'BOOLEAN', description: 'True for hourly weather breakdown.' }
+          },
+          required: ['startDate', 'endDate']
         }
       }
     ]
@@ -140,37 +166,34 @@ const ANALYST_TOOLS_DECLARATIONS = [
 
 const ANALYST_SYSTEM_INSTRUCTION = `You are Qdine AI Business Analyst, an AI-powered restaurant business analyst.
 
-Your responsibility is to analyze restaurant performance using verified data from:
-- Sales
-- Orders
-- Inventory
-- Restaurant knowledge
-
-Your goal is to provide accurate, actionable, data-driven business insights that help restaurant owners and managers improve revenue, reduce waste, improve operations, and make better decisions.
+Your responsibility is to analyze restaurant performance using verified data from sales, orders, inventory, restaurant knowledge, weather & holidays.
 
 Core Rules:
 1. Never invent business data:
-   Never make up Revenue, Order count, Product sales, Inventory quantities, Cancellation rates, Percentages, Trends, or Business dates.
+   Never make up Revenue, Order count, Product sales, Inventory quantities, Cancellation rates, Weather data, Holidays, Percentages, Trends, or Business dates.
    If required information is unavailable, clearly state that the data is unavailable.
-   Never estimate a number unless the user explicitly asks for an estimate.
 
 2. Never directly access the database or write SQL:
-   You must strictly use the provided tool functions to query restaurant data.
-   Always analyze using the tools provided.
+   Strictly use provided tool functions to query restaurant data.
 
-3. Tool Selection Strategy:
-   - First understand the user's intent.
-   - Select strictly the MINIMUM number of tools required to answer accurately (usually 1 or 2 tools max).
-   - Do NOT execute extra comparative or historical tools unless the user explicitly asks for comparison.
-   - Simple factual question ("What were yesterday's sales?"): Call getSalesSummary()
-   - Simple cancellation question ("What is our cancellation rate?"): Call getCancellationRate()
+3. Tool Selection & Efficiency Rules:
+   - Execute all needed tools in 1 turn concurrently whenever multiple tools are required.
+   - For comparisons between multiple date ranges (e.g. today vs yesterday), request all date-specific tool calls together in 1 single turn concurrently (e.g. call getHourlySales for date 1 AND getHourlySales for date 2 in the same turn).
+   - For demand forecasting, dish prep planning, or targets for tomorrow/future dates, you MUST ALWAYS call 'getTopProducts' (or 'getSalesSummary'), 'getHolidays', and 'getWeather' CONCURRENTLY in 1 single turn.
+   - All tool date parameters default automatically to today's business date. Never call searchRestaurantKnowledge just to look up today's date.
+   - Never call searchRestaurantKnowledge unless specifically asked about staff, operating hours, or restaurant settings.
+   - Never re-call the same tool function with identical arguments if you have already received its data in Turn 1.
 
-4. Concise Answer Formatting (Token Efficient):
-   - Be extremely direct, brief, and concise. Do NOT generate unnecessary filler or verbose intro text.
-   - Answer directly with the key data metrics requested.
-   - Do NOT generate recommendations, advice, or action plans unless the user explicitly asks for recommendations.
-   - Format numbers clearly in Indian currency (e.g. ₹1,499.00).
-   - Keep answers objective, data-backed, and short (2-4 bullet points maximum).`;
+4. Demand Forecasting, Weather & Holiday Analysis Rules:
+   - When estimating prep targets for tomorrow/future dates, calculate baseline sales from past days, then adjust using:
+     • Holiday impact (e.g., public holidays/festivals increase order volume).
+     • Weather impact (e.g., heavy rain increases hot item/biryani/tea delivery demand, mild rain affects dine-in).
+   - Explicitly mention the holiday status and weather forecast for tomorrow in your response when giving prep advice.
+
+5. Concise Answer Formatting (Token Efficient):
+   - Direct, brief, and concise.
+   - No unnecessary recommendations or filler text unless explicitly requested.
+   - Format currency in INR (₹). Short 2-4 bullet points max.`;
 
 export class AIAnalystService {
   /**
@@ -235,9 +258,19 @@ export class AIAnalystService {
     const formattedModel = model.startsWith('models/') ? model : `models/${model}`;
     const maxOutputTokens = await AIRepository.getMaxOutputTokens(ANALYST_REQUEST_TYPE, 10000);
 
-    // 4. Construct Gemini Contents array from recent conversation history
-    const historyMessages = await this.getSessionMessages(sessionId, 12);
-    const contents: GeminiContent[] = historyMessages.map(msg => ({
+    // 4. Fetch global config & max output tokens for BUSINESS_ANALYST_CHAT
+    const historyRes = await pool.query(
+      `SELECT role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY created_at DESC LIMIT 8`,
+      [sessionId]
+    );
+
+    let rawMsgs = historyRes.rows.reverse();
+    // Gemini API requirement: first message in contents MUST have role 'user'
+    while (rawMsgs.length > 0 && rawMsgs[0].role !== 'user') {
+      rawMsgs.shift();
+    }
+
+    const contents: GeminiContent[] = rawMsgs.map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }]
     }));
@@ -273,7 +306,7 @@ export class AIAnalystService {
     let finalAnswer = '';
     const executedToolCalls: Array<{ name: string; args: any; result: any }> = [];
     let totalOutputTokens = 0;
-    let actualInputTokens = estimatedInputTokens;
+    let totalInputTokens = 0;
     let iterations = 0;
     const maxIterations = 5;
 
@@ -281,10 +314,13 @@ export class AIAnalystService {
       while (iterations < maxIterations) {
         iterations++;
 
+        const todayDate = new Date().toISOString().split('T')[0];
+        const dynamicSystemInstruction = `${ANALYST_SYSTEM_INSTRUCTION}\n\nCurrent Business Date / Today: ${todayDate}`;
+
         const requestBody: any = {
           contents: currentContents,
           systemInstruction: {
-            parts: [{ text: ANALYST_SYSTEM_INSTRUCTION }]
+            parts: [{ text: dynamicSystemInstruction }]
           },
           tools: ANALYST_TOOLS_DECLARATIONS,
           generationConfig: {
@@ -318,42 +354,86 @@ export class AIAnalystService {
         if (!response || !response.ok) {
           const errText = response ? await response.text() : 'No response';
           console.error('Gemini API Analyst request error:', response?.status, errText);
-          throw new Error(`Gemini API returned status ${response?.status}`);
+          throw new Error(`Gemini API returned status ${response?.status}: ${errText}`);
         }
 
         const resJson = await response.json();
         const usage = resJson.usageMetadata || {};
-        if (usage.promptTokenCount) actualInputTokens = usage.promptTokenCount;
+        console.log('📊 Gemini API usageMetadata:', JSON.stringify(usage, null, 2));
+        if (usage.promptTokenCount) totalInputTokens += usage.promptTokenCount;
         if (usage.candidatesTokenCount) totalOutputTokens += usage.candidatesTokenCount;
 
         const candidate = resJson.candidates?.[0];
         const parts = candidate?.content?.parts || [];
 
-        // Check if candidate contains function calls
-        const functionCallPart = parts.find((p: any) => p.functionCall);
+        const functionCallParts = parts.filter((p: any) => p.functionCall);
 
-        if (functionCallPart && functionCallPart.functionCall) {
-          const { name, args } = functionCallPart.functionCall;
-          console.log(`🤖 AI Analyst requested tool: ${name}`, args);
+        if (functionCallParts.length > 0) {
+          const batchStartTime = Date.now();
+          console.log(
+            `⚡ [Qdine Orchestrator] Gemini requested ${functionCallParts.length} concurrent tool call(s):`,
+            functionCallParts.map((p: any) => p.functionCall.name)
+          );
 
-          // Execute tool on PostgreSQL database
-          const toolResult = await executeAnalystToolCall(restaurantId, name, args || {});
-          executedToolCalls.push({ name, args, result: toolResult });
+          // Execute all independent tool calls concurrently via Promise.all with 10s timeout protection
+          const toolResults = await Promise.all(
+            functionCallParts.map(async (part: any) => {
+              const { name, args } = part.functionCall;
+              const toolStartTime = Date.now();
+              try {
+               const timeoutPromise = new Promise((_, reject) =>
+                  setTimeout(() => reject(new Error(`Tool ${name} execution timed out`)), 10000)
+                );
 
-          // Append model's functionCall turn (preserving all parts and thought signatures returned by Gemini)
+                const rawResult = await Promise.race([
+                  executeAnalystToolCall(restaurantId, name, args || {}),
+                  timeoutPromise
+                ]); 
+
+                const duration = Date.now() - toolStartTime;
+                console.log(`✅ Tool ${name} completed successfully in ${duration}ms`);
+
+                const formattedResult = typeof rawResult === 'object' && rawResult !== null ? rawResult : { result: rawResult };
+                return { name, args, success: true, result: formattedResult, durationMs: duration };
+              } catch (toolErr: any) {
+                const duration = Date.now() - toolStartTime;
+                console.error(`❌ Tool ${name} failed in ${duration}ms:`, toolErr.message);
+
+                return {
+                  name,
+                  args,
+                  success: false,
+                  result: { success: false, error: toolErr.message || 'Tool execution failed' },
+                  error: toolErr.message,
+                  durationMs: duration
+                };
+              }
+            })
+          );
+
+          const batchDuration = Date.now() - batchStartTime;
+          console.log(`🚀 [Qdine Orchestrator] Concurrently completed ${toolResults.length} tool(s) in ${batchDuration}ms`);
+
+          // Record executed tool calls for chat history & DB persistence
+          toolResults.forEach(tr => {
+            executedToolCalls.push({ name: tr.name, args: tr.args, result: tr.result });
+          });
+
+          // Append Gemini's function call turn to conversation
           currentContents.push(candidate.content);
 
-          // Append tool response turn to conversation (Gemini REST API expects role: 'user' or 'function' with response being the data object)
+          // Build single turn containing ALL function response parts for Gemini
+          const functionResponseParts = toolResults.map(tr => ({
+            functionResponse: {
+              name: tr.name,
+              response: tr.result
+            }
+          }));
+
+          // Append tool response turn to conversation
           currentContents.push({
             role: 'user',
-            parts: [
-              {
-                functionResponse: {
-                  name,
-                  response: typeof toolResult === 'object' && toolResult !== null ? toolResult : { result: toolResult }
-                }
-              }
-            ]
+            parts: functionResponseParts
           });
 
           // Continue loop for next turn
@@ -400,7 +480,8 @@ export class AIAnalystService {
       }
 
       const responseTimeMs = Date.now() - startTime;
-      const totalTokens = actualInputTokens + totalOutputTokens;
+      const finalInputTokens = totalInputTokens || estimatedInputTokens;
+      const totalTokens = finalInputTokens + totalOutputTokens;
 
       // Save assistant response to DB
       await pool.query(
@@ -430,7 +511,7 @@ export class AIAnalystService {
         restaurantId,
         requestType: ANALYST_REQUEST_TYPE,
         model,
-        inputTokens: actualInputTokens,
+        inputTokens: finalInputTokens,
         outputTokens: totalOutputTokens,
         totalTokens,
         status: 'SUCCESS',
@@ -443,7 +524,7 @@ export class AIAnalystService {
         message: finalAnswer,
         toolCalls: executedToolCalls,
         tokens: {
-          input: actualInputTokens,
+          input: finalInputTokens,
           output: totalOutputTokens,
           total: totalTokens
         }
@@ -452,14 +533,15 @@ export class AIAnalystService {
     } catch (err: any) {
       const responseTimeMs = Date.now() - startTime;
       console.error('AI Analyst processChat error:', err);
+      const finalInputTokens = totalInputTokens || estimatedInputTokens;
 
       await AIRepository.logRequestUsage({
         restaurantId,
         requestType: ANALYST_REQUEST_TYPE,
         model,
-        inputTokens: actualInputTokens,
+        inputTokens: finalInputTokens,
         outputTokens: 0,
-        totalTokens: actualInputTokens,
+        totalTokens: finalInputTokens,
         status: 'ERROR',
         errorCode: 'ANALYST_CHAT_EXCEPTION',
         errorMessage: err.message || 'Chat processing error',

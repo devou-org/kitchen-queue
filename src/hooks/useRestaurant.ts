@@ -23,6 +23,14 @@ export type RestaurantContext = {
   gst_number?: string;
   gst_rate?: number;
   billing_status?: string;
+  country?: string;
+  country_code?: string;
+  state?: string;
+  state_code?: string;
+  district?: string;
+  city?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 let cached: RestaurantContext | null = null;

@@ -1,5 +1,6 @@
 import { pool } from '@/lib/db';
 import { getCurrentBusinessDate } from '@/lib/format';
+import { getWeather } from './services/weather.service';
 
 export interface DateFilter {
   date_from?: string;
@@ -52,6 +53,28 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
   const cancelledOrders = Number(row.cancelled_orders || 0);
   const cancellationRatePercent = totalOrders > 0 ? Math.round((cancelledOrders / totalOrders) * 10000) / 100 : 0;
 
+  // Payment methods breakdown for paid orders
+  const paymentRes = await pool.query(
+    `SELECT 
+       COALESCE(payment_method, 'UNKNOWN') as method,
+       COUNT(*)::int as count,
+       COALESCE(SUM(total_price), 0)::numeric as total_amount
+     FROM orders
+     WHERE restaurant_id = $1
+       AND business_date >= $2::date
+       AND business_date <= $3::date
+       AND status = 'PAID'
+     GROUP BY COALESCE(payment_method, 'UNKNOWN')
+     ORDER BY total_amount DESC`,
+    [restaurantId, dateFrom, dateTo]
+  );
+
+  const paymentBreakdown = paymentRes.rows.map(r => ({
+    method: r.method,
+    count: Number(r.count || 0),
+    total_amount: Math.round(Number(r.total_amount) * 100) / 100
+  }));
+
   return {
     date_from: dateFrom,
     date_to: dateTo,
@@ -63,7 +86,8 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
     paid_revenue: Math.round(Number(row.total_paid_revenue) * 100) / 100,
     net_subtotal: Math.round(Number(row.net_subtotal) * 100) / 100,
     gst_collected: Math.round(Number(row.gst_collected) * 100) / 100,
-    average_order_value: Math.round(Number(row.average_order_value) * 100) / 100
+    average_order_value: Math.round(Number(row.average_order_value) * 100) / 100,
+    payment_breakdown: paymentBreakdown
   };
 }
 
@@ -452,6 +476,88 @@ export async function searchRestaurantKnowledge(restaurantId: string, params: { 
 }
 
 /**
+ * 12. getHolidays
+ */
+export async function getHolidays(restaurantId: string, args: { startDate?: string; endDate?: string } = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const nowStr = currentBusinessDate || new Date().toISOString().split('T')[0];
+  const parts = nowStr.split('-');
+  const yearStr = parts[0] || '2026';
+  const monthStr = parts[1] || '08';
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+
+  const defaultStart = `${yearStr}-${monthStr}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const defaultEnd = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+
+  const startDate = args?.startDate || defaultStart;
+  const endDate = args?.endDate || defaultEnd;
+
+  const restRes = await pool.query(
+    `SELECT country_code, state_code, district, city FROM restaurants WHERE id = $1 LIMIT 1`,
+    [restaurantId]
+  );
+
+  const countryCode = restRes.rows[0]?.country_code || 'IN';
+  const stateCode = restRes.rows[0]?.state_code || 'KL';
+
+  const holidayRes = await pool.query(
+    `SELECT name, holiday_date, holiday_type, is_public_holiday, source
+     FROM holidays
+     WHERE holiday_date >= $1::date AND holiday_date <= $2::date
+       AND (country_code = $3 OR country_code IS NULL)
+       AND (state_code IS NULL OR state_code = $4)
+     ORDER BY holiday_date ASC`,
+    [startDate, endDate, countryCode, stateCode]
+  );
+
+  return {
+    restaurant_location: {
+      country_code: countryCode,
+      state_code: stateCode
+    },
+    period: {
+      start: startDate,
+      end: endDate
+    },
+    total_holidays: holidayRes.rows.length,
+    holidays: holidayRes.rows.map(h => {
+      let formattedDate = h.holiday_date;
+      if (h.holiday_date instanceof Date) {
+        formattedDate = h.holiday_date.toISOString().split('T')[0];
+      } else if (typeof h.holiday_date === 'string') {
+        formattedDate = h.holiday_date.split('T')[0];
+      }
+      return {
+        name: h.name,
+        date: formattedDate,
+        type: h.holiday_type,
+        is_public_holiday: h.is_public_holiday,
+        source: h.source
+      };
+    })
+  };
+}
+
+/**
+ * 13. getWeather
+ */
+export async function getWeatherTool(restaurantId: string, args: { startDate?: string; endDate?: string; includeHourly?: boolean } = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const nowStr = currentBusinessDate || new Date().toISOString().split('T')[0];
+  const startDate = args?.startDate || nowStr;
+  const endDate = args?.endDate || nowStr;
+
+  return await getWeather({
+    restaurantId,
+    startDate,
+    endDate,
+    includeHourly: args?.includeHourly
+  });
+}
+
+/**
  * Master dispatcher for tool calls invoked by Gemini Function Calling
  */
 export async function executeAnalystToolCall(restaurantId: string, toolName: string, args: any = {}): Promise<any> {
@@ -479,6 +585,10 @@ export async function executeAnalystToolCall(restaurantId: string, toolName: str
         return await getInventorySummary(restaurantId);
       case 'searchRestaurantKnowledge':
         return await searchRestaurantKnowledge(restaurantId, args);
+      case 'getHolidays':
+        return await getHolidays(restaurantId, args);
+      case 'getWeather':
+        return await getWeatherTool(restaurantId, args);
       default:
         return { error: `Unknown tool function name: ${toolName}` };
     }

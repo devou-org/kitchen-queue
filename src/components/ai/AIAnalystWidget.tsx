@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
+import { SalesTrendChart } from './SalesTrendChart';
 
 interface ChatMessage {
   id?: string;
@@ -249,6 +250,7 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: '8px',
               padding: '10px 22px',
               borderRadius: '48px',
               background: primaryColor,
@@ -261,6 +263,7 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
               whiteSpace: 'nowrap'
             }}
           >
+            <Bot size={18} />
             <span>AI Analyst</span>
           </button>
         </div>
@@ -460,7 +463,10 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
                       {isUser ? (
                         <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{msg.content}</p>
                       ) : (
-                        <div>{formatContent(msg.content)}</div>
+                        <div>
+                          {formatContent(msg.content)}
+                          <SalesTrendChart toolCalls={msg.tool_calls} primaryColor={primaryColor} />
+                        </div>
                       )}
                     </div>
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
-import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart, Receipt } from 'lucide-react';
+import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart, Receipt, MapPin, Navigation } from 'lucide-react';
 type Module = {
   module_name: string;
   is_enabled: boolean;
@@ -53,6 +53,14 @@ export default function RestaurantDetails() {
   const [gstNumber, setGstNumber] = useState('');
   const [gstRate, setGstRate] = useState(5.00);
   const [savingGst, setSavingGst] = useState(false);
+
+  // Geo Location State
+  const [geoCity, setGeoCity] = useState('');
+  const [geoState, setGeoState] = useState('');
+  const [geoCountry, setGeoCountry] = useState('');
+  const [geoLat, setGeoLat] = useState('');
+  const [geoLong, setGeoLong] = useState('');
+  const [savingGeo, setSavingGeo] = useState(false);
 
   // Form Fields State
   const [name, setName] = useState('');
@@ -109,6 +117,15 @@ export default function RestaurantDetails() {
         setGstType((r as any).gst_type || 'NONE');
         setGstNumber((r as any).gst_number || '');
         setGstRate(Number((r as any).gst_rate || 0) || ((r as any).gst_type !== 'NONE' ? 5 : 0));
+
+        // Location States
+        setGeoCity((r as any).city || '');
+        setGeoState((r as any).state || '');
+        setGeoCountry((r as any).country || '');
+        const latVal = (r as any).latitude;
+        const lngVal = (r as any).longitude;
+        setGeoLat(latVal != null ? String(latVal) : '');
+        setGeoLong(lngVal != null ? String(lngVal) : '');
       } else {
         toast.error('Restaurant not found');
         router.push('/super-admin');
@@ -119,6 +136,35 @@ export default function RestaurantDetails() {
       setLoading(false);
     }
   }, [id, router]);
+
+  const handleSaveGeo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingGeo(true);
+    try {
+      const res = await fetch(`/api/super-admin/restaurants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        ...authHeaders,
+        body: JSON.stringify({
+          city: geoCity || null,
+          state: geoState || null,
+          country: geoCountry || null,
+          latitude: geoLat !== '' ? Number(geoLat) : null,
+          longitude: geoLong !== '' ? Number(geoLong) : null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Geo-Location coordinates updated successfully!');
+      } else {
+        toast.error(data.error || 'Failed to update location');
+      }
+    } catch {
+      toast.error('Connection error while updating location');
+    } finally {
+      setSavingGeo(false);
+    }
+  };
 
   const handleSaveGst = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -621,7 +667,75 @@ export default function RestaurantDetails() {
               </div>
             </div>
 
+            {/* Geo-Location & Coordinates (AI Analyst Context) */}
+            <div style={S.card}>
+              <h2 style={{...S.cardTitle, display: 'flex', alignItems: 'center', gap: '8px'}}><MapPin size={20} color="#10b981" /> Geo-Location & AI Context</h2>
+              <p style={S.cardDesc}>Latitude and longitude coordinates used by Open-Meteo weather service and regional holiday engine for AI Business Intelligence.</p>
+              
+              <form onSubmit={handleSaveGeo} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={S.label}>Latitude °</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={geoLat} 
+                      onChange={e => setGeoLat(e.target.value)} 
+                      style={S.input} 
+                      placeholder="e.g. 11.7750435" 
+                    />
+                  </div>
+                  <div>
+                    <label style={S.label}>Longitude °</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={geoLong} 
+                      onChange={e => setGeoLong(e.target.value)} 
+                      style={S.input} 
+                      placeholder="e.g. 75.4968640" 
+                    />
+                  </div>
+                </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={S.label}>City</label>
+                    <input 
+                      type="text" 
+                      value={geoCity} 
+                      onChange={e => setGeoCity(e.target.value)} 
+                      style={S.input} 
+                      placeholder="Thalassery" 
+                    />
+                  </div>
+                  <div>
+                    <label style={S.label}>State</label>
+                    <input 
+                      type="text" 
+                      value={geoState} 
+                      onChange={e => setGeoState(e.target.value)} 
+                      style={S.input} 
+                      placeholder="Kerala" 
+                    />
+                  </div>
+                  <div>
+                    <label style={S.label}>Country</label>
+                    <input 
+                      type="text" 
+                      value={geoCountry} 
+                      onChange={e => setGeoCountry(e.target.value)} 
+                      style={S.input} 
+                      placeholder="India" 
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" style={{ ...S.primaryLinkBtn, border: 'none', cursor: 'pointer', textAlign: 'center' }} disabled={savingGeo}>
+                  {savingGeo ? 'Saving Coordinates...' : 'Save Geo Location'}
+                </button>
+              </form>
+            </div>
 
             {/* GST Settings */}
             <div style={S.card}>

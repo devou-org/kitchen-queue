@@ -26,7 +26,15 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS gst_number VARCHAR(20),
       ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2) DEFAULT 5.00,
       ADD COLUMN IF NOT EXISTS custom_subscription_charge DECIMAL(10,2) DEFAULT NULL,
-      ADD COLUMN IF NOT EXISTS custom_otp_charge DECIMAL(10,2) DEFAULT NULL;
+      ADD COLUMN IF NOT EXISTS custom_otp_charge DECIMAL(10,2) DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS country VARCHAR(100) DEFAULT 'India',
+      ADD COLUMN IF NOT EXISTS country_code VARCHAR(10) DEFAULT 'IN',
+      ADD COLUMN IF NOT EXISTS state VARCHAR(100) DEFAULT 'Kerala',
+      ADD COLUMN IF NOT EXISTS state_code VARCHAR(20) DEFAULT 'KL',
+      ADD COLUMN IF NOT EXISTS district VARCHAR(100) DEFAULT 'Kannur',
+      ADD COLUMN IF NOT EXISTS city VARCHAR(150) DEFAULT 'Thalassery',
+      ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,7) DEFAULT 11.7750435,
+      ADD COLUMN IF NOT EXISTS longitude DECIMAL(10,7) DEFAULT 75.496864;
     `;
     await sqlConnection`
       ALTER TABLE orders
@@ -78,7 +86,7 @@ async function runAutoMigration(sqlConnection: any) {
 
 export async function getRestaurantBySlug(slug: string) {
   try {
-    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, country, country_code, state, state_code, district, city, latitude, longitude FROM restaurants WHERE slug = ${slug} LIMIT 1`;
     return rows[0] || null;
   } catch (error: any) {
     if (error.message?.includes('column') || error.message?.includes('does not exist')) {
@@ -177,7 +185,7 @@ export async function getAllRestaurants() {
 export async function getRestaurantById(id: string) {
   try {
     const rows = await sql`
-      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge
+      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, country, country_code, state, state_code, district, city, latitude, longitude, timezone, opening_time, closing_time, rollover_time
       FROM restaurants WHERE id = ${id} LIMIT 1
     `;
     return rows[0] || null;
@@ -313,6 +321,14 @@ export async function updateRestaurant(id: string, data: {
   gst_rate?: number | null;
   custom_subscription_charge?: number | null;
   custom_otp_charge?: number | null;
+  country?: string | null;
+  country_code?: string | null;
+  state?: string | null;
+  state_code?: string | null;
+  district?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }) {
   try {
     const rows = await sql`
@@ -341,6 +357,14 @@ export async function updateRestaurant(id: string, data: {
         gst_rate = COALESCE(${data.gst_rate ?? null}, gst_rate),
         custom_subscription_charge = CASE WHEN ${data.custom_subscription_charge !== undefined} THEN ${data.custom_subscription_charge ?? null} ELSE custom_subscription_charge END,
         custom_otp_charge = CASE WHEN ${data.custom_otp_charge !== undefined} THEN ${data.custom_otp_charge ?? null} ELSE custom_otp_charge END,
+        country = COALESCE(${data.country ?? null}, country),
+        country_code = COALESCE(${data.country_code ?? null}, country_code),
+        state = COALESCE(${data.state ?? null}, state),
+        state_code = COALESCE(${data.state_code ?? null}, state_code),
+        district = COALESCE(${data.district ?? null}, district),
+        city = COALESCE(${data.city ?? null}, city),
+        latitude = CASE WHEN ${data.latitude !== undefined} THEN ${data.latitude ?? null} ELSE latitude END,
+        longitude = CASE WHEN ${data.longitude !== undefined} THEN ${data.longitude ?? null} ELSE longitude END,
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

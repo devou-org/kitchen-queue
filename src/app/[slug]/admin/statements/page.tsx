@@ -331,7 +331,12 @@ export default function AdminStatements() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                 <div><p className="label">TABLE</p><p style={{ fontWeight: 700 }}>{selectedOrder.table_number || 'N/A'}</p></div>
-                <div style={{ textAlign: 'right' }}><p className="label">PAYMENT</p><p style={{ fontWeight: 700, color: selectedOrder.is_paid ? '#059669' : 'var(--warning)' }}>{selectedOrder.is_paid ? `PAID ${selectedOrder.payment_method ? `(${selectedOrder.payment_method})` : ''}` : 'PENDING'}</p></div>
+                <div style={{ textAlign: 'right' }}>
+                  <p className="label">PAYMENT</p>
+                  <p style={{ fontWeight: 700, color: (selectedOrder.status === 'PAID' || selectedOrder.is_paid) ? '#059669' : 'var(--warning)' }}>
+                    {(selectedOrder.status === 'PAID' || selectedOrder.is_paid) ? `PAID ${selectedOrder.payment_method ? `(${selectedOrder.payment_method})` : ''}` : 'PENDING'}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -350,7 +355,7 @@ export default function AdminStatements() {
               </div>
             </div>
             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {selectedOrder.is_paid && (
+              {(selectedOrder.status === 'PAID' || selectedOrder.is_paid) && (
                 <button
                   onClick={() => setShowBill(true)}
                   className="btn"
