@@ -27,7 +27,7 @@ async function getRestaurantContext(restaurantId: string) {
  * 1. getSalesSummary
  */
 export async function getSalesSummary(restaurantId: string, params: DateFilter = {}) {
-  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const { rest, currentBusinessDate } = await getRestaurantContext(restaurantId);
   const dateFrom = params.date_from || currentBusinessDate;
   const dateTo = params.date_to || currentBusinessDate;
 
@@ -38,8 +38,9 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
        COUNT(*) FILTER (WHERE status = 'CANCELLED')::int as cancelled_orders,
        COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0)::numeric as gross_revenue,
        COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as total_paid_revenue,
-       COALESCE(SUM(subtotal) FILTER (WHERE status = 'PAID'), 0)::numeric as net_subtotal,
-       COALESCE(SUM(gst_amount) FILTER (WHERE status = 'PAID'), 0)::numeric as gst_collected,
+       COALESCE(SUM(subtotal) FILTER (WHERE status = 'PAID' AND gst_type = 'REGULAR'), 0)::numeric as net_subtotal,
+       COALESCE(SUM(gst_amount) FILTER (WHERE status = 'PAID' AND gst_type = 'REGULAR'), 0)::numeric as regular_gst,
+       COALESCE(SUM(total_price * gst_rate / 100) FILTER (WHERE status = 'PAID' AND gst_type = 'COMPOSITION'), 0)::numeric as composition_gst,
        COALESCE(AVG(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as average_order_value
      FROM orders
      WHERE restaurant_id = $1
@@ -52,6 +53,14 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
   const totalOrders = Number(row.total_orders || 0);
   const cancelledOrders = Number(row.cancelled_orders || 0);
   const cancellationRatePercent = totalOrders > 0 ? Math.round((cancelledOrders / totalOrders) * 10000) / 100 : 0;
+
+  // Compute GST based on restaurant GST type
+  let gstCollected = 0;
+  if (rest.gst_type === 'REGULAR') {
+    gstCollected = Number(row.regular_gst || 0);
+  } else if (rest.gst_type === 'COMPOSITION') {
+    gstCollected = Number(row.composition_gst || 0);
+  }
 
   // Payment methods breakdown for paid orders
   const paymentRes = await pool.query(
@@ -78,6 +87,7 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
   return {
     date_from: dateFrom,
     date_to: dateTo,
+    gst_type: rest.gst_type,
     total_orders: totalOrders,
     paid_orders: Number(row.paid_orders || 0),
     cancelled_orders: cancelledOrders,
@@ -85,7 +95,7 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
     gross_revenue: Math.round(Number(row.gross_revenue) * 100) / 100,
     paid_revenue: Math.round(Number(row.total_paid_revenue) * 100) / 100,
     net_subtotal: Math.round(Number(row.net_subtotal) * 100) / 100,
-    gst_collected: Math.round(Number(row.gst_collected) * 100) / 100,
+    gst_collected: Math.round(gstCollected * 100) / 100,
     average_order_value: Math.round(Number(row.average_order_value) * 100) / 100,
     payment_breakdown: paymentBreakdown
   };

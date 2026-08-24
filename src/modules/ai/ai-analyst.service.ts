@@ -13,7 +13,7 @@ const ANALYST_TOOLS_DECLARATIONS = [
     functionDeclarations: [
       {
         name: 'getSalesSummary',
-        description: 'Returns gross & paid revenue, order counts, subtotal, GST, AOV, cancellation rate, and payment method breakdown (CASH, UPI, CARD, etc.).',
+        description: 'Returns gross & paid revenue, order counts, subtotal, GST (collected for REGULAR or payable for COMPOSITION depending on restaurant setup), AOV, cancellation rate, and payment method breakdown (CASH, UPI, CARD, etc.).',
         parameters: {
           type: 'OBJECT',
           properties: {

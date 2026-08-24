@@ -49,7 +49,7 @@ export class AIRepository {
       // Fallback default if missing
       return {
         id: '',
-        model: 'gemini-3.5-flash',
+        model: 'gemini-3.5-flash-lite',
         rpm_limit: 15,
         tpm_limit: 200000,
         rpd_limit: 1500,

@@ -51,7 +51,7 @@ async function runAutoMigration(sqlConnection: any) {
     `;
     await sqlConnection`
       UPDATE gemini_config
-      SET model = 'gemini-3.5-flash',
+      SET model = 'gemini-3.5-flash-lite',
           rpm_limit = 15,
           rpd_limit = 1500,
           updated_at = CURRENT_TIMESTAMP;
