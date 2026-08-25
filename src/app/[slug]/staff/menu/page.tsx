@@ -102,6 +102,7 @@ export default function StaffMenuPage() {
   const [categories, setCategories] = useState<string[]>(['All']);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [tables, setTables] = useState<any[]>([]);
   const [orderForm, setOrderForm] = useState({
     customer_name: '',
     phone: '',
@@ -129,6 +130,13 @@ export default function StaffMenuPage() {
               .filter((cat: string) => cat && cat !== 'All')
           ));
           setCategories(['All', ...uniqueCats]);
+        }
+
+        // Fetch tables for table selection dropdown
+        const tablesRes = await fetch('/api/tables');
+        const tablesData = await tablesRes.json();
+        if (tablesData.success && tablesData.tables) {
+          setTables(tablesData.tables);
         }
       } catch {
         toast.error('Failed to load menu');
@@ -267,6 +275,7 @@ export default function StaffMenuPage() {
       const res = await orderService.createOrder({
         customer_name: nameToUse,
         phone: phoneToUse,
+        table_number: orderForm.table_number || undefined,
         items,
         party_size: orderForm.party_size,
         notes: orderForm.notes,
@@ -395,7 +404,37 @@ export default function StaffMenuPage() {
               <div style={{ display: 'flex', gap: '12px' }}>
                 <div style={{ flex: 1 }}>
                   <label className="label">Table Number *</label>
-                  <input type="text" className="input" placeholder="e.g. 12" value={orderForm.table_number} onChange={e => setOrderForm({ ...orderForm, table_number: e.target.value })} />
+                  {tables.length > 0 ? (
+                    <select
+                      className="input"
+                      value={orderForm.table_number}
+                      onChange={e => {
+                        const selectedNum = e.target.value;
+                        const matchedTable = tables.find((t: any) => t.table_number === selectedNum);
+                        setOrderForm({
+                          ...orderForm,
+                          table_number: selectedNum,
+                          party_size: matchedTable?.capacity ? Number(matchedTable.capacity) : orderForm.party_size
+                        });
+                      }}
+                    >
+                      <option value="">-- Select Table --</option>
+                      {tables.map((t: any) => (
+                        <option key={t.id} value={t.table_number}>
+                          Table #{t.table_number} {t.capacity ? `(${t.capacity} seats)` : ''} {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
+                        </option>
+                      ))}
+                      <option value="Takeaway">Takeaway</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g. 12"
+                      value={orderForm.table_number}
+                      onChange={e => setOrderForm({ ...orderForm, table_number: e.target.value })}
+                    />
+                  )}
                 </div>
                 <div style={{ width: '100px' }}>
                   <label className="label">Persons</label>
