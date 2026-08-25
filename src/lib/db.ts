@@ -843,7 +843,7 @@ export async function getOrderById(restaurantId: string, id: string) {
          )::integer as pos
        FROM orders o
        WHERE o.restaurant_id = ${restaurantId} 
-         AND o.status IN ('PENDING', 'PREPARING')
+         AND o.status = 'PENDING'
          AND o.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = o.restaurant_id)
     )
     SELECT o.*, s.name as staff_name, 
@@ -878,7 +878,7 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
          )::integer as pos
        FROM orders o
        WHERE o.restaurant_id = ${restaurantId} 
-         AND o.status IN ('PENDING', 'PREPARING')
+         AND o.status = 'PENDING'
          AND o.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = o.restaurant_id)
     )
     SELECT o.*, s.name as staff_name, 
@@ -913,7 +913,7 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
          )::integer as pos
        FROM orders o
        WHERE o.restaurant_id = ${restaurantId} 
-         AND o.status IN ('PENDING', 'PREPARING')
+         AND o.status = 'PENDING'
          AND o.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = o.restaurant_id)
     )
     SELECT q.id, q.token_number as ticket_number, q.created_at, q.queue_type,
