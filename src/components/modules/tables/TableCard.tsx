@@ -26,8 +26,8 @@ export function TableCard({ table, onViewQR, onDelete, primaryColor = '#059669' 
       style={{
         background: '#FFFFFF',
         borderRadius: '16px',
-        border: `1px solid ${isOccupied ? '#FDE68A' : '#E2E8F0'}`,
-        boxShadow: 'none',
+        border: 'none',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
         padding: '18px',
         display: 'flex',
         flexDirection: 'column',
