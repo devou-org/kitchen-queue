@@ -159,6 +159,118 @@ const ANALYST_TOOLS_DECLARATIONS = [
           },
           required: ['startDate', 'endDate']
         }
+      },
+      {
+        name: 'getTableOccupancy',
+        description: 'Returns table occupancy rate, total tables, occupied tables, and available tables for a date range.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          }
+        }
+      },
+      {
+        name: 'getTableTurnover',
+        description: 'Returns table turnover rate, total completed table sessions, and average turn time in minutes.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          }
+        }
+      },
+      {
+        name: 'getAverageTableTurnTime',
+        description: 'Returns average, fastest, and slowest table turn times in minutes for closed table sessions.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          }
+        }
+      },
+      {
+        name: 'getTableUtilization',
+        description: 'Returns total available table hours, occupied table hours, and utilization percentage.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          }
+        }
+      },
+      {
+        name: 'getTableUsageByHour',
+        description: 'Returns hourly breakdown (0-23) of table sessions and occupancy percentage.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          }
+        }
+      },
+      {
+        name: 'getTablePerformance',
+        description: 'Returns table-by-table performance stats including sessions, revenue, party size, and turn time.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          }
+        }
+      },
+      {
+        name: 'getTopTablesByRevenue',
+        description: 'Returns top tables ranked by revenue generated.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' },
+            limit: { type: 'NUMBER', description: 'Number of top tables to return' }
+          }
+        }
+      },
+      {
+        name: 'getBottomTablesByRevenue',
+        description: 'Returns lowest revenue-generating tables for optimization analysis.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' },
+            limit: { type: 'NUMBER', description: 'Number of bottom tables to return' }
+          }
+        }
+      },
+      {
+        name: 'getTableCapacityPerformance',
+        description: 'Returns seat utilization efficiency by comparing average party size to table capacity.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          }
+        }
+      },
+      {
+        name: 'getRevenuePerTableHour',
+        description: 'Returns total table revenue, total occupied table hours, and revenue per table hour.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            date_from: { type: 'STRING', description: 'YYYY-MM-DD start' },
+            date_to: { type: 'STRING', description: 'YYYY-MM-DD end' }
+          }
+        }
       }
     ]
   }
@@ -166,17 +278,21 @@ const ANALYST_TOOLS_DECLARATIONS = [
 
 const ANALYST_SYSTEM_INSTRUCTION = `You are Qdine AI Business Analyst, an AI-powered restaurant business analyst.
 
-Your responsibility is to analyze restaurant performance using verified data from sales, orders, inventory, restaurant knowledge, weather & holidays.
+Your responsibility is to analyze restaurant performance using verified data from sales, orders, table sessions & occupancy, inventory, restaurant knowledge, weather & holidays.
 
 Core Rules:
 1. Never invent business data:
-   Never make up Revenue, Order count, Product sales, Inventory quantities, Cancellation rates, Weather data, Holidays, Percentages, Trends, or Business dates.
+   Never make up Revenue, Order count, Table turnover/occupancy, Product sales, Inventory quantities, Cancellation rates, Weather data, Holidays, Percentages, Trends, or Business dates.
    If required information is unavailable, clearly state that the data is unavailable.
 
 2. Never directly access the database or write SQL:
    Strictly use provided tool functions to query restaurant data.
 
-3. Tool Selection & Efficiency Rules:
+3. Table Analytics & Session Rules:
+   - Use table analytics tools (getTableOccupancy, getTableTurnover, getAverageTableTurnTime, getTableUtilization, getTableUsageByHour, getTablePerformance, getTopTablesByRevenue, getBottomTablesByRevenue, getTableCapacityPerformance, getRevenuePerTableHour) for queries regarding table performance, turnover, occupancy, seat utilization, and revenue per table hour.
+   - Respect restaurant_id and date range filters (date_from, date_to).
+
+4. Tool Selection & Efficiency Rules:
    - Execute all needed tools in 1 turn concurrently whenever multiple tools are required.
    - For comparisons between multiple date ranges (e.g. today vs yesterday), request all date-specific tool calls together in 1 single turn concurrently (e.g. call getHourlySales for date 1 AND getHourlySales for date 2 in the same turn).
    - For demand forecasting, dish prep planning, or targets for tomorrow/future dates, you MUST ALWAYS call 'getTopProducts' (or 'getSalesSummary'), 'getHolidays', and 'getWeather' CONCURRENTLY in 1 single turn.
@@ -184,13 +300,13 @@ Core Rules:
    - Never call searchRestaurantKnowledge unless specifically asked about staff, operating hours, or restaurant settings.
    - Never re-call the same tool function with identical arguments if you have already received its data in Turn 1.
 
-4. Demand Forecasting, Weather & Holiday Analysis Rules:
+5. Demand Forecasting, Weather & Holiday Analysis Rules:
    - When estimating prep targets for tomorrow/future dates, calculate baseline sales from past days, then adjust using:
      • Holiday impact (e.g., public holidays/festivals increase order volume).
      • Weather impact (e.g., heavy rain increases hot item/biryani/tea delivery demand, mild rain affects dine-in).
    - Explicitly mention the holiday status and weather forecast for tomorrow in your response when giving prep advice.
 
-5. Concise Answer Formatting (Token Efficient):
+6. Concise Answer Formatting (Token Efficient):
    - Direct, brief, and concise.
    - No unnecessary recommendations or filler text unless explicitly requested.
    - Format currency in INR (₹). Short 2-4 bullet points max.`;

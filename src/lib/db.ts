@@ -92,14 +92,35 @@ async function runAutoMigration(sqlConnection: any) {
       );
     `;
     await sqlConnection`
+      CREATE TABLE IF NOT EXISTS table_sessions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          table_id UUID NOT NULL REFERENCES restaurant_tables(id) ON DELETE CASCADE,
+          started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          ended_at TIMESTAMPTZ,
+          party_size INT,
+          status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    await sqlConnection`
+      CREATE INDEX IF NOT EXISTS idx_table_sessions_restaurant_date ON table_sessions(restaurant_id, started_at);
+      CREATE INDEX IF NOT EXISTS idx_table_sessions_table ON table_sessions(table_id, started_at);
+    `;
+    await sqlConnection`
       ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS table_id UUID REFERENCES restaurant_tables(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS table_session_id UUID REFERENCES table_sessions(id) ON DELETE SET NULL,
       ADD COLUMN IF NOT EXISTS pending_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       ADD COLUMN IF NOT EXISTS preparing_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
     `;
-    console.log("Auto-migrated menu, GST, AI analyst chat, and Table Management columns/tables successfully!");
+    await sqlConnection`
+      CREATE INDEX IF NOT EXISTS idx_orders_table_session ON orders(table_session_id);
+    `;
+    console.log("Auto-migrated menu, GST, AI analyst chat, and Table Management/Analytics columns/tables successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
@@ -1129,33 +1150,33 @@ export async function createOrder(data: {
     const pendingAt = targetStatus === 'PENDING' ? new Date().toISOString() : new Date().toISOString();
     const preparingAt = targetStatus === 'PREPARING' ? new Date().toISOString() : null;
 
+    // Handle table_id and table_session_id if order has table_number
+    let tableId: string | null = null;
+    let tableSessionId: string | null = null;
+
+    if (data.table_number && data.table_number.trim() !== '') {
+      const sessionInfo = await findOrCreateTableSession(client, data.restaurant_id, data.table_number, data.party_size || 1);
+      tableId = sessionInfo.tableId;
+      tableSessionId = sessionInfo.tableSessionId;
+    }
+
     const orderResult = await client.query(
       `
         INSERT INTO orders (
           restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, 
-          notes, party_size, ticket_number, table_number, staff_id, business_date, subtotal, 
+          notes, party_size, ticket_number, table_number, table_id, table_session_id, staff_id, business_date, subtotal, 
           gst_amount, gst_rate, gst_type, pending_at, preparing_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12, COALESCE($13, CURRENT_DATE), $14, $15, $16, $17, $18, $19)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, CURRENT_DATE), $16, $17, $18, $19, $20, $21)
         RETURNING id
       `,
       [
         data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
-        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, data.staff_id || null, 
+        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, data.staff_id || null, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt
       ]
     );
-
-    // If order has table_number, mark table as OCCUPIED
-    if (data.table_number && data.table_number.trim() !== '') {
-      await client.query(
-        `UPDATE restaurant_tables
-         SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP
-         WHERE restaurant_id = $1 AND table_number = $2`,
-        [data.restaurant_id, data.table_number.trim()]
-      );
-    }
 
     const orderId = orderResult.rows[0]?.id;
     if (!orderId) {
@@ -1181,6 +1202,111 @@ export async function createOrder(data: {
   }
 }
 
+export async function findOrCreateTableSession(
+  clientOrPool: any,
+  restaurantId: string,
+  tableNumber: string,
+  partySize: number = 1
+): Promise<{ tableId: string; tableSessionId: string }> {
+  const cleanTableNum = tableNumber.trim();
+
+  let tableRes = await clientOrPool.query(
+    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND table_number = $2 LIMIT 1`,
+    [restaurantId, cleanTableNum]
+  );
+
+  let tableId: string;
+  if (tableRes.rows.length === 0) {
+    const newTable = await clientOrPool.query(
+      `INSERT INTO restaurant_tables (restaurant_id, table_number, capacity, status)
+       VALUES ($1, $2, $3, 'OCCUPIED')
+       ON CONFLICT (restaurant_id, table_number) DO UPDATE SET status = 'OCCUPIED'
+       RETURNING id`,
+      [restaurantId, cleanTableNum, partySize || 4]
+    );
+    tableId = newTable.rows[0].id;
+  } else {
+    tableId = tableRes.rows[0].id;
+  }
+
+  await clientOrPool.query(
+    `UPDATE restaurant_tables SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+    [tableId]
+  );
+
+  let sessionRes = await clientOrPool.query(
+    `SELECT id FROM table_sessions
+     WHERE restaurant_id = $1 AND table_id = $2 AND status = 'OPEN'
+     ORDER BY started_at DESC LIMIT 1`,
+    [restaurantId, tableId]
+  );
+
+  let tableSessionId: string;
+  if (sessionRes.rows.length > 0) {
+    tableSessionId = sessionRes.rows[0].id;
+    if (partySize > 1) {
+      await clientOrPool.query(
+        `UPDATE table_sessions SET party_size = GREATEST(COALESCE(party_size, 1), $1), updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [partySize, tableSessionId]
+      );
+    }
+  } else {
+    const newSession = await clientOrPool.query(
+      `INSERT INTO table_sessions (restaurant_id, table_id, party_size, status, started_at)
+       VALUES ($1, $2, $3, 'OPEN', CURRENT_TIMESTAMP)
+       RETURNING id`,
+      [restaurantId, tableId, partySize || 1]
+    );
+    tableSessionId = newSession.rows[0].id;
+  }
+
+  return { tableId, tableSessionId };
+}
+
+export async function checkAndCloseTableSession(
+  clientOrPool: any,
+  restaurantId: string,
+  tableNumber: string
+) {
+  if (!tableNumber || tableNumber.trim() === '') return;
+  const cleanTableNum = tableNumber.trim();
+
+  const tblRes = await clientOrPool.query(
+    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND table_number = $2 LIMIT 1`,
+    [restaurantId, cleanTableNum]
+  );
+
+  if (tblRes.rows.length === 0) return;
+  const tableId = tblRes.rows[0].id;
+
+  const activeCheck = await clientOrPool.query(
+    `SELECT COUNT(*)::int as active_count
+     FROM orders
+     WHERE restaurant_id = $1
+       AND (table_id = $2 OR table_number = $3)
+       AND status NOT IN ('PAID', 'CANCELLED')`,
+    [restaurantId, tableId, cleanTableNum]
+  );
+
+  const activeCount = Number(activeCheck.rows[0]?.active_count || 0);
+
+  if (activeCount === 0) {
+    await clientOrPool.query(
+      `UPDATE table_sessions
+       SET status = 'CLOSED', ended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE restaurant_id = $1 AND table_id = $2 AND status = 'OPEN'`,
+      [restaurantId, tableId]
+    );
+
+    await clientOrPool.query(
+      `UPDATE restaurant_tables
+       SET status = 'AVAILABLE', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [tableId]
+    );
+  }
+}
+
 export async function updateOrderStatus(restaurantId: string, id: string, status: string, tableNumber?: string) {
   let timestampSet = '';
   if (status === 'PENDING') timestampSet = ', pending_at = COALESCE(pending_at, CURRENT_TIMESTAMP)';
@@ -1188,11 +1314,25 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   else if (status === 'READY') timestampSet = ', ready_at = COALESCE(ready_at, CURRENT_TIMESTAMP)';
   else if (status === 'PAID') timestampSet = ', paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP), is_paid = true';
 
+  // Check if tableNumber is assigned or updated
+  let tableId: string | undefined = undefined;
+  let tableSessionId: string | undefined = undefined;
+
+  if (tableNumber && tableNumber.trim() !== '') {
+    const sessionInfo = await findOrCreateTableSession(pool, restaurantId, tableNumber, 1);
+    tableId = sessionInfo.tableId;
+    tableSessionId = sessionInfo.tableSessionId;
+  }
+
+  const setTableFields = tableNumber && tableNumber.trim() !== ''
+    ? `, table_number = $2, table_id = '${tableId}', table_session_id = '${tableSessionId}'`
+    : `, table_number = COALESCE($2, table_number)`;
+
   const queryText = `
     UPDATE orders
     SET status = $1,
-        table_number = COALESCE($2, table_number),
         updated_at = CURRENT_TIMESTAMP
+        ${setTableFields}
         ${timestampSet}
     WHERE restaurant_id = $3 AND id = $4
     RETURNING *
@@ -1201,29 +1341,13 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   const res = await pool.query(queryText, [status, tableNumber ?? null, restaurantId, id]);
   const updatedOrder = res.rows[0] || null;
 
-  // Re-evaluate table occupancy if order is PAID or CANCELLED
+  // Re-evaluate table occupancy and close session if order is PAID or CANCELLED
   const activeTableNum = tableNumber || updatedOrder?.table_number;
   if (activeTableNum && (status === 'PAID' || status === 'CANCELLED')) {
     try {
-      const activeCheck = await pool.query(
-        `SELECT COUNT(*)::int as active_count
-         FROM orders
-         WHERE restaurant_id = $1
-           AND table_number = $2
-           AND status NOT IN ('PAID', 'CANCELLED')`,
-        [restaurantId, activeTableNum]
-      );
-      const activeCount = Number(activeCheck.rows[0]?.active_count || 0);
-      const newStatus = activeCount > 0 ? 'OCCUPIED' : 'AVAILABLE';
-
-      await pool.query(
-        `UPDATE restaurant_tables
-         SET status = $1, updated_at = CURRENT_TIMESTAMP
-         WHERE restaurant_id = $2 AND table_number = $3`,
-        [newStatus, restaurantId, activeTableNum]
-      );
+      await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
     } catch (tblErr) {
-      console.error('Error re-evaluating table occupancy:', tblErr);
+      console.error('Error re-evaluating table occupancy & session:', tblErr);
     }
   }
 

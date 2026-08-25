@@ -568,6 +568,386 @@ export async function getWeatherTool(restaurantId: string, args: { startDate?: s
 }
 
 /**
+ * ============================================================================
+ * TABLE MANAGEMENT & ANALYTICS TOOLS
+ * ============================================================================
+ */
+
+export async function getTableOccupancy(restaurantId: string, params: DateFilter = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+
+  const totalRes = await pool.query(
+    `SELECT COUNT(*)::int as total_tables FROM restaurant_tables WHERE restaurant_id = $1`,
+    [restaurantId]
+  );
+  const totalTables = Number(totalRes.rows[0]?.total_tables || 0);
+
+  const occupiedRes = await pool.query(
+    `SELECT COUNT(DISTINCT table_id)::int as occupied_tables
+     FROM table_sessions
+     WHERE restaurant_id = $1
+       AND started_at::date <= $3::date
+       AND (ended_at IS NULL OR ended_at::date >= $2::date)`,
+    [restaurantId, dateFrom, dateTo]
+  );
+
+  const occupiedTables = Math.min(totalTables, Number(occupiedRes.rows[0]?.occupied_tables || 0));
+  const availableTables = Math.max(0, totalTables - occupiedTables);
+  const occupancyRate = totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100 * 100) / 100 : 0;
+
+  return {
+    date_from: dateFrom,
+    date_to: dateTo,
+    total_tables: totalTables,
+    occupied_tables: occupiedTables,
+    available_tables: availableTables,
+    occupancy_rate: occupancyRate
+  };
+}
+
+export async function getTableTurnover(restaurantId: string, params: DateFilter = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+
+  const totalRes = await pool.query(
+    `SELECT COUNT(*)::int as total_tables FROM restaurant_tables WHERE restaurant_id = $1`,
+    [restaurantId]
+  );
+  const totalTables = Number(totalRes.rows[0]?.total_tables || 0);
+
+  const sessionRes = await pool.query(
+    `SELECT 
+       COUNT(*)::int as completed_sessions,
+       COALESCE(AVG(EXTRACT(EPOCH FROM (ended_at - started_at))/60), 0)::numeric as avg_minutes
+     FROM table_sessions
+     WHERE restaurant_id = $1
+       AND status = 'CLOSED'
+       AND ended_at IS NOT NULL
+       AND started_at >= $2::date AND started_at < ($3::date + INTERVAL '1 day')`,
+    [restaurantId, dateFrom, dateTo]
+  );
+
+  const completedSessions = Number(sessionRes.rows[0]?.completed_sessions || 0);
+  const avgTurnTimeMinutes = Math.round(Number(sessionRes.rows[0]?.avg_minutes || 0) * 10) / 10;
+  const turnoverRate = totalTables > 0 ? Math.round((completedSessions / totalTables) * 100) / 100 : 0;
+
+  return {
+    date_from: dateFrom,
+    date_to: dateTo,
+    total_tables: totalTables,
+    completed_sessions: completedSessions,
+    turnover_rate: turnoverRate,
+    average_turn_time_minutes: avgTurnTimeMinutes
+  };
+}
+
+export async function getAverageTableTurnTime(restaurantId: string, params: DateFilter = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+
+  const res = await pool.query(
+    `SELECT 
+       COALESCE(AVG(EXTRACT(EPOCH FROM (ended_at - started_at))/60), 0)::numeric as average_minutes,
+       COALESCE(MIN(EXTRACT(EPOCH FROM (ended_at - started_at))/60), 0)::numeric as fastest_table_minutes,
+       COALESCE(MAX(EXTRACT(EPOCH FROM (ended_at - started_at))/60), 0)::numeric as slowest_table_minutes,
+       COUNT(*)::int as completed_sessions
+     FROM table_sessions
+     WHERE restaurant_id = $1
+       AND status = 'CLOSED'
+       AND ended_at IS NOT NULL
+       AND started_at >= $2::date AND started_at < ($3::date + INTERVAL '1 day')`,
+    [restaurantId, dateFrom, dateTo]
+  );
+
+  const row = res.rows[0];
+  const count = Number(row?.completed_sessions || 0);
+
+  return {
+    date_from: dateFrom,
+    date_to: dateTo,
+    average_minutes: count > 0 ? Math.round(Number(row.average_minutes) * 10) / 10 : 0,
+    fastest_table_minutes: count > 0 ? Math.round(Number(row.fastest_table_minutes) * 10) / 10 : 0,
+    slowest_table_minutes: count > 0 ? Math.round(Number(row.slowest_table_minutes) * 10) / 10 : 0
+  };
+}
+
+export async function getTableUtilization(restaurantId: string, params: DateFilter = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+
+  const totalRes = await pool.query(
+    `SELECT COUNT(*)::int as total_tables FROM restaurant_tables WHERE restaurant_id = $1`,
+    [restaurantId]
+  );
+  const totalTables = Number(totalRes.rows[0]?.total_tables || 0);
+
+  const daysRes = await pool.query(
+    `SELECT ($2::date - $1::date + 1)::int as num_days`,
+    [dateFrom, dateTo]
+  );
+  const numDays = Math.max(1, Number(daysRes.rows[0]?.num_days || 1));
+  const totalAvailableTableHours = Math.round(totalTables * numDays * 24 * 10) / 10;
+
+  const occupiedRes = await pool.query(
+    `SELECT 
+       COALESCE(SUM(
+         EXTRACT(EPOCH FROM (
+           LEAST(COALESCE(ended_at, CURRENT_TIMESTAMP), ($3::date + INTERVAL '1 day')) - 
+           GREATEST(started_at, $2::date)
+         ))/3600
+       ), 0)::numeric as occupied_hours
+     FROM table_sessions
+     WHERE restaurant_id = $1
+       AND started_at < ($3::date + INTERVAL '1 day')
+       AND (ended_at IS NULL OR ended_at >= $2::date)`,
+    [restaurantId, dateFrom, dateTo]
+  );
+
+  const occupiedTableHours = Math.round(Number(occupiedRes.rows[0]?.occupied_hours || 0) * 10) / 10;
+  const utilizationRate = totalAvailableTableHours > 0 
+    ? Math.min(100, Math.round((occupiedTableHours / totalAvailableTableHours) * 100 * 100) / 100) 
+    : 0;
+
+  return {
+    date_from: dateFrom,
+    date_to: dateTo,
+    total_available_table_hours: totalAvailableTableHours,
+    occupied_table_hours: occupiedTableHours,
+    utilization_rate: utilizationRate
+  };
+}
+
+export async function getTableUsageByHour(restaurantId: string, params: DateFilter = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+
+  const totalRes = await pool.query(
+    `SELECT COUNT(*)::int as total_tables FROM restaurant_tables WHERE restaurant_id = $1`,
+    [restaurantId]
+  );
+  const totalTables = Number(totalRes.rows[0]?.total_tables || 0);
+
+  const daysRes = await pool.query(
+    `SELECT ($2::date - $1::date + 1)::int as num_days`,
+    [dateFrom, dateTo]
+  );
+  const numDays = Math.max(1, Number(daysRes.rows[0]?.num_days || 1));
+
+  const res = await pool.query(
+    `SELECT 
+       EXTRACT(HOUR FROM started_at)::int as hour,
+       COUNT(*)::int as sessions
+     FROM table_sessions
+     WHERE restaurant_id = $1
+       AND started_at >= $2::date AND started_at < ($3::date + INTERVAL '1 day')
+     GROUP BY EXTRACT(HOUR FROM started_at)
+     ORDER BY hour ASC`,
+    [restaurantId, dateFrom, dateTo]
+  );
+
+  const hourMap = new Map<number, number>();
+  res.rows.forEach(r => hourMap.set(r.hour, Number(r.sessions)));
+
+  const usageList = [];
+  for (let h = 0; h < 24; h++) {
+    const sessions = hourMap.get(h) || 0;
+    const occupancyRate = (totalTables * numDays) > 0 
+      ? Math.min(100, Math.round((sessions / (totalTables * numDays)) * 100 * 100) / 100)
+      : 0;
+    usageList.push({
+      hour: h,
+      sessions,
+      occupancy_rate: occupancyRate
+    });
+  }
+
+  return usageList;
+}
+
+export async function getTablePerformance(restaurantId: string, params: DateFilter = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+
+  const res = await pool.query(
+    `SELECT 
+       t.id as table_id,
+       t.table_number,
+       t.capacity,
+       COUNT(DISTINCT ts.id)::int as sessions,
+       COALESCE(SUM(o.total_price) FILTER (WHERE o.status = 'PAID'), 0)::numeric as revenue,
+       COALESCE(AVG(ts.party_size), 0)::numeric as average_party_size,
+       COALESCE(AVG(EXTRACT(EPOCH FROM (ts.ended_at - ts.started_at))/60) FILTER (WHERE ts.status = 'CLOSED' AND ts.ended_at IS NOT NULL), 0)::numeric as avg_turn_time
+     FROM restaurant_tables t
+     LEFT JOIN table_sessions ts ON ts.table_id = t.id
+       AND ts.started_at >= $2::date AND ts.started_at < ($3::date + INTERVAL '1 day')
+     LEFT JOIN orders o ON (o.table_session_id = ts.id OR (o.table_id = t.id AND o.table_session_id IS NULL))
+       AND o.business_date >= $2::date AND o.business_date <= $3::date
+     WHERE t.restaurant_id = $1
+     GROUP BY t.id, t.table_number, t.capacity
+     ORDER BY 
+       CASE 
+         WHEN t.table_number ~ '^[0-9]+$' THEN t.table_number::integer 
+         ELSE 999999 
+       END ASC, 
+       t.table_number ASC`,
+    [restaurantId, dateFrom, dateTo]
+  );
+
+  return res.rows.map(r => ({
+    table_id: r.table_id,
+    table_number: r.table_number,
+    capacity: Number(r.capacity),
+    sessions: Number(r.sessions),
+    revenue: Math.round(Number(r.revenue) * 100) / 100,
+    average_party_size: Math.round(Number(r.average_party_size) * 10) / 10,
+    average_turn_time_minutes: Math.round(Number(r.avg_turn_time) * 10) / 10
+  }));
+}
+
+export async function getTopTablesByRevenue(restaurantId: string, params: DateFilter & { limit?: number } = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+  const limit = Math.min(params.limit || 10, 50);
+
+  const res = await pool.query(
+    `SELECT 
+       t.table_number,
+       COALESCE(SUM(o.total_price) FILTER (WHERE o.status = 'PAID'), 0)::numeric as revenue
+     FROM restaurant_tables t
+     LEFT JOIN table_sessions ts ON ts.table_id = t.id
+       AND ts.started_at >= $2::date AND ts.started_at < ($3::date + INTERVAL '1 day')
+     LEFT JOIN orders o ON (o.table_session_id = ts.id OR (o.table_id = t.id AND o.table_session_id IS NULL))
+       AND o.business_date >= $2::date AND o.business_date <= $3::date
+     WHERE t.restaurant_id = $1
+     GROUP BY t.id, t.table_number
+     ORDER BY revenue DESC
+     LIMIT $4`,
+    [restaurantId, dateFrom, dateTo, limit]
+  );
+
+  return res.rows.map(r => ({
+    table_number: r.table_number,
+    revenue: Math.round(Number(r.revenue) * 100) / 100
+  }));
+}
+
+export async function getBottomTablesByRevenue(restaurantId: string, params: DateFilter & { limit?: number } = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+  const limit = Math.min(params.limit || 10, 50);
+
+  const res = await pool.query(
+    `SELECT 
+       t.table_number,
+       COALESCE(SUM(o.total_price) FILTER (WHERE o.status = 'PAID'), 0)::numeric as revenue
+     FROM restaurant_tables t
+     LEFT JOIN table_sessions ts ON ts.table_id = t.id
+       AND ts.started_at >= $2::date AND ts.started_at < ($3::date + INTERVAL '1 day')
+     LEFT JOIN orders o ON (o.table_session_id = ts.id OR (o.table_id = t.id AND o.table_session_id IS NULL))
+       AND o.business_date >= $2::date AND o.business_date <= $3::date
+     WHERE t.restaurant_id = $1
+     GROUP BY t.id, t.table_number
+     ORDER BY revenue ASC
+     LIMIT $4`,
+    [restaurantId, dateFrom, dateTo, limit]
+  );
+
+  return res.rows.map(r => ({
+    table_number: r.table_number,
+    revenue: Math.round(Number(r.revenue) * 100) / 100
+  }));
+}
+
+export async function getTableCapacityPerformance(restaurantId: string, params: DateFilter = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+
+  const res = await pool.query(
+    `SELECT 
+       t.table_number,
+       t.capacity,
+       COALESCE(AVG(ts.party_size), 0)::numeric as average_party_size
+     FROM restaurant_tables t
+     LEFT JOIN table_sessions ts ON ts.table_id = t.id
+       AND ts.started_at >= $2::date AND ts.started_at < ($3::date + INTERVAL '1 day')
+     WHERE t.restaurant_id = $1
+     GROUP BY t.id, t.table_number, t.capacity
+     ORDER BY 
+       CASE 
+         WHEN t.table_number ~ '^[0-9]+$' THEN t.table_number::integer 
+         ELSE 999999 
+       END ASC, 
+       t.table_number ASC`,
+    [restaurantId, dateFrom, dateTo]
+  );
+
+  return res.rows.map(r => {
+    const capacity = Number(r.capacity || 4);
+    const avgPartySize = Math.round(Number(r.average_party_size) * 10) / 10;
+    const seatUtil = capacity > 0 ? Math.min(100, Math.round((avgPartySize / capacity) * 100 * 10) / 10) : 0;
+    return {
+      table_number: r.table_number,
+      capacity,
+      average_party_size: avgPartySize,
+      seat_utilization: seatUtil
+    };
+  });
+}
+
+export async function getRevenuePerTableHour(restaurantId: string, params: DateFilter = {}) {
+  const { currentBusinessDate } = await getRestaurantContext(restaurantId);
+  const dateFrom = params.date_from || currentBusinessDate;
+  const dateTo = params.date_to || currentBusinessDate;
+
+  const revRes = await pool.query(
+    `SELECT COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as total_revenue
+     FROM orders
+     WHERE restaurant_id = $1
+       AND table_id IS NOT NULL
+       AND business_date >= $2::date AND business_date <= $3::date`,
+    [restaurantId, dateFrom, dateTo]
+  );
+  const totalRevenue = Math.round(Number(revRes.rows[0]?.total_revenue || 0) * 100) / 100;
+
+  const hoursRes = await pool.query(
+    `SELECT 
+       COALESCE(SUM(
+         EXTRACT(EPOCH FROM (
+           LEAST(COALESCE(ended_at, CURRENT_TIMESTAMP), ($3::date + INTERVAL '1 day')) - 
+           GREATEST(started_at, $2::date)
+         ))/3600
+       ), 0)::numeric as occupied_hours
+     FROM table_sessions
+     WHERE restaurant_id = $1
+       AND started_at < ($3::date + INTERVAL '1 day')
+       AND (ended_at IS NULL OR ended_at >= $2::date)`,
+    [restaurantId, dateFrom, dateTo]
+  );
+  const occupiedTableHours = Math.round(Number(hoursRes.rows[0]?.occupied_hours || 0) * 10) / 10;
+  const revPerTableHour = occupiedTableHours > 0 
+    ? Math.round((totalRevenue / occupiedTableHours) * 100) / 100 
+    : 0;
+
+  return {
+    date_from: dateFrom,
+    date_to: dateTo,
+    total_revenue: totalRevenue,
+    occupied_table_hours: occupiedTableHours,
+    revenue_per_table_hour: revPerTableHour
+  };
+}
+
+/**
  * Master dispatcher for tool calls invoked by Gemini Function Calling
  */
 export async function executeAnalystToolCall(restaurantId: string, toolName: string, args: any = {}): Promise<any> {
@@ -599,6 +979,26 @@ export async function executeAnalystToolCall(restaurantId: string, toolName: str
         return await getHolidays(restaurantId, args);
       case 'getWeather':
         return await getWeatherTool(restaurantId, args);
+      case 'getTableOccupancy':
+        return await getTableOccupancy(restaurantId, args);
+      case 'getTableTurnover':
+        return await getTableTurnover(restaurantId, args);
+      case 'getAverageTableTurnTime':
+        return await getAverageTableTurnTime(restaurantId, args);
+      case 'getTableUtilization':
+        return await getTableUtilization(restaurantId, args);
+      case 'getTableUsageByHour':
+        return await getTableUsageByHour(restaurantId, args);
+      case 'getTablePerformance':
+        return await getTablePerformance(restaurantId, args);
+      case 'getTopTablesByRevenue':
+        return await getTopTablesByRevenue(restaurantId, args);
+      case 'getBottomTablesByRevenue':
+        return await getBottomTablesByRevenue(restaurantId, args);
+      case 'getTableCapacityPerformance':
+        return await getTableCapacityPerformance(restaurantId, args);
+      case 'getRevenuePerTableHour':
+        return await getRevenuePerTableHour(restaurantId, args);
       default:
         return { error: `Unknown tool function name: ${toolName}` };
     }
