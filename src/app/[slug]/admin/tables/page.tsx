@@ -11,6 +11,7 @@ import { RestaurantTable } from '@/modules/tables/tables.repository';
 import { TableCard } from '@/components/modules/tables/TableCard';
 import { CreateTableModal } from '@/components/modules/tables/CreateTableModal';
 import { TableQRModal } from '@/components/modules/tables/TableQRModal';
+import { DeleteTableModal } from '@/components/modules/tables/DeleteTableModal';
 
 export default function AdminTablesPage() {
   const { slug } = useParams();
@@ -26,6 +27,8 @@ export default function AdminTablesPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addingTable, setAddingTable] = useState(false);
   const [selectedQRTable, setSelectedQRTable] = useState<RestaurantTable | null>(null);
+  const [tableToDelete, setTableToDelete] = useState<RestaurantTable | null>(null);
+  const [deletingTable, setDeletingTable] = useState(false);
 
   const fetchTables = async () => {
     setLoading(true);
@@ -78,9 +81,8 @@ export default function AdminTablesPage() {
     }
   };
 
-  const handleDeleteTable = async (tableId: string, tableNumber: string) => {
-    if (!confirm(`Are you sure you want to delete Table #${tableNumber}?`)) return;
-
+  const handleConfirmDelete = async (tableId: string, tableNumber: string) => {
+    setDeletingTable(true);
     try {
       const headers: Record<string, string> = slugStr ? { 'x-restaurant-slug': slugStr } : {};
       const res = await fetch(`/api/tables/${tableId}`, {
@@ -91,12 +93,15 @@ export default function AdminTablesPage() {
       const data = await res.json();
       if (data.success) {
         toast.success(`Table #${tableNumber} deleted`);
+        setTableToDelete(null);
         fetchTables();
       } else {
         toast.error(data.error || 'Failed to delete table');
       }
     } catch {
       toast.error('Network error deleting table');
+    } finally {
+      setDeletingTable(false);
     }
   };
 
@@ -231,7 +236,7 @@ export default function AdminTablesPage() {
               key={table.id}
               table={table}
               onViewQR={(t) => setSelectedQRTable(t)}
-              onDelete={handleDeleteTable}
+              onDelete={(t) => setTableToDelete(t)}
               primaryColor={primaryColor}
             />
           ))}
@@ -253,6 +258,13 @@ export default function AdminTablesPage() {
         restaurantLogo={restaurant?.logo_url}
         onClose={() => setSelectedQRTable(null)}
         primaryColor={primaryColor}
+      />
+
+      <DeleteTableModal
+        table={tableToDelete}
+        onClose={() => setTableToDelete(null)}
+        onConfirmDelete={handleConfirmDelete}
+        loading={deletingTable}
       />
     </AdminContentWrapper>
   );

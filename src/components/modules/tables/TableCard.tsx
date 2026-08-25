@@ -7,7 +7,7 @@ import { formatPrice } from '@/lib/format';
 interface TableCardProps {
   table: RestaurantTable;
   onViewQR: (table: RestaurantTable) => void;
-  onDelete: (tableId: string, tableNumber: string) => void;
+  onDelete: (table: RestaurantTable) => void;
   primaryColor?: string;
 }
 
@@ -98,7 +98,7 @@ export function TableCard({ table, onViewQR, onDelete, primaryColor = '#059669' 
             <QrCode size={16} color={primaryColor} />
           </button>
           <button
-            onClick={() => onDelete(table.id, table.table_number)}
+            onClick={() => onDelete(table)}
             title="Delete Table"
             style={{
               padding: '6px',

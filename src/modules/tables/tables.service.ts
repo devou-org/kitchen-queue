@@ -49,6 +49,13 @@ export class TablesService {
    * Delete table
    */
   static async deleteTable(tableId: string, restaurantId: string): Promise<void> {
+    const table = await TablesRepository.getTableById(tableId, restaurantId);
+    if (!table) throw new Error('Table not found');
+
+    if (table.status === 'OCCUPIED') {
+      throw new Error(`Cannot delete Table #${table.table_number} while it is OCCUPIED. Please settle active orders first.`);
+    }
+
     const deleted = await TablesRepository.deleteTable(tableId, restaurantId);
     if (!deleted) throw new Error('Table not found');
   }
