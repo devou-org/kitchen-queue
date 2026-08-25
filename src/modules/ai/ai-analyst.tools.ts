@@ -585,11 +585,27 @@ export async function getTableOccupancy(restaurantId: string, params: DateFilter
   const totalTables = Number(totalRes.rows[0]?.total_tables || 0);
 
   const occupiedRes = await pool.query(
-    `SELECT COUNT(DISTINCT table_id)::int as occupied_tables
-     FROM table_sessions
-     WHERE restaurant_id = $1
-       AND started_at::date <= $3::date
-       AND (ended_at IS NULL OR ended_at::date >= $2::date)`,
+    `SELECT COUNT(DISTINCT t.id)::int as occupied_tables
+     FROM restaurant_tables t
+     WHERE t.restaurant_id = $1
+       AND (
+         t.status = 'OCCUPIED'
+         OR EXISTS (
+           SELECT 1 FROM orders o
+           WHERE o.restaurant_id = $1
+             AND (o.table_id = t.id OR o.table_number = t.table_number)
+             AND o.status NOT IN ('PAID', 'CANCELLED')
+             AND o.business_date >= $2::date
+             AND o.business_date <= $3::date
+         )
+         OR EXISTS (
+           SELECT 1 FROM table_sessions ts
+           WHERE ts.restaurant_id = $1
+             AND ts.table_id = t.id
+             AND ts.started_at::date <= $3::date
+             AND (ts.ended_at IS NULL OR ts.ended_at::date >= $2::date)
+         )
+       )`,
     [restaurantId, dateFrom, dateTo]
   );
 
@@ -787,7 +803,7 @@ export async function getTablePerformance(restaurantId: string, params: DateFilt
      FROM restaurant_tables t
      LEFT JOIN table_sessions ts ON ts.table_id = t.id
        AND ts.started_at >= $2::date AND ts.started_at < ($3::date + INTERVAL '1 day')
-     LEFT JOIN orders o ON (o.table_session_id = ts.id OR (o.table_id = t.id AND o.table_session_id IS NULL))
+     LEFT JOIN orders o ON (o.table_session_id = ts.id OR (o.table_id = t.id AND o.table_session_id IS NULL) OR (o.table_number = t.table_number AND o.table_session_id IS NULL))
        AND o.business_date >= $2::date AND o.business_date <= $3::date
      WHERE t.restaurant_id = $1
      GROUP BY t.id, t.table_number, t.capacity
