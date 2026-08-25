@@ -835,7 +835,19 @@ export async function getOrderStats(restaurantId: string, filters: {
 
 export async function getOrderById(restaurantId: string, id: string) {
   const rows = await sql`
+    WITH active_ranks AS (
+       SELECT
+         o.id as order_id,
+         ROW_NUMBER() OVER (
+           ORDER BY o.created_at ASC, o.ticket_number ASC
+         )::integer as pos
+       FROM orders o
+       WHERE o.restaurant_id = ${restaurantId} 
+         AND o.status IN ('PENDING', 'PREPARING')
+         AND o.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = o.restaurant_id)
+    )
     SELECT o.*, s.name as staff_name, 
+      COALESCE(ar.pos, 0) as queue_position,
       json_agg(json_build_object(
         'id', oi.id, 
         'product_id', oi.product_id, 
@@ -844,11 +856,13 @@ export async function getOrderById(restaurantId: string, id: string) {
         'product_name', p.name,
         'product_image', p.image_url
       ) ORDER BY oi.id) as items
-    FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
+    FROM orders o 
+    LEFT JOIN staffs s ON s.id = o.staff_id
+    LEFT JOIN active_ranks ar ON ar.order_id = o.id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
     WHERE o.restaurant_id = ${restaurantId} AND o.id = ${id}
-    GROUP BY o.id, s.name
+    GROUP BY o.id, ar.pos, s.name
     LIMIT 1
   `;
   return rows[0] || null;
@@ -858,15 +872,14 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
   const rows = await sql`
     WITH active_ranks AS (
        SELECT
-         q.id as queue_id,
+         o.id as order_id,
          ROW_NUMBER() OVER (
-           ORDER BY q.created_at ASC, q.token_number ASC
+           ORDER BY o.created_at ASC, o.ticket_number ASC
          )::integer as pos
-       FROM queues q
-       JOIN queue_status qs ON qs.id = q.queue_status_id
-       WHERE q.restaurant_id = ${restaurantId} 
-         AND qs.possible_queue_status IN ('PENDING', 'PREPARING')
-         AND q.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = q.restaurant_id)
+       FROM orders o
+       WHERE o.restaurant_id = ${restaurantId} 
+         AND o.status IN ('PENDING', 'PREPARING')
+         AND o.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = o.restaurant_id)
     )
     SELECT o.*, s.name as staff_name, 
       COALESCE(ar.pos, 0) as queue_position,
@@ -879,7 +892,7 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
         'product_image', p.image_url
       ) ORDER BY oi.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
-    LEFT JOIN active_ranks ar ON ar.queue_id = o.queue_id
+    LEFT JOIN active_ranks ar ON ar.order_id = o.id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
     WHERE o.restaurant_id = ${restaurantId} AND o.ticket_number = ${ticket_number}
@@ -894,15 +907,14 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
   const rows = await sql`
     WITH active_ranks AS (
        SELECT
-         q.id,
+         o.id as order_id,
          ROW_NUMBER() OVER (
-           ORDER BY q.created_at ASC, q.token_number ASC
+           ORDER BY o.created_at ASC, o.ticket_number ASC
          )::integer as pos
-       FROM queues q
-       JOIN queue_status qs ON qs.id = q.queue_status_id
-       WHERE q.restaurant_id = ${restaurantId} 
-         AND qs.possible_queue_status IN ('PENDING', 'PREPARING')
-         AND q.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = q.restaurant_id)
+       FROM orders o
+       WHERE o.restaurant_id = ${restaurantId} 
+         AND o.status IN ('PENDING', 'PREPARING')
+         AND o.business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = o.restaurant_id)
     )
     SELECT q.id, q.token_number as ticket_number, q.created_at, q.queue_type,
       o.id as order_id, o.is_paid, o.total_price,
@@ -926,7 +938,7 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
     JOIN users u ON u.id = q.user_id
     JOIN queue_status qs ON qs.id = q.queue_status_id
     LEFT JOIN orders o ON o.queue_id = q.id
-    LEFT JOIN active_ranks ar ON ar.id = q.id
+    LEFT JOIN active_ranks ar ON ar.order_id = o.id
     WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone} AND q.queue_type = 'ORDER'
     ORDER BY q.created_at DESC
     LIMIT 20
@@ -1107,10 +1119,10 @@ export async function createOrder(data: {
     const queueRes = await client.query(`
       INSERT INTO queues (
         restaurant_id, user_id, queue_status_id, token_number, 
-        queue_type, party_size, notes
-      ) VALUES ($1, $2, $3, $4, 'ORDER', $5, $6)
+        queue_type, party_size, notes, business_date
+      ) VALUES ($1, $2, $3, $4, 'ORDER', $5, $6, COALESCE($7, CURRENT_DATE))
       RETURNING id
-    `, [data.restaurant_id, userId, statusId, nextToken, data.party_size || 1, data.notes || '']);
+    `, [data.restaurant_id, userId, statusId, nextToken, data.party_size || 1, data.notes || '', data.business_date || null]);
     const queueId = queueRes.rows[0].id;
 
     // Determine status timestamp
