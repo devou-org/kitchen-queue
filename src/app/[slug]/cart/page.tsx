@@ -70,7 +70,14 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
       {/* Header */}
       <div className="page-header">
         <button className="btn btn-ghost btn-sm" onClick={() => router.back()} style={{ minWidth: 'auto' }}>← Back</button>
-        <h1 style={{ fontWeight: 800, fontSize: '18px' }}>Your Order</h1>
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ fontWeight: 800, fontSize: '18px', margin: 0 }}>Your Order</h1>
+          {typeof window !== 'undefined' && localStorage.getItem(`table_number_${slug}`) && (
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#059669', background: '#ECFDF5', padding: '2px 8px', borderRadius: '12px', display: 'inline-block', marginTop: '2px' }}>
+              TABLE #{localStorage.getItem(`table_number_${slug}`)}
+            </span>
+          )}
+        </div>
         <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{totalItems} items</span>
       </div>
 

@@ -376,8 +376,8 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             #{String(order.ticket_number).padStart(3, '0')}
           </h1>
 
-          {/* Queue Position Sub-card - For active waiting statuses */}
-          {['PENDING', 'WAITING', 'PREPARING'].includes((order.status || '').trim().toUpperCase()) && (
+          {/* Queue Position Sub-card — Only for PENDING / WAITING status */}
+          {['PENDING', 'WAITING'].includes((order.status || '').trim().toUpperCase()) && (
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -400,10 +400,32 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               </div>
             </div>
           )}
+
+          {/* Table Number Badge — For PREPARING / READY / SEATED / PAID when table_number is available */}
+          {!['PENDING', 'WAITING', 'CANCELLED', 'EXPIRED'].includes((order.status || '').trim().toUpperCase()) && order.table_number && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: '#ECFDF5',
+              border: '1px solid #A7F3D0',
+              padding: '10px 20px',
+              borderRadius: '16px',
+              marginTop: '16px'
+            }}>
+              <Utensils size={18} color="var(--primary)" />
+              <div style={{ textAlign: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)', letterSpacing: '0.04em' }}>
+                  TABLE #{order.table_number}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Notification Banner - For active waiting statuses */}
-        {['PENDING', 'WAITING', 'PREPARING'].includes((order.status || '').trim().toUpperCase()) && (
+        {/* Notification Banner - For PENDING & WAITING statuses */}
+        {['PENDING', 'WAITING'].includes((order.status || '').trim().toUpperCase()) && (
           <div style={{
             background: '#EEF6FF',
             borderRadius: '18px',

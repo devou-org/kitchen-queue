@@ -78,7 +78,28 @@ async function runAutoMigration(sqlConnection: any) {
           created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `;
-    console.log("Auto-migrated menu, GST, and AI analyst chat columns/tables successfully!");
+    await sqlConnection`
+      CREATE TABLE IF NOT EXISTS restaurant_tables (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          table_number VARCHAR(50) NOT NULL,
+          capacity INT NOT NULL DEFAULT 4,
+          status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+          qr_code_url TEXT NULL,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(restaurant_id, table_number)
+      );
+    `;
+    await sqlConnection`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS table_id UUID REFERENCES restaurant_tables(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS pending_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS preparing_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+    `;
+    console.log("Auto-migrated menu, GST, AI analyst chat, and Table Management columns/tables successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
@@ -86,7 +107,7 @@ async function runAutoMigration(sqlConnection: any) {
 
 export async function getRestaurantBySlug(slug: string) {
   try {
-    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, country, country_code, state, state_code, district, city, latitude, longitude FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude FROM restaurants WHERE slug = ${slug} LIMIT 1`;
     return rows[0] || null;
   } catch (error: any) {
     if (error.message?.includes('column') || error.message?.includes('does not exist')) {
@@ -185,7 +206,7 @@ export async function getAllRestaurants() {
 export async function getRestaurantById(id: string) {
   try {
     const rows = await sql`
-      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, country, country_code, state, state_code, district, city, latitude, longitude, timezone, opening_time, closing_time, rollover_time
+      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude, timezone, opening_time, closing_time, rollover_time
       FROM restaurants WHERE id = ${id} LIMIT 1
     `;
     return rows[0] || null;
@@ -321,6 +342,8 @@ export async function updateRestaurant(id: string, data: {
   gst_rate?: number | null;
   custom_subscription_charge?: number | null;
   custom_otp_charge?: number | null;
+  monthly_ai_credits?: number | null;
+  custom_ai_credits?: number | null;
   country?: string | null;
   country_code?: string | null;
   state?: string | null;
@@ -357,6 +380,8 @@ export async function updateRestaurant(id: string, data: {
         gst_rate = COALESCE(${data.gst_rate ?? null}, gst_rate),
         custom_subscription_charge = CASE WHEN ${data.custom_subscription_charge !== undefined} THEN ${data.custom_subscription_charge ?? null} ELSE custom_subscription_charge END,
         custom_otp_charge = CASE WHEN ${data.custom_otp_charge !== undefined} THEN ${data.custom_otp_charge ?? null} ELSE custom_otp_charge END,
+        monthly_ai_credits = CASE WHEN ${data.monthly_ai_credits !== undefined} THEN ${data.monthly_ai_credits ?? 10} ELSE monthly_ai_credits END,
+        custom_ai_credits = CASE WHEN ${data.custom_ai_credits !== undefined} THEN ${data.custom_ai_credits ?? null} ELSE custom_ai_credits END,
         country = COALESCE(${data.country ?? null}, country),
         country_code = COALESCE(${data.country_code ?? null}, country_code),
         state = COALESCE(${data.state ?? null}, state),
@@ -1053,8 +1078,9 @@ export async function createOrder(data: {
     `, [data.customer_name || 'Guest', data.phone || '0000000000']);
     const userId = userRes.rows[0].id;
 
-    // 2. Get status ID and name strictly
-    const targetStatus = data.is_pos ? 'PREPARING' : 'PENDING';
+    // 2. Check if order is placed via table QR (table_number exists) or POS -> Set PREPARING, else PENDING
+    const isTableOrder = Boolean(data.table_number && data.table_number.trim() !== '');
+    const targetStatus = (data.is_pos || isTableOrder) ? 'PREPARING' : 'PENDING';
     
     let statusRes = await client.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = $2 LIMIT 1`, [data.restaurant_id, targetStatus]);
     
@@ -1087,14 +1113,37 @@ export async function createOrder(data: {
     `, [data.restaurant_id, userId, statusId, nextToken, data.party_size || 1, data.notes || '']);
     const queueId = queueRes.rows[0].id;
 
+    // Determine status timestamp
+    const pendingAt = targetStatus === 'PENDING' ? new Date().toISOString() : new Date().toISOString();
+    const preparingAt = targetStatus === 'PREPARING' ? new Date().toISOString() : null;
+
     const orderResult = await client.query(
       `
-        INSERT INTO orders (restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, notes, party_size, ticket_number, table_number, staff_id, business_date, subtotal, gst_amount, gst_rate, gst_type)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12, COALESCE($13, CURRENT_DATE), $14, $15, $16, $17)
+        INSERT INTO orders (
+          restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, 
+          notes, party_size, ticket_number, table_number, staff_id, business_date, subtotal, 
+          gst_amount, gst_rate, gst_type, pending_at, preparing_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12, COALESCE($13, CURRENT_DATE), $14, $15, $16, $17, $18, $19)
         RETURNING id
       `,
-      [data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, data.staff_id || null, data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE']
+      [
+        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
+        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, data.staff_id || null, 
+        data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
+        pendingAt, preparingAt
+      ]
     );
+
+    // If order has table_number, mark table as OCCUPIED
+    if (data.table_number && data.table_number.trim() !== '') {
+      await client.query(
+        `UPDATE restaurant_tables
+         SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP
+         WHERE restaurant_id = $1 AND table_number = $2`,
+        [data.restaurant_id, data.table_number.trim()]
+      );
+    }
 
     const orderId = orderResult.rows[0]?.id;
     if (!orderId) {
@@ -1121,16 +1170,52 @@ export async function createOrder(data: {
 }
 
 export async function updateOrderStatus(restaurantId: string, id: string, status: string, tableNumber?: string) {
-  const rows = await sql`
+  let timestampSet = '';
+  if (status === 'PENDING') timestampSet = ', pending_at = COALESCE(pending_at, CURRENT_TIMESTAMP)';
+  else if (status === 'PREPARING') timestampSet = ', preparing_at = COALESCE(preparing_at, CURRENT_TIMESTAMP)';
+  else if (status === 'READY') timestampSet = ', ready_at = COALESCE(ready_at, CURRENT_TIMESTAMP)';
+  else if (status === 'PAID') timestampSet = ', paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP), is_paid = true';
+
+  const queryText = `
     UPDATE orders
-    SET status    = ${status},
-        table_number = COALESCE(${tableNumber ?? null}, table_number),
-        updated_at = NOW()
-    WHERE restaurant_id = ${restaurantId} AND id = ${id}
-    RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method
+    SET status = $1,
+        table_number = COALESCE($2, table_number),
+        updated_at = CURRENT_TIMESTAMP
+        ${timestampSet}
+    WHERE restaurant_id = $3 AND id = $4
+    RETURNING *
   `;
-  if (!rows[0]) throw new Error(`Order ${id} not found.`);
-  return rows[0];
+
+  const res = await pool.query(queryText, [status, tableNumber ?? null, restaurantId, id]);
+  const updatedOrder = res.rows[0] || null;
+
+  // Re-evaluate table occupancy if order is PAID or CANCELLED
+  const activeTableNum = tableNumber || updatedOrder?.table_number;
+  if (activeTableNum && (status === 'PAID' || status === 'CANCELLED')) {
+    try {
+      const activeCheck = await pool.query(
+        `SELECT COUNT(*)::int as active_count
+         FROM orders
+         WHERE restaurant_id = $1
+           AND table_number = $2
+           AND status NOT IN ('PAID', 'CANCELLED')`,
+        [restaurantId, activeTableNum]
+      );
+      const activeCount = Number(activeCheck.rows[0]?.active_count || 0);
+      const newStatus = activeCount > 0 ? 'OCCUPIED' : 'AVAILABLE';
+
+      await pool.query(
+        `UPDATE restaurant_tables
+         SET status = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE restaurant_id = $2 AND table_number = $3`,
+        [newStatus, restaurantId, activeTableNum]
+      );
+    } catch (tblErr) {
+      console.error('Error re-evaluating table occupancy:', tblErr);
+    }
+  }
+
+  return updatedOrder;
 }
 
 export async function completeOrderAndBill(restaurantId: string, id: string, status: string | undefined, isPaid: boolean | undefined, tableNumber?: string, paymentMethod?: string) {

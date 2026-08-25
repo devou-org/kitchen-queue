@@ -7,6 +7,7 @@ export interface GeminiConfig {
   tpm_limit: number;
   rpd_limit: number;
   max_output_tokens: number;
+  tokens_per_credit: number;
   is_enabled: boolean;
   created_at?: string;
   updated_at?: string;
@@ -40,7 +41,7 @@ export class AIRepository {
    */
   static async getGlobalConfig(): Promise<GeminiConfig> {
     const res = await pool.query(`
-      SELECT id, model, rpm_limit, tpm_limit, rpd_limit, max_output_tokens, is_enabled
+      SELECT id, model, rpm_limit, tpm_limit, rpd_limit, max_output_tokens, tokens_per_credit, is_enabled
       FROM gemini_config
       LIMIT 1
     `);
@@ -54,6 +55,7 @@ export class AIRepository {
         tpm_limit: 200000,
         rpd_limit: 1500,
         max_output_tokens: 2000,
+        tokens_per_credit: 2000,
         is_enabled: true
       };
     }
@@ -66,6 +68,7 @@ export class AIRepository {
       tpm_limit: parseInt(row.tpm_limit, 10),
       rpd_limit: parseInt(row.rpd_limit, 10),
       max_output_tokens: parseInt(row.max_output_tokens, 10),
+      tokens_per_credit: parseInt(row.tokens_per_credit || '2000', 10),
       is_enabled: row.is_enabled
     };
   }
@@ -301,11 +304,12 @@ export class AIRepository {
         ]
       );
 
-      // 2. Update monthly stats for restaurant if restaurantId provided
+      // 2. Update monthly stats & ai_credits for restaurant if restaurantId provided
       if (restaurantId) {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
+        const periodStr = `${year}-${String(month).padStart(2, '0')}`;
 
         const isSuccess = status === 'SUCCESS' ? 1 : 0;
         const isError = status === 'ERROR' ? 1 : 0;
@@ -323,6 +327,28 @@ export class AIRepository {
             success_count = gemini_usage_monthly.success_count + EXCLUDED.success_count,
             error_count = gemini_usage_monthly.error_count + EXCLUDED.error_count`,
           [restaurantId, year, month, inputTokens, outputTokens, totalTokens, isSuccess, isError]
+        );
+
+        // Fetch tokens per credit and restaurant allocated credits
+        const configRes = await client.query(`SELECT tokens_per_credit FROM gemini_config LIMIT 1`);
+        const tokensPerCredit = parseInt(configRes.rows[0]?.tokens_per_credit || '2000', 10);
+
+        const restRes = await client.query(`SELECT monthly_ai_credits, custom_ai_credits FROM restaurants WHERE id = $1`, [restaurantId]);
+        const rRow = restRes.rows[0];
+        const allocatedCredits = rRow ? (rRow.custom_ai_credits ?? rRow.monthly_ai_credits ?? 10) : 10;
+
+        // Upsert ai_credits for current monthly billing period
+        await client.query(
+          `INSERT INTO ai_credits (
+            restaurant_id, billing_period, allocated_credits, used_tokens, used_credits
+          ) VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (restaurant_id, billing_period)
+          DO UPDATE SET
+            allocated_credits = $3,
+            used_tokens = ai_credits.used_tokens + $4,
+            used_credits = ROUND((ai_credits.used_tokens + $4)::numeric / $6::numeric, 2),
+            updated_at = CURRENT_TIMESTAMP`,
+          [restaurantId, periodStr, allocatedCredits, totalTokens, Number((totalTokens / tokensPerCredit).toFixed(2)), tokensPerCredit]
         );
       }
 
@@ -428,6 +454,60 @@ export class AIRepository {
   }
 
   /**
+   * Gets AI credits stats for a specific restaurant for current month (or creates current month record if missing)
+   */
+  static async getRestaurantAICredits(restaurantId: string) {
+    const now = new Date();
+    const periodStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // Get config tokens per credit
+    const config = await this.getGlobalConfig();
+    const tokensPerCredit = config.tokens_per_credit || 2000;
+
+    // Get restaurant allocation
+    const restRes = await pool.query(
+      `SELECT monthly_ai_credits, custom_ai_credits FROM restaurants WHERE id = $1`,
+      [restaurantId]
+    );
+    const rRow = restRes.rows[0];
+    const allocatedCredits = rRow ? (rRow.custom_ai_credits ?? rRow.monthly_ai_credits ?? 10) : 10;
+
+    // Fetch or calculate usage for current month
+    const creditRes = await pool.query(
+      `SELECT allocated_credits, used_credits, used_tokens FROM ai_credits WHERE restaurant_id = $1 AND billing_period = $2`,
+      [restaurantId, periodStr]
+    );
+
+    let usedTokens = 0;
+    let usedCredits = 0;
+
+    if (creditRes.rows.length > 0) {
+      usedTokens = parseInt(creditRes.rows[0].used_tokens, 10);
+      usedCredits = parseFloat(creditRes.rows[0].used_credits);
+    } else {
+      // Calculate from gemini_usage for current month
+      const usageCalc = await pool.query(
+        `SELECT COALESCE(SUM(total_tokens), 0)::bigint as total_tokens
+         FROM gemini_usage
+         WHERE restaurant_id = $1
+           AND created_at >= date_trunc('month', CURRENT_DATE)`,
+        [restaurantId]
+      );
+      usedTokens = parseInt(usageCalc.rows[0]?.total_tokens || '0', 10);
+      usedCredits = Number((usedTokens / tokensPerCredit).toFixed(2));
+    }
+
+    return {
+      billing_period: periodStr,
+      allocated_credits: allocatedCredits,
+      used_credits: usedCredits,
+      used_tokens: usedTokens,
+      tokens_per_credit: tokensPerCredit,
+      remaining_credits: Math.max(0, Number((allocatedCredits - usedCredits).toFixed(2)))
+    };
+  }
+
+  /**
    * Updates Super Admin global config settings.
    */
   static async updateGlobalConfig(params: {
@@ -436,6 +516,7 @@ export class AIRepository {
     tpm_limit?: number;
     rpd_limit?: number;
     max_output_tokens?: number;
+    tokens_per_credit?: number;
     is_enabled?: boolean;
   }): Promise<GeminiConfig> {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -446,6 +527,7 @@ export class AIRepository {
     const tpm_limit = params.tpm_limit ?? current.tpm_limit;
     const rpd_limit = params.rpd_limit ?? current.rpd_limit;
     const max_output_tokens = params.max_output_tokens ?? current.max_output_tokens;
+    const tokens_per_credit = params.tokens_per_credit ?? current.tokens_per_credit;
     const is_enabled = params.is_enabled ?? current.is_enabled;
 
     await pool.query(
@@ -455,10 +537,11 @@ export class AIRepository {
            tpm_limit = $3,
            rpd_limit = $4,
            max_output_tokens = $5,
-           is_enabled = $6,
+           tokens_per_credit = $6,
+           is_enabled = $7,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7`,
-      [model, rpm_limit, tpm_limit, rpd_limit, max_output_tokens, is_enabled, current.id]
+       WHERE id = $8`,
+      [model, rpm_limit, tpm_limit, rpd_limit, max_output_tokens, tokens_per_credit, is_enabled, current.id]
     );
 
     // If re-enabling globally, reset daily record's is_enabled flag if needed
