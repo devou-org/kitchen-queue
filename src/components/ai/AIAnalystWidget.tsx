@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { 
   Bot, Send, Sparkles, Trash2, TrendingUp, ShoppingBag, 
   Clock, AlertTriangle, Activity, Zap, RefreshCw, X, Maximize2, Minimize2,
-  CheckCircle2, ChevronRight, MessageSquare, User
+  CheckCircle2, ChevronRight, MessageSquare, User, Lock
 } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -150,7 +150,23 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
     }
   };
 
+  const isCreditsExhausted = Boolean(
+    creditData && (creditData.remaining_credits <= 0 || creditData.used_credits >= creditData.allocated_credits)
+  );
+
   const handleSendMessage = async (textToSend?: string) => {
+    if (isCreditsExhausted) {
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'model',
+          content: '⚠️ Credits used fully. If you want more, buy credits from admin. Credits reset every month.',
+          created_at: new Date().toISOString()
+        }
+      ]);
+      return;
+    }
+
     const text = (textToSend || inputMessage).trim();
     if (!text || loading) return;
 
@@ -192,11 +208,14 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
         };
         setMessages(prev => [...prev, assistantMsg]);
       } else {
+        if (data.creditsExhausted || res.status === 403) {
+          fetchCreditData();
+        }
         setMessages(prev => [
           ...prev,
           {
             role: 'model',
-            content: `⚠️ ${data.error || 'Failed to process request.'}`,
+            content: `⚠️ ${data.error || 'Credits used fully. If you want more, buy credits from admin. Credits reset every month.'}`,
             created_at: new Date().toISOString()
           }
         ]);
@@ -403,13 +422,15 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
                     return (
                       <button
                         key={idx}
-                        onClick={() => handleSendMessage(item.query)}
+                        onClick={() => !isCreditsExhausted && handleSendMessage(item.query)}
+                        disabled={isCreditsExhausted || loading}
                         style={{
                           padding: '10px 12px',
                           borderRadius: '12px',
                           border: '1px solid #E2E8F0',
-                          background: '#FFFFFF',
-                          cursor: 'pointer',
+                          background: isCreditsExhausted ? '#F8FAFC' : '#FFFFFF',
+                          cursor: isCreditsExhausted || loading ? 'not-allowed' : 'pointer',
+                          opacity: isCreditsExhausted ? 0.6 : 1,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -417,17 +438,21 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
                           transition: 'all 0.2s'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#059669';
-                          e.currentTarget.style.background = '#F0FDF4';
+                          if (!isCreditsExhausted) {
+                            e.currentTarget.style.borderColor = '#059669';
+                            e.currentTarget.style.background = '#F0FDF4';
+                          }
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = '#E2E8F0';
-                          e.currentTarget.style.background = '#FFFFFF';
+                          if (!isCreditsExhausted) {
+                            e.currentTarget.style.borderColor = '#E2E8F0';
+                            e.currentTarget.style.background = '#FFFFFF';
+                          }
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <Icon size={16} color="#059669" />
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B' }}>{item.query}</span>
+                          <Icon size={16} color={isCreditsExhausted ? "#94A3B8" : "#059669"} />
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: isCreditsExhausted ? "#94A3B8" : "#1E293B" }}>{item.query}</span>
                         </div>
                         <ChevronRight size={14} color="#94A3B8" />
                       </button>
@@ -549,11 +574,40 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Credits Exhausted Alert Banner */}
+          {isCreditsExhausted && (
+            <div style={{
+              padding: '10px 14px',
+              background: '#FEF2F2',
+              borderTop: '1px solid #FEE2E2',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              color: '#991B1B'
+            }}>
+              <div style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                background: '#FEE2E2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Lock size={14} color="#DC2626" />
+              </div>
+              <div style={{ flex: 1, fontSize: '12px', lineHeight: 1.4, fontWeight: 600 }}>
+                Credits used fully. If you want more, buy credits from admin. Credits reset every month.
+              </div>
+            </div>
+          )}
+
           {/* Input Footer */}
           <div style={{
             padding: '12px 14px',
-            borderTop: '1px solid #E2E8F0',
-            background: '#FFFFFF',
+            borderTop: isCreditsExhausted ? 'none' : '1px solid #E2E8F0',
+            background: isCreditsExhausted ? '#FAFAFA' : '#FFFFFF',
             display: 'flex',
             gap: '8px',
             alignItems: 'center'
@@ -562,9 +616,9 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-              placeholder="Ask sales, peak hours, cancellations..."
-              disabled={loading}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && !isCreditsExhausted && handleSendMessage()}
+              placeholder={isCreditsExhausted ? "Credits used fully. Contact admin for credits." : "Ask sales, peak hours, cancellations..."}
+              disabled={loading || isCreditsExhausted}
               style={{
                 flex: 1,
                 padding: '10px 14px',
@@ -572,28 +626,29 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
                 border: '1px solid #CBD5E1',
                 fontSize: '13px',
                 outline: 'none',
-                background: '#F8FAFC',
-                color: '#0F172A'
+                background: isCreditsExhausted ? '#F1F5F9' : '#F8FAFC',
+                color: isCreditsExhausted ? '#94A3B8' : '#0F172A',
+                cursor: isCreditsExhausted ? 'not-allowed' : 'text'
               }}
-              onFocus={(e) => e.target.style.borderColor = primaryColor}
+              onFocus={(e) => !isCreditsExhausted && (e.target.style.borderColor = primaryColor)}
               onBlur={(e) => e.target.style.borderColor = '#CBD5E1'}
             />
 
             <button
               onClick={() => handleSendMessage()}
-              disabled={loading || !inputMessage.trim()}
+              disabled={loading || !inputMessage.trim() || isCreditsExhausted}
               style={{
                 padding: '10px 16px',
                 borderRadius: '12px',
-                background: loading || !inputMessage.trim() ? '#E2E8F0' : primaryColor,
-                color: loading || !inputMessage.trim() ? '#94A3B8' : '#FFFFFF',
+                background: loading || !inputMessage.trim() || isCreditsExhausted ? '#E2E8F0' : primaryColor,
+                color: loading || !inputMessage.trim() || isCreditsExhausted ? '#94A3B8' : '#FFFFFF',
                 border: 'none',
                 fontWeight: 700,
                 fontSize: '13px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                cursor: loading || !inputMessage.trim() ? 'not-allowed' : 'pointer'
+                cursor: loading || !inputMessage.trim() || isCreditsExhausted ? 'not-allowed' : 'pointer'
               }}
             >
               <Send size={14} />

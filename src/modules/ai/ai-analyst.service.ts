@@ -358,6 +358,12 @@ export class AIAnalystService {
     const { restaurantId, message } = params;
     const startTime = Date.now();
 
+    // Check credits before proceeding
+    const credits = await AIRepository.getRestaurantAICredits(restaurantId);
+    if (credits.remaining_credits <= 0 || credits.used_credits >= credits.allocated_credits) {
+      throw new Error('Credits used fully. If you want more, buy credits from admin. Credits reset every month.');
+    }
+
     // 1. Resolve session ID
     const sessionId = await this.getOrCreateSession(restaurantId, params.sessionId);
 

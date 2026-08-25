@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRestaurantBySlug, pool } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { AIAnalystService } from '@/modules/ai/ai-analyst.service';
+import { AIRepository } from '@/modules/ai/ai.repository';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,19 @@ export async function POST(request: NextRequest) {
     const admin = await requireAdmin(request);
     if (!admin) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check AI credits status
+    const creditData = await AIRepository.getRestaurantAICredits(restaurant.id);
+    if (creditData.remaining_credits <= 0 || creditData.used_credits >= creditData.allocated_credits) {
+      return NextResponse.json(
+        {
+          success: false,
+          creditsExhausted: true,
+          error: 'Credits used fully. If you want more, buy credits from admin. Credits reset every month.'
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
