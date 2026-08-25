@@ -50,6 +50,7 @@ export default function AdminOrders() {
   const [recentUpdates, setRecentUpdates] = useState<OrderUpdateLog[]>([]);
   const [queueStatuses, setQueueStatuses] = useState<string[]>([]);
   const [statusesLoaded, setStatusesLoaded] = useState(false);
+  const [tables, setTables] = useState<any[]>([]);
   const { restaurant } = useRestaurant();
 
   useEffect(() => {
@@ -61,6 +62,21 @@ export default function AdminOrders() {
     } catch (e) {
       console.error('Failed to load live additions', e);
     }
+  }, [slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+    const currentSlug = Array.isArray(slug) ? slug[0] : slug;
+    fetch('/api/tables', {
+      headers: { 'x-restaurant-slug': currentSlug || '' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.tables)) {
+          setTables(data.tables);
+        }
+      })
+      .catch(() => {});
   }, [slug]);
 
   useEffect(() => {
@@ -113,7 +129,7 @@ export default function AdminOrders() {
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!statusesLoaded || !restaurant) return;
-    if (!silent) setLoading(true);
+    if (!silent && ordersRef.current.length === 0) setLoading(true);
     try {
       const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
@@ -134,19 +150,25 @@ export default function AdminOrders() {
     } catch {
       toast.error('Failed to load orders');
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   }, [page, statusFilter, queueStatuses, statusesLoaded, restaurant]);
 
+  const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    fetchOrders();
+    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    fetchDebounceRef.current = setTimeout(() => {
+      fetchOrders();
+    }, 100);
+    return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    };
   }, [fetchOrders]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchOrdersDebounced = useCallback((silent = false) => {
     if (fetchDebounceRef.current) {
@@ -642,14 +664,22 @@ export default function AdminOrders() {
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                   <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Assign Table Number</p>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="e.g. T-01, VIP-2"
+                    <select
+                      className="select"
                       value={tempTableNumber}
-                      onChange={(e) => setTempTableNumber(e.target.value.toUpperCase())}
-                      style={{ flex: 1, textTransform: 'uppercase' }}
-                    />
+                      onChange={(e) => setTempTableNumber(e.target.value)}
+                      style={{ flex: 1, height: '42px', fontWeight: 600 }}
+                    >
+                      <option value="">-- Select Table --</option>
+                      {tables.map((t: any) => (
+                        <option key={t.id} value={t.table_number}>
+                          Table {t.table_number} {t.capacity ? `(${t.capacity} seats)` : ''} {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
+                        </option>
+                      ))}
+                      {tempTableNumber && !tables.some((t: any) => t.table_number === tempTableNumber) && (
+                        <option value={tempTableNumber}>Table {tempTableNumber}</option>
+                      )}
+                    </select>
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => {

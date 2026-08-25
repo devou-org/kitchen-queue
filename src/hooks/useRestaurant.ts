@@ -40,9 +40,8 @@ const listeners = new Set<(data: RestaurantContext | null) => void>();
 
 export async function fetchRestaurant(force = false): Promise<RestaurantContext | null> {
   const now = Date.now();
-  if (!force && cached) return cached;
   if (fetchPromise) return fetchPromise;
-  if (!force && cached && now - lastFetchTime < 1500) return cached;
+  if (!force && cached && now - lastFetchTime < 10000) return cached;
 
   // Extract slug from URL: /[slug]/...
   let slug = '';
@@ -102,8 +101,9 @@ export function useRestaurant() {
       handler(cached);
     }
 
-    // Always fetch fresh state in background on mount/page navigation (Stale-While-Revalidate)
-    fetchRestaurant(true);
+    if (!cached || Date.now() - lastFetchTime > 10000) {
+      fetchRestaurant(false);
+    }
 
     // Auto-revalidate whenever user switches back to this browser tab or window gains focus
     const revalidate = () => {

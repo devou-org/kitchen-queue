@@ -24,10 +24,27 @@ export default function StaffOrders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [tempTableNumber, setTempTableNumber] = useState('');
+  const [tables, setTables] = useState<any[]>([]);
+  const ordersRef = useRef<Order[]>([]);
+
+  useEffect(() => {
+    if (!slug) return;
+    const currentSlug = Array.isArray(slug) ? slug[0] : slug;
+    fetch('/api/tables', {
+      headers: { 'x-restaurant-slug': currentSlug || '' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.tables)) {
+          setTables(data.tables);
+        }
+      })
+      .catch(() => {});
+  }, [slug]);
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!restaurant) return;
-    if (!silent) setLoading(true);
+    if (!silent && ordersRef.current.length === 0) setLoading(true);
     try {
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
       const data = await orderService.getOrders({
@@ -41,23 +58,30 @@ export default function StaffOrders() {
 
       if (data.success && data.data) {
         setOrders(data.data);
+        ordersRef.current = data.data;
       }
     } catch {
       toast.error('Failed to load orders');
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   }, [page, statusFilter, restaurant]);
 
+  const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    fetchOrders();
+    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    fetchDebounceRef.current = setTimeout(() => {
+      fetchOrders();
+    }, 100);
+    return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    };
   }, [fetchOrders]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchOrdersDebounced = useCallback((silent = false) => {
     if (fetchDebounceRef.current) {
@@ -294,17 +318,26 @@ export default function StaffOrders() {
                 </select>
               </div>
 
-              {(selectedOrder.status === 'PREPARING') && (
+              {(selectedOrder.status === 'PREPARING' || selectedOrder.status === 'PENDING') && (
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                   <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Assign Table Number</p>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      className="input"
+                    <select
+                      className="select"
                       value={tempTableNumber}
-                      onChange={(e) => setTempTableNumber(e.target.value.toUpperCase())}
-                      style={{ flex: 1, textTransform: 'uppercase' }}
-                    />
+                      onChange={(e) => setTempTableNumber(e.target.value)}
+                      style={{ flex: 1, height: '42px', fontWeight: 600 }}
+                    >
+                      <option value="">-- Select Table --</option>
+                      {tables.map((t: any) => (
+                        <option key={t.id} value={t.table_number}>
+                          Table {t.table_number} {t.capacity ? `(${t.capacity} seats)` : ''} {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
+                        </option>
+                      ))}
+                      {tempTableNumber && !tables.some((t: any) => t.table_number === tempTableNumber) && (
+                        <option value={tempTableNumber}>Table {tempTableNumber}</option>
+                      )}
+                    </select>
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => handleStatusChange(selectedOrder.id, selectedOrder.status, tempTableNumber)}
