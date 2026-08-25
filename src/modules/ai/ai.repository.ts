@@ -107,7 +107,7 @@ export class AIRepository {
 
       // 1. Lock & check global config
       const configRes = await client.query(`
-        SELECT id, model, rpm_limit, tpm_limit, rpd_limit, max_output_tokens, is_enabled
+        SELECT id, model, rpm_limit, tpm_limit, rpd_limit, max_output_tokens, tokens_per_credit, is_enabled
         FROM gemini_config
         LIMIT 1
         FOR UPDATE
@@ -122,6 +122,7 @@ export class AIRepository {
           tpm_limit: 200000,
           rpd_limit: 200,
           max_output_tokens: 1000,
+          tokens_per_credit: 2000,
           is_enabled: true
         };
       } else {
@@ -133,6 +134,7 @@ export class AIRepository {
           tpm_limit: parseInt(row.tpm_limit, 10),
           rpd_limit: parseInt(row.rpd_limit, 10),
           max_output_tokens: parseInt(row.max_output_tokens, 10),
+          tokens_per_credit: parseInt(row.tokens_per_credit || '2000', 10),
           is_enabled: row.is_enabled
         };
       }
