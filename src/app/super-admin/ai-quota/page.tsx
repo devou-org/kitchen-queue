@@ -19,6 +19,7 @@ export default function SuperAdminAIQuotaPage() {
     tpm_limit: 200000,
     rpd_limit: 200,
     max_output_tokens: 1000,
+    tokens_per_credit: 2000,
     is_enabled: true
   });
 
@@ -40,6 +41,7 @@ export default function SuperAdminAIQuotaPage() {
             tpm_limit: json.data.config.tpm_limit || 200000,
             rpd_limit: json.data.config.rpd_limit || 200,
             max_output_tokens: json.data.config.max_output_tokens || 1000,
+            tokens_per_credit: json.data.config.tokens_per_credit || 2000,
             is_enabled: json.data.config.is_enabled ?? true
           });
         }
@@ -309,9 +311,13 @@ export default function SuperAdminAIQuotaPage() {
                 <span style={{ color: '#64748b' }}>RPM Limit:</span>
                 <strong style={{ color: '#0f172a' }}>{config.rpm_limit} req/min</strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '6px' }}>
                 <span style={{ color: '#64748b' }}>Max Output Tokens:</span>
                 <strong style={{ color: '#0f172a' }}>{config.max_output_tokens} tokens</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748b' }}>Credit Token Ratio:</span>
+                <strong style={{ color: '#059669' }}>1 credit = {(config.tokens_per_credit || 2000).toLocaleString()} tok</strong>
               </div>
             </div>
           </div>
@@ -487,23 +493,24 @@ export default function SuperAdminAIQuotaPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>TPD Limit (Daily Tokens Cap)</label>
-                  <input
-                    type="number"
-                    value={form.tpm_limit}
-                    onChange={e => setForm(f => ({ ...f, tpm_limit: parseInt(e.target.value, 10) }))}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
-                    required
-                  />
-                </div>
-
-                <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>Max Output Tokens</label>
                   <input
                     type="number"
                     value={form.max_output_tokens}
                     onChange={e => setForm(f => ({ ...f, max_output_tokens: parseInt(e.target.value, 10) }))}
                     style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '6px', textTransform: 'uppercase' }}>Tokens Per 1 AI Credit</label>
+                  <input
+                    type="number"
+                    value={form.tokens_per_credit}
+                    onChange={e => setForm(f => ({ ...f, tokens_per_credit: parseInt(e.target.value, 10) }))}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                    placeholder="2000"
                     required
                   />
                 </div>

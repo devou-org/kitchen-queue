@@ -31,6 +31,31 @@ const ALL_MODULES = [
   { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', desc: 'Tracks active order tokens and served tokens for kitchen screen.', icon: <Ticket size={16} /> },
 ];
 
+const S: Record<string, React.CSSProperties> = {
+  page: { minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif", padding: '0 0 80px', color: '#0f172a' },
+  topNav: { display: 'flex', alignItems: 'center', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 32px' },
+  backBtn: { fontSize: '13px', color: '#059669', textDecoration: 'none', fontWeight: 700 },
+  container: { maxWidth: '1080px', margin: '0 auto', padding: '24px 20px 0' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px', backgroundColor: '#ffffff', padding: '20px 24px', borderRadius: '12px', border: '1px solid #e2e8f0' },
+  title: { fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: 0 },
+  subtitle: { fontSize: '13px', color: '#64748b', marginTop: '4px', margin: 0 },
+  slugBadge: { background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '11px', fontWeight: 700 },
+  primaryLinkBtn: { textDecoration: 'none', padding: '10px 18px', backgroundColor: '#10b981', color: 'white', fontSize: '13px', fontWeight: 700, borderRadius: '8px', boxShadow: '0 2px 8px rgba(16,185,129,0.2)' },
+  secondaryLinkBtn: { textDecoration: 'none', padding: '10px 18px', backgroundColor: '#ffffff', color: '#334155', fontSize: '13px', fontWeight: 700, borderRadius: '8px', border: '1px solid #cbd5e1' },
+  grid: { display: 'grid', gridTemplateColumns: 'minmax(300px, 3fr) minmax(300px, 2fr)', gap: '20px', alignItems: 'start' },
+  card: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' },
+  cardTitle: { fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 },
+  cardDesc: { fontSize: '12px', color: '#64748b', marginTop: '4px', margin: 0 },
+  label: { display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' },
+  input: { width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' },
+  colorSwatch: { width: '38px', height: '38px', padding: 0, border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 },
+  colorInput: { flex: 1, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '14px', fontFamily: 'monospace' },
+  saveBtn: { display: 'block', width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.15)', marginTop: '8px' },
+  deleteInitBtn: { display: 'block', width: '100%', padding: '10px', backgroundColor: 'transparent', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginTop: '12px' },
+  deleteConfirmBtn: { flex: 1, padding: '10px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
+  cancelBtn: { flex: 1, padding: '10px', backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }
+};
+
 export default function RestaurantDetails() {
   const router = useRouter();
   const params = useParams();
@@ -61,6 +86,11 @@ export default function RestaurantDetails() {
   const [geoLat, setGeoLat] = useState('');
   const [geoLong, setGeoLong] = useState('');
   const [savingGeo, setSavingGeo] = useState(false);
+
+  // AI Credit Quota State
+  const [monthlyAiCredits, setMonthlyAiCredits] = useState(10);
+  const [customAiCredits, setCustomAiCredits] = useState<string>('');
+  const [savingAiCredits, setSavingAiCredits] = useState(false);
 
   // Form Fields State
   const [name, setName] = useState('');
@@ -118,6 +148,11 @@ export default function RestaurantDetails() {
         setGstNumber((r as any).gst_number || '');
         setGstRate(Number((r as any).gst_rate || 0) || ((r as any).gst_type !== 'NONE' ? 5 : 0));
 
+        // AI Credits States
+        setMonthlyAiCredits((r as any).monthly_ai_credits ?? 10);
+        const custCred = (r as any).custom_ai_credits;
+        setCustomAiCredits(custCred != null ? String(custCred) : '');
+
         // Location States
         setGeoCity((r as any).city || '');
         setGeoState((r as any).state || '');
@@ -136,6 +171,36 @@ export default function RestaurantDetails() {
       setLoading(false);
     }
   }, [id, router]);
+
+  const handleSaveAiCredits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingAiCredits(true);
+    try {
+      const res = await fetch(`/api/super-admin/restaurants/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        ...authHeaders,
+        body: JSON.stringify({
+          monthly_ai_credits: Number(monthlyAiCredits),
+          custom_ai_credits: null, // Clear override so monthly allocation is the single source of truth
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.data) {
+          setMonthlyAiCredits(data.data.monthly_ai_credits ?? 10);
+          setCustomAiCredits('');
+        }
+        toast.success('AI Credit Quotas updated successfully!');
+      } else {
+        toast.error(data.error || 'Failed to update AI credits');
+      }
+    } catch {
+      toast.error('Connection error while updating AI credits');
+    } finally {
+      setSavingAiCredits(false);
+    }
+  };
 
   const handleSaveGeo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -611,6 +676,82 @@ export default function RestaurantDetails() {
               </div>
             )}
             </div> {/* End Queue Management Card */}
+
+            {/* GST Settings */}
+            <div style={S.card}>
+              <h2 style={{...S.cardTitle, display: 'flex', alignItems: 'center', gap: '8px'}}><Receipt size={20} /> GST Configuration</h2>
+              <p style={S.cardDesc}>Configure tax rules for this restaurant.</p>
+              
+              <form onSubmit={handleSaveGst} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={S.label}>GST Type</label>
+                  <select 
+                    value={gstType} 
+                    onChange={e => {
+                      setGstType(e.target.value as any);
+                      if (e.target.value === 'NONE') setGstRate(0);
+                      else if (gstRate === 0) setGstRate(5);
+                    }}
+                    style={S.input}
+                  >
+                    <option value="NONE">None (No GST)</option>
+                    <option value="REGULAR">Regular (Show separately)</option>
+                    <option value="COMPOSITION">Composition (Included in price)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={S.label}>GST Number {gstType !== 'NONE' && '*'}</label>
+                  <input 
+                    type="text" 
+                    value={gstNumber} 
+                    onChange={e => setGstNumber(e.target.value)} 
+                    disabled={gstType === 'NONE'} 
+                    style={S.input} 
+                    placeholder="e.g. 29ABCDE1234F1Z5" 
+                  />
+                </div>
+                <div>
+                  <label style={S.label}>GST Rate (%) {gstType !== 'NONE' && '*'}</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={gstRate} 
+                    onChange={e => setGstRate(parseFloat(e.target.value) || 0)} 
+                    disabled={gstType === 'NONE'} 
+                    style={S.input} 
+                  />
+                </div>
+                <button type="submit" style={{ ...S.primaryLinkBtn, border: 'none', cursor: 'pointer', textAlign: 'center' }} disabled={savingGst}>
+                  {savingGst ? 'Saving...' : 'Save GST'}
+                </button>
+              </form>
+            </div>
+
+            {/* AI Credit Quotas Card */}
+            <div style={S.card}>
+              <h2 style={{...S.cardTitle, display: 'flex', alignItems: 'center', gap: '8px'}}><Navigation size={20} color="#6366f1" /> AI Analyst Credits Quota</h2>
+              <p style={S.cardDesc}>Configure monthly AI credit allowance for this specific restaurant tenant.</p>
+              
+              <form onSubmit={handleSaveAiCredits} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={S.label}>Monthly AI Credits Limit</label>
+                  <input 
+                    type="number" 
+                    value={monthlyAiCredits} 
+                    onChange={e => setMonthlyAiCredits(parseInt(e.target.value, 10) || 0)} 
+                    style={S.input} 
+                    placeholder="10" 
+                    min="0"
+                    required
+                  />
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>Monthly AI credits assigned to this restaurant (resets at 1st of every month)</span>
+                </div>
+
+                <button type="submit" style={{ ...S.primaryLinkBtn, backgroundColor: '#6366f1', border: 'none', cursor: 'pointer', textAlign: 'center' }} disabled={savingAiCredits}>
+                  {savingAiCredits ? 'Updating Quota...' : 'Save AI Credit Limit'}
+                </button>
+              </form>
+            </div>
           </div> {/* End Left Panel Flex */}
 
           {/* Right Panel: Modules and Brand Preview */}
@@ -737,55 +878,7 @@ export default function RestaurantDetails() {
               </form>
             </div>
 
-            {/* GST Settings */}
-            <div style={S.card}>
-              <h2 style={{...S.cardTitle, display: 'flex', alignItems: 'center', gap: '8px'}}><Receipt size={20} /> GST Configuration</h2>
-              <p style={S.cardDesc}>Configure tax rules for this restaurant.</p>
-              
-              <form onSubmit={handleSaveGst} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div>
-                  <label style={S.label}>GST Type</label>
-                  <select 
-                    value={gstType} 
-                    onChange={e => {
-                      setGstType(e.target.value as any);
-                      if (e.target.value === 'NONE') setGstRate(0);
-                      else if (gstRate === 0) setGstRate(5);
-                    }}
-                    style={S.input}
-                  >
-                    <option value="NONE">None (No GST)</option>
-                    <option value="REGULAR">Regular (Show separately)</option>
-                    <option value="COMPOSITION">Composition (Included in price)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={S.label}>GST Number {gstType !== 'NONE' && '*'}</label>
-                  <input 
-                    type="text" 
-                    value={gstNumber} 
-                    onChange={e => setGstNumber(e.target.value)} 
-                    disabled={gstType === 'NONE'} 
-                    style={S.input} 
-                    placeholder="e.g. 29ABCDE1234F1Z5" 
-                  />
-                </div>
-                <div>
-                  <label style={S.label}>GST Rate (%) {gstType !== 'NONE' && '*'}</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    value={gstRate} 
-                    onChange={e => setGstRate(parseFloat(e.target.value) || 0)} 
-                    disabled={gstType === 'NONE'} 
-                    style={S.input} 
-                  />
-                </div>
-                <button type="submit" style={{ ...S.primaryLinkBtn, border: 'none', cursor: 'pointer', textAlign: 'center' }} disabled={savingGst}>
-                  {savingGst ? 'Saving...' : 'Save GST'}
-                </button>
-              </form>
-            </div>
+
 
             {/* Danger Zone deletion panel */}
             <div style={{ ...S.card, borderColor: '#fecaca', backgroundColor: '#fff5f5' }}>
@@ -837,27 +930,3 @@ export default function RestaurantDetails() {
   );
 }
 
-const S: Record<string, React.CSSProperties> = {
-  page: { minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif", padding: '0 0 80px', color: '#0f172a' },
-  topNav: { display: 'flex', alignItems: 'center', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '12px 32px' },
-  backBtn: { fontSize: '13px', color: '#059669', textDecoration: 'none', fontWeight: 700 },
-  container: { maxWidth: '1080px', margin: '0 auto', padding: '24px 20px 0' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px', backgroundColor: '#ffffff', padding: '20px 24px', borderRadius: '12px', border: '1px solid #e2e8f0' },
-  title: { fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: 0 },
-  subtitle: { fontSize: '13px', color: '#64748b', marginTop: '4px', margin: 0 },
-  slugBadge: { background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '11px', fontWeight: 700 },
-  primaryLinkBtn: { textDecoration: 'none', padding: '10px 18px', backgroundColor: '#10b981', color: 'white', fontSize: '13px', fontWeight: 700, borderRadius: '8px', boxShadow: '0 2px 8px rgba(16,185,129,0.2)' },
-  secondaryLinkBtn: { textDecoration: 'none', padding: '10px 18px', backgroundColor: '#ffffff', color: '#334155', fontSize: '13px', fontWeight: 700, borderRadius: '8px', border: '1px solid #cbd5e1' },
-  grid: { display: 'grid', gridTemplateColumns: 'minmax(300px, 3fr) minmax(300px, 2fr)', gap: '20px', alignItems: 'start' },
-  card: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' },
-  cardTitle: { fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 },
-  cardDesc: { fontSize: '12px', color: '#64748b', marginTop: '4px', margin: 0 },
-  label: { display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' },
-  input: { width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' },
-  colorSwatch: { width: '38px', height: '38px', padding: 0, border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 },
-  colorInput: { flex: 1, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '14px', fontFamily: 'monospace' },
-  saveBtn: { display: 'block', width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.15)', marginTop: '8px' },
-  deleteInitBtn: { display: 'block', width: '100%', padding: '10px', backgroundColor: 'transparent', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginTop: '12px' },
-  deleteConfirmBtn: { flex: 1, padding: '10px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
-  cancelBtn: { flex: 1, padding: '10px', backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }
-};

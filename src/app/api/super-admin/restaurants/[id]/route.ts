@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRestaurantWithModules, updateRestaurant, deleteRestaurant, setAllRestaurantModules } from '@/lib/db';
+import { getRestaurantWithModules, updateRestaurant, deleteRestaurant, setAllRestaurantModules, pool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 
 async function requireSuperAdmin(request: NextRequest) {
@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules, billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, country, country_code, state, state_code, district, city, latitude, longitude } = body;
+    const { name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, modules, billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude } = body;
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
       return NextResponse.json({ success: false, error: 'Slug must be lowercase letters, numbers, and hyphens only' }, { status: 400 });
@@ -55,13 +55,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       gst_type, gst_number: gst_number || null, gst_rate: Number(gst_rate) || 0,
       custom_subscription_charge: custom_subscription_charge !== undefined ? (custom_subscription_charge === null || custom_subscription_charge === '' ? null : Number(custom_subscription_charge)) : undefined,
       custom_otp_charge: custom_otp_charge !== undefined ? (custom_otp_charge === null || custom_otp_charge === '' ? null : Number(custom_otp_charge)) : undefined,
+      monthly_ai_credits: monthly_ai_credits !== undefined ? (monthly_ai_credits === null || monthly_ai_credits === '' ? 10 : Number(monthly_ai_credits)) : undefined,
+      custom_ai_credits: custom_ai_credits !== undefined ? (custom_ai_credits === null || custom_ai_credits === '' ? null : Number(custom_ai_credits)) : undefined,
       country, country_code, state, state_code, district, city,
       latitude: latitude !== undefined ? (latitude === null || latitude === '' ? null : Number(latitude)) : undefined,
       longitude: longitude !== undefined ? (longitude === null || longitude === '' ? null : Number(longitude)) : undefined
     });
     if (!restaurant) return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
 
-
+    // Sync active month's ai_credits row if AI credits were updated
+    if (monthly_ai_credits !== undefined || custom_ai_credits !== undefined) {
+      try {
+        const now = new Date();
+        const periodStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const effectiveCredits = restaurant.custom_ai_credits ?? restaurant.monthly_ai_credits ?? 10;
+        await pool.query(
+          `UPDATE ai_credits 
+           SET allocated_credits = $1, updated_at = NOW()
+           WHERE restaurant_id = $2 AND billing_period = $3`,
+          [effectiveCredits, id, periodStr]
+        );
+      } catch (syncErr) {
+        console.error('Failed to sync ai_credits allocated_credits:', syncErr);
+      }
+    }
     // Update modules if provided
     if (Array.isArray(modules)) {
       let modulesToSet = [];

@@ -164,12 +164,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         price_at_purchase: i.price,
       }));
 
+      const storedTable = typeof window !== 'undefined' ? localStorage.getItem(`table_number_${slug}`) || undefined : undefined;
+
       const data = await orderService.createOrder({
         customer_name: form.customer_name.trim(),
         phone: form.phone,
         items: orderItems,
         notes: form.notes.trim() || undefined,
         party_size: parseInt(form.party_size),
+        table_number: storedTable,
       });
 
       if (data.success && data.data) {
@@ -183,6 +186,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         }
         localStorage.removeItem(`cart_${slug}`);
         localStorage.removeItem(`add_to_order_${slug}`);
+        localStorage.removeItem(`table_number_${slug}`);
         toast.success('Order placed successfully! 🎉');
         router.push(`/${slug}/order-status/${data.data.id}`);
       } else {

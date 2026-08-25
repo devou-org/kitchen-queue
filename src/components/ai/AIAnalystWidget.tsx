@@ -10,6 +10,7 @@ import {
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { SalesTrendChart } from './SalesTrendChart';
+import { AICreditProgressBar, AICreditData } from './AICreditProgressBar';
 
 interface ChatMessage {
   id?: string;
@@ -52,6 +53,8 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeToolStep, setActiveToolStep] = useState<string | null>(null);
+  const [creditData, setCreditData] = useState<AICreditData | null>(null);
+  const [loadingCredit, setLoadingCredit] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -66,10 +69,31 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
   }, [messages, activeToolStep, isOpen]);
 
   useEffect(() => {
-    if (slugStr && isOpen && sessions.length === 0) {
-      fetchSessions();
+    if (slugStr && isOpen) {
+      if (sessions.length === 0) {
+        fetchSessions();
+      }
+      fetchCreditData();
     }
   }, [slugStr, isOpen]);
+
+  const fetchCreditData = async () => {
+    if (!slugStr) return;
+    setLoadingCredit(true);
+    try {
+      const res = await fetch(`/api/ai/credits?slug=${slugStr}`, {
+        headers: { 'x-restaurant-slug': slugStr }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setCreditData(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch AI credit data:', err);
+    } finally {
+      setLoadingCredit(false);
+    }
+  };
 
   const fetchSessions = async () => {
     try {
@@ -189,6 +213,7 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
     } finally {
       setLoading(false);
       setActiveToolStep(null);
+      fetchCreditData();
     }
   };
 
@@ -296,7 +321,9 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px'
+            gap: '12px',
+            position: 'relative',
+            zIndex: 10
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '26px', height: '26px', borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E2E8F0' }}>
@@ -309,6 +336,7 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
               <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: '#0F172A' }}>
                 Qdine AI Analyst
               </h3>
+              <AICreditProgressBar creditData={creditData} loading={loadingCredit} />
             </div>
 
             {/* Minimal Controls */}

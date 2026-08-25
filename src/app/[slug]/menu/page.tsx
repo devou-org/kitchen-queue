@@ -412,9 +412,23 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const [isServiceActive, setIsServiceActive] = useState(true);
   const [serviceMessage, setServiceMessage] = useState('');
 
-  // Load cart from localStorage
+  // Load cart and sync table query param from URL
   useEffect(() => {
     if (!slug) return;
+
+    // Sync table query param with localStorage
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tableParam = urlParams.get('table');
+      if (tableParam) {
+        // If customer scanned a specific table QR, update stored table number
+        localStorage.setItem(`table_number_${slug}`, tableParam);
+      } else {
+        // If customer accessed generic menu URL (without QR table param), clear previous table session
+        localStorage.removeItem(`table_number_${slug}`);
+      }
+    }
+
     const saved = localStorage.getItem(`cart_${slug}`);
     if (saved) {
       try {

@@ -17,9 +17,10 @@ const pool = new Pool({
 });
 
 const migrationFiles = [
-  'migration_gemini_quota.sql',
-  'migration_ai_analyst.sql',
-  'migration_weather_holidays.sql'
+  // 'migration_gemini_quota.sql',
+  // 'migration_ai_analyst.sql',
+  // 'migration_weather_holidays.sql',
+  'migration_ai_credits.sql'
 ];
 
 async function runAllAIMigrations() {
