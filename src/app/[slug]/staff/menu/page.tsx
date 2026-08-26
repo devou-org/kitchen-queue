@@ -6,6 +6,7 @@ import { Product, CartItem, ProductStatus } from '@/types';
 import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
 import { orderService } from '@/app/services/orders.api';
+import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { Search } from 'lucide-react';
 
@@ -133,10 +134,9 @@ export default function StaffMenuPage() {
         }
 
         // Fetch tables for table selection dropdown
-        const tablesRes = await fetch('/api/tables');
-        const tablesData = await tablesRes.json();
-        if (tablesData.success && tablesData.tables) {
-          setTables(tablesData.tables);
+        const tablesRes = await tableService.getTables();
+        if (tablesRes.success && tablesRes.data) {
+          setTables(tablesRes.data);
         }
       } catch {
         toast.error('Failed to load menu');
