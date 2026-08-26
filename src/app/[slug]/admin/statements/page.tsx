@@ -183,8 +183,8 @@ export default function AdminStatements() {
           </div>
           <div className="stat-card">
             <p className="stat-label">Net Revenue</p>
-            <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(actualRevenue)}</h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Excluding Cancelled</p>
+            <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(restaurant?.gst_type === 'COMPOSITION' ? netRevenue : actualRevenue)}</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>{restaurant?.gst_type === 'COMPOSITION' ? 'After GST Payable Deduction' : 'Excluding Cancelled'}</p>
           </div>
           
           {restaurant?.gst_type === 'REGULAR' && (
