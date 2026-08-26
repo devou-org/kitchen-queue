@@ -1284,7 +1284,7 @@ export async function checkAndCloseTableSession(
      FROM orders
      WHERE restaurant_id = $1
        AND (table_id = $2 OR table_number = $3)
-       AND status NOT IN ('PAID', 'CANCELLED')`,
+       AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')`,
     [restaurantId, tableId, cleanTableNum]
   );
 
@@ -1341,9 +1341,9 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   const res = await pool.query(queryText, [status, tableNumber ?? null, restaurantId, id]);
   const updatedOrder = res.rows[0] || null;
 
-  // Re-evaluate table occupancy and close session if order is PAID or CANCELLED
+  // Re-evaluate table occupancy and close session if order is PAID, CANCELLED, or EXPIRED
   const activeTableNum = tableNumber || updatedOrder?.table_number;
-  if (activeTableNum && (status === 'PAID' || status === 'CANCELLED')) {
+  if (activeTableNum && (status === 'PAID' || status === 'CANCELLED' || status === 'EXPIRED')) {
     try {
       await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
     } catch (tblErr) {
@@ -1393,6 +1393,17 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     }
     
     await client.query('COMMIT');
+
+    // Re-evaluate table occupancy and close session if order is PAID, CANCELLED, or EXPIRED
+    const activeTableNum = tableNumber || updatedOrder?.table_number;
+    if (activeTableNum && (nextStatus === 'PAID' || nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED')) {
+      try {
+        await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
+      } catch (tblErr) {
+        console.error('Error re-evaluating table occupancy & session:', tblErr);
+      }
+    }
+
     return updatedOrder;
   } catch (error) {
     await client.query('ROLLBACK');

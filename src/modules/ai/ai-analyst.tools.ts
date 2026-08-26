@@ -594,7 +594,7 @@ export async function getTableOccupancy(restaurantId: string, params: DateFilter
            SELECT 1 FROM orders o
            WHERE o.restaurant_id = $1
              AND (o.table_id = t.id OR o.table_number = t.table_number)
-             AND o.status NOT IN ('PAID', 'CANCELLED')
+             AND o.status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
              AND o.business_date >= $2::date
              AND o.business_date <= $3::date
          )

@@ -46,7 +46,7 @@ export class TablesRepository {
            ) as orders_json
          FROM orders
          WHERE restaurant_id = $1
-           AND status NOT IN ('PAID', 'CANCELLED')
+           AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
            AND table_number IS NOT NULL AND table_number != ''
          GROUP BY restaurant_id, table_number
        ) active ON active.table_number = t.table_number
@@ -191,7 +191,7 @@ export class TablesRepository {
        FROM orders
        WHERE restaurant_id = $1
          AND table_number = $2
-         AND status NOT IN ('PAID', 'CANCELLED')`,
+         AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')`,
       [restaurantId, tableNumber]
     );
 
