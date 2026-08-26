@@ -424,7 +424,6 @@ export default function StaffMenuPage() {
                           Table #{t.table_number} {t.capacity ? `(${t.capacity} seats)` : ''} {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
                         </option>
                       ))}
-                      <option value="Takeaway">Takeaway</option>
                     </select>
                   ) : (
                     <input
