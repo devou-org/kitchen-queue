@@ -23,6 +23,8 @@ export default function StaffOrders() {
   const [mounted, setMounted] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [tempStatus, setTempStatus] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [tempTableNumber, setTempTableNumber] = useState('');
   const [tables, setTables] = useState<any[]>([]);
   const ordersRef = useRef<Order[]>([]);
@@ -79,10 +81,6 @@ export default function StaffOrders() {
     };
   }, [fetchOrders]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const fetchOrdersDebounced = useCallback((silent = false) => {
     if (fetchDebounceRef.current) {
       clearTimeout(fetchDebounceRef.current);
@@ -94,15 +92,21 @@ export default function StaffOrders() {
   }, [fetchOrders]);
 
   useEffect(() => {
+    setMounted(true);
     if (!pusherClient || !restaurant) return;
-    const channelName = restaurant.pusher_channel;
+
+    const channelName = restaurant.pusher_channel || `queue-channel-${restaurant.id}`;
     const channel = pusherClient.subscribe(channelName);
 
     const handleNewOrder = (data: any) => {
-      fetchOrdersDebounced(true);
+      if (data.restaurant_id !== restaurant.id) return;
+      toast(`🔔 New order #${String(data.ticket_number).padStart(3, '0')}`, { icon: '🛒', duration: 4000 });
+      fetchOrdersDebounced();
     };
 
     const handleOrderUpdate = (data: any) => {
+      if (data.restaurant_id !== restaurant.id) return;
+
       setOrders(prev => {
         const orderIndex = prev.findIndex(o => o.id === data.order_id);
         if (orderIndex === -1) return prev;
@@ -145,22 +149,23 @@ export default function StaffOrders() {
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
-  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string) => {
+  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string) => {
     setModalLoading(true);
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
-        table_number: tableNumber
+        table_number: tableNumber,
+        payment_method: pMethod || undefined
       });
       if (data.success) {
         setOrders(prev => {
-          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number } : o)
+          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number, payment_method: pMethod ?? o.payment_method } : o)
             .filter(o => {
               if (statusFilter) return o.status === statusFilter;
               return o.status === 'PENDING';
             });
         });
-        setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number } : null);
+        setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number, payment_method: pMethod ?? prev.payment_method } : null);
         setTimeout(closeModal, 400);
       } else {
         toast.error(data.error || 'Failed to update');
@@ -176,21 +181,26 @@ export default function StaffOrders() {
 
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
+    setTempStatus(order.status);
+    setPaymentMethod(order.payment_method || '');
     setTempTableNumber(order.table_number || '');
   };
   const closeModal = () => {
     setSelectedOrder(null);
     setTempTableNumber('');
+    setPaymentMethod('');
+    setTempStatus('');
   };
 
   return (
     <AdminContentWrapper>
       <AdminPageHeader
-        title="Orders"
+        title="Live Orders"
+        description="Manage and track active orders coming from staff and tables."
       />
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: '#F9FAFB' }}>
           <select
             className="input"
             value={statusFilter}
@@ -297,9 +307,27 @@ export default function StaffOrders() {
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', marginTop: '8px', borderTop: '2px dashed var(--border)', fontWeight: 800, fontSize: '18px' }}>
-                <span>Total</span><span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
-              </div>
+
+              {(selectedOrder.gst_amount && Number(selectedOrder.gst_amount) > 0) ? (
+                <div style={{ marginTop: '8px', borderTop: '2px dashed var(--border)', paddingTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    <span>Subtotal</span>
+                    <span>{formatPrice(selectedOrder.subtotal || (selectedOrder.total_price - selectedOrder.gst_amount))}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    <span>GST ({selectedOrder.gst_rate || 5}%)</span>
+                    <span>{formatPrice(selectedOrder.gst_amount)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', fontWeight: 800, fontSize: '18px' }}>
+                    <span>Total</span>
+                    <span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', marginTop: '8px', borderTop: '2px dashed var(--border)', fontWeight: 800, fontSize: '18px' }}>
+                  <span>Total</span><span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
+                </div>
+              )}
             </div>
 
             <div style={{ background: '#F9FAFB', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
@@ -307,8 +335,14 @@ export default function StaffOrders() {
                 <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Update Status</p>
                 <select
                   className="input"
-                  value={selectedOrder.status}
-                  onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value, tempTableNumber)}
+                  value={tempStatus}
+                  onChange={(e) => {
+                    const newStatus = e.target.value;
+                    setTempStatus(newStatus);
+                    if (newStatus !== 'PAID') {
+                      handleStatusChange(selectedOrder.id, newStatus, tempTableNumber, paymentMethod);
+                    }
+                  }}
                   style={{ width: '100%', height: '42px', fontWeight: 700 }}
                   disabled={modalLoading}
                 >
@@ -318,7 +352,33 @@ export default function StaffOrders() {
                 </select>
               </div>
 
-              {(selectedOrder.status === 'PREPARING' || selectedOrder.status === 'PENDING') && (
+              {tempStatus === 'PAID' && (
+                <div style={{ marginTop: '12px', padding: '12px', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <p style={{ fontWeight: 700, fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>Select Payment Method</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <select
+                      className="select"
+                      style={{ flex: 1, height: '42px', fontWeight: 600 }}
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                    >
+                      <option value="">Choose Method</option>
+                      <option value="UPI">UPI</option>
+                      <option value="CASH">Cash</option>
+                      <option value="CARD">Card</option>
+                    </select>
+                    <button 
+                      className="btn btn-primary"
+                      disabled={modalLoading || !paymentMethod}
+                      onClick={() => handleStatusChange(selectedOrder.id, 'PAID', tempTableNumber, paymentMethod)}
+                    >
+                      Confirm Paid
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(tempStatus === 'PREPARING' || tempStatus === 'PENDING') && (
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                   <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Assign Table Number</p>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -340,7 +400,7 @@ export default function StaffOrders() {
                     </select>
                     <button
                       className="btn btn-primary btn-sm"
-                      onClick={() => handleStatusChange(selectedOrder.id, selectedOrder.status, tempTableNumber)}
+                      onClick={() => handleStatusChange(selectedOrder.id, tempStatus, tempTableNumber, paymentMethod)}
                       disabled={modalLoading || !tempTableNumber}
                     >
                       Save Table

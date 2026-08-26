@@ -607,9 +607,26 @@ export default function AdminOrders() {
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', marginTop: '8px', borderTop: '2px dashed var(--border)', fontWeight: 800, fontSize: '18px' }}>
-                <span>Total</span><span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
-              </div>
+              {(selectedOrder.gst_amount && Number(selectedOrder.gst_amount) > 0) ? (
+                <div style={{ marginTop: '8px', borderTop: '2px dashed var(--border)', paddingTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    <span>Subtotal</span>
+                    <span>{formatPrice(selectedOrder.subtotal || (selectedOrder.total_price - selectedOrder.gst_amount))}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    <span>GST ({selectedOrder.gst_rate || 5}%)</span>
+                    <span>{formatPrice(selectedOrder.gst_amount)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', fontWeight: 800, fontSize: '18px' }}>
+                    <span>Total</span>
+                    <span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', marginTop: '8px', borderTop: '2px dashed var(--border)', fontWeight: 800, fontSize: '18px' }}>
+                  <span>Total</span><span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
+                </div>
+              )}
             </div>
 
             <div style={{ background: '#F9FAFB', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>

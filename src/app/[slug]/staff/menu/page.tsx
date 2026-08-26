@@ -394,9 +394,28 @@ export default function StaffMenuPage() {
                   <span style={{ fontWeight: 600 }}>{formatPrice(item.price * item.quantity)}</span>
                 </div>
               ))}
-              <div style={{ borderTop: '1px dashed var(--border)', margin: '12px 0', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
-                <span>Total</span>
-                <span style={{ color: 'var(--primary)' }}>{formatPrice(totalPrice)}</span>
+              <div style={{ borderTop: '1px dashed var(--border)', margin: '12px 0', paddingTop: '12px' }}>
+                {gstAmount > 0 ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      <span>Subtotal</span>
+                      <span>{formatPrice(subtotal)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      <span>GST ({restaurant?.gst_rate || 0}%)</span>
+                      <span>{formatPrice(gstAmount)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px', paddingTop: '4px' }}>
+                      <span>Total</span>
+                      <span style={{ color: 'var(--primary)' }}>{formatPrice(totalPrice)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px' }}>
+                    <span>Total</span>
+                    <span style={{ color: 'var(--primary)' }}>{formatPrice(totalPrice)}</span>
+                  </div>
+                )}
               </div>
             </div>
 
