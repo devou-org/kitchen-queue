@@ -765,7 +765,7 @@ export async function getOrderStats(restaurantId: string, filters: {
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), r.gst_rate, 0) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
         FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND status = ${filters.status}
           AND orders.business_date >= ${filters.date_from}::date
@@ -782,7 +782,7 @@ export async function getOrderStats(restaurantId: string, filters: {
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), r.gst_rate, 0) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
         FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND status = ANY(${statuses})
           AND orders.business_date >= ${filters.date_from}::date
@@ -798,7 +798,7 @@ export async function getOrderStats(restaurantId: string, filters: {
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), r.gst_rate, 0) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
         FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND orders.business_date >= ${filters.date_from}::date
           AND orders.business_date <= ${filters.date_to}::date
@@ -816,7 +816,7 @@ export async function getOrderStats(restaurantId: string, filters: {
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), r.gst_rate, 0) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
         FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND status = ${filters.status}
     `;
@@ -833,7 +833,7 @@ export async function getOrderStats(restaurantId: string, filters: {
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), r.gst_rate, 0) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
         FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND status = ANY(${statuses})
     `;
@@ -848,7 +848,7 @@ export async function getOrderStats(restaurantId: string, filters: {
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), r.gst_rate, 0) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
         FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar)
   `;

@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const restaurant = await updateRestaurant(id, {
       name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description,
       billing_tier, billing_model, billing_status, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time,
-      gst_type, gst_number: gst_number || null, gst_rate: Number(gst_rate) || 0,
+      gst_type, gst_number: gst_number || null, gst_rate: (gst_type && gst_type !== 'NONE') ? (Number(gst_rate) || 5) : 0,
       custom_subscription_charge: custom_subscription_charge !== undefined ? (custom_subscription_charge === null || custom_subscription_charge === '' ? null : Number(custom_subscription_charge)) : undefined,
       custom_otp_charge: custom_otp_charge !== undefined ? (custom_otp_charge === null || custom_otp_charge === '' ? null : Number(custom_otp_charge)) : undefined,
       monthly_ai_credits: monthly_ai_credits !== undefined ? (monthly_ai_credits === null || monthly_ai_credits === '' ? 10 : Number(monthly_ai_credits)) : undefined,

@@ -476,7 +476,7 @@ export default function AdminSettings() {
             </h2>
             <p style={S.cardDesc}>Read-only tax configuration configured by Super Admin.</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginTop: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '12px', marginTop: '16px' }}>
               <div>
                 <label style={S.label}>GST Type</label>
                 <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
@@ -488,6 +488,13 @@ export default function AdminSettings() {
                 <label style={S.label}>GSTIN</label>
                 <div style={{ fontSize: '14px', fontWeight: 600, color: restaurant?.gst_number ? '#0f172a' : '#94a3b8', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
                   {restaurant?.gst_number || 'Not Configured'}
+                </div>
+              </div>
+
+              <div>
+                <label style={S.label}>GST Rate (%)</label>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>
+                  {restaurant?.gst_type !== 'NONE' ? `${(restaurant as any)?.gst_rate || 5}%` : '0%'}
                 </div>
               </div>
             </div>
