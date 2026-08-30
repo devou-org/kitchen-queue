@@ -456,27 +456,50 @@ export default function StaffMenuPage() {
                         }}
                       >
                         <option value="">-- Select Table --</option>
-                        {tables.map((t: any) => {
-                          const cap = Number(t.capacity) || 0;
-                          const activeOrds = t.active_orders || [];
-                          const seated = activeOrds.reduce((sum: number, o: any) => {
-                            if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
-                            return sum + (Number(o.party_size) || 1);
-                          }, 0);
-                          const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
-                          const isOccupied = t.status === 'OCCUPIED';
-                          const isFull = isOccupied && (cap > 0 ? remaining === 0 : true);
-                          const statusLabel = isFull 
-                            ? `🔴 Occupied (0/${cap})` 
-                            : isOccupied 
-                              ? `🟠 Occupied (${remaining}/${cap})` 
-                              : '🟢 Available';
-                          return (
-                            <option key={t.id} value={t.table_number}>
-                              Table #{t.table_number} {(!isOccupied && t.capacity) ? `(${t.capacity} seats)` : ''} {statusLabel}
-                            </option>
-                          );
-                        })}
+                        {tables
+                          .filter((t: any) => {
+                            const cap = Number(t.capacity) || 0;
+                            const activeOrds = t.active_orders || [];
+                            const seated = activeOrds.reduce((sum: number, o: any) => {
+                              if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
+                              return sum + (Number(o.party_size) || 1);
+                            }, 0);
+                            const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
+                            const isOccupied = t.status === 'OCCUPIED';
+                            const isFull = (cap > 0 && remaining <= 0) || (cap === 0 && isOccupied);
+                            return !isFull;
+                          })
+                          .map((t: any) => {
+                            const cap = Number(t.capacity) || 0;
+                            const activeOrds = t.active_orders || [];
+                            const seated = activeOrds.reduce((sum: number, o: any) => {
+                              if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
+                              return sum + (Number(o.party_size) || 1);
+                            }, 0);
+                            const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
+
+                            const rawNum = String(t.table_number || '').trim();
+                            let tableLabel = rawNum;
+                            if (/^\d+$/.test(rawNum)) {
+                              tableLabel = `T${rawNum}`;
+                            } else if (rawNum.toLowerCase().startsWith('t-')) {
+                              tableLabel = `T-${rawNum.slice(2)}`;
+                            } else if (rawNum.toLowerCase().startsWith('t') && !rawNum.toLowerCase().startsWith('table')) {
+                              tableLabel = `T${rawNum.slice(1)}`;
+                            } else if (rawNum.toLowerCase().startsWith('table #')) {
+                              const c = rawNum.slice(7).trim();
+                              tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
+                            } else if (rawNum.toLowerCase().startsWith('table ')) {
+                              const c = rawNum.slice(6).trim();
+                              tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
+                            }
+
+                            return (
+                              <option key={t.id} value={t.table_number}>
+                                {tableLabel} · {seated}/{cap} · {remaining} Free
+                              </option>
+                            );
+                          })}
                       </select>
                     ) : (
                       <input

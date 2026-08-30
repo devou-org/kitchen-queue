@@ -706,18 +706,52 @@ export default function AdminOrders() {
                       style={{ flex: 1, height: '42px', fontWeight: 600 }}
                     >
                       <option value="">-- Select Table --</option>
-                      {tables.map((t: any) => {
-                        const activeOrds = t.active_orders || [];
-                        const seated = activeOrds.reduce((sum: number, o: any) => sum + (Number(o.party_size) || 1), 0);
-                        const rem = t.status === 'OCCUPIED' ? Math.max(0, (t.capacity || 0) - seated) : (t.capacity || 0);
-                        return (
-                          <option key={t.id} value={t.table_number}>
-                            Table {t.table_number} ({rem} of {t.capacity} seats free) {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
-                          </option>
-                        );
-                      })}
+                      {tables
+                        .filter((t: any) => {
+                          const cap = Number(t.capacity) || 0;
+                          const activeOrds = t.active_orders || [];
+                          const seated = activeOrds.reduce((sum: number, o: any) => {
+                            if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
+                            return sum + (Number(o.party_size) || 1);
+                          }, 0);
+                          const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
+                          const isOccupied = t.status === 'OCCUPIED';
+                          const isFull = (cap > 0 && remaining <= 0) || (cap === 0 && isOccupied);
+                          return !isFull || t.table_number === tempTableNumber;
+                        })
+                        .map((t: any) => {
+                          const cap = Number(t.capacity) || 0;
+                          const activeOrds = t.active_orders || [];
+                          const seated = activeOrds.reduce((sum: number, o: any) => {
+                            if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
+                            return sum + (Number(o.party_size) || 1);
+                          }, 0);
+                          const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
+
+                          const rawNum = String(t.table_number || '').trim();
+                          let tableLabel = rawNum;
+                          if (/^\d+$/.test(rawNum)) {
+                            tableLabel = `T${rawNum}`;
+                          } else if (rawNum.toLowerCase().startsWith('t-')) {
+                            tableLabel = `T-${rawNum.slice(2)}`;
+                          } else if (rawNum.toLowerCase().startsWith('t') && !rawNum.toLowerCase().startsWith('table')) {
+                            tableLabel = `T${rawNum.slice(1)}`;
+                          } else if (rawNum.toLowerCase().startsWith('table #')) {
+                            const c = rawNum.slice(7).trim();
+                            tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
+                          } else if (rawNum.toLowerCase().startsWith('table ')) {
+                            const c = rawNum.slice(6).trim();
+                            tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
+                          }
+
+                          return (
+                            <option key={t.id} value={t.table_number}>
+                              {tableLabel} · {seated}/{cap} · {remaining} Free
+                            </option>
+                          );
+                        })}
                       {tempTableNumber && !tables.some((t: any) => t.table_number === tempTableNumber) && (
-                        <option value={tempTableNumber}>Table {tempTableNumber}</option>
+                        <option value={tempTableNumber}>T{tempTableNumber}</option>
                       )}
                     </select>
                     <button
