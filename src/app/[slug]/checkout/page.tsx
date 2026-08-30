@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { CartItem, Order } from '@/types';
+import { CartItem, Order, OrderType } from '@/types';
 import { authService } from '@/app/services/auth.api';
 import { orderService } from '@/app/services/orders.api';
 
@@ -35,11 +35,18 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [addToMode, setAddToMode] = useState(false); // true = adding to existing order
   const [inOtpStep, setInOtpStep] = useState(false);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    customer_name: string;
+    phone: string;
+    party_size: string;
+    notes: string;
+    order_type?: OrderType | string;
+  }>({
     customer_name: '',
     phone: '',
     party_size: '',
     notes: '',
+    order_type: 'DINE_IN',
   });
 
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -139,10 +146,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       toast.error('Please enter a valid 10-digit phone number');
       return;
     }
-    const partySize = parseInt(form.party_size);
-    if (!form.party_size || partySize < 1) {
-      toast.error('Please select number of persons');
-      return;
+    const isTakeaway = form.order_type === 'TAKEAWAY';
+    if (!isTakeaway) {
+      const partySize = parseInt(form.party_size);
+      if (!form.party_size || partySize < 1) {
+        toast.error('Please select number of persons');
+        return;
+      }
     }
     if (items.length === 0) {
       toast.error('Your cart is empty');
@@ -171,8 +181,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         phone: form.phone,
         items: orderItems,
         notes: form.notes.trim() || undefined,
-        party_size: parseInt(form.party_size),
-        table_number: storedTable,
+        party_size: isTakeaway ? 0 : (parseInt(form.party_size) || 1),
+        table_number: isTakeaway ? undefined : storedTable,
+        order_type: (form.order_type as OrderType) || 'DINE_IN',
       });
 
       if (data.success && data.data) {

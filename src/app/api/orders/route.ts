@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       date_to: searchParams.get('date_to') || undefined,
       phone: searchParams.get('phone') || undefined,
       payment_method: searchParams.get('payment_method') || undefined,
+      order_type: searchParams.get('order_type') || undefined,
       sort: (searchParams.get('sort') as 'ASC' | 'DESC') || undefined,
       page: parseInt(searchParams.get('page') || '1'),
       per_page: parseInt(searchParams.get('per_page') || '50'),
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customer_name, phone, items, notes, party_size, table_number } = body;
+    const { customer_name, phone, items, notes, party_size, table_number, order_type } = body;
 
     if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
@@ -127,8 +128,9 @@ export async function POST(request: NextRequest) {
       gst_rate,
       gst_type,
       notes,
-      party_size: party_size || 1,
-      table_number,
+      party_size: order_type === 'TAKEAWAY' ? 0 : (party_size || 1),
+      table_number: order_type === 'TAKEAWAY' ? null : table_number,
+      order_type: order_type || 'DINE_IN',
       is_pos: isPos,
       staff_id: isPos ? admin?.userId : undefined,
       business_date,

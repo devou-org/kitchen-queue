@@ -95,7 +95,7 @@ export default function AdminStatements() {
     document.body.removeChild(link);
   };
 
-    const { totalRevenue, totalPaidRevenue, orderCount, paidCount, totalRegularSubtotal, totalRegularGst, totalCompositionRevenue, totalCompositionGst, totalNoneRevenue } = stats as any;
+  const { totalRevenue, totalPaidRevenue, orderCount, paidCount, totalRegularSubtotal, totalRegularGst, totalCompositionRevenue, totalCompositionGst, totalNoneRevenue } = stats as any;
 
   const actualRevenue = (totalRegularSubtotal || 0) + (totalCompositionRevenue || 0) + (totalNoneRevenue || 0) || totalRevenue;
   const gstCollected = totalRegularGst || 0;
@@ -176,7 +176,7 @@ export default function AdminStatements() {
 
         {/* Summary Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-           <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
+          <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
             <p className="stat-label">Total Revenue</p>
             <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>{formatPrice(totalRevenue)}</h3>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Revenue + GST</p>
@@ -186,7 +186,7 @@ export default function AdminStatements() {
             <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(restaurant?.gst_type === 'COMPOSITION' ? netRevenue : actualRevenue)}</h3>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>{restaurant?.gst_type === 'COMPOSITION' ? 'After GST Payable Deduction' : 'Excluding Cancelled'}</p>
           </div>
-          
+
           {restaurant?.gst_type === 'REGULAR' && (
             <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
               <p className="stat-label">GST Collected</p>
@@ -217,7 +217,7 @@ export default function AdminStatements() {
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Final retained earnings</p>
           </div> */}
 
-         
+
         </div>
 
         {/* Summary Cards */}
@@ -297,7 +297,7 @@ export default function AdminStatements() {
             )}
           </div>
 
-          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Showing {orders.length} records in this period</span>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Prev</button>

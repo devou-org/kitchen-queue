@@ -12,6 +12,8 @@ import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { User, Users, ChefHat, StickyNote } from 'lucide-react';
+import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
+import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
 
 interface OrderUpdateLog {
   id: string;
@@ -31,6 +33,7 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [orderTypeFilter, setOrderTypeFilter] = useState('');
   const [readySearch, setReadySearch] = useState('');
   const [page, setPage] = useState(1);
   const [mounted, setMounted] = useState(false);
@@ -76,7 +79,7 @@ export default function AdminOrders() {
           setTables(data.tables);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [slug]);
 
   useEffect(() => {
@@ -133,14 +136,15 @@ export default function AdminOrders() {
     try {
       const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
-      
+
       const data = await orderService.getOrders({
         page,
         per_page: 100,
         sort: 'ASC',
         date_from: bDate,
         date_to: bDate,
-        status: statusFilter || currentDefault
+        status: statusFilter || currentDefault,
+        order_type: orderTypeFilter || undefined,
       });
 
       if (data.success && data.data) {
@@ -152,7 +156,7 @@ export default function AdminOrders() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, queueStatuses, statusesLoaded, restaurant]);
+  }, [page, statusFilter, orderTypeFilter, queueStatuses, statusesLoaded, restaurant]);
 
   const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -212,7 +216,7 @@ export default function AdminOrders() {
           const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
           const currentFilter = statusFilter || currentDefault;
           if (currentFilter !== 'ALL') {
-             return o.status === currentFilter;
+            return o.status === currentFilter;
           }
           return true;
         });
@@ -234,19 +238,19 @@ export default function AdminOrders() {
           message: `New items added`,
           items: data.added_items
         };
-        
+
         // FCFS: Add to the end, oldest stays at index 0
         setRecentUpdates(up => {
           const updated = [...up, newUpdate].slice(-10);
           localStorage.setItem(`kitchenQueue_liveAdditions_${Array.isArray(slug) ? slug[0] : slug}`, JSON.stringify(updated));
           return updated;
         });
-        
+
         toast(
           `🛒 Customer added items to order #${String(data.ticket_number).padStart(3, '0')}`,
           { icon: '🟢', duration: 5000, style: { fontWeight: 700 } }
         );
-        
+
         // Full background refresh to get accurate totals/item list
         fetchOrdersDebounced(true);
       } else if (!data.items_updated) {
@@ -261,7 +265,7 @@ export default function AdminOrders() {
             const updated: Order = res.data;
             setSelectedOrder(prev => (prev?.id === data.order_id) ? updated : prev);
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
     };
 
@@ -359,15 +363,15 @@ export default function AdminOrders() {
           </div>
           <div className="live-updates-container">
             {recentUpdates.map(update => (
-              <div 
-                key={update.id} 
-                className="card live-update-card animate-fade-in" 
-                style={{ 
-                  padding: '16px', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'space-between', 
-                  borderLeft: '4px solid var(--success)', 
+              <div
+                key={update.id}
+                className="card live-update-card animate-fade-in"
+                style={{
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderLeft: '4px solid var(--success)',
                   position: 'relative'
                 }}
               >
@@ -384,8 +388,8 @@ export default function AdminOrders() {
                       <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>{update.message}</p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => dismissUpdate(update.id)} 
+                  <button
+                    onClick={() => dismissUpdate(update.id)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '18px', padding: '0 4px', lineHeight: 1 }}
                   >
                     ✕
@@ -437,6 +441,16 @@ export default function AdminOrders() {
                 )}
               </select>
             </div>
+            <div style={{ minWidth: '180px' }}>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Order Type</label>
+              <OrderTypeFilter
+                value={orderTypeFilter}
+                onChange={(val) => {
+                  setOrderTypeFilter(val);
+                  setPage(1);
+                }}
+              />
+            </div>
             {statusFilter === 'READY' && (
               <div style={{ flex: 1, minWidth: '220px' }}>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Search Ready Orders</label>
@@ -476,11 +490,14 @@ export default function AdminOrders() {
                     style={{ cursor: 'pointer' }}
                   >
                     <td>
-                      <strong style={{
-                        color: 'var(--primary)',
-                        fontSize: '16px',
-                        transition: 'color 0.4s ease',
-                      }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <strong style={{
+                          color: 'var(--primary)',
+                          fontSize: '16px',
+                          transition: 'color 0.4s ease',
+                        }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
+                        <OrderTypeBadge type={order.order_type} />
+                      </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDateTime(order.created_at)}</div>
                       {order.staff_name && (
                         <div style={{ fontSize: '10px', color: 'white', background: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', fontWeight: 700 }}>
@@ -528,7 +545,7 @@ export default function AdminOrders() {
           )}
         </div>
 
-        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
           <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{displayedOrders.length} orders found</span>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Prev</button>
@@ -542,8 +559,9 @@ export default function AdminOrders() {
           <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                  <h2 style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: 800 }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h3>
+                  <OrderTypeBadge type={selectedOrder.order_type} />
                   <span className={`badge badge-${selectedOrder.status.toLowerCase()}`}>{selectedOrder.status}</span>
                   {selectedOrder.table_number && (
                     <span style={{
@@ -664,7 +682,7 @@ export default function AdminOrders() {
                         <option value="CASH">Cash</option>
                         <option value="CARD">Card</option>
                       </select>
-                      <button 
+                      <button
                         className="btn btn-primary btn-sm"
                         onClick={() => handleStatusChange(selectedOrder.id, tempStatus, tempTableNumber, paymentMethod)}
                         disabled={modalLoading || !paymentMethod || (tempStatus === selectedOrder.status && paymentMethod === (selectedOrder.payment_method || ''))}
@@ -688,11 +706,16 @@ export default function AdminOrders() {
                       style={{ flex: 1, height: '42px', fontWeight: 600 }}
                     >
                       <option value="">-- Select Table --</option>
-                      {tables.map((t: any) => (
-                        <option key={t.id} value={t.table_number}>
-                          Table {t.table_number} {t.capacity ? `(${t.capacity} seats)` : ''} {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
-                        </option>
-                      ))}
+                      {tables.map((t: any) => {
+                        const activeOrds = t.active_orders || [];
+                        const seated = activeOrds.reduce((sum: number, o: any) => sum + (Number(o.party_size) || 1), 0);
+                        const rem = t.status === 'OCCUPIED' ? Math.max(0, (t.capacity || 0) - seated) : (t.capacity || 0);
+                        return (
+                          <option key={t.id} value={t.table_number}>
+                            Table {t.table_number} ({rem} of {t.capacity} seats free) {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
+                          </option>
+                        );
+                      })}
                       {tempTableNumber && !tables.some((t: any) => t.table_number === tempTableNumber) && (
                         <option value={tempTableNumber}>Table {tempTableNumber}</option>
                       )}
@@ -712,7 +735,7 @@ export default function AdminOrders() {
               )}
             </div>
 
-            <button 
+            <button
               onClick={closeModal}
               style={{
                 width: '100%',
@@ -767,7 +790,7 @@ export default function AdminOrders() {
                     const preparing = Number(item.preparing_qty) || 0;
                     const stock = Number(item.current_stock) || 0;
                     const isLowStock = stock < (pending + preparing);
-                    
+
                     return (
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 12px', borderBottom: '1px solid #F3F4F6' }}>
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, paddingRight: '8px' }}>

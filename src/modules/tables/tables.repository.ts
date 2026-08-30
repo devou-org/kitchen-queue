@@ -35,6 +35,7 @@ export class TablesRepository {
                'ticket_number', ticket_number,
                'customer_name', customer_name,
                'phone', phone,
+               'party_size', party_size,
                'total_price', total_price,
                'status', status,
                'pending_at', pending_at,
@@ -48,6 +49,7 @@ export class TablesRepository {
          WHERE restaurant_id = $1
            AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
            AND table_number IS NOT NULL AND table_number != ''
+           AND (order_type IS NULL OR order_type != 'TAKEAWAY')
          GROUP BY restaurant_id, table_number
        ) active ON active.table_number = t.table_number
        WHERE t.restaurant_id = $1
@@ -191,7 +193,8 @@ export class TablesRepository {
        FROM orders
        WHERE restaurant_id = $1
          AND table_number = $2
-         AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')`,
+         AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
+         AND (order_type IS NULL OR order_type != 'TAKEAWAY')`,
       [restaurantId, tableNumber]
     );
 
