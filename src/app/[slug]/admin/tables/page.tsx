@@ -128,7 +128,7 @@ export default function AdminTablesPage() {
 
   const occupiedCount = tables.filter(t => t.status === 'OCCUPIED').length;
   const availableCount = tables.filter(t => t.status === 'AVAILABLE').length;
-  const reservedCount = tables.filter((t: any) => t.status === 'RESERVED').length;
+  // const reservedCount = tables.filter((t: any) => t.status === 'RESERVED').length;
 
   const totalCapacity = tables.reduce((sum, t) => sum + (Number(t.capacity) || 0), 0);
   const totalSeatedGuests = tables.reduce((sum, t) => {
@@ -278,8 +278,8 @@ export default function AdminTablesPage() {
               <span style={{ fontSize: '22px', fontWeight: 800, color: '#E04F16' }}>{occupiedCount}</span>
             </div>
 
-            {/* Reserved */}
-            <div
+            {/* Reserved - disabled for now */}
+            {/* <div
               style={{
                 flex: 1,
                 minWidth: '130px',
@@ -292,7 +292,7 @@ export default function AdminTablesPage() {
             >
               <span style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>Reserved</span>
               <span style={{ fontSize: '22px', fontWeight: 800, color: '#2563EB' }}>{reservedCount}</span>
-            </div>
+            </div> */}
 
             {/* Available */}
             <div

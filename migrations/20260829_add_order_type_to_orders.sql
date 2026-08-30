@@ -10,6 +10,6 @@ BEGIN
     ) THEN
         ALTER TABLE orders 
         ADD CONSTRAINT chk_orders_order_type 
-        CHECK (order_type IN ('DINE_IN', 'TAKEAWAY', 'DELIVERY'));
+        CHECK (order_type IN ('DINE_IN', 'TAKEAWAY'));
     END IF;
 END $$;
