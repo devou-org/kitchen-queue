@@ -10,6 +10,7 @@ import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { User, Users, StickyNote } from 'lucide-react';
+import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 
@@ -231,7 +232,10 @@ export default function StaffOrders() {
                 {orders.map(order => (
                   <tr key={order.id} onClick={() => openOrderModal(order)} style={{ cursor: 'pointer' }}>
                     <td>
-                      <strong style={{ color: 'var(--primary)', fontSize: '15px' }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <strong style={{ color: 'var(--primary)', fontSize: '15px' }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
+                        <OrderTypeBadge type={order.order_type} />
+                      </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDateTime(order.created_at)}</div>
                       {order.staff_name && (
                         <div style={{ fontSize: '10px', color: 'white', background: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', fontWeight: 700 }}>
@@ -267,6 +271,7 @@ export default function StaffOrders() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
                   <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'var(--primary)' }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h2>
+                  <OrderTypeBadge type={selectedOrder.order_type} />
                   <span className={`badge badge-${selectedOrder.status.toLowerCase()}`}>{selectedOrder.status}</span>
                   {selectedOrder.table_number && (
                     <span style={{ fontSize: '12px', fontWeight: 800, color: 'white', background: 'var(--primary)', padding: '4px 8px', borderRadius: '4px' }}>
@@ -389,11 +394,27 @@ export default function StaffOrders() {
                       style={{ flex: 1, height: '42px', fontWeight: 600 }}
                     >
                       <option value="">-- Select Table --</option>
-                      {tables.map((t: any) => (
-                        <option key={t.id} value={t.table_number}>
-                          Table {t.table_number} {t.capacity ? `(${t.capacity} seats)` : ''} {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
-                        </option>
-                      ))}
+                      {tables.map((t: any) => {
+                        const cap = Number(t.capacity) || 0;
+                        const activeOrds = t.active_orders || [];
+                        const seated = activeOrds.reduce((sum: number, o: any) => {
+                          if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
+                          return sum + (Number(o.party_size) || 1);
+                        }, 0);
+                        const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
+                        const isOccupied = t.status === 'OCCUPIED';
+                        const isFull = isOccupied && (cap > 0 ? remaining === 0 : true);
+                        const statusLabel = isFull 
+                          ? `🔴 Occupied (0/${cap})` 
+                          : isOccupied 
+                            ? `🟠 Occupied (${remaining}/${cap})` 
+                            : '🟢 Available';
+                        return (
+                          <option key={t.id} value={t.table_number}>
+                            Table {t.table_number} {(!isOccupied && t.capacity) ? `(${t.capacity} seats)` : ''} {statusLabel}
+                          </option>
+                        );
+                      })}
                       {tempTableNumber && !tables.some((t: any) => t.table_number === tempTableNumber) && (
                         <option value={tempTableNumber}>Table {tempTableNumber}</option>
                       )}

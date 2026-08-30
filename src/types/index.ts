@@ -4,6 +4,7 @@
 
 export type ProductStatus = 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK';
 export type OrderStatus = string;
+export type OrderType = 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY';
 
 export interface User {
   id: string;
@@ -55,6 +56,7 @@ export interface Order {
   notes?: string;
   party_size?: number;
   table_number?: string;
+  order_type?: OrderType | string;
   payment_method?: string;
   created_at: string;
   completed_at: string | null;
@@ -162,6 +164,7 @@ export interface OrderFilters {
   date_to?: string;
   phone?: string;
   payment_method?: string;
+  order_type?: string;
   sort?: 'ASC' | 'DESC';
   page?: number;
   per_page?: number;

@@ -3,6 +3,9 @@ import toast from 'react-hot-toast';
 import { authService } from '@/app/services/auth.api';
 import { User, BadgeCheck, Info } from 'lucide-react';
 
+import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
+import { OrderType } from '@/types';
+
 const COUNTRY_CODES = [
   { code: '+91', label: '+91', country: 'India' },
 ];
@@ -13,12 +16,14 @@ interface CustomerDetailsProps {
     phone: string;
     party_size: string;
     notes: string;
+    order_type?: OrderType | string;
   };
   setForm: React.Dispatch<React.SetStateAction<{
     customer_name: string;
     phone: string;
     party_size: string;
     notes: string;
+    order_type?: OrderType | string;
   }>>;
   isVerified: boolean;
   onVerified: (user: any) => void;
@@ -148,6 +153,12 @@ export default function CustomerDetails({
 
   return (
     <form onSubmit={onSubmit} id="new-order-form">
+      <div style={{ marginBottom: '16px' }}>
+        <OrderTypeSelector
+          value={(form.order_type as OrderType) || 'DINE_IN'}
+          onChange={(val) => setForm(f => ({ ...f, order_type: val }))}
+        />
+      </div>
       <div className="card">
         <h3 style={{ fontWeight: 700, marginBottom: '18px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <User size={18} />
@@ -350,21 +361,22 @@ export default function CustomerDetails({
               </div>
             )}
           </div>
-          <div>
-            <label className="label">Number of Persons *</label>
-            <select
-              className="select"
-              value={form.party_size}
-              onChange={e => setForm(f => ({ ...f, party_size: e.target.value }))}
-              required
-            >
-              <option value="" disabled>Select persons</option>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                <option key={n} value={n}>{n} Party</option>
-              ))}
-            </select>
-
-          </div>
+          {form.order_type !== 'TAKEAWAY' && (
+            <div>
+              <label className="label">Number of Persons *</label>
+              <select
+                className="select"
+                value={form.party_size}
+                onChange={e => setForm(f => ({ ...f, party_size: e.target.value }))}
+                required={form.order_type !== 'TAKEAWAY'}
+              >
+                <option value="" disabled>Select persons</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                  <option key={n} value={n}>{n} Party</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
     </form>

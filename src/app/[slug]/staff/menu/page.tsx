@@ -9,6 +9,8 @@ import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { Search } from 'lucide-react';
+import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
+import { OrderType } from '@/types';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -104,12 +106,20 @@ export default function StaffMenuPage() {
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [tables, setTables] = useState<any[]>([]);
-  const [orderForm, setOrderForm] = useState({
+  const [orderForm, setOrderForm] = useState<{
+    customer_name: string;
+    phone: string;
+    table_number: string;
+    party_size: number;
+    notes: string;
+    order_type: OrderType | string;
+  }>({
     customer_name: '',
     phone: '',
     table_number: '',
     party_size: 1,
-    notes: ''
+    notes: '',
+    order_type: 'DINE_IN'
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -256,7 +266,8 @@ export default function StaffMenuPage() {
   const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.size === 0) return toast.error('Cart is empty');
-    if (!orderForm.customer_name && !orderForm.table_number) {
+    const isTakeaway = orderForm.order_type === 'TAKEAWAY';
+    if (!isTakeaway && !orderForm.customer_name && !orderForm.table_number) {
       return toast.error('Please provide a Customer Name or Table Number');
     }
 
@@ -270,15 +281,16 @@ export default function StaffMenuPage() {
 
       // Generate a mock phone if not provided for staff orders
       const phoneToUse = orderForm.phone || `+910000000000`;
-      const nameToUse = orderForm.customer_name || `Table ${orderForm.table_number}`;
+      const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
       const res = await orderService.createOrder({
         customer_name: nameToUse,
         phone: phoneToUse,
-        table_number: orderForm.table_number || undefined,
+        table_number: isTakeaway ? undefined : (orderForm.table_number || undefined),
         items,
-        party_size: orderForm.party_size,
+        party_size: isTakeaway ? 0 : orderForm.party_size,
         notes: orderForm.notes,
+        order_type: orderForm.order_type,
         is_pos: true
       });
 
@@ -286,7 +298,7 @@ export default function StaffMenuPage() {
         toast.success(`Order placed successfully! Ticket #${res.data.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '' });
+        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN' });
       } else {
         toast.error(res.error || 'Failed to place order');
       }
@@ -420,54 +432,77 @@ export default function StaffMenuPage() {
             </div>
 
             <form onSubmit={submitOrder} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{ flex: 1 }}>
-                  <label className="label">Table Number *</label>
-                  {tables.length > 0 ? (
+              <OrderTypeSelector
+                value={(orderForm.order_type as OrderType) || 'DINE_IN'}
+                onChange={(val) => setOrderForm({ ...orderForm, order_type: val })}
+              />
+
+              {orderForm.order_type !== 'TAKEAWAY' && (
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="label">Table Number *</label>
+                    {tables.length > 0 ? (
+                      <select
+                        className="input"
+                        value={orderForm.table_number}
+                        onChange={e => {
+                          const selectedNum = e.target.value;
+                          const matchedTable = tables.find((t: any) => t.table_number === selectedNum);
+                          setOrderForm({
+                            ...orderForm,
+                            table_number: selectedNum,
+                            party_size: matchedTable?.capacity ? Number(matchedTable.capacity) : orderForm.party_size
+                          });
+                        }}
+                      >
+                        <option value="">-- Select Table --</option>
+                        {tables.map((t: any) => {
+                          const cap = Number(t.capacity) || 0;
+                          const activeOrds = t.active_orders || [];
+                          const seated = activeOrds.reduce((sum: number, o: any) => {
+                            if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
+                            return sum + (Number(o.party_size) || 1);
+                          }, 0);
+                          const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
+                          const isOccupied = t.status === 'OCCUPIED';
+                          const isFull = isOccupied && (cap > 0 ? remaining === 0 : true);
+                          const statusLabel = isFull 
+                            ? `🔴 Occupied (0/${cap})` 
+                            : isOccupied 
+                              ? `🟠 Occupied (${remaining}/${cap})` 
+                              : '🟢 Available';
+                          return (
+                            <option key={t.id} value={t.table_number}>
+                              Table #{t.table_number} {(!isOccupied && t.capacity) ? `(${t.capacity} seats)` : ''} {statusLabel}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="e.g. 12"
+                        value={orderForm.table_number}
+                        onChange={e => setOrderForm({ ...orderForm, table_number: e.target.value })}
+                      />
+                    )}
+                  </div>
+                  <div style={{ width: '100px' }}>
+                    <label className="label">Persons</label>
                     <select
                       className="input"
-                      value={orderForm.table_number}
-                      onChange={e => {
-                        const selectedNum = e.target.value;
-                        const matchedTable = tables.find((t: any) => t.table_number === selectedNum);
-                        setOrderForm({
-                          ...orderForm,
-                          table_number: selectedNum,
-                          party_size: matchedTable?.capacity ? Number(matchedTable.capacity) : orderForm.party_size
-                        });
-                      }}
+                      value={orderForm.party_size}
+                      onChange={e => setOrderForm({ ...orderForm, party_size: parseInt(e.target.value) || 1 })}
+                      style={{ paddingRight: '30px' }}
                     >
-                      <option value="">-- Select Table --</option>
-                      {tables.map((t: any) => (
-                        <option key={t.id} value={t.table_number}>
-                          Table #{t.table_number} {t.capacity ? `(${t.capacity} seats)` : ''} {t.status === 'OCCUPIED' ? '🔴 Occupied' : '🟢 Available'}
-                        </option>
+                      {[...Array(10)].map((_, i) => (
+                        <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
                       ))}
                     </select>
-                  ) : (
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="e.g. 12"
-                      value={orderForm.table_number}
-                      onChange={e => setOrderForm({ ...orderForm, table_number: e.target.value })}
-                    />
-                  )}
+                  </div>
                 </div>
-                <div style={{ width: '100px' }}>
-                  <label className="label">Persons</label>
-                  <select
-                    className="input"
-                    value={orderForm.party_size}
-                    onChange={e => setOrderForm({ ...orderForm, party_size: parseInt(e.target.value) || 1 })}
-                    style={{ paddingRight: '30px' }}
-                  >
-                    {[...Array(10)].map((_, i) => (
-                      <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              )}
 
               <div>
                 <label className="label">Customer Name (Optional)</label>

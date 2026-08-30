@@ -1,4 +1,6 @@
 import React from 'react';
+import OrderTypeBadge from './OrderTypeBadge';
+import { OrderType } from '@/types';
 
 interface OrderItem {
   name: string;
@@ -13,6 +15,7 @@ interface OrderTicketProps {
     total_price: number;
     is_paid: boolean;
     table_number?: string;
+    order_type?: OrderType | string;
     status: string;
     items: OrderItem[];
     user_name?: string;
@@ -34,8 +37,11 @@ export default function OrderTicket({ order, onUpdateStatus }: OrderTicketProps)
     <div className={`border rounded-xl p-5 shadow-sm transition-all ${colorClass}`}>
       <div className="flex justify-between items-start mb-4 border-b border-black/10 pb-3">
         <div>
-          <h3 className="text-xl font-black">#{order.ticket_number}</h3>
-          <p className="text-sm font-semibold opacity-80">{order.user_name || 'Guest'}</p>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-black">#{order.ticket_number}</h3>
+            <OrderTypeBadge type={order.order_type} />
+          </div>
+          <p className="text-sm font-semibold opacity-80 mt-0.5">{order.user_name || 'Guest'}</p>
           {order.table_number && (
             <p className="text-xs font-bold mt-1 bg-black/5 inline-block px-2 py-0.5 rounded">
               Table: {order.table_number}

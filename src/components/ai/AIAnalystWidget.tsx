@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { 
-  Bot, Send, Sparkles, Trash2, TrendingUp, ShoppingBag, 
+import {
+  Bot, Send, Sparkles, Trash2, TrendingUp, ShoppingBag,
   Clock, AlertTriangle, Activity, Zap, RefreshCw, X, Maximize2, Minimize2,
-  CheckCircle2, ChevronRight, MessageSquare, User, Lock
+  ChevronRight, MessageSquare, User, Lock
 } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -267,53 +267,74 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
     return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   };
 
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener('open-ai-analyst', handleOpen);
+    return () => window.removeEventListener('open-ai-analyst', handleOpen);
+  }, []);
+
   return (
-    <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999, fontFamily: 'inherit' }}>
-      {/* Floating Trigger Button */}
+    <>
+      <style>{`
+        .ai-analyst-hover-btn {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          width: 46px;
+          height: 46px;
+          padding: 0 13px;
+          border-radius: 28px;
+          background: ${primaryColor};
+          color: #FFFFFF;
+          border: none;
+          cursor: pointer;
+          box-shadow: 0 4px 18px ${primaryColor}4D;
+          overflow: hidden;
+          white-space: nowrap;
+          transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        .ai-analyst-hover-btn:hover {
+          width: 145px;
+          padding: 0 16px;
+          box-shadow: 0 6px 22px ${primaryColor}66;
+          transform: translateY(-2px);
+        }
+
+        .ai-analyst-label {
+          opacity: 0;
+          font-weight: 700;
+          font-size: 14px;
+          letter-spacing: 0.01em;
+          margin-left: 8px;
+          transition: opacity 0.2s ease 0.08s;
+          pointer-events: none;
+        }
+
+        .ai-analyst-hover-btn:hover .ai-analyst-label {
+          opacity: 1;
+        }
+      `}</style>
+
+      {/* Compact Icon Floating Button (Expands on Hover) */}
       {!isOpen && (
-        <div
+        <button
+          className="ai-analyst-hover-btn"
           onClick={() => setIsOpen(true)}
-          style={{
-            position: 'relative',
-            padding: '2px',
-            borderRadius: '50px',
-            background: `linear-gradient(90deg, ${primaryColor}, #34D399, #60A5FA, #A855F7, ${primaryColor})`,
-            backgroundSize: '300% 300%',
-            animation: 'animatedBorder 3s linear infinite',
-            boxShadow: `0 4px 18px ${primaryColor}4D`,
-            cursor: 'pointer',
-            transition: 'transform 0.2s ease-in-out',
-            display: 'inline-block'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.04) translateY(-1px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) translateY(0)'}
+          title="AI Analyst"
         >
-          <button
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '10px 22px',
-              borderRadius: '48px',
-              background: primaryColor,
-              color: '#FFFFFF',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '14px',
-              letterSpacing: '0.02em',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <Bot size={18} />
-            <span>AI Analyst</span>
-          </button>
-        </div>
+          <Bot size={20} style={{ flexShrink: 0 }} />
+          <span className="ai-analyst-label">AI Analyst</span>
+        </button>
       )}
 
       {/* Expanded Floating Chat Panel */}
       {isOpen && (
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999, fontFamily: 'inherit' }}>
         <div
           style={{
             width: isExpanded ? '680px' : '420px',
@@ -346,10 +367,10 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '26px', height: '26px', borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E2E8F0' }}>
-                <img 
-                  src={QDINE_LOGO_URL} 
-                  alt="Qdine Logo" 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.3)' }} 
+                <img
+                  src={QDINE_LOGO_URL}
+                  alt="Qdine Logo"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.3)' }}
                 />
               </div>
               <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: '#0F172A' }}>
@@ -522,26 +543,7 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
                       )}
                     </div>
 
-                    {!isUser && msg.tool_calls && msg.tool_calls.length > 0 && (
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-                        {msg.tool_calls.map((t: any, i: number) => (
-                          <span key={i} style={{
-                            fontSize: '10px',
-                            fontWeight: 500,
-                            background: '#F8FAFC',
-                            color: '#64748B',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            border: '1px solid #F1F5F9'
-                          }}>
-                            <CheckCircle2 size={10} color={primaryColor} /> Verified via {t.name}()
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    {/* Function/tool call badges (e.g. Verified via getSalesSummary()) are hidden from frontend UI */}
                   </div>
                 </div>
               );
@@ -655,6 +657,7 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
             </button>
           </div>
         </div>
+        </div>
       )}
 
       <style jsx global>{`
@@ -677,6 +680,6 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
           100% { background-position: 0% 50%; }
         }
       `}</style>
-    </div>
+    </>
   );
 }
