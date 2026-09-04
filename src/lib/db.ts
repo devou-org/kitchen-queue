@@ -1930,8 +1930,8 @@ export async function getStaffById(restaurantId: string, id: string) {
 }
 
 export async function createStaff(restaurantId: string, data: { name: string; email: string; phone?: string; password?: string; role?: string; is_active?: boolean }) {
-  // Limit staff creation per restaurant
-  const limit = 10;
+  // Limit staff creation per restaurant to 6
+  const limit = 6;
   const countRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId}`;
   if (countRows[0].count >= limit) {
     throw new Error(`Staff limit reached (max ${limit} staff members per restaurant)`);
@@ -1946,6 +1946,13 @@ export async function createStaff(restaurantId: string, data: { name: string; em
 }
 
 export async function updateStaff(restaurantId: string, id: string, data: Partial<{ name: string; email: string; phone: string; password?: string; role: string; is_active: boolean }>) {
+  if (data.is_active === true) {
+    const activeCountRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId} AND is_active = true AND id != ${id}`;
+    if (activeCountRows[0].count >= 6) {
+      throw new Error(`Active staff limit reached (max 6 active/online staff members allowed)`);
+    }
+  }
+
   const rows = await sql`
     UPDATE staffs SET
       name = COALESCE(${data.name ?? null}, name),

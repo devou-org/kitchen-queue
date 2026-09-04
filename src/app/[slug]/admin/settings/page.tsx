@@ -5,7 +5,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2 } from 'lucide-react';
+import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
@@ -30,6 +30,15 @@ export default function AdminSettings() {
   const [menuLayout, setMenuLayout] = useState<'LIST' | 'GRID'>('LIST');
   const [menuTitle, setMenuTitle] = useState("Today's Specials");
   const [menuDescription, setMenuDescription] = useState("Hand-curated coastal delicacies prepared with traditional recipes.");
+
+  // Admin Security & Credentials State
+  const [adminEmail, setAdminEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [savingCredentials, setSavingCredentials] = useState(false);
 
   // Geo-location & AI Context State
   const [city, setCity] = useState('');
@@ -132,6 +141,68 @@ export default function AdminSettings() {
       }
     }
   }, [restaurant, hasPromptedGeo]);
+
+  useEffect(() => {
+    if (slug) {
+      fetch('/api/admin/credentials', {
+        headers: { 'x-restaurant-slug': slug as string }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.email) {
+            setAdminEmail(data.email);
+          }
+        })
+        .catch(err => console.error('Error fetching admin credentials:', err));
+    }
+  }, [slug]);
+
+  const handleSaveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminEmail.trim()) {
+      toast.error('Admin Email is required');
+      return;
+    }
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        toast.error('New password must be at least 6 characters long');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        toast.error('New password and confirmation do not match');
+        return;
+      }
+    }
+
+    setSavingCredentials(true);
+    try {
+      const res = await fetch('/api/admin/credentials', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': slug as string
+        },
+        body: JSON.stringify({
+          email: adminEmail,
+          currentPassword: currentPassword || undefined,
+          newPassword: newPassword || undefined
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Admin login credentials updated successfully!');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        toast.error(data.error || 'Failed to update credentials');
+      }
+    } catch {
+      toast.error('Connection error while updating credentials');
+    } finally {
+      setSavingCredentials(false);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -468,6 +539,115 @@ export default function AdminSettings() {
 
         {/* Right Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Admin Credentials & Security Card (Temporarily Hidden)
+          <div className="card">
+            <h2 style={S.cardTitle}>
+              <KeyRound size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '6px' }} />
+              Admin Credentials & Security
+            </h2>
+            <p style={S.cardDesc}>Reset or update your admin login email address and account password.</p>
+
+            <form onSubmit={handleSaveCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
+              <div>
+                <label style={S.label}>Admin Email Address *</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="email"
+                    required
+                    value={adminEmail}
+                    onChange={e => setAdminEmail(e.target.value)}
+                    placeholder="admin@restaurant.com"
+                    style={{ ...S.input, paddingLeft: '36px' }}
+                  />
+                  <Mail size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={S.label}>Current Password (Optional Verification)</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={currentPassword}
+                    onChange={e => setCurrentPassword(e.target.value)}
+                    placeholder="••••••••"
+                    style={{ ...S.input, paddingLeft: '36px', paddingRight: '36px' }}
+                  />
+                  <Lock size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                  >
+                    {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                <div>
+                  <label style={S.label}>New Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="Min 6 characters"
+                      style={{ ...S.input, paddingLeft: '36px', paddingRight: '36px' }}
+                    />
+                    <KeyRound size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                    >
+                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={S.label}>Confirm Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      style={{
+                        ...S.input,
+                        paddingLeft: '36px',
+                        borderColor: confirmPassword && newPassword !== confirmPassword ? '#ef4444' : '#cbd5e1'
+                      }}
+                    />
+                    <ShieldCheck size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  </div>
+                  {confirmPassword && newPassword !== confirmPassword && (
+                    <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px', margin: 0 }}>Passwords do not match</p>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingCredentials}
+                className="btn btn-primary"
+                style={{
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontWeight: 600
+                }}
+              >
+                {savingCredentials ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                {savingCredentials ? 'Saving Credentials...' : 'Update Admin Credentials'}
+              </button>
+            </form>
+          </div>
+          */}
+
           {/* GST Information Card (Read-Only) */}
           <div className="card">
             <h2 style={S.cardTitle}>

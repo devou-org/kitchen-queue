@@ -117,7 +117,17 @@ export default function StaffAdminPage() {
           <button
             className="btn btn-primary"
             onClick={() => openModal()}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', fontWeight: 600 }}
+            disabled={staffs.length >= 6}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              fontWeight: 600,
+              opacity: staffs.length >= 6 ? 0.5 : 1,
+              cursor: staffs.length >= 6 ? 'not-allowed' : 'pointer'
+            }}
+            title={staffs.length >= 6 ? 'Maximum staff limit reached (6 max)' : 'Add Staff'}
           >
             <Plus size={18} /> Add Staff
           </button>
