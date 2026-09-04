@@ -33,14 +33,45 @@ export class TablesService {
   }
 
   /**
-   * Update table
+   * Update table details (table_number, capacity, status)
    */
   static async updateTable(
     tableId: string,
     restaurantId: string,
-    data: { capacity?: number; status?: 'AVAILABLE' | 'OCCUPIED' }
+    restaurantSlug: string,
+    data: { table_number?: string; capacity?: number; status?: 'AVAILABLE' | 'OCCUPIED' }
   ): Promise<RestaurantTable> {
-    const table = await TablesRepository.updateTable(tableId, restaurantId, data);
+    const existing = await TablesRepository.getTableById(tableId, restaurantId);
+    if (!existing) throw new Error('Table not found');
+
+    let cleanTableNum: string | undefined = undefined;
+    let newQrUrl: string | undefined = undefined;
+
+    if (data.table_number !== undefined) {
+      cleanTableNum = data.table_number.trim();
+      if (!cleanTableNum) {
+        throw new Error('Table name/number cannot be empty');
+      }
+
+      if (cleanTableNum !== existing.table_number) {
+        const duplicate = await TablesRepository.getTableByNumber(restaurantId, cleanTableNum);
+        if (duplicate) {
+          throw new Error(`Table "${cleanTableNum}" already exists.`);
+        }
+
+        const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://qdinetest.devou.in';
+        newQrUrl = `${baseUrl}/${restaurantSlug}/menu?table=${encodeURIComponent(cleanTableNum)}`;
+      }
+    }
+
+    const table = await TablesRepository.updateTable(tableId, restaurantId, {
+      table_number: cleanTableNum,
+      capacity: data.capacity,
+      status: data.status,
+      qr_code_url: newQrUrl,
+      old_table_number: cleanTableNum && cleanTableNum !== existing.table_number ? existing.table_number : undefined,
+    });
+
     if (!table) throw new Error('Table not found');
     return table;
   }

@@ -22,9 +22,10 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { capacity, status } = body;
+    const { table_number, capacity, status } = body;
 
-    const updatedTable = await TablesService.updateTable(id, restaurant.id, {
+    const updatedTable = await TablesService.updateTable(id, restaurant.id, restaurant.slug, {
+      table_number: table_number !== undefined ? String(table_number) : undefined,
       capacity: capacity !== undefined ? parseInt(capacity, 10) : undefined,
       status
     });

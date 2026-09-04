@@ -14,6 +14,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import { User, Users, ChefHat, StickyNote } from 'lucide-react';
 import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
+import { checkTableAssignment } from '@/lib/table-capacity';
 
 interface OrderUpdateLog {
   id: string;
@@ -67,7 +68,7 @@ export default function AdminOrders() {
     }
   }, [slug]);
 
-  useEffect(() => {
+  const fetchTables = useCallback(() => {
     if (!slug) return;
     const currentSlug = Array.isArray(slug) ? slug[0] : slug;
     fetch('/api/tables', {
@@ -81,6 +82,10 @@ export default function AdminOrders() {
       })
       .catch(() => { });
   }, [slug]);
+
+  useEffect(() => {
+    fetchTables();
+  }, [fetchTables]);
 
   useEffect(() => {
     const fetchStatuses = async () => {
@@ -180,9 +185,10 @@ export default function AdminOrders() {
     }
     fetchDebounceRef.current = setTimeout(() => {
       fetchOrders(silent);
+      fetchTables();
       fetchDebounceRef.current = null;
     }, 400); // 400ms buffer to batch multiple updates
-  }, [fetchOrders]);
+  }, [fetchOrders, fetchTables]);
 
   useEffect(() => {
     if (!pusherClient || !restaurant) return;
@@ -192,9 +198,11 @@ export default function AdminOrders() {
     const handleNewOrder = (data: any) => {
       toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
       fetchOrdersDebounced(true);
+      fetchTables();
     };
 
     const handleOrderUpdate = (data: any) => {
+      fetchTables();
       // 1. PATCH LOCAL STATE (The "incremental" way)
       // This makes the UI update INSTANTLY without a network request
       setOrders(prev => {
@@ -708,25 +716,24 @@ export default function AdminOrders() {
                       <option value="">-- Select Table --</option>
                       {tables
                         .filter((t: any) => {
-                          const cap = Number(t.capacity) || 0;
-                          const activeOrds = t.active_orders || [];
-                          const seated = activeOrds.reduce((sum: number, o: any) => {
-                            if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
-                            return sum + (Number(o.party_size) || 1);
-                          }, 0);
-                          const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
-                          const isOccupied = t.status === 'OCCUPIED';
-                          const isFull = (cap > 0 && remaining <= 0) || (cap === 0 && isOccupied);
-                          return !isFull || t.table_number === tempTableNumber;
+                          const partySize = selectedOrder ? (Number(selectedOrder.party_size) || 1) : 1;
+                          const check = checkTableAssignment(t, partySize, {
+                            orderId: selectedOrder?.id,
+                            phone: selectedOrder?.phone,
+                            customerName: selectedOrder?.customer_name,
+                          });
+                          const isCurrent = t.table_number === tempTableNumber;
+                          return check.allowed || isCurrent;
                         })
                         .map((t: any) => {
+                          const partySize = selectedOrder ? (Number(selectedOrder.party_size) || 1) : 1;
+                          const check = checkTableAssignment(t, partySize, {
+                            orderId: selectedOrder?.id,
+                            phone: selectedOrder?.phone,
+                            customerName: selectedOrder?.customer_name,
+                          });
                           const cap = Number(t.capacity) || 0;
-                          const activeOrds = t.active_orders || [];
-                          const seated = activeOrds.reduce((sum: number, o: any) => {
-                            if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
-                            return sum + (Number(o.party_size) || 1);
-                          }, 0);
-                          const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
+                          const seated = check.occupiedSeats;
 
                           const rawNum = String(t.table_number || '').trim();
                           let tableLabel = rawNum;
@@ -744,9 +751,11 @@ export default function AdminOrders() {
                             tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
                           }
 
+                          const freeSeats = Math.max(0, cap - seated);
+
                           return (
                             <option key={t.id} value={t.table_number}>
-                              {tableLabel} · {seated}/{cap} · {remaining} Free
+                              {tableLabel} · {seated}/{cap} · {freeSeats} Free
                             </option>
                           );
                         })}

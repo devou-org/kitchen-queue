@@ -11,6 +11,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import { Search } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
+import { checkTableAssignment } from '@/lib/table-capacity';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -123,6 +124,17 @@ export default function StaffMenuPage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  const fetchTables = useCallback(async () => {
+    try {
+      const tablesRes = await tableService.getTables();
+      if (tablesRes.success && tablesRes.data) {
+        setTables(tablesRes.data);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     const initPage = async () => {
       try {
@@ -143,11 +155,7 @@ export default function StaffMenuPage() {
           setCategories(['All', ...uniqueCats]);
         }
 
-        // Fetch tables for table selection dropdown
-        const tablesRes = await tableService.getTables();
-        if (tablesRes.success && tablesRes.data) {
-          setTables(tablesRes.data);
-        }
+        await fetchTables();
       } catch {
         toast.error('Failed to load menu');
       } finally {
@@ -155,12 +163,12 @@ export default function StaffMenuPage() {
       }
     };
     initPage();
-  }, []);
+  }, [fetchTables]);
 
   // Pusher for real-time updates
   useEffect(() => {
-    if (!pusherClient || !restaurant?.pusher_channel) return;
-    const channelName = restaurant.pusher_channel;
+    if (!pusherClient || !restaurant) return;
+    const channelName = restaurant.pusher_channel || `queue-channel-${restaurant.id}`;
     const channel = pusherClient.subscribe(channelName);
 
     channel.bind('product_updated', (updatedProduct: Product) => {
@@ -183,12 +191,22 @@ export default function StaffMenuPage() {
       setProducts(prev => prev.filter(p => p.id !== data.id));
     });
 
+    channel.bind('new_order', () => {
+      fetchTables();
+    });
+
+    channel.bind('order_update', () => {
+      fetchTables();
+    });
+
     return () => {
       channel.unbind('product_updated');
       channel.unbind('product_deleted');
+      channel.unbind('new_order');
+      channel.unbind('order_update');
       pusherClient?.unsubscribe(channelName);
     };
-  }, [restaurant?.pusher_channel]);
+  }, [restaurant, fetchTables]);
 
   // Keep cart aligned with latest product availability and details
   useEffect(() => {
@@ -299,6 +317,7 @@ export default function StaffMenuPage() {
         setCart(new Map());
         setCheckoutOpen(false);
         setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN' });
+        await fetchTables();
       } else {
         toast.error(res.error || 'Failed to place order');
       }
@@ -458,25 +477,22 @@ export default function StaffMenuPage() {
                         <option value="">-- Select Table --</option>
                         {tables
                           .filter((t: any) => {
-                            const cap = Number(t.capacity) || 0;
-                            const activeOrds = t.active_orders || [];
-                            const seated = activeOrds.reduce((sum: number, o: any) => {
-                              if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
-                              return sum + (Number(o.party_size) || 1);
-                            }, 0);
-                            const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
-                            const isOccupied = t.status === 'OCCUPIED';
-                            const isFull = (cap > 0 && remaining <= 0) || (cap === 0 && isOccupied);
-                            return !isFull;
+                            const partySize = Number(orderForm.party_size) || 1;
+                            const check = checkTableAssignment(t, partySize, {
+                              phone: orderForm.phone,
+                              customerName: orderForm.customer_name,
+                            });
+                            const isCurrent = t.table_number === orderForm.table_number;
+                            return check.allowed || isCurrent;
                           })
                           .map((t: any) => {
+                            const partySize = Number(orderForm.party_size) || 1;
+                            const check = checkTableAssignment(t, partySize, {
+                              phone: orderForm.phone,
+                              customerName: orderForm.customer_name,
+                            });
                             const cap = Number(t.capacity) || 0;
-                            const activeOrds = t.active_orders || [];
-                            const seated = activeOrds.reduce((sum: number, o: any) => {
-                              if (o.order_type === 'TAKEAWAY' || o.order_type === 'DELIVERY') return sum;
-                              return sum + (Number(o.party_size) || 1);
-                            }, 0);
-                            const remaining = cap > 0 ? Math.max(0, cap - seated) : 0;
+                            const seated = check.occupiedSeats;
 
                             const rawNum = String(t.table_number || '').trim();
                             let tableLabel = rawNum;
@@ -494,9 +510,11 @@ export default function StaffMenuPage() {
                               tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
                             }
 
+                            const freeSeats = Math.max(0, cap - seated);
+
                             return (
                               <option key={t.id} value={t.table_number}>
-                                {tableLabel} · {seated}/{cap} · {remaining} Free
+                                {tableLabel} · {seated}/{cap} · {freeSeats} Free
                               </option>
                             );
                           })}

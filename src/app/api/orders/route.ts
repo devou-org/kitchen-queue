@@ -93,6 +93,25 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    if (order_type !== 'TAKEAWAY' && table_number) {
+      const { TablesRepository } = await import('@/modules/tables/tables.repository');
+      const { checkTableAssignment } = await import('@/lib/table-capacity');
+      const tables = await TablesRepository.getTablesByRestaurant(restaurant.id);
+      const targetTable = tables.find(t => String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase());
+      if (targetTable) {
+        const check = checkTableAssignment(targetTable, party_size || 1, {
+          phone,
+          customerName: customer_name
+        });
+        if (!check.allowed) {
+          return NextResponse.json({
+            success: false,
+            error: check.reason || 'Table capacity exceeded.'
+          }, { status: 400 });
+        }
+      }
+    }
+
     // Calculate total and GST
     let subtotal = 0;
     for (const item of items) {

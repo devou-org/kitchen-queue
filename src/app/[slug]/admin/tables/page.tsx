@@ -10,6 +10,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
 import { TableCard } from '@/components/modules/tables/TableCard';
 import { CreateTableModal } from '@/components/modules/tables/CreateTableModal';
+import { EditTableModal } from '@/components/modules/tables/EditTableModal';
 import { TableQRModal } from '@/components/modules/tables/TableQRModal';
 import { DeleteTableModal } from '@/components/modules/tables/DeleteTableModal';
 
@@ -27,6 +28,7 @@ export default function AdminTablesPage() {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addingTable, setAddingTable] = useState(false);
+  const [selectedEditTable, setSelectedEditTable] = useState<RestaurantTable | null>(null);
   const [selectedQRTable, setSelectedQRTable] = useState<RestaurantTable | null>(null);
   const [tableToDelete, setTableToDelete] = useState<RestaurantTable | null>(null);
   const [deletingTable, setDeletingTable] = useState(false);
@@ -423,6 +425,7 @@ export default function AdminTablesPage() {
             <TableCard
               key={table.id}
               table={table}
+              onEdit={(t) => setSelectedEditTable(t)}
               onViewQR={(t) => setSelectedQRTable(t)}
               onDelete={(t) => setTableToDelete(t)}
               primaryColor={primaryColor}
@@ -437,6 +440,14 @@ export default function AdminTablesPage() {
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={handleCreateTable}
         loading={addingTable}
+        primaryColor={primaryColor}
+      />
+
+      <EditTableModal
+        table={selectedEditTable}
+        isOpen={!!selectedEditTable}
+        onClose={() => setSelectedEditTable(null)}
+        onSuccess={fetchTables}
         primaryColor={primaryColor}
       />
 

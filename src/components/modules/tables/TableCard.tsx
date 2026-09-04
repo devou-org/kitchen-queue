@@ -1,11 +1,12 @@
 import React from 'react';
-import { Users, QrCode, Trash2, ShoppingBag } from 'lucide-react';
+import { Users, QrCode, Trash2, ShoppingBag, Edit2 } from 'lucide-react';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
 import { formatPrice } from '@/lib/format';
 
 interface TableCardProps {
   table: RestaurantTable;
   onViewQR: (table: RestaurantTable) => void;
+  onEdit: (table: RestaurantTable) => void;
   onDelete: (table: RestaurantTable) => void;
   primaryColor?: string;
 }
@@ -150,7 +151,7 @@ function TableVisualDiagram({
   );
 }
 
-export function TableCard({ table, onViewQR, onDelete, primaryColor = '#059669' }: TableCardProps) {
+export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#059669' }: TableCardProps) {
   const isOccupied = table.status === 'OCCUPIED';
   const activeOrders = table.active_orders || [];
 
@@ -181,26 +182,26 @@ export function TableCard({ table, onViewQR, onDelete, primaryColor = '#059669' 
           <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', margin: 0 }}>
             Table #{table.table_number}
           </h3>
-          {/* <span
-            style={{
-              fontSize: '11px',
-              fontWeight: 800,
-              padding: '3px 10px',
-              borderRadius: '20px',
-              background: isOccupied ? '#FEF9C3' : `${primaryColor}15`,
-              color: isOccupied ? '#A16207' : primaryColor,
-              border: `1px solid ${isOccupied ? '#FEF08A' : `${primaryColor}40`}`,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isOccupied ? '#EAB308' : primaryColor }} />
-            {isOccupied ? 'OCCUPIED' : 'AVAILABLE'}
-          </span> */}
         </div>
 
         <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={() => onEdit(table)}
+            title="Edit Table Name & Capacity"
+            style={{
+              padding: '6px',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+              background: '#F8FAFC',
+              color: '#334155',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Edit2 size={16} color={primaryColor} />
+          </button>
           <button
             onClick={() => onViewQR(table)}
             title="View & Print Table QR Code"

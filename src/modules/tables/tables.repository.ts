@@ -38,6 +38,7 @@ export class TablesRepository {
                'party_size', party_size,
                'total_price', total_price,
                'status', status,
+               'order_type', order_type,
                'pending_at', pending_at,
                'preparing_at', preparing_at,
                'ready_at', ready_at,
@@ -128,16 +129,27 @@ export class TablesRepository {
   }
 
   /**
-   * Update table details (capacity, status, qr_code_url)
+   * Update table details (table_number, capacity, status, qr_code_url)
    */
   static async updateTable(
     tableId: string,
     restaurantId: string,
-    data: { capacity?: number; status?: 'AVAILABLE' | 'OCCUPIED'; qr_code_url?: string }
+    data: {
+      table_number?: string;
+      capacity?: number;
+      status?: 'AVAILABLE' | 'OCCUPIED';
+      qr_code_url?: string;
+      old_table_number?: string;
+    }
   ): Promise<RestaurantTable | null> {
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
+
+    if (data.table_number !== undefined) {
+      fields.push(`table_number = $${idx++}`);
+      values.push(data.table_number);
+    }
 
     if (data.capacity !== undefined) {
       fields.push(`capacity = $${idx++}`);
@@ -168,7 +180,19 @@ export class TablesRepository {
       values
     );
 
-    return res.rows[0] || null;
+    const updated = res.rows[0] || null;
+
+    // If table_number changed, update active orders to match new table_number
+    if (updated && data.old_table_number && data.table_number) {
+      await pool.query(
+        `UPDATE orders
+         SET table_number = $1
+         WHERE restaurant_id = $2 AND table_number = $3 AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')`,
+        [data.table_number, restaurantId, data.old_table_number]
+      ).catch(err => console.error('Failed to update orders table_number:', err));
+    }
+
+    return updated;
   }
 
   /**
