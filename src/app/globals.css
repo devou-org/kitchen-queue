@@ -605,10 +605,16 @@ tr:hover td {
 
 
 
-/* ===================== ADMIN SIDEBAR ===================== */
+/* ===================== ADMIN SIDEBAR & LAYOUT ===================== */
 .admin-layout {
   display: flex;
   min-height: 100vh;
+}
+
+@media (min-width: 769px) {
+  .admin-layout {
+    zoom: 0.90;
+  }
 }
 
 .sidebar {
