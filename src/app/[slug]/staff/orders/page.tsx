@@ -13,7 +13,10 @@ import { User, Users, StickyNote } from 'lucide-react';
 import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
+import { Pagination } from '@/components/ui/Pagination';
 import { checkTableAssignment } from '@/lib/table-capacity';
+
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 export default function StaffOrders() {
   const { slug } = useParams();
@@ -211,17 +214,15 @@ export default function StaffOrders() {
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: '#F9FAFB' }}>
-          <select
-            className="input"
+          <CustomSelect
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
+            onChange={(val) => {
+              setStatusFilter(val);
               setPage(1);
             }}
-            style={{ width: '100%', height: '42px' }}
-          >
-            {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+            options={allStatuses.map(s => ({ value: s, label: s }))}
+            buttonStyle={{ height: '42px' }}
+          />
         </div>
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', minHeight: '300px' }}>
@@ -271,6 +272,13 @@ export default function StaffOrders() {
             </table>
           )}
         </div>
+
+        <Pagination
+          currentPage={page}
+          totalPages={orders.length < 100 && page === 1 ? 1 : orders.length < 100 ? page : page + 1}
+          onPageChange={(p) => setPage(p)}
+          totalRecords={orders.length}
+        />
       </div>
 
       {mounted && selectedOrder && createPortal(

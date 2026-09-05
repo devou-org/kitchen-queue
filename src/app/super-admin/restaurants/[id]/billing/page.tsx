@@ -17,6 +17,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface RestaurantBilling {
   id: string;
@@ -726,29 +727,13 @@ export default function SuperAdminRestaurantBilling() {
               </div>
               
               {/* Pagination Controls */}
-              {totalTxs > 10 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>
-                    Showing {(txPage - 1) * 10 + 1} to {Math.min(txPage * 10, totalTxs)} of {totalTxs}
-                  </span>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      onClick={() => setTxPage(p => Math.max(1, p - 1))}
-                      disabled={txPage === 1}
-                      style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: txPage === 1 ? '#e2e8f0' : '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: txPage === 1 ? 'not-allowed' : 'pointer' }}
-                    >
-                      Prev
-                    </button>
-                    <button 
-                      onClick={() => setTxPage(p => Math.min(Math.ceil(totalTxs / 10), p + 1))}
-                      disabled={txPage >= Math.ceil(totalTxs / 10)}
-                      style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: txPage >= Math.ceil(totalTxs / 10) ? '#e2e8f0' : '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: txPage >= Math.ceil(totalTxs / 10) ? 'not-allowed' : 'pointer' }}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              <Pagination
+                currentPage={txPage}
+                totalPages={Math.ceil(totalTxs / 10)}
+                onPageChange={(p) => setTxPage(p)}
+                totalRecords={totalTxs}
+                pageSize={10}
+              />
             </div>
 
           </div>

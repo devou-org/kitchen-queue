@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { pusherClient } from '@/lib/pusher-client';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { Users } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 export default function AdminQueueManager({ restaurantId }: { restaurantId: string }) {
   const [queues, setQueues] = useState<any[]>([]);
@@ -15,7 +16,7 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const { restaurant } = useRestaurant();
-  
+
   const fetchQueues = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -39,7 +40,7 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
         setAllStatuses(data.data);
         setStatusFilter(prev => prev ? prev : data.data[0].possible_queue_status);
       }
-    } catch (err) {}
+    } catch (err) { }
   }, [restaurantId]);
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
 
   const handleUpdateStatus = async (queueId: string, status: string) => {
     try {
-       const res = await fetch(`/api/admin/queue/update`, {
+      const res = await fetch(`/api/admin/queue/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ queueId, statusEnum: status, restaurantId })
@@ -95,12 +96,12 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
 
     if (statusFilter && q.queue_status !== statusFilter) return false;
     if (!statusFilter && ['CANCELLED'].includes(q.queue_status)) return false; // Default to active (not cancelled)
-    
+
     if (search) {
       const term = search.toLowerCase();
-      return (q.user_name || '').toLowerCase().includes(term) || 
-             (q.user_phone || '').toLowerCase().includes(term) || 
-             String(q.token_number).includes(term);
+      return (q.user_name || '').toLowerCase().includes(term) ||
+        (q.user_phone || '').toLowerCase().includes(term) ||
+        String(q.token_number).includes(term);
     }
     return true;
   });
@@ -111,7 +112,7 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
         title="Queue Management"
         description="Live waitlist for your restaurant."
         action={
-          <button 
+          <button
             onClick={() => window.open(`/${restaurant?.slug || restaurantId}/queue-board`, '_blank')}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -136,15 +137,15 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>
               <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Filter Status</label>
-              <select
-                className="select"
+              <CustomSelect
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={{ height: '42px' }}
-              >
-                <option value="" disabled>Select Status</option>
-                {allStatuses.map(s => <option key={s.id} value={s.possible_queue_status}>{s.possible_queue_status}</option>)}
-              </select>
+                onChange={(val) => setStatusFilter(val)}
+                options={[
+                  { value: '', label: 'Select Status' },
+                  ...allStatuses.map((s) => ({ value: s.possible_queue_status, label: s.possible_queue_status }))
+                ]}
+                buttonStyle={{ height: '42px' }}
+              />
             </div>
             <div style={{ flex: 1, minWidth: '220px' }}>
               <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Search Waitlist</label>
@@ -205,14 +206,13 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                        <select 
-                          className="input" 
-                          style={{ height: '32px', padding: '0 28px 0 12px', fontSize: '13px', minWidth: '130px', borderRadius: '6px' }}
+                        <CustomSelect
                           value={q.queue_status}
-                          onChange={(e) => handleUpdateStatus(q.id, e.target.value)}
-                        >
-                          {allStatuses.map(s => <option key={s.id} value={s.possible_queue_status}>{s.possible_queue_status}</option>)}
-                        </select>
+                          onChange={(val) => handleUpdateStatus(q.id, val)}
+                          options={allStatuses.map((s) => ({ value: s.possible_queue_status, label: s.possible_queue_status }))}
+                          style={{ width: '150px' }}
+                          buttonStyle={{ height: '34px', fontSize: '13px', padding: '0 8px' }}
+                        />
                       </div>
                     </td>
                   </tr>

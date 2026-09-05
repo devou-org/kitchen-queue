@@ -14,6 +14,8 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import { User, Users, ChefHat, StickyNote } from 'lucide-react';
 import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import { Pagination } from '@/components/ui/Pagination';
 import { checkTableAssignment } from '@/lib/table-capacity';
 
 interface OrderUpdateLog {
@@ -136,8 +138,8 @@ export default function AdminOrders() {
   };
 
   const fetchOrders = useCallback(async (silent = false) => {
-    if (!statusesLoaded || !restaurant) return;
-    if (!silent && ordersRef.current.length === 0) setLoading(true);
+    if (!restaurant) return;
+    if (!silent) setLoading(true);
     try {
       const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
@@ -155,13 +157,19 @@ export default function AdminOrders() {
       if (data.success && data.data) {
         setOrders(data.data);
         ordersRef.current = data.data;
+      } else {
+        setOrders([]);
+        ordersRef.current = [];
       }
-    } catch {
+    } catch (err) {
+      console.error('Failed to load orders', err);
       toast.error('Failed to load orders');
+      setOrders([]);
+      ordersRef.current = [];
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, orderTypeFilter, queueStatuses, statusesLoaded, restaurant]);
+  }, [page, statusFilter, orderTypeFilter, queueStatuses, restaurant]);
 
   const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -352,7 +360,7 @@ export default function AdminOrders() {
   };
 
   return (
-    <AdminContentWrapper>
+    <AdminContentWrapper fullWidth>
       <AdminPageHeader
         title="Active Order Queue"
         description="Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)"
@@ -428,26 +436,24 @@ export default function AdminOrders() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>
               <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Filter Status</label>
-              <select
-                className="select"
+              <CustomSelect
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
+                onChange={(val) => {
+                  setStatusFilter(val);
                   setReadySearch('');
                   setPage(1);
                 }}
-                style={{ height: '42px' }}
+                options={
+                  !statusesLoaded
+                    ? [{ value: '', label: 'Loading...' }]
+                    : [
+                      { value: '', label: defaultStatus },
+                      ...activeStatuses.map((s) => ({ value: s, label: s })),
+                    ]
+                }
                 disabled={!statusesLoaded}
-              >
-                {!statusesLoaded ? (
-                  <option value="">Loading...</option>
-                ) : (
-                  <>
-                    <option value="">{defaultStatus}</option>
-                    {activeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                  </>
-                )}
-              </select>
+                buttonStyle={{ height: '42px' }}
+              />
             </div>
             <div style={{ minWidth: '180px' }}>
               <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Order Type</label>
@@ -475,7 +481,7 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', minHeight: '400px' }}>
+        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', minHeight: '580px' }}>
           {loading ? (
             <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : (
@@ -553,13 +559,12 @@ export default function AdminOrders() {
           )}
         </div>
 
-        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-          <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{displayedOrders.length} orders found</span>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Prev</button>
-            <button className="btn btn-secondary btn-sm" disabled={orders.length < 100} onClick={() => setPage(p => p + 1)}>Next →</button>
-          </div>
-        </div>
+        <Pagination
+          currentPage={page}
+          totalPages={orders.length < 100 && page === 1 ? 1 : orders.length < 100 ? page : page + 1}
+          onPageChange={(p) => setPage(p)}
+          totalRecords={displayedOrders.length}
+        />
       </div>
 
       {mounted && selectedOrder && createPortal(
@@ -659,42 +664,39 @@ export default function AdminOrders() {
               <div>
                 <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Order Status</p>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <select
-                    className="select"
+                  <CustomSelect
                     style={{ flex: 1 }}
                     value={tempStatus}
                     disabled={modalLoading}
-                    onChange={(e) => {
-                      const newStatus = e.target.value;
-                      setTempStatus(newStatus);
-                      if (newStatus !== 'PAID') {
-                        handleStatusChange(selectedOrder.id, newStatus, tempTableNumber, paymentMethod);
+                    onChange={(val) => {
+                      setTempStatus(val);
+                      if (val !== 'PAID') {
+                        handleStatusChange(selectedOrder.id, val, tempTableNumber, paymentMethod);
                       }
                     }}
-                  >
-                    {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                    options={allStatuses.map((s) => ({ value: s, label: s }))}
+                  />
                 </div>
                 {tempStatus === 'PAID' && (
                   <div style={{ marginTop: '12px', padding: '12px', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
                     <p style={{ fontWeight: 700, fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>Select Payment Method</p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <select
-                        className="select"
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <CustomSelect
                         style={{ flex: 1 }}
                         value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                      >
-                        <option value="">Choose Method</option>
-                        <option value="UPI">UPI</option>
-                        <option value="CASH">Cash</option>
-                        <option value="CARD">Card</option>
-                      </select>
+                        onChange={(val) => setPaymentMethod(val)}
+                        options={[
+                          { value: '', label: 'Choose Method' },
+                          { value: 'UPI', label: 'UPI' },
+                          { value: 'CASH', label: 'Cash' },
+                          { value: 'CARD', label: 'Card' },
+                        ]}
+                      />
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={() => handleStatusChange(selectedOrder.id, tempStatus, tempTableNumber, paymentMethod)}
                         disabled={modalLoading || !paymentMethod || (tempStatus === selectedOrder.status && paymentMethod === (selectedOrder.payment_method || ''))}
-                        style={{ minWidth: '80px' }}
+                        style={{ minWidth: '80px', height: '42px' }}
                       >
                         Save
                       </button>
@@ -706,63 +708,62 @@ export default function AdminOrders() {
               {(tempStatus === 'PREPARING' || tempStatus === 'PENDING') && (
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                   <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Assign Table Number</p>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <select
-                      className="select"
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <CustomSelect
+                      style={{ flex: 1 }}
                       value={tempTableNumber}
-                      onChange={(e) => setTempTableNumber(e.target.value)}
-                      style={{ flex: 1, height: '42px', fontWeight: 600 }}
-                    >
-                      <option value="">-- Select Table --</option>
-                      {tables
-                        .filter((t: any) => {
-                          const partySize = selectedOrder ? (Number(selectedOrder.party_size) || 1) : 1;
-                          const check = checkTableAssignment(t, partySize, {
-                            orderId: selectedOrder?.id,
-                            phone: selectedOrder?.phone,
-                            customerName: selectedOrder?.customer_name,
-                          });
-                          const isCurrent = t.table_number === tempTableNumber;
-                          return check.allowed || isCurrent;
-                        })
-                        .map((t: any) => {
-                          const partySize = selectedOrder ? (Number(selectedOrder.party_size) || 1) : 1;
-                          const check = checkTableAssignment(t, partySize, {
-                            orderId: selectedOrder?.id,
-                            phone: selectedOrder?.phone,
-                            customerName: selectedOrder?.customer_name,
-                          });
-                          const cap = Number(t.capacity) || 0;
-                          const seated = check.occupiedSeats;
+                      onChange={(val) => setTempTableNumber(val)}
+                      options={[
+                        { value: '', label: '-- Select Table --' },
+                        ...tables
+                          .filter((t: any) => {
+                            const partySize = selectedOrder ? (Number(selectedOrder.party_size) || 1) : 1;
+                            const check = checkTableAssignment(t, partySize, {
+                              orderId: selectedOrder?.id,
+                              phone: selectedOrder?.phone,
+                              customerName: selectedOrder?.customer_name,
+                            });
+                            const isCurrent = t.table_number === tempTableNumber;
+                            return check.allowed || isCurrent;
+                          })
+                          .map((t: any) => {
+                            const partySize = selectedOrder ? (Number(selectedOrder.party_size) || 1) : 1;
+                            const check = checkTableAssignment(t, partySize, {
+                              orderId: selectedOrder?.id,
+                              phone: selectedOrder?.phone,
+                              customerName: selectedOrder?.customer_name,
+                            });
+                            const cap = Number(t.capacity) || 0;
+                            const seated = check.occupiedSeats;
 
-                          const rawNum = String(t.table_number || '').trim();
-                          let tableLabel = rawNum;
-                          if (/^\d+$/.test(rawNum)) {
-                            tableLabel = `T${rawNum}`;
-                          } else if (rawNum.toLowerCase().startsWith('t-')) {
-                            tableLabel = `T-${rawNum.slice(2)}`;
-                          } else if (rawNum.toLowerCase().startsWith('t') && !rawNum.toLowerCase().startsWith('table')) {
-                            tableLabel = `T${rawNum.slice(1)}`;
-                          } else if (rawNum.toLowerCase().startsWith('table #')) {
-                            const c = rawNum.slice(7).trim();
-                            tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
-                          } else if (rawNum.toLowerCase().startsWith('table ')) {
-                            const c = rawNum.slice(6).trim();
-                            tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
-                          }
+                            const rawNum = String(t.table_number || '').trim();
+                            let tableLabel = rawNum;
+                            if (/^\d+$/.test(rawNum)) {
+                              tableLabel = `T${rawNum}`;
+                            } else if (rawNum.toLowerCase().startsWith('t-')) {
+                              tableLabel = `T-${rawNum.slice(2)}`;
+                            } else if (rawNum.toLowerCase().startsWith('t') && !rawNum.toLowerCase().startsWith('table')) {
+                              tableLabel = `T${rawNum.slice(1)}`;
+                            } else if (rawNum.toLowerCase().startsWith('table #')) {
+                              const c = rawNum.slice(7).trim();
+                              tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
+                            } else if (rawNum.toLowerCase().startsWith('table ')) {
+                              const c = rawNum.slice(6).trim();
+                              tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
+                            }
 
-                          const freeSeats = Math.max(0, cap - seated);
+                            const freeSeats = Math.max(0, cap - seated);
 
-                          return (
-                            <option key={t.id} value={t.table_number}>
-                              {tableLabel} · {seated}/{cap} · {freeSeats} Free
-                            </option>
-                          );
-                        })}
-                      {tempTableNumber && !tables.some((t: any) => t.table_number === tempTableNumber) && (
-                        <option value={tempTableNumber}>T{tempTableNumber}</option>
-                      )}
-                    </select>
+                            return {
+                              value: String(t.table_number),
+                              label: `${tableLabel} · ${seated}/${cap} · ${freeSeats} Free`,
+                            };
+                          }),
+                        ...(tempTableNumber && !tables.some((t: any) => t.table_number === tempTableNumber)
+                          ? [{ value: tempTableNumber, label: `T${tempTableNumber}` }]
+                          : []),
+                      ]}
+                    />
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => {

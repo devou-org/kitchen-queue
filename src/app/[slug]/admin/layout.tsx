@@ -8,14 +8,16 @@ import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
 import { AIAnalystWidget } from '@/components/ai/AIAnalystWidget';
+import { AdminLayoutProvider, useAdminLayout } from '@/context/AdminLayoutContext';
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { slug } = useParams();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const { isMaximized } = useAdminLayout();
   const { restaurant, loading: resLoading } = useRestaurant();
   const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
@@ -106,8 +108,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push(`/${slug}/admin/login`);
   };
 
-
-
   const navLinks = [
     ...(showOrdering ? [{ name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
@@ -146,14 +146,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <>
       <link rel="manifest" href={`/api/manifest?slug=${slug}&type=admin`} />
       <div className="admin-layout">
-        {restaurant?.primary_color && (
-          <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{ __html: `
+          ${restaurant?.primary_color ? `
           :root {
             --primary: ${restaurant.primary_color};
             --primary-dark: ${restaurant.primary_color};
           }
+          ` : ''}
+          .sidebar {
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
+          }
+          .admin-main {
+            transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          }
+          @media (min-width: 769px) {
+            .sidebar.maximized-hidden {
+              transform: translateX(-100%) !important;
+              opacity: 0 !important;
+              pointer-events: none !important;
+            }
+            .admin-main.maximized-full {
+              margin-left: 0 !important;
+            }
+          }
         `}} />
-      )}
 
       {/* Backdrop for mobile */}
       {isSidebarOpen && (
@@ -164,7 +180,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Sidebar */}
-      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} ${isMaximized ? 'maximized-hidden' : ''}`}>
         <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {restaurant?.logo_url ? (
             <img 
@@ -229,7 +245,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Content */}
-      <main className="admin-main">
+      <main className={`admin-main ${isMaximized ? 'maximized-full' : ''}`}>
         {/* Mobile Header */}
         <div className="md:hidden" style={{ display: 'flex', alignItems: 'center', padding: '16px', background: 'var(--card)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 40, gap: '16px' }}>
           <button 
@@ -244,5 +260,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </main>
     </div>
     </>
+  );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AdminLayoutProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </AdminLayoutProvider>
   );
 }

@@ -1,13 +1,16 @@
+'use client';
 import React from 'react';
+import { LayoutMaximizeToggle } from './LayoutMaximizeToggle';
 
 interface AdminPageHeaderProps {
   title: React.ReactNode;
   description?: React.ReactNode;
   action?: React.ReactNode;
   backLink?: React.ReactNode;
+  hideMaximize?: boolean;
 }
 
-export function AdminPageHeader({ title, description, action, backLink }: AdminPageHeaderProps) {
+export function AdminPageHeader({ title, description, action, backLink, hideMaximize = false }: AdminPageHeaderProps) {
   return (
     <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
       <div style={{ flex: 1, minWidth: '240px' }}>
@@ -25,11 +28,10 @@ export function AdminPageHeader({ title, description, action, backLink }: AdminP
           </p>
         )}
       </div>
-      {action && (
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
-          {action}
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+        {action}
+        {!hideMaximize && <LayoutMaximizeToggle />}
+      </div>
     </div>
   );
 }

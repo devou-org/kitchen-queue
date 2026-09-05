@@ -10,6 +10,8 @@ import { Download, Clock, User, Hourglass, Check, Receipt } from 'lucide-react';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import BillTemplate from '@/components/BillTemplate';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import { Pagination } from '@/components/ui/Pagination';
 
 export default function AdminStatements() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -143,21 +145,31 @@ export default function AdminStatements() {
             <label className="label">To</label>
             <input type="date" className="input" value={dateTo} min={dateFrom} onChange={e => setDateTo(e.target.value)} style={{ width: '160px' }} />
           </div>
-          <div>
+          <div style={{ minWidth: '160px' }}>
             <label className="label">Status</label>
-            <select className="select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: '160px' }}>
-              <option value="">All Statuses</option>
-              {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <CustomSelect
+              value={statusFilter}
+              onChange={val => setStatusFilter(val)}
+              options={[
+                { value: '', label: 'All Statuses' },
+                ...allStatuses.map(s => ({ value: s, label: s }))
+              ]}
+              style={{ width: '160px' }}
+            />
           </div>
-          <div>
+          <div style={{ minWidth: '140px' }}>
             <label className="label">Payment</label>
-            <select className="select" value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)} style={{ width: '140px' }}>
-              <option value="">All Methods</option>
-              <option value="UPI">UPI</option>
-              <option value="CASH">Cash</option>
-              <option value="CARD">Card</option>
-            </select>
+            <CustomSelect
+              value={paymentMethodFilter}
+              onChange={val => setPaymentMethodFilter(val)}
+              options={[
+                { value: '', label: 'All Methods' },
+                { value: 'UPI', label: 'UPI' },
+                { value: 'CASH', label: 'Cash' },
+                { value: 'CARD', label: 'Card' }
+              ]}
+              style={{ width: '140px' }}
+            />
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
             <button className="btn btn-ghost" onClick={exportCSV} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#059669', background: 'rgba(5, 150, 105, 0.1)' }}>
@@ -210,23 +222,10 @@ export default function AdminStatements() {
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>No GST applicable</p>
             </div>
           )}
-
-          {/* <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
-            <p className="stat-label">Net Revenue</p>
-            <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>{formatPrice(netRevenue)}</h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Final retained earnings</p>
-          </div> */}
-
-
         </div>
 
         {/* Summary Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          {/* <div className="stat-card">
-            <p className="stat-label">Total Revenue</p>
-            <h3 className="stat-value" style={{ color: 'var(--primary)' }}>{formatPrice(totalRevenue)}</h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Exclude cancelled orders</p>
-          </div> */}
           <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
             <p className="stat-label">Gross Paid</p>
             <h3 className="stat-value" style={{ color: '#059669' }}>{formatPrice(totalPaidRevenue)}</h3>
@@ -247,7 +246,7 @@ export default function AdminStatements() {
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto' }}>
             {loading ? (
-              <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+              <div style={{ padding: '60px', display: 'center', justifyContent: 'center' }}><div className="loader" /></div>
             ) : (
               <table>
                 <thead>
@@ -297,13 +296,12 @@ export default function AdminStatements() {
             )}
           </div>
 
-          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Showing {orders.length} records in this period</span>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Prev</button>
-              <button className="btn btn-secondary btn-sm" disabled={orders.length < 200} onClick={() => setPage(p => p + 1)}>Next →</button>
-            </div>
-          </div>
+          <Pagination
+            currentPage={page}
+            totalPages={orders.length < 200 && page === 1 ? 1 : orders.length < 200 ? page : page + 1}
+            onPageChange={(p) => setPage(p)}
+            totalRecords={orders.length}
+          />
         </div>
       </AdminContentWrapper>
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { authService } from '@/app/services/auth.api';
 import toast from 'react-hot-toast';
 import { User, BadgeCheck } from 'lucide-react';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 const COUNTRY_CODES = [
   { code: '+91', label: 'IN +91', country: 'India' },
@@ -241,17 +242,14 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>Phone Number *</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <select
-                  className="select"
+                <CustomSelect
                   value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value)}
-                  style={{ width: '100px', flexShrink: 0, paddingLeft: '8px', paddingRight: '28px' }}
+                  onChange={(val) => setCountryCode(val)}
                   disabled={otpStep || isVerified}
-                >
-                  {COUNTRY_CODES.map(c => (
-                    <option key={c.code} value={c.code}>{c.label}</option>
-                  ))}
-                </select>
+                  options={COUNTRY_CODES.map((c) => ({ value: c.code, label: c.label }))}
+                  style={{ width: '110px', flexShrink: 0 }}
+                  buttonStyle={{ height: '44px' }}
+                />
                 <input 
                   type="tel" required disabled={otpStep || isVerified}
                   value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
@@ -350,17 +348,19 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
 
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>Number of Persons *</label>
-              <select
-                value={partySize}
-                onChange={e => setPartySize(Number(e.target.value))}
-                className="select"
-                style={{ width: '100%', color: partySize ? '#0f172a' : '#94a3b8' }}
-              >
-                <option value="" disabled>Select persons</option>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => (
-                  <option key={num} value={num}>{num} {num === 1 ? 'Person' : 'Persons'}</option>
-                ))}
-              </select>
+              <CustomSelect
+                value={String(partySize)}
+                onChange={(val) => setPartySize(val ? Number(val) : '')}
+                placeholder="Select persons"
+                options={[
+                  { value: '', label: 'Select persons' },
+                  ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => ({
+                    value: String(num),
+                    label: `${num} ${num === 1 ? 'Person' : 'Persons'}`,
+                  })),
+                ]}
+                buttonStyle={{ height: '48px' }}
+              />
             </div>
 
             <button type="submit" disabled={loading || !isVerified} style={{
