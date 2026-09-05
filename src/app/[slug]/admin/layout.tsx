@@ -44,7 +44,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const isUnauthorizedPath = 
         pathname.startsWith(`/${slug}/admin/orders`) || 
         pathname.startsWith(`/${slug}/admin/statements`) || 
-        pathname.startsWith(`/${slug}/admin/sales`);
+        pathname.startsWith(`/${slug}/admin/sales`) ||
+        pathname.startsWith(`/${slug}/admin/tables`);
       if (isUnauthorizedPath) {
         const target = showQueue ? 'queue' : 'products';
         router.replace(`/${slug}/admin/${target}`);
@@ -111,7 +112,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navLinks = [
     ...(showOrdering ? [{ name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
-    { name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
+    ...(showOrdering ? [{ name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/sales`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),

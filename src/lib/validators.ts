@@ -54,6 +54,7 @@ export function sanitizeText(text: string): string {
 }
 
 export function calculateProductStatus(stock: number, buffer: number): string {
+  if (stock === 0 && buffer === 0) return 'AVAILABLE';
   if (stock <= 0) return 'OUT_OF_STOCK';
   if (stock <= buffer) return 'LOW_STOCK';
   return 'AVAILABLE';

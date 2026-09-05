@@ -169,7 +169,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
   // Stock status calculator
   const stockNum = parseInt(form.stock_quantity) || 0;
   const bufferNum = parseInt(form.buffer_quantity) || 0;
-  const calculatedStatus = stockNum <= 0 ? 'OUT_OF_STOCK' : stockNum <= bufferNum ? 'LOW_STOCK' : 'AVAILABLE';
+  const calculatedStatus = !showOnlineOrdering || (stockNum === 0 && bufferNum === 0) ? 'AVAILABLE' : stockNum <= 0 ? 'OUT_OF_STOCK' : stockNum <= bufferNum ? 'LOW_STOCK' : 'AVAILABLE';
 
   return (
     <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>

@@ -16,6 +16,7 @@ const MODULE_RULES = [
   { pathPrefix: '/queue', module: 'QUEUE_MANAGEMENT' },
   { pathPrefix: '/queue-status', module: 'QUEUE_MANAGEMENT' },
   { pathPrefix: '/admin/queue', module: 'QUEUE_MANAGEMENT' },
+  { pathPrefix: '/admin/tables', module: 'ONLINE_ORDERING' },
   { pathPrefix: '/admin/sales', module: 'ONLINE_ORDERING' },
   { pathPrefix: '/checkout', module: 'ONLINE_ORDERING' },
   { pathPrefix: '/cart', module: 'ONLINE_ORDERING' },

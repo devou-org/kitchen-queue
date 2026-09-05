@@ -536,14 +536,35 @@ export async function createProduct(data: {
   category: string;
   dietary_preference?: string;
 }) {
-  const rows = await sql`
-    INSERT INTO products (restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference)
-    VALUES (${data.restaurant_id}, ${data.name}, ${data.description}, ${data.price}, ${data.image_url}, 
-            ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'})
-    RETURNING *
-  `;
-  return rows[0];
+  try {
+    const rows = await sql`
+      INSERT INTO products (restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference)
+      VALUES (${data.restaurant_id}, ${data.name}, ${data.description}, ${data.price}, ${data.image_url}, 
+              ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'})
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (error: any) {
+    if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''`;
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS dietary_preference VARCHAR(20) DEFAULT 'NON_VEG'`;
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0`;
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS buffer_quantity INTEGER DEFAULT 0`;
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'AVAILABLE'`;
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE`;
+
+      const rows = await sql`
+        INSERT INTO products (restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference)
+        VALUES (${data.restaurant_id}, ${data.name}, ${data.description}, ${data.price}, ${data.image_url}, 
+                ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'})
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    throw error;
+  }
 }
+
 
 export async function updateProduct(restaurantId: string, id: string, data: Partial<{
   name: string;
