@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { ClipboardList, UtensilsCrossed, LogOut } from 'lucide-react';
 import { ServiceToggle } from '@/components/ServiceToggle';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import { AdminLayoutProvider, useAdminLayout } from '@/context/AdminLayoutContext';
+
 function parseToken(token: string) {
   try {
     const base64Url = token.split('.')[1];
@@ -21,13 +23,14 @@ function parseToken(token: string) {
   }
 }
 
-export default function StaffLayout({ children }: { children: React.ReactNode }) {
+function StaffLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { slug } = useParams();
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<{ name: string; role: string; restaurantName?: string; restaurantSlug?: string } | null>(null);
   const { restaurant } = useRestaurant();
+  const { isMaximized } = useAdminLayout();
 
   useEffect(() => {
     const staffToken = localStorage.getItem('staff_token');
@@ -89,76 +92,89 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: '70px' }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: isMaximized ? '0' : '70px', transition: 'padding 0.2s ease' }}>
       <link rel="manifest" href={`/api/manifest?slug=${slug}&type=staff`} />
       {/* Top Header */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50, background: 'var(--card)',
-        padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '1px solid var(--border)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '8px',
-            backgroundColor: '#000000', color: 'white',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, fontSize: '18px', flexShrink: 0,
-            overflow: 'hidden'
-          }}>
-            {restaurant?.logo_url ? (
-              <img
-                src={restaurant?.logo_url}
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              />
-            ) : (
-              staff?.restaurantName
-                ? staff.restaurantName.charAt(0).toUpperCase()
-                : '🌿'
-            )}          </div>
-          <div>
-            <h2 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-              {staff?.restaurantName || 'Staff Portal'}
-            </h2>
-            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginTop: '1px' }}>
-              {staff?.name} • <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{staff?.role}</span>
-            </span>
+      {!isMaximized && (
+        <header style={{
+          position: 'sticky', top: 0, zIndex: 50, background: 'var(--card)',
+          padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          borderBottom: '1px solid var(--border)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '8px',
+              backgroundColor: '#000000', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 800, fontSize: '18px', flexShrink: 0,
+              overflow: 'hidden'
+            }}>
+              {restaurant?.logo_url ? (
+                <img
+                  src={restaurant?.logo_url}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
+              ) : (
+                staff?.restaurantName
+                  ? staff.restaurantName.charAt(0).toUpperCase()
+                  : '🌿'
+              )}
+            </div>
+            <div>
+              <h2 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                {staff?.restaurantName || 'Staff Portal'}
+              </h2>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginTop: '1px' }}>
+                {staff?.name} • <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{staff?.role}</span>
+              </span>
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {/* <ServiceToggle variant="light" /> */}
-          <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, fontSize: '14px' }}>
-            <LogOut size={18} /> <span className="hidden sm:inline">Logout</span>
-          </button>
-        </div>
-      </header>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* <ServiceToggle variant="light" /> */}
+            <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, fontSize: '14px' }}>
+              <LogOut size={18} /> <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
+        </header>
+      )}
 
       <main>
         {children}
       </main>
 
       {/* Bottom Nav for Staff */}
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: 'var(--card)', borderTop: '1px solid var(--border)',
-        display: 'flex', zIndex: 50, height: '64px'
-      }}>
-        {navLinks.map((link) => {
-          const isActive = pathname.startsWith(link.href);
-          return (
-            <Link
-              key={link.name} href={link.href}
-              style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                textDecoration: 'none', gap: '4px'
-              }}
-            >
-              {link.icon}
-              <span style={{ fontSize: '11px', fontWeight: isActive ? 700 : 500 }}>{link.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      {!isMaximized && (
+        <nav style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          background: 'var(--card)', borderTop: '1px solid var(--border)',
+          display: 'flex', zIndex: 50, height: '64px'
+        }}>
+          {navLinks.map((link) => {
+            const isActive = pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.name} href={link.href}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
+                  textDecoration: 'none', gap: '4px'
+                }}
+              >
+                {link.icon}
+                <span style={{ fontSize: '11px', fontWeight: isActive ? 700 : 500 }}>{link.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </div>
+  );
+}
+
+export default function StaffLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AdminLayoutProvider>
+      <StaffLayoutInner>{children}</StaffLayoutInner>
+    </AdminLayoutProvider>
   );
 }

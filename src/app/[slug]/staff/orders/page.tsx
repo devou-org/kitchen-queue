@@ -16,12 +16,14 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapshotModal';
+import { useAdminLayout } from '@/context/AdminLayoutContext';
 
 import { CustomSelect } from '@/components/ui/CustomSelect';
 
 export default function StaffOrders() {
   const { slug } = useParams();
   const { restaurant } = useRestaurant();
+  const { isMaximized } = useAdminLayout();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('PENDING');
@@ -208,7 +210,7 @@ export default function StaffOrders() {
   };
 
   return (
-    <AdminContentWrapper>
+    <AdminContentWrapper fullWidth>
       <AdminPageHeader
         title="Live Orders"
         description="Manage and track active orders coming from staff and tables."
@@ -223,7 +225,7 @@ export default function StaffOrders() {
         }
       />
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: isMaximized ? 'calc(100vh - 130px)' : 'calc(100vh - 210px)', transition: 'min-height 0.2s ease' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: '#F9FAFB' }}>
           <CustomSelect
             value={statusFilter}
@@ -236,11 +238,11 @@ export default function StaffOrders() {
           />
         </div>
 
-        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', minHeight: '300px' }}>
+        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {loading ? (
-            <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+            <div style={{ padding: '80px', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}><div className="loader" /></div>
           ) : (
-            <table>
+            <table style={{ width: '100%', height: orders.length === 0 ? '100%' : 'auto' }}>
               <thead>
                 <tr>
                   <th>Ticket</th>
@@ -251,7 +253,7 @@ export default function StaffOrders() {
               </thead>
               <tbody>
                 {orders.map(order => (
-                  <tr key={order.id} onClick={() => openOrderModal(order)} style={{ cursor: 'pointer' }}>
+                  <tr key={order.id} onClick={() => openOrderModal(order)} style={{ cursor: 'pointer', height: '60px' }}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <strong style={{ color: 'var(--primary)', fontSize: '15px' }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
@@ -277,7 +279,11 @@ export default function StaffOrders() {
                   </tr>
                 ))}
                 {orders.length === 0 && (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No orders found</td></tr>
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '100px 20px', color: 'var(--text-secondary)' }}>
+                      <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-primary)', marginBottom: '4px' }}>No orders found</div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -289,6 +295,7 @@ export default function StaffOrders() {
           totalPages={orders.length < 100 && page === 1 ? 1 : orders.length < 100 ? page : page + 1}
           onPageChange={(p) => setPage(p)}
           totalRecords={orders.length}
+          style={{ marginTop: 'auto' }}
         />
       </div>
 
