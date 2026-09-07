@@ -28,9 +28,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized', debug }, { status: 401 });
   }
 
+  // Cross-tenant verification for staff
+  if (admin.isStaff && admin.restaurantId && admin.restaurantId !== restaurant.id) {
+    return NextResponse.json({ success: false, error: 'Forbidden: Wrong restaurant' }, { status: 403 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'dashboard';
+
+    // Staff role restrictions: Staff can only access kitchen-snapshot
+    if (admin.isStaff && !admin.isAdmin && type !== 'kitchen-snapshot') {
+      return NextResponse.json({ success: false, error: 'Forbidden: Staff access is limited to kitchen snapshot' }, { status: 403 });
+    }
+
     const { date_from, date_to } = getDateRange(request);
 
     if (type === 'dashboard') {
@@ -51,7 +62,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data });
     }
     if (type === 'kitchen-snapshot') {
-      const data = await getKitchenSnapshot(restaurant.id);
+      const bDate = searchParams.get('business_date') || undefined;
+      const data = await getKitchenSnapshot(restaurant.id, bDate);
       return NextResponse.json({ success: true, data });
     }
 

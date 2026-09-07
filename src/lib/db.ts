@@ -1823,9 +1823,9 @@ export async function getDashboardStats(restaurantId: string) {
   };
 }
 
-export async function getKitchenSnapshot(restaurantId: string) {
+export async function getKitchenSnapshot(restaurantId: string, businessDate?: string) {
   const localTimezone = 'Asia/Kolkata';
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
+  const queryDate = businessDate || new Intl.DateTimeFormat('en-CA', { timeZone: localTimezone }).format(new Date());
 
   const rows = await sql`
     SELECT
@@ -1840,7 +1840,7 @@ export async function getKitchenSnapshot(restaurantId: string) {
     JOIN orders o ON oi.order_id = o.id
     JOIN products p ON oi.product_id = p.id
     WHERE o.restaurant_id = ${restaurantId}
-      AND o.business_date = ${today}::date
+      AND o.business_date = ${queryDate}::date
       AND UPPER(o.status) IN ('PENDING', 'PREPARING')
     GROUP BY p.id, p.name, p.category, p.image_url, p.stock_quantity
     ORDER BY p.name ASC

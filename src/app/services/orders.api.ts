@@ -146,7 +146,19 @@ class OrderService {
     }
   }
 
-
+  async getKitchenSnapshot(businessDate?: string): Promise<ApiResponse<any[]>> {
+    try {
+      const url = businessDate 
+        ? `/api/analytics?type=kitchen-snapshot&business_date=${encodeURIComponent(businessDate)}`
+        : '/api/analytics?type=kitchen-snapshot';
+      const res = await fetch(url, {
+        headers: this.getAuthHeaders(),
+      });
+      return await res.json();
+    } catch {
+      return { success: false, error: 'Network error fetching kitchen snapshot' };
+    }
+  }
 
 }
 

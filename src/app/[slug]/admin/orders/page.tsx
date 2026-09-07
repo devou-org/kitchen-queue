@@ -17,6 +17,7 @@ import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
 import { checkTableAssignment } from '@/lib/table-capacity';
+import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapshotModal';
 
 interface OrderUpdateLog {
   id: string;
@@ -47,10 +48,8 @@ export default function AdminOrders() {
   const [paymentMethod, setPaymentMethod] = useState('');
   const ordersRef = useRef<Order[]>([]);
 
-  // Kitchen Snapshot States
+  // Kitchen Snapshot State
   const [showKitchenSnapshot, setShowKitchenSnapshot] = useState(false);
-  const [kitchenSnapshotLoading, setKitchenSnapshotLoading] = useState(false);
-  const [kitchenSnapshot, setKitchenSnapshot] = useState<any[]>([]);
 
   // Live Updates Log
   const [recentUpdates, setRecentUpdates] = useState<OrderUpdateLog[]>([]);
@@ -118,23 +117,6 @@ export default function AdminOrders() {
       localStorage.setItem(`kitchenQueue_liveAdditions_${Array.isArray(slug) ? slug[0] : slug}`, JSON.stringify(updated));
       return updated;
     });
-  };
-
-  const loadKitchenSnapshot = async () => {
-    setShowKitchenSnapshot(true);
-    setKitchenSnapshotLoading(true);
-    try {
-      const res = await adminService.getKitchenSnapshot();
-      if (res.success && res.data) {
-        setKitchenSnapshot(res.data);
-      } else {
-        toast.error('Failed to load kitchen snapshot');
-      }
-    } catch {
-      toast.error('Error loading kitchen snapshot');
-    } finally {
-      setKitchenSnapshotLoading(false);
-    }
   };
 
   const fetchOrders = useCallback(async (silent = false) => {
@@ -365,7 +347,7 @@ export default function AdminOrders() {
         title="Active Order Queue"
         description="Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)"
         action={
-          <button className="btn btn-primary" onClick={loadKitchenSnapshot} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button className="btn btn-primary" onClick={() => setShowKitchenSnapshot(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ChefHat size={18} /> Kitchen Snapshot
           </button>
         }
@@ -800,72 +782,11 @@ export default function AdminOrders() {
         document.body
       )}
 
-      {mounted && showKitchenSnapshot && createPortal(
-        <div className="modal-backdrop" onClick={() => setShowKitchenSnapshot(false)} style={{ alignItems: 'center', zIndex: 1000 }}>
-          <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '95%', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '24px', background: 'rgba(151,19,69,0.1)', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px', color: 'var(--primary)' }}>
-                  <ChefHat size={24} />
-                </span>
-                <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.1 }}>Kitchen Snapshot <span style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 600 }}>(Live)</span></h2>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Current consolidated demand vs available stock.</p>
-                </div>
-              </div>
-              <button onClick={() => setShowKitchenSnapshot(false)} style={{ background: 'none', border: 'none', fontSize: '24px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}>✕</button>
-            </div>
-
-            {kitchenSnapshotLoading ? (
-              <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
-            ) : (
-              <div style={{ marginTop: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px 12px', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ flex: 1, fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ITEM</span>
-                  <div style={{ display: 'flex', gap: '12px', textAlign: 'center', width: '160px', flexShrink: 0 }}>
-                    <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: '#D97706', textTransform: 'uppercase' }}>Pending</span>
-                    <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: '#2563EB', textTransform: 'uppercase' }}>Preparing</span>
-                    <span style={{ flex: 1, fontSize: '10px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Stock</span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {kitchenSnapshot.map((item, idx) => {
-                    const pending = Number(item.pending_qty) || 0;
-                    const preparing = Number(item.preparing_qty) || 0;
-                    const stock = Number(item.current_stock) || 0;
-                    const isLowStock = stock < (pending + preparing);
-
-                    return (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 12px', borderBottom: '1px solid #F3F4F6' }}>
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, paddingRight: '8px' }}>
-                          {item.image_url ? (
-                            <img src={item.image_url} alt={item.product_name} style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: '#F3F4F6', flexShrink: 0 }} />
-                          ) : (
-                            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🍽️</div>
-                          )}
-                          <div style={{ minWidth: 0, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-                            <p style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)', lineHeight: 1.2 }}>{item.product_name}</p>
-                            {isLowStock && <p style={{ fontSize: '10px', color: '#DC2626', fontWeight: 700, marginTop: '2px' }}>⚠️ LOW</p>}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '12px', textAlign: 'center', width: '160px', alignItems: 'center', flexShrink: 0 }}>
-                          <span style={{ flex: 1, fontSize: '18px', fontWeight: 900, color: pending > 0 ? '#D97706' : '#E5E7EB' }}>{pending}</span>
-                          <span style={{ flex: 1, fontSize: '18px', fontWeight: 900, color: '#2563EB' }}>{preparing}</span>
-                          <span style={{ flex: 1, fontSize: '16px', fontWeight: 700, color: isLowStock ? '#DC2626' : 'var(--text-secondary)' }}>{stock}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {kitchenSnapshot.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)', fontSize: '14px' }}>No active demand to display</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
+      <KitchenSnapshotModal
+        isOpen={showKitchenSnapshot}
+        onClose={() => setShowKitchenSnapshot(false)}
+        businessDate={restaurant ? getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time) : undefined}
+      />
     </AdminContentWrapper>
   );
 }

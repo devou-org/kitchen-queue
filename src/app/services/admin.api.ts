@@ -7,14 +7,22 @@ class AdminService {
     const sToken = localStorage.getItem('staff_token');
     const authT = localStorage.getItem('auth_token');
     
-    let token = (aToken && aToken !== 'null' && aToken !== 'undefined') ? aToken : 
-                ((sToken && sToken !== 'null' && sToken !== 'undefined') ? sToken : 
-                ((authT && authT !== 'null' && authT !== 'undefined') ? authT : null));
+    const path = window.location.pathname;
+    let token: string | null = null;
+    if (path.includes('/staff')) {
+      token = (sToken && sToken !== 'null' && sToken !== 'undefined') ? sToken : 
+              ((aToken && aToken !== 'null' && aToken !== 'undefined') ? aToken : null);
+    } else if (path.startsWith('/admin') || path.includes('/admin/')) {
+      token = (aToken && aToken !== 'null' && aToken !== 'undefined') ? aToken : null;
+    } else {
+      token = (aToken && aToken !== 'null' && aToken !== 'undefined') ? aToken : 
+              ((sToken && sToken !== 'null' && sToken !== 'undefined') ? sToken : 
+              ((authT && authT !== 'null' && authT !== 'undefined') ? authT : null));
+    }
     
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const path = window.location.pathname;
     const segments = path.split('/').filter(Boolean);
     let slug = segments[0];
 
@@ -87,9 +95,12 @@ class AdminService {
     }
   }
 
-  async getKitchenSnapshot(): Promise<ApiResponse<any[]>> {
+  async getKitchenSnapshot(businessDate?: string): Promise<ApiResponse<any[]>> {
     try {
-      const res = await fetch('/api/analytics?type=kitchen-snapshot', {
+      const url = businessDate
+        ? `/api/analytics?type=kitchen-snapshot&business_date=${encodeURIComponent(businessDate)}`
+        : '/api/analytics?type=kitchen-snapshot';
+      const res = await fetch(url, {
         headers: this.getAuthHeaders(),
       });
       return await res.json();

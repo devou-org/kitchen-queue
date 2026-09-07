@@ -9,12 +9,13 @@ import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/forma
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { User, Users, StickyNote } from 'lucide-react';
+import { User, Users, StickyNote, ChefHat } from 'lucide-react';
 import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { checkTableAssignment } from '@/lib/table-capacity';
+import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapshotModal';
 
 import { CustomSelect } from '@/components/ui/CustomSelect';
 
@@ -32,6 +33,7 @@ export default function StaffOrders() {
   const [paymentMethod, setPaymentMethod] = useState('');
   const [tempTableNumber, setTempTableNumber] = useState('');
   const [tables, setTables] = useState<any[]>([]);
+  const [showKitchenSnapshot, setShowKitchenSnapshot] = useState(false);
   const ordersRef = useRef<Order[]>([]);
 
   const fetchTables = useCallback(() => {
@@ -210,6 +212,15 @@ export default function StaffOrders() {
       <AdminPageHeader
         title="Live Orders"
         description="Manage and track active orders coming from staff and tables."
+        action={
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowKitchenSnapshot(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <ChefHat size={18} /> Kitchen Snapshot
+          </button>
+        }
       />
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -483,6 +494,12 @@ export default function StaffOrders() {
         </div>,
         document.body
       )}
+
+      <KitchenSnapshotModal
+        isOpen={showKitchenSnapshot}
+        onClose={() => setShowKitchenSnapshot(false)}
+        businessDate={restaurant ? getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time) : undefined}
+      />
     </AdminContentWrapper>
   );
 }
