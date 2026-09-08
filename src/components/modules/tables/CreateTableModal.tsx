@@ -53,7 +53,7 @@ export function CreateTableModal({ isOpen, onClose, onSubmit, loading, primaryCo
           width: '100%',
           maxWidth: '420px',
           background: '#FFFFFF',
-          borderRadius: '20px',
+          borderRadius: '8px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           overflow: 'hidden',
           animation: 'fadeIn 0.2s ease-out'
@@ -97,7 +97,7 @@ export function CreateTableModal({ isOpen, onClose, onSubmit, loading, primaryCo
                 style={{
                   width: '100%',
                   padding: '10px 12px 10px 38px',
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   border: '1px solid #CBD5E1',
                   fontSize: '14px',
                   outline: 'none'
@@ -122,7 +122,7 @@ export function CreateTableModal({ isOpen, onClose, onSubmit, loading, primaryCo
                 style={{
                   width: '100%',
                   padding: '10px 12px 10px 38px',
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   border: '1px solid #CBD5E1',
                   fontSize: '14px',
                   outline: 'none'
@@ -138,7 +138,7 @@ export function CreateTableModal({ isOpen, onClose, onSubmit, loading, primaryCo
               style={{
                 flex: 1,
                 padding: '10px',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 border: '1px solid #CBD5E1',
                 background: '#FFFFFF',
                 color: '#475569',
@@ -155,7 +155,7 @@ export function CreateTableModal({ isOpen, onClose, onSubmit, loading, primaryCo
               style={{
                 flex: 1,
                 padding: '10px',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 border: 'none',
                 background: primaryColor,
                 color: '#FFFFFF',

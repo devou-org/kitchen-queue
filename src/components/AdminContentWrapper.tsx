@@ -17,7 +17,7 @@ export function AdminContentWrapper({ children, className = '', style = {}, full
     <>
       <style>{`
         .admin-wrapper-inner {
-          padding: 32px;
+          padding: 20px 32px;
           max-width: 1200px;
           margin: 0 auto;
           width: 100%;
@@ -27,18 +27,24 @@ export function AdminContentWrapper({ children, className = '', style = {}, full
         .admin-wrapper-inner.full-width {
           max-width: 100% !important;
         }
+        .admin-wrapper-inner.is-maximized {
+          padding: 12px 20px !important;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
         @media (max-width: 768px) {
           .admin-wrapper-inner {
-            padding: 20px 12px;
+            padding: 16px 12px;
           }
         }
         @media (max-width: 640px) {
           .admin-wrapper-inner {
-            padding: 16px 8px;
+            padding: 12px 8px;
           }
         }
       `}</style>
-      <div className={`admin-wrapper-inner animate-fade-in ${shouldBeFullWidth ? 'full-width' : ''} ${className}`} style={style}>
+      <div className={`admin-wrapper-inner animate-fade-in ${shouldBeFullWidth ? 'full-width' : ''} ${isMaximized ? 'is-maximized' : ''} ${className}`} style={style}>
         {children}
       </div>
     </>

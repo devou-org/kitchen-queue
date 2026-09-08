@@ -130,10 +130,7 @@ export default function AdminStatements() {
   return (
     <>
       <AdminContentWrapper>
-        <AdminPageHeader
-          title="Financial Statements"
-          description="Analyze revenue and historical orders. Click any record to view or edit details."
-        />
+        <AdminPageHeader />
 
         {/* Date Range Filter */}
         <div className="card" style={{ marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>

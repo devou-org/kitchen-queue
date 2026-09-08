@@ -109,8 +109,6 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
   return (
     <AdminContentWrapper>
       <AdminPageHeader
-        title="Queue Management"
-        description="Live waitlist for your restaurant."
         action={
           <button
             onClick={() => window.open(`/${restaurant?.slug || restaurantId}/queue-board`, '_blank')}

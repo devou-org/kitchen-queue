@@ -1,23 +1,22 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import Link from 'next/link';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
-import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/format';
+import { getCurrentBusinessDate } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { User, Users, ChefHat, StickyNote } from 'lucide-react';
-import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
+import { ChefHat, Search, X } from 'lucide-react';
+import { OrderTableRow, OrderTableHeader } from '@/components/modules/orders/OrderTableRow';
+import OrderDetailsView from '@/components/modules/orders/OrderDetailsView';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
-import { checkTableAssignment } from '@/lib/table-capacity';
 import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapshotModal';
+import { useAdminLayout } from '@/context/AdminLayoutContext';
 
 interface OrderUpdateLog {
   id: string;
@@ -34,18 +33,15 @@ import { useParams } from 'next/navigation';
 
 export default function AdminOrders() {
   const { slug } = useParams();
+  const { isMaximized } = useAdminLayout();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
   const [readySearch, setReadySearch] = useState('');
   const [page, setPage] = useState(1);
-  const [mounted, setMounted] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
-  const [tempTableNumber, setTempTableNumber] = useState('');
-  const [tempStatus, setTempStatus] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
   const ordersRef = useRef<Order[]>([]);
 
   // Kitchen Snapshot State
@@ -164,10 +160,6 @@ export default function AdminOrders() {
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
     };
   }, [fetchOrders]);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const fetchOrdersDebounced = useCallback((silent = false) => {
     if (fetchDebounceRef.current) {
@@ -297,10 +289,7 @@ export default function AdminOrders() {
             });
         });
         setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number, payment_method: pMethod ?? prev.payment_method } : null);
-        setTempStatus(newStatus);
-
-        // Always close modal after successful update to streamline workflow
-        setTimeout(closeModal, 400);
+        toast.success(`Order updated to ${newStatus}`);
       } else {
         toast.error(data.error || 'Failed to update');
       }
@@ -316,39 +305,136 @@ export default function AdminOrders() {
   const defaultStatus = allStatuses[0] || 'PENDING';
   const activeStatuses = allStatuses.slice(1);
 
-  const readySearchTerm = readySearch.trim().toLowerCase();
-  const displayedOrders = statusFilter === 'READY' && readySearchTerm
+  const queryTerm = readySearch.trim().toLowerCase();
+  const displayedOrders = queryTerm
     ? orders.filter(order => {
-      const ticket = String(order.ticket_number).padStart(3, '0').toLowerCase();
-      const customer = (order.customer_name || '').toLowerCase();
-      const phone = (order.phone || '').toLowerCase();
-      const table = (order.table_number || '').toLowerCase();
-      return ticket.includes(readySearchTerm)
-        || customer.includes(readySearchTerm)
-        || phone.includes(readySearchTerm)
-        || table.includes(readySearchTerm);
-    })
+        const ticket = String(order.ticket_number).padStart(3, '0').toLowerCase();
+        const rawTicket = String(order.ticket_number).toLowerCase();
+        const customer = (order.customer_name || '').toLowerCase();
+        const phone = (order.phone || '').toLowerCase();
+        const table = (order.table_number || '').toLowerCase();
+        const hasItem = (order.items || []).some(item => (item.product_name || '').toLowerCase().includes(queryTerm));
+        return ticket.includes(queryTerm)
+          || rawTicket.includes(queryTerm)
+          || customer.includes(queryTerm)
+          || phone.includes(queryTerm)
+          || table.includes(queryTerm)
+          || hasItem;
+      })
     : orders;
 
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
-    setTempTableNumber(order.table_number || '');
-    setTempStatus(order.status);
-    setPaymentMethod(order.payment_method || '');
   };
   const closeModal = () => {
     setSelectedOrder(null);
-    setTempTableNumber('');
   };
 
   return (
     <AdminContentWrapper fullWidth>
       <AdminPageHeader
-        title="Active Order Queue"
-        description="Live fulfillment for PENDING & PREPARING orders. (READY orders are moved to pickup)"
+        search={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', width: '220px' }}>
+              <Search
+                size={15}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94A3B8',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search ticket, customer, table..."
+                value={readySearch}
+                onChange={(e) => setReadySearch(e.target.value)}
+                style={{
+                  height: '38px',
+                  paddingLeft: '34px',
+                  paddingRight: readySearch ? '30px' : '12px',
+                  fontSize: '13px',
+                  borderRadius: '8px',
+                  background: 'white',
+                  border: '1px solid var(--border)',
+                  width: '100%',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                  outline: 'none',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              {readySearch && (
+                <button
+                  type="button"
+                  onClick={() => setReadySearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    color: '#94A3B8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Status Dropdown (200px) */}
+            <div style={{ width: '200px' }}>
+              <CustomSelect
+                value={statusFilter}
+                onChange={(val) => {
+                  setStatusFilter(val);
+                  setPage(1);
+                }}
+                options={
+                  !statusesLoaded
+                    ? [{ value: '', label: 'Loading...' }]
+                    : [
+                      { value: '', label: defaultStatus },
+                      ...activeStatuses.map((s) => ({ value: s, label: s })),
+                    ]
+                }
+                disabled={!statusesLoaded}
+                buttonStyle={{ height: '38px', fontSize: '13px' }}
+                style={{ width: '200px' }}
+              />
+            </div>
+
+            {/* Order Type Dropdown (200px) */}
+            <div style={{ width: '200px' }}>
+              <OrderTypeFilter
+                value={orderTypeFilter}
+                onChange={(val) => {
+                  setOrderTypeFilter(val);
+                  setPage(1);
+                }}
+                style={{ width: '200px' }}
+                buttonStyle={{ height: '38px', fontSize: '13px' }}
+              />
+            </div>
+          </div>
+        }
         action={
-          <button className="btn btn-primary" onClick={() => setShowKitchenSnapshot(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ChefHat size={18} /> Kitchen Snapshot
+          <button
+            className="btn-minimal"
+            onClick={() => setShowKitchenSnapshot(true)}
+          >
+            <ChefHat size={16} style={{ color: 'var(--primary)' }} /> Kitchen Snapshot
           </button>
         }
       />
@@ -413,128 +499,41 @@ export default function AdminOrders() {
         </div>
       )}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Filter Status</label>
-              <CustomSelect
-                value={statusFilter}
-                onChange={(val) => {
-                  setStatusFilter(val);
-                  setReadySearch('');
-                  setPage(1);
-                }}
-                options={
-                  !statusesLoaded
-                    ? [{ value: '', label: 'Loading...' }]
-                    : [
-                      { value: '', label: defaultStatus },
-                      ...activeStatuses.map((s) => ({ value: s, label: s })),
-                    ]
-                }
-                disabled={!statusesLoaded}
-                buttonStyle={{ height: '42px' }}
-              />
-            </div>
-            <div style={{ minWidth: '180px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Order Type</label>
-              <OrderTypeFilter
-                value={orderTypeFilter}
-                onChange={(val) => {
-                  setOrderTypeFilter(val);
-                  setPage(1);
-                }}
-              />
-            </div>
-            {statusFilter === 'READY' && (
-              <div style={{ flex: 1, minWidth: '220px' }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Search Ready Orders</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Search ticket, customer, phone, table"
-                  value={readySearch}
-                  onChange={(e) => setReadySearch(e.target.value)}
-                  style={{ height: '42px' }}
-                />
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Main Orders Table (always 100% full width, never adjusted or squeezed) */}
+      <div
+        className="card"
+        style={{
+          width: '100%',
+          padding: 0,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: isMaximized ? 1 : undefined,
+          minHeight: isMaximized ? 'calc(100vh - 65px)' : 'calc(100vh - 96px)',
+          transition: 'all 0.2s ease',
+          borderRadius: '8px',
+          border: '1px solid var(--border)',
+          boxShadow: 'none',
+        }}
+      >
 
-        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', minHeight: '580px' }}>
+        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {loading ? (
-            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}><div className="loader" /></div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Ticket</th>
-                  <th>Customer</th>
-                  <th>Persons</th>
-                  <th>Status</th>
-                  <th>Subtotal</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', height: displayedOrders.length === 0 ? '100%' : 'auto' }}>
+              <OrderTableHeader />
               <tbody>
                 {displayedOrders.map(order => (
-                  <tr
+                  <OrderTableRow
                     key={order.id}
+                    order={order}
+                    isSelected={selectedOrder?.id === order.id}
                     onClick={() => openOrderModal(order)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <strong style={{
-                          color: 'var(--primary)',
-                          fontSize: '16px',
-                          transition: 'color 0.4s ease',
-                        }}>#{String(order.ticket_number).padStart(3, '0')}</strong>
-                        <OrderTypeBadge type={order.order_type} />
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDateTime(order.created_at)}</div>
-                      {order.staff_name && (
-                        <div style={{ fontSize: '10px', color: 'white', background: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', fontWeight: 700 }}>
-                          <User size={12} /> {order.staff_name.split(' ')[0]}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.phone}</div>
-                      {order.table_number && (
-                        <div style={{
-                          fontSize: '11px',
-                          color: 'white',
-                          background: 'var(--primary)',
-                          display: 'inline-block',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          marginTop: '4px',
-                          fontWeight: 700
-                        }}>
-                          🪑 TABLE {order.table_number}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <span style={{
-                        fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)',
-                        background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '4px',
-                        display: 'inline-flex', alignItems: 'center', gap: '6px'
-                      }}>
-                        <Users size={14} /> {order.party_size || 1} Party
-                      </span>
-                    </td>
-                    <td><span className={`badge badge-${order.status.toLowerCase()}`}>{order.status}</span></td>
-                    <td style={{ fontWeight: 600 }}>{formatPrice(order.total_price)}</td>
-                    <td><button className="btn btn-ghost btn-sm" style={{ color: 'var(--primary)' }}>View / Edit →</button></td>
-                  </tr>
+                  />
                 ))}
                 {displayedOrders.length === 0 && (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>No active orders found</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '60px', color: '#64748B', fontSize: '14px' }}>No active orders found</td></tr>
                 )}
               </tbody>
             </table>
@@ -546,240 +545,21 @@ export default function AdminOrders() {
           totalPages={orders.length < 100 && page === 1 ? 1 : orders.length < 100 ? page : page + 1}
           onPageChange={(p) => setPage(p)}
           totalRecords={displayedOrders.length}
+          style={{ marginTop: 'auto' }}
         />
       </div>
 
-      {mounted && selectedOrder && createPortal(
-        <div className="modal-backdrop" onClick={closeModal} style={{ alignItems: 'center' }}>
-          <div className="modal-desktop" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h3 style={{ fontSize: '20px', fontWeight: 800 }}>#{String(selectedOrder.ticket_number).padStart(3, '0')}</h3>
-                  <OrderTypeBadge type={selectedOrder.order_type} />
-                  <span className={`badge badge-${selectedOrder.status.toLowerCase()}`}>{selectedOrder.status}</span>
-                  {selectedOrder.table_number && (
-                    <span style={{
-                      fontSize: '12px',
-                      fontWeight: 800,
-                      color: 'white',
-                      background: 'var(--primary)',
-                      padding: '4px 8px',
-                      borderRadius: 'var(--radius-sm)',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      🪑 TABLE {selectedOrder.table_number}
-                    </span>
-                  )}
-                </div>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatDateTime(selectedOrder.created_at)}</p>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                <Link prefetch={false} href={`/${slug}/admin/orders/${selectedOrder.id}/edit`}
-                  className="btn btn-secondary btn-sm"
-                  onClick={closeModal}
-                  style={{
-                    minHeight: '30px',
-                    padding: '0 14px',
-                    fontSize: '10px',
-                    fontWeight: 800,
-                    letterSpacing: '0.02em',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  EDIT ORDER
-                </Link>
-                <button onClick={closeModal} className="modal-close-btn">✕</button>
-              </div>
-            </div>
-
-            <div className="card" style={{ background: '#F9FAFB', padding: '12px 16px', marginBottom: '16px', border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div><p className="label">CUSTOMER</p><p style={{ fontWeight: 700 }}>{selectedOrder.customer_name}</p></div>
-                {selectedOrder.staff_name && (
-                  <div style={{ textAlign: 'center' }}><p className="label">TAKEN BY</p><p style={{ fontWeight: 600, color: 'var(--primary)' }}>{selectedOrder.staff_name.split(' ')[0]}</p></div>
-                )}
-                <div style={{ textAlign: 'right' }}><p className="label">PHONE</p><p style={{ fontWeight: 600 }}>{selectedOrder.phone}</p></div>
-              </div>
-              <p style={{ fontSize: '13px', color: 'var(--info)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Users size={14} /> {selectedOrder.party_size || 1} Party
-              </p>
-              {selectedOrder.notes && <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', fontStyle: 'italic', display: 'flex', alignItems: 'flex-start', gap: '6px' }}><StickyNote size={14} style={{ marginTop: '2px', flexShrink: 0 }} /> <span>{selectedOrder.notes}</span></p>}
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <p className="label">ORDER ITEMS</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {(selectedOrder.items || []).map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'white', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span className="qty-badge">{item.quantity}</span>
-                      <span style={{ fontWeight: 600, fontSize: '14px' }}>{item.product_name}</span>
-                    </div>
-                    <span style={{ fontWeight: 700, fontSize: '14px' }}>{formatPrice(item.price_at_purchase * item.quantity)}</span>
-                  </div>
-                ))}
-              </div>
-              {(selectedOrder.gst_amount && Number(selectedOrder.gst_amount) > 0) ? (
-                <div style={{ marginTop: '8px', borderTop: '2px dashed var(--border)', paddingTop: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                    <span>Subtotal</span>
-                    <span>{formatPrice(selectedOrder.subtotal || (selectedOrder.total_price - selectedOrder.gst_amount))}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                    <span>GST ({selectedOrder.gst_rate || 5}%)</span>
-                    <span>{formatPrice(selectedOrder.gst_amount)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', fontWeight: 800, fontSize: '18px' }}>
-                    <span>Total</span>
-                    <span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', marginTop: '8px', borderTop: '2px dashed var(--border)', fontWeight: 800, fontSize: '18px' }}>
-                  <span>Total</span><span style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total_price)}</span>
-                </div>
-              )}
-            </div>
-
-            <div style={{ background: '#F9FAFB', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-              <div>
-                <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Order Status</p>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <CustomSelect
-                    style={{ flex: 1 }}
-                    value={tempStatus}
-                    disabled={modalLoading}
-                    onChange={(val) => {
-                      setTempStatus(val);
-                      if (val !== 'PAID') {
-                        handleStatusChange(selectedOrder.id, val, tempTableNumber, paymentMethod);
-                      }
-                    }}
-                    options={allStatuses.map((s) => ({ value: s, label: s }))}
-                  />
-                </div>
-                {tempStatus === 'PAID' && (
-                  <div style={{ marginTop: '12px', padding: '12px', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-                    <p style={{ fontWeight: 700, fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>Select Payment Method</p>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <CustomSelect
-                        style={{ flex: 1 }}
-                        value={paymentMethod}
-                        onChange={(val) => setPaymentMethod(val)}
-                        options={[
-                          { value: '', label: 'Choose Method' },
-                          { value: 'UPI', label: 'UPI' },
-                          { value: 'CASH', label: 'Cash' },
-                          { value: 'CARD', label: 'Card' },
-                        ]}
-                      />
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleStatusChange(selectedOrder.id, tempStatus, tempTableNumber, paymentMethod)}
-                        disabled={modalLoading || !paymentMethod || (tempStatus === selectedOrder.status && paymentMethod === (selectedOrder.payment_method || ''))}
-                        style={{ minWidth: '80px', height: '42px' }}
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {(tempStatus === 'PREPARING' || tempStatus === 'PENDING') && (
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-                  <p style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>Assign Table Number</p>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <CustomSelect
-                      style={{ flex: 1 }}
-                      value={tempTableNumber}
-                      onChange={(val) => setTempTableNumber(val)}
-                      options={[
-                        { value: '', label: '-- Select Table --' },
-                        ...tables
-                          .filter((t: any) => {
-                            const partySize = selectedOrder ? (Number(selectedOrder.party_size) || 1) : 1;
-                            const check = checkTableAssignment(t, partySize, {
-                              orderId: selectedOrder?.id,
-                              phone: selectedOrder?.phone,
-                              customerName: selectedOrder?.customer_name,
-                            });
-                            const isCurrent = t.table_number === tempTableNumber;
-                            return check.allowed || isCurrent;
-                          })
-                          .map((t: any) => {
-                            const partySize = selectedOrder ? (Number(selectedOrder.party_size) || 1) : 1;
-                            const check = checkTableAssignment(t, partySize, {
-                              orderId: selectedOrder?.id,
-                              phone: selectedOrder?.phone,
-                              customerName: selectedOrder?.customer_name,
-                            });
-                            const cap = Number(t.capacity) || 0;
-                            const seated = check.occupiedSeats;
-
-                            const rawNum = String(t.table_number || '').trim();
-                            let tableLabel = rawNum;
-                            if (/^\d+$/.test(rawNum)) {
-                              tableLabel = `T${rawNum}`;
-                            } else if (rawNum.toLowerCase().startsWith('t-')) {
-                              tableLabel = `T-${rawNum.slice(2)}`;
-                            } else if (rawNum.toLowerCase().startsWith('t') && !rawNum.toLowerCase().startsWith('table')) {
-                              tableLabel = `T${rawNum.slice(1)}`;
-                            } else if (rawNum.toLowerCase().startsWith('table #')) {
-                              const c = rawNum.slice(7).trim();
-                              tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
-                            } else if (rawNum.toLowerCase().startsWith('table ')) {
-                              const c = rawNum.slice(6).trim();
-                              tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
-                            }
-
-                            const freeSeats = Math.max(0, cap - seated);
-
-                            return {
-                              value: String(t.table_number),
-                              label: `${tableLabel} · ${seated}/${cap} · ${freeSeats} Free`,
-                            };
-                          }),
-                        ...(tempTableNumber && !tables.some((t: any) => t.table_number === tempTableNumber)
-                          ? [{ value: tempTableNumber, label: `T${tempTableNumber}` }]
-                          : []),
-                      ]}
-                    />
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => {
-                        const nextStatus = tempStatus === defaultStatus && activeStatuses.length > 0 ? activeStatuses[0] : tempStatus;
-                        handleStatusChange(selectedOrder.id, nextStatus, tempTableNumber, paymentMethod);
-                      }}
-                      disabled={modalLoading || !tempTableNumber}
-                    >
-                      Update Table
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={closeModal}
-              style={{
-                width: '100%',
-                marginTop: '16px',
-                padding: '12px',
-                background: 'white',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)',
-                fontWeight: 700,
-                color: 'var(--text-secondary)',
-                cursor: 'pointer'
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>,
-        document.body
+      {/* Slide-over Order Details Drawer Overlay */}
+      {selectedOrder && (
+        <OrderDetailsView
+          order={selectedOrder}
+          slug={Array.isArray(slug) ? slug[0] : (slug || '')}
+          tables={tables}
+          allStatuses={allStatuses}
+          onClose={closeModal}
+          onStatusChange={handleStatusChange}
+          loading={modalLoading}
+        />
       )}
 
       <KitchenSnapshotModal

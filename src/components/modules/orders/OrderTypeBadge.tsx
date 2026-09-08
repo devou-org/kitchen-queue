@@ -5,6 +5,7 @@ import { OrderType } from '@/types';
 interface OrderTypeBadgeProps {
   type?: OrderType | string;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'minimal';
   showIcon?: boolean;
   className?: string;
 }
@@ -46,11 +47,33 @@ export function getOrderTypeConfig(type?: string) {
 export default function OrderTypeBadge({
   type = 'DINE_IN',
   size = 'sm',
+  variant = 'default',
   showIcon = true,
   className = '',
 }: OrderTypeBadgeProps) {
   const config = getOrderTypeConfig(type);
   const Icon = config.icon;
+
+  if (variant === 'minimal') {
+    return (
+      <span
+        className={className}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          fontSize: '12px',
+          fontWeight: 500,
+          color: '#334155',
+          whiteSpace: 'nowrap',
+          lineHeight: 1.2,
+        }}
+      >
+        {showIcon && <Icon size={13} style={{ color: '#64748b', flexShrink: 0 }} />}
+        {config.label}
+      </span>
+    );
+  }
 
   const sizeStyles = {
     sm: {
@@ -72,7 +95,7 @@ export default function OrderTypeBadge({
       fontSize: '13px',
       iconSize: 16,
       gap: '6px',
-      borderRadius: '10px',
+      borderRadius: '8px',
     },
   }[size];
 

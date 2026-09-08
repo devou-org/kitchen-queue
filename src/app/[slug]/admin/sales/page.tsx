@@ -123,8 +123,6 @@ export default function AdminInventorySummary() {
   return (
     <AdminContentWrapper>
       <AdminPageHeader
-        title="Sales Summary"
-        description="Detailed sales and revenue performance by item."
         action={
           <Link prefetch={false} href={`/${slug}/admin/products`} className="btn btn-secondary">← Back to Products</Link>
         }
@@ -253,7 +251,7 @@ export default function AdminInventorySummary() {
                       <td>
                         <span style={{
                           padding: '3px 10px',
-                          borderRadius: '20px',
+                          borderRadius: '8px',
                           fontSize: '11px',
                           fontWeight: 700,
                           letterSpacing: '0.05em',

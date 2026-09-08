@@ -91,7 +91,7 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                borderRadius: '12px',
+                borderRadius: '8px',
                 color: 'var(--primary)',
                 flexShrink: 0,
               }}

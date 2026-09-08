@@ -93,6 +93,7 @@ function StaffLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: isMaximized ? '0' : '70px', transition: 'padding 0.2s ease' }}>
+    <div className="staff-layout" style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: isMaximized ? '0' : '70px', transition: 'padding 0.2s ease' }}>
       <link rel="manifest" href={`/api/manifest?slug=${slug}&type=staff`} />
       {/* Top Header */}
       {!isMaximized && (

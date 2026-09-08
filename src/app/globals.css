@@ -23,6 +23,13 @@
   --radius-full: 9999px;
 }
 
+.admin-layout, .staff-layout {
+  --radius: 8px;
+  --radius-sm: 8px;
+  --radius-lg: 8px;
+  --radius-full: 8px;
+}
+
 *,
 *::before,
 *::after {
@@ -116,6 +123,37 @@ body {
 .btn-success {
   background: var(--success);
   color: white;
+}
+
+.btn-minimal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  outline: none;
+}
+
+.btn-minimal:hover:not(:disabled) {
+  background: #F9FAFB;
+  border-color: #CBD5E1;
+  color: var(--text-primary);
+}
+
+.btn-minimal:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-lg {
@@ -657,7 +695,7 @@ tr:hover td {
   color: var(--text-secondary);
   text-decoration: none;
   transition: all 0.2s ease;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .sidebar-link:hover {
@@ -950,12 +988,36 @@ tr:hover td {
   padding: 12px 14px;
   background: #F9FAFB;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   margin-bottom: 20px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .status-toggle-wrapper:hover {
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+.sidebar-logout-btn {
+  width: 100%;
+  color: var(--text-primary);
+  background: #F9FAFB;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: none;
+  outline: none;
+}
+
+.sidebar-logout-btn:hover {
   background: #F3F4F6;
   border-color: #D1D5DB;
 }

@@ -46,7 +46,7 @@ export default function StaffLogin() {
           <div style={{
             width: '80px', height: '80px',
             background: 'white',
-            borderRadius: '20px',
+            borderRadius: '8px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
             boxShadow: '0 8px 16px rgba(0,0,0,0.1)',

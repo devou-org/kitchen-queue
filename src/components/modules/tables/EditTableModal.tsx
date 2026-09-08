@@ -108,7 +108,7 @@ export function EditTableModal({
           width: '100%',
           maxWidth: '440px',
           background: '#FFFFFF',
-          borderRadius: '20px',
+          borderRadius: '8px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           overflow: 'hidden',
           animation: 'fadeIn 0.2s ease-out',
@@ -121,7 +121,7 @@ export function EditTableModal({
               style={{
                 width: '36px',
                 height: '36px',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 background: `${primaryColor}15`,
                 display: 'flex',
                 alignItems: 'center',

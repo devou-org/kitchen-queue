@@ -93,7 +93,7 @@ function TableVisualDiagram({
           style={{
             minWidth: topCount > 2 ? `${topCount * 36}px` : '96px',
             height: '62px',
-            borderRadius: '16px',
+            borderRadius: '8px',
             background: isOccupied ? '#FEF9C3' : '#F8FAFC',
             border: `2px solid ${isOccupied ? '#FDE68A' : `${primaryColor}25`}`,
             display: 'flex',
@@ -165,7 +165,7 @@ export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#
     <div
       style={{
         background: '#FFFFFF',
-        borderRadius: '18px',
+        borderRadius: '8px',
         border: '1px solid #F1F5F9',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
         padding: '18px',
@@ -268,7 +268,7 @@ export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#
       </div>
 
       {isOccupied ? (
-        <div style={{ background: '#FFFBEB', padding: '10px 12px', borderRadius: '10px', border: '1px solid #FEF08A' }}>
+        <div style={{ background: '#FFFBEB', padding: '10px 12px', borderRadius: '8px', border: '1px solid #FEF08A' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '11px', fontWeight: 800, color: '#854D0E', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <ShoppingBag size={13} /> Active Orders ({activeOrders.length})
@@ -307,7 +307,7 @@ export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#
           )}
         </div>
       ) : (
-        <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: '10px', border: '1px solid #F1F5F9', color: '#94A3B8', fontSize: '12px', textAlign: 'center' }}>
+        <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: '8px', border: '1px solid #F1F5F9', color: '#94A3B8', fontSize: '12px', textAlign: 'center' }}>
           No active orders. Ready for guests.
         </div>
       )}

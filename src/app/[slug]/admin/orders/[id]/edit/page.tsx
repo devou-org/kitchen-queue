@@ -374,7 +374,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                           disabled={item.quantity <= 1}
                           style={{
                             width: '40px', height: '40px',
-                            borderRadius: '10px 0 0 10px',
+                            borderRadius: '8px 0 0 8px',
                             border: '1.5px solid var(--border)',
                             borderRight: 'none',
                             background: item.quantity <= 1 ? '#f9fafb' : 'white',
@@ -403,7 +403,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                           disabled={item.quantity >= 99}
                           style={{
                             width: '40px', height: '40px',
-                            borderRadius: '0 10px 10px 0',
+                            borderRadius: '0 8px 8px 0',
                             border: '1.5px solid var(--border)',
                             borderLeft: 'none',
                             background: 'white',

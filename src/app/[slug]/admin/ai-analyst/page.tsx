@@ -8,7 +8,7 @@ export default function AIAnalystPage() {
   return (
     <div style={{ padding: '30px', maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
       <div style={{
-        width: '64px', height: '64px', borderRadius: '20px',
+        width: '64px', height: '64px', borderRadius: '8px',
         background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
         color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
         margin: '40px auto 20px', boxShadow: '0 10px 30px rgba(5, 150, 105, 0.3)'

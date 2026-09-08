@@ -81,10 +81,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             <div style={{ height: '32px', width: '250px', background: '#e2e8f0', borderRadius: '8px', marginBottom: '32px', animation: 'pulse 2s infinite' }} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' }}>
               {[1, 2, 3].map(i => (
-                <div key={i} style={{ height: '120px', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', animation: 'pulse 2s infinite' }} />
+                <div key={i} style={{ height: '120px', background: 'white', borderRadius: '8px', border: '1px solid var(--border)', animation: 'pulse 2s infinite' }} />
               ))}
             </div>
-            <div style={{ height: '500px', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', animation: 'pulse 2s infinite' }} />
+            <div style={{ height: '500px', background: 'white', borderRadius: '8px', border: '1px solid var(--border)', animation: 'pulse 2s infinite' }} />
           </main>
         </div>
       </div>
@@ -123,7 +123,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (restaurant?.billing_status === 'SUSPENDED') {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '20px' }}>
-        <div style={{ background: 'white', padding: '40px', borderRadius: '16px', textAlign: 'center', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+        <div style={{ background: 'white', padding: '40px', borderRadius: '8px', textAlign: 'center', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
           <div style={{ width: '64px', height: '64px', background: '#FEF2F2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
             <AlertTriangle size={32} color="#EF4444" />
           </div>
@@ -224,19 +224,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         <div style={{ padding: '20px', borderTop: '1px solid var(--border)', flexShrink: 0, marginTop: 'auto' }}>
           {(showOrdering || showDigitalMenu) && <ServiceToggle />}
           <button 
-            className="btn" 
-            style={{ 
-              width: '100%', 
-              color: 'var(--text-primary)', 
-              background: '#F9FAFB', 
-              border: '1px solid var(--border)',
-              justifyContent: 'flex-start',
-              fontWeight: 600,
-              fontSize: '14px',
-              padding: '10px 16px',
-              borderRadius: '8px',
-              marginTop: '12px'
-            }}
+            className="sidebar-logout-btn" 
             onClick={handleLogout}
           >
             Log Out →
@@ -256,7 +244,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         {children}
-        <AIAnalystWidget />
+        {!isMaximized && <AIAnalystWidget />}
       </main>
     </div>
     </>

@@ -402,7 +402,7 @@ export default function StaffMenuPage() {
           <button
             className="btn btn-primary"
             onClick={() => setCheckoutOpen(true)}
-            style={{ width: '100%', maxWidth: '400px', borderRadius: '999px', height: '48px', fontSize: '15px', fontWeight: 700, display: 'flex', justifyContent: 'space-between', padding: '0 20px', boxShadow: '0 8px 20px rgba(0,0,0,0.2)' }}
+            style={{ width: '100%', maxWidth: '400px', borderRadius: '8px', height: '48px', fontSize: '15px', fontWeight: 700, display: 'flex', justifyContent: 'space-between', padding: '0 20px', boxShadow: '0 8px 20px rgba(0,0,0,0.2)' }}
           >
             <span>{totalItems} items</span>
             <span>Checkout {formatPrice(totalPrice)}</span>

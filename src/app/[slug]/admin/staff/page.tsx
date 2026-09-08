@@ -111,8 +111,6 @@ export default function StaffAdminPage() {
     <>
     <AdminContentWrapper>
       <AdminPageHeader
-        title="Staff Management"
-        description="Manage your kitchen staff, waiters, and general restaurant operators."
         action={
           <button
             className="btn btn-primary"
@@ -137,7 +135,7 @@ export default function StaffAdminPage() {
       {loading ? (
         <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
       ) : (
-        <div className="card" style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border)', background: 'white' }}>
+        <div className="card" style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border)', background: 'white' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', background: '#F9FAFB' }}>
@@ -232,7 +230,7 @@ export default function StaffAdminPage() {
         overflowY: 'auto'
       }}>
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '24px', borderRadius: '16px', background: 'white', border: '1px solid var(--border)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '24px', borderRadius: '8px', background: 'white', border: '1px solid var(--border)' }}>
           <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
             {editingStaff ? 'Edit Staff Member' : 'Add Staff Member'}
           </h2>

@@ -276,8 +276,6 @@ export default function AdminProducts() {
   return (
     <AdminContentWrapper>
       <AdminPageHeader
-        title="Products Inventory"
-        description="Manage your menu items, categories, and availability."
         action={
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <style dangerouslySetInnerHTML={{ __html: `
@@ -303,7 +301,7 @@ export default function AdminProducts() {
               style={{
                 height: '42px',
                 padding: '0 20px',
-                borderRadius: '9999px',
+                borderRadius: '8px',
                 backgroundColor: aiEnabled ? 'var(--primary, #0f172a)' : '#475569',
                 opacity: aiEnabled ? 1 : 0.6,
                 color: '#ffffff',
@@ -329,7 +327,7 @@ export default function AdminProducts() {
               style={{
                 height: '42px',
                 padding: '0 20px',
-                borderRadius: '9999px',
+                borderRadius: '8px',
                 backgroundColor: 'var(--primary, #0f172a)',
                 color: '#ffffff',
                 border: 'none',
@@ -426,7 +424,7 @@ export default function AdminProducts() {
                             width: '38px',
                             height: '20px',
                             background: p.status === 'AVAILABLE' ? '#10b981' : '#cbd5e1',
-                            borderRadius: '999px',
+                            borderRadius: '8px',
                             transition: 'background-color 0.2s ease',
                             cursor: 'pointer'
                           }}>
@@ -497,7 +495,7 @@ export default function AdminProducts() {
           
           <div style={{
             backgroundColor: '#ffffff',
-            borderRadius: '20px',
+            borderRadius: '8px',
             width: '100%',
             maxWidth: '900px',
             maxHeight: '90vh',
@@ -556,7 +554,7 @@ export default function AdminProducts() {
                   onClick={() => fileInputRef.current?.click()}
                   style={{
                     border: `2px dashed ${isDragOver ? '#0f172a' : '#cbd5e1'}`,
-                    borderRadius: '16px',
+                    borderRadius: '8px',
                     padding: '50px 24px',
                     textAlign: 'center',
                     backgroundColor: isDragOver ? '#f1f5f9' : '#f8fafc',
@@ -574,7 +572,7 @@ export default function AdminProducts() {
                   <div style={{
                     width: '56px',
                     height: '56px',
-                    borderRadius: '14px',
+                    borderRadius: '8px',
                     backgroundColor: '#e2e8f0',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -674,7 +672,7 @@ export default function AdminProducts() {
                     </div>
                   </div>
 
-                  <div style={{ maxHeight: '380px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                  <div style={{ maxHeight: '380px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em' }}>
@@ -772,7 +770,7 @@ export default function AdminProducts() {
                     onClick={() => setAiModalOpen(false)}
                     style={{
                       padding: '10px 18px',
-                      borderRadius: '9999px',
+                      borderRadius: '8px',
                       border: '1px solid #cbd5e1',
                       backgroundColor: '#ffffff',
                       color: '#475569',
@@ -788,7 +786,7 @@ export default function AdminProducts() {
                     disabled={aiSaving}
                     style={{
                       padding: '10px 22px',
-                      borderRadius: '9999px',
+                      borderRadius: '8px',
                       border: 'none',
                       backgroundColor: '#0f172a',
                       color: '#ffffff',
@@ -832,7 +830,7 @@ export default function AdminProducts() {
         }}>
           <div style={{
             backgroundColor: '#f8fafc',
-            borderRadius: '20px',
+            borderRadius: '8px',
             maxWidth: '1050px',
             width: '100%',
             maxHeight: '90vh',
@@ -882,7 +880,7 @@ export default function AdminProducts() {
           <div
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: '10px',
+              borderRadius: '8px',
               maxWidth: '420px',
               width: '100%',
               overflow: 'hidden',

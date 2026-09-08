@@ -142,8 +142,6 @@ export default function AdminTablesPage() {
   return (
     <AdminContentWrapper>
       <AdminPageHeader
-        title="Table Management"
-        description="Create tables with seat capacities, download QR codes, and monitor real-time order timestamps."
         action={
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button
@@ -156,7 +154,7 @@ export default function AdminTablesPage() {
                 justifyContent: 'center',
                 height: '40px',
                 width: '40px',
-                borderRadius: '12px',
+                borderRadius: '8px',
                 border: `1.5px solid ${primaryColor}`,
                 color: primaryColor,
                 background: '#FFFFFF',
@@ -178,7 +176,7 @@ export default function AdminTablesPage() {
                 gap: '6px',
                 background: primaryColor,
                 borderColor: primaryColor,
-                borderRadius: '20px',
+                borderRadius: '8px',
                 padding: '0 18px',
                 fontWeight: 700,
                 boxSizing: 'border-box'
@@ -194,7 +192,7 @@ export default function AdminTablesPage() {
       <div
         style={{
           background: '#FFFFFF',
-          borderRadius: '16px',
+          borderRadius: '8px',
           border: '1px solid #E2E8F0',
           boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
           padding: '12px',
@@ -217,7 +215,7 @@ export default function AdminTablesPage() {
           <div
             style={{
               background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}E6 100%)`,
-              borderRadius: '12px',
+              borderRadius: '8px',
               padding: '16px 20px',
               minWidth: '220px',
               flex: '1 1 220px',
@@ -342,7 +340,7 @@ export default function AdminTablesPage() {
               style={{
                 width: '100%',
                 padding: '8px 32px 8px 36px',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 border: '1.5px solid #E2E8F0',
                 fontSize: '13px',
                 outline: 'none',
@@ -376,7 +374,7 @@ export default function AdminTablesPage() {
           </div>
 
           {/* Seats Summary Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', background: '#F8FAFC', padding: '6px 14px', borderRadius: '20px', border: '1px solid #E2E8F0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', background: '#F8FAFC', padding: '6px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
             <Users size={15} color={primaryColor} />
             <span style={{ color: '#475569', fontWeight: 600 }}>
               Free Seats: <strong style={{ color: totalRemainingSeats > 0 ? '#16A34A' : '#DC2626' }}>{totalRemainingSeats}</strong> / {totalCapacity}

@@ -138,10 +138,10 @@ export default function BillingPage() {
         <div style={{ height: '40px', width: '200px', backgroundColor: '#e2e8f0', borderRadius: '6px', marginBottom: '24px', animation: 'pulse 2s infinite' }} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '30px' }}>
           {[1, 2, 3].map((i) => (
-            <div key={i} style={{ height: '140px', backgroundColor: '#e2e8f0', borderRadius: '12px', animation: 'pulse 2s infinite' }} />
+            <div key={i} style={{ height: '140px', backgroundColor: '#e2e8f0', borderRadius: '8px', animation: 'pulse 2s infinite' }} />
           ))}
         </div>
-        <div style={{ height: '300px', backgroundColor: '#e2e8f0', borderRadius: '12px', animation: 'pulse 2s infinite' }} />
+        <div style={{ height: '300px', backgroundColor: '#e2e8f0', borderRadius: '8px', animation: 'pulse 2s infinite' }} />
       </div>
     );
   }
@@ -202,15 +202,13 @@ export default function BillingPage() {
   return (
     <AdminContentWrapper style={{ fontFamily: 'inherit' }}>
       <AdminPageHeader
-        title="Billing & Invoices"
-        description="Manage subscription tiers, view commission rates, and review past statement logs."
         action={
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
             gap: '8px', 
             padding: '8px 16px', 
-            borderRadius: '9999px', 
+            borderRadius: '8px', 
             backgroundColor: statusStyle.bg, 
             color: statusStyle.text,
             border: `1px solid ${statusStyle.border}`,
@@ -231,7 +229,7 @@ export default function BillingPage() {
         {/* Active Plan Card */}
         <div style={{ 
           backgroundColor: 'white', 
-          borderRadius: '16px', 
+          borderRadius: '8px', 
           border: '1px solid #e5e7eb', 
           padding: '24px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
@@ -277,7 +275,7 @@ export default function BillingPage() {
         {/* OTP Usage & Accrued Charges Card */}
         <div style={{ 
           backgroundColor: 'white', 
-          borderRadius: '16px', 
+          borderRadius: '8px', 
           border: '1px solid #e5e7eb', 
           padding: '24px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
@@ -310,7 +308,7 @@ export default function BillingPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '32px' }}>
         
         {/* Monthly Billing Summaries (Invoices) */}
-        <div style={{ backgroundColor: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Receipt size={18} style={{ color: '#6b7280' }} />

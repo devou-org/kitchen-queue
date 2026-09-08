@@ -20,6 +20,7 @@ export interface CustomSelectProps<T = string> {
   dropdownStyle?: React.CSSProperties;
   iconColor?: string;
   defaultIcon?: React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>;
+  direction?: 'down' | 'up' | 'auto';
 }
 
 export function CustomSelect<T extends string = string>({
@@ -34,9 +35,26 @@ export function CustomSelect<T extends string = string>({
   dropdownStyle = {},
   iconColor = 'var(--primary)',
   defaultIcon: DefaultIcon,
+  direction = 'down',
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [computedDirection, setComputedDirection] = useState<'down' | 'up'>(
+    direction === 'up' ? 'up' : 'down'
+  );
+
+  useEffect(() => {
+    if (direction === 'up') {
+      setComputedDirection('up');
+    } else if (direction === 'down') {
+      setComputedDirection('down');
+    } else if (direction === 'auto' && isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setComputedDirection(spaceBelow < 260 && spaceAbove > spaceBelow ? 'up' : 'down');
+    }
+  }, [isOpen, direction]);
 
   const selectedOption = options.find((opt) => opt.value === value) || (options.length > 0 ? options[0] : null);
   const OptionIcon = selectedOption?.icon || DefaultIcon;
@@ -99,16 +117,18 @@ export function CustomSelect<T extends string = string>({
         <div
           style={{
             position: 'absolute',
-            top: 'calc(100% + 4px)',
+            ...(computedDirection === 'up'
+              ? { bottom: 'calc(100% + 4px)', top: 'auto', boxShadow: '0 -10px 25px -5px rgba(0, 0, 0, 0.1), 0 -8px 10px -6px rgba(0, 0, 0, 0.05)' }
+              : { top: 'calc(100% + 4px)', bottom: 'auto', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)' }
+            ),
             left: 0,
             right: 0,
             zIndex: 100,
             background: 'white',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-sm, 8px)',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
             overflowY: 'auto',
-            maxHeight: '260px',
+            maxHeight: '340px',
             padding: '4px',
             ...dropdownStyle,
           }}

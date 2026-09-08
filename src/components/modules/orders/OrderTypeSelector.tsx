@@ -62,7 +62,7 @@ export default function OrderTypeSelector({
           gap: '8px',
           background: 'rgba(0, 0, 0, 0.04)',
           padding: '4px',
-          borderRadius: '14px',
+          borderRadius: '8px',
         }}
       >
         {typesToRender.map((t) => {
@@ -81,7 +81,7 @@ export default function OrderTypeSelector({
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '12px 8px',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 border: 'none',
                 background: isSelected ? 'white' : 'transparent',
                 color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',

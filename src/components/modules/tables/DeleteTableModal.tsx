@@ -55,7 +55,7 @@ export function DeleteTableModal({
           width: '100%',
           maxWidth: '400px',
           background: '#FFFFFF',
-          borderRadius: '20px',
+          borderRadius: '8px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           overflow: 'hidden',
           animation: 'fadeIn 0.2s ease-out'
@@ -74,7 +74,7 @@ export function DeleteTableModal({
             <div style={{
               width: '34px',
               height: '34px',
-              borderRadius: '10px',
+              borderRadius: '8px',
               background: isOccupied ? '#FEF2F2' : '#FEE2E2',
               color: '#EF4444',
               display: 'flex',
@@ -118,7 +118,7 @@ export function DeleteTableModal({
             <div style={{
               padding: '14px',
               background: '#FFFBEB',
-              borderRadius: '12px',
+              borderRadius: '8px',
               border: '1px solid #FDE68A',
               display: 'flex',
               alignItems: 'flex-start',
@@ -148,7 +148,7 @@ export function DeleteTableModal({
               style={{
                 flex: 1,
                 padding: '10px 14px',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 border: '1px solid #CBD5E1',
                 background: '#FFFFFF',
                 color: '#475569',
@@ -168,7 +168,7 @@ export function DeleteTableModal({
                 style={{
                   flex: 1,
                   padding: '10px 14px',
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   border: 'none',
                   background: '#DC2626',
                   color: '#FFFFFF',

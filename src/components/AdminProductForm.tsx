@@ -218,13 +218,13 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             <Link 
               prefetch={false} 
               href={`/${slug}/admin/products`}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#475569', textDecoration: 'none', transition: 'all 0.2s ease' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#475569', textDecoration: 'none', transition: 'all 0.2s ease' }}
               title="Back to Products"
             >
               <ArrowLeft size={18} />
             </Link>
           ) : (
-            <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <UtensilsCrossed size={20} />
             </div>
           )}
@@ -244,7 +244,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             onClick={handleCancelClick}
             style={{
               padding: '10px 18px',
-              borderRadius: '10px',
+              borderRadius: '8px',
               border: '1px solid #cbd5e1',
               backgroundColor: '#ffffff',
               color: '#334155',
@@ -263,7 +263,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               alignItems: 'center',
               gap: '8px',
               padding: '10px 22px',
-              borderRadius: '10px',
+              borderRadius: '8px',
               border: 'none',
               backgroundColor: 'var(--primary, #0f172a)',
               color: '#ffffff',
@@ -288,7 +288,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 justifyContent: 'center',
                 width: '38px',
                 height: '38px',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 backgroundColor: '#f1f5f9',
                 border: '1px solid #cbd5e1',
                 color: '#475569',
@@ -310,7 +310,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
         {/* Left Column: Basic Details & Pricing */}
         <div className="form-col-left">
           {/* Card 1: Basic Information */}
-        <div className="form-card-basic" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div className="form-card-basic" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ChefHat size={18} />
@@ -332,7 +332,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 style={{
                   width: '100%',
                   padding: '10px 14px',
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   border: '1px solid #cbd5e1',
                   fontSize: '14px',
                   color: '#0f172a',
@@ -363,7 +363,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 style={{
                   width: '100%',
                   padding: '10px 14px',
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   border: '1px solid #cbd5e1',
                   fontSize: '14px',
                   color: '#0f172a',
@@ -381,7 +381,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               </select>
 
               {showAddCategory && (
-                <div style={{ marginTop: '10px', display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
+                <div style={{ marginTop: '10px', display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
                   <input
                     type="text"
                     value={newCategoryName}
@@ -414,7 +414,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 style={{
                   width: '100%',
                   padding: '10px 14px',
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   border: '1px solid #cbd5e1',
                   fontSize: '13px',
                   color: '#0f172a',
@@ -429,7 +429,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
         </div>
 
         {/* Card 3: Pricing & Dietary Classification */}
-        <div className="form-card-pricing" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div className="form-card-pricing" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Tag size={18} />
@@ -456,7 +456,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   style={{
                     width: '100%',
                     padding: '10px 14px 10px 32px',
-                    borderRadius: '10px',
+                    borderRadius: '8px',
                     border: '1px solid #cbd5e1',
                     fontSize: '15px',
                     fontWeight: 600,
@@ -479,7 +479,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   onClick={() => setForm(f => ({ ...f, dietary_preference: 'VEG' }))}
                   style={{
                     padding: '12px 14px',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     border: form.dietary_preference === 'VEG' ? '2px solid #16a34a' : '1px solid #e2e8f0',
                     backgroundColor: form.dietary_preference === 'VEG' ? '#f0fdf4' : '#ffffff',
                     cursor: 'pointer',
@@ -503,7 +503,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   onClick={() => setForm(f => ({ ...f, dietary_preference: 'NON_VEG' }))}
                   style={{
                     padding: '12px 14px',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     border: form.dietary_preference === 'NON_VEG' ? '2px solid #dc2626' : '1px solid #e2e8f0',
                     backgroundColor: form.dietary_preference === 'NON_VEG' ? '#fef2f2' : '#ffffff',
                     cursor: 'pointer',
@@ -532,7 +532,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
       <div className="form-col-right">
           {/* Card 2: Inventory & Stock Control */}
         {showOnlineOrdering && (
-          <div className="form-card-inventory" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div className="form-card-inventory" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -545,7 +545,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               <span
                 style={{
                   padding: '4px 10px',
-                  borderRadius: '9999px',
+                  borderRadius: '8px',
                   fontSize: '11px',
                   fontWeight: 700,
                   backgroundColor: calculatedStatus === 'AVAILABLE' ? '#dcfce7' : calculatedStatus === 'LOW_STOCK' ? '#fef9c3' : '#fee2e2',
@@ -568,7 +568,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))}
                   placeholder="0"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
                 />
               </div>
 
@@ -583,7 +583,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))}
                   placeholder="0"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
                 />
               </div>
             </div>
@@ -591,7 +591,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
         )}
 
         {/* Card 4: Product Image Card */}
-        <div className="form-card-image" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div className="form-card-image" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ImageIcon size={18} />
@@ -608,20 +608,20 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               value={form.image_url}
               onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
               placeholder="https://images.unsplash.com/..."
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none' }}
+              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none' }}
             />
           </div>
         </div>
 
         {/* Card 5: Live Customer Menu Preview Card */}
-        <div className="form-card-preview" style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div className="form-card-preview" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
             <Eye size={16} style={{ color: '#64748b' }} />
             <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Live Menu Card Preview</span>
           </div>
 
           {/* Menu Card Mock */}
-          <div style={{ borderRadius: '14px', border: '1px solid #f1f5f9', backgroundColor: '#fafafa', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
+          <div style={{ borderRadius: '8px', border: '1px solid #f1f5f9', backgroundColor: '#fafafa', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
             
             {/* Card Image Display */}
             <div style={{ width: '100%', height: '160px', backgroundColor: '#f1f5f9', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
@@ -640,7 +640,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               )}
 
               {/* Category Pill Tag */}
-              <div style={{ position: 'absolute', top: '10px', left: '10px', padding: '4px 10px', borderRadius: '9999px', backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', color: '#ffffff', fontSize: '11px', fontWeight: 600 }}>
+              <div style={{ position: 'absolute', top: '10px', left: '10px', padding: '4px 10px', borderRadius: '8px', backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', color: '#ffffff', fontSize: '11px', fontWeight: 600 }}>
                 {form.category || 'Category'}
               </div>
             </div>

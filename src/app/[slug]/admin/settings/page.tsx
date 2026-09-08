@@ -257,10 +257,7 @@ export default function AdminSettings() {
 
   return (
     <AdminContentWrapper style={{ paddingBottom: '100px' }}>
-      <AdminPageHeader
-        title="Settings & Branding"
-        description="Manage your restaurant profile, business hours, and visual theme."
-      />
+      <AdminPageHeader />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', alignItems: 'start' }}>
         {/* Left Panel: Profile Configurations */}
@@ -358,7 +355,7 @@ export default function AdminSettings() {
                 <button
                   type="button" onClick={() => setMenuLayout('LIST')}
                   style={{
-                    padding: '12px', borderRadius: '10px',
+                    padding: '12px', borderRadius: '8px',
                     border: menuLayout === 'LIST' ? '2px solid #10b981' : '1px solid #cbd5e1',
                     background: menuLayout === 'LIST' ? '#ecfdf5' : '#ffffff',
                     color: menuLayout === 'LIST' ? '#047857' : '#334155',
@@ -372,7 +369,7 @@ export default function AdminSettings() {
                 <button
                   type="button" onClick={() => setMenuLayout('GRID')}
                   style={{
-                    padding: '12px', borderRadius: '10px',
+                    padding: '12px', borderRadius: '8px',
                     border: menuLayout === 'GRID' ? '2px solid #10b981' : '1px solid #cbd5e1',
                     background: menuLayout === 'GRID' ? '#ecfdf5' : '#ffffff',
                     color: menuLayout === 'GRID' ? '#047857' : '#334155',
@@ -386,7 +383,7 @@ export default function AdminSettings() {
             </div>
 
             {/* Geo-Location & AI Business Context */}
-            <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
                   <label style={{ ...S.label, margin: 0, display: 'flex', alignItems: 'center', gap: '6px', color: '#0f172a' }}>
@@ -470,7 +467,7 @@ export default function AdminSettings() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div>
                 <label style={S.label}>Timezone</label>
                 <select
@@ -513,7 +510,7 @@ export default function AdminSettings() {
             </div>
 
             {/* Theme Colors Configuration */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div>
                 <label style={S.label}>Primary Color</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
@@ -687,7 +684,7 @@ export default function AdminSettings() {
             </h2>
             <p style={S.cardDesc}>Real-time visual rendering of how customers see the menu header.</p>
 
-            <div style={{ marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+            <div style={{ marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
               {/* Header Mockup */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
                 {logoUrl ? (

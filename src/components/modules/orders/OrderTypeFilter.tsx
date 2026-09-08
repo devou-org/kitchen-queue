@@ -8,6 +8,7 @@ interface OrderTypeFilterProps {
   style?: React.CSSProperties;
   className?: string;
   disabled?: boolean;
+  buttonStyle?: React.CSSProperties;
 }
 
 const OPTIONS = [
@@ -22,6 +23,7 @@ export default function OrderTypeFilter({
   style,
   className,
   disabled = false,
+  buttonStyle = {},
 }: OrderTypeFilterProps) {
   return (
     <CustomSelect
@@ -31,6 +33,7 @@ export default function OrderTypeFilter({
       style={style}
       className={className}
       disabled={disabled}
+      buttonStyle={buttonStyle}
     />
   );
 }
