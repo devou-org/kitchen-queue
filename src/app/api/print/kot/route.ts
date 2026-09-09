@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { getRestaurantBySlug, getOrderById } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { buildKotEscposBuffer, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
+import { buildKotEscposBuffer, sendRawPrintToWindowsPrinter, KotPrintData } from '@/lib/escpos';
 
 async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
   const admin = await requireAdmin(request);
@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
 
     const targetPrinter = printerName?.trim() || process.env.KOT_PRINTER_NAME || 'POS-80C';
     const restaurantName = restaurant.name || 'QDINE';
+    const isWindows = process.platform === 'win32';
 
     // Group items or filter by counter
     const isAllCounters = !counterName || counterName.toUpperCase() === 'ALL' || counterName === '*';
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const buffer = buildKotEscposBuffer({
+      const kotData: KotPrintData = {
         restaurantName,
         ticketNumber: order.ticket_number,
         orderType: order.order_type,
@@ -90,36 +91,45 @@ export async function POST(request: NextRequest) {
         counterName: counterName,
         items: filteredItems,
         notes: order.notes,
-      });
+      };
 
-      const printResult = await sendRawPrintToWindowsPrinter(
-        targetPrinter,
-        buffer,
-        `KOT #${order.ticket_number} - ${counterName}`
-      );
+      const buffer = buildKotEscposBuffer(kotData);
+      const base64Bytes = buffer.toString('base64');
 
-      if (!printResult.success) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: printResult.error || `Failed to print to ${targetPrinter}`,
-            printer: targetPrinter,
-          },
-          { status: 500 }
+      // If on Windows server with local printer attached, attempt direct raw print
+      if (isWindows) {
+        const printResult = await sendRawPrintToWindowsPrinter(
+          targetPrinter,
+          buffer,
+          `KOT #${order.ticket_number} - ${counterName}`
         );
+
+        if (printResult.success) {
+          return NextResponse.json({
+            success: true,
+            mode: 'server',
+            message: `KOT printed for ${counterName}`,
+            printer: targetPrinter,
+            itemCount: filteredItems.length,
+          });
+        }
       }
 
+      // Hosted in Cloud (Linux) or local printer fallback -> client-side print
       return NextResponse.json({
         success: true,
-        message: `KOT printed for ${counterName}`,
+        mode: 'client',
+        message: `KOT ready for ${counterName}`,
         printer: targetPrinter,
+        kotData,
+        base64Bytes,
         itemCount: filteredItems.length,
       });
     }
 
     // Printing ALL counters
     if (separateSlips) {
-      // Group items by counter and print a separate slip for each counter
+      // Group items by counter and prepare slips
       const counterMap: Record<string, any[]> = {};
       for (const item of allItems) {
         const c = (item.counter || 'Unassigned').trim();
@@ -127,11 +137,10 @@ export async function POST(request: NextRequest) {
         counterMap[c].push(item);
       }
 
-      const printedCounters: string[] = [];
-      const errors: string[] = [];
+      const slips: Array<{ kotData: KotPrintData; base64Bytes: string }> = [];
 
       for (const [cName, cItems] of Object.entries(counterMap)) {
-        const buffer = buildKotEscposBuffer({
+        const kotData: KotPrintData = {
           restaurantName,
           ticketNumber: order.ticket_number,
           orderType: order.order_type,
@@ -143,38 +152,47 @@ export async function POST(request: NextRequest) {
           counterName: cName,
           items: cItems,
           notes: order.notes,
+        };
+
+        const buffer = buildKotEscposBuffer(kotData);
+        slips.push({
+          kotData,
+          base64Bytes: buffer.toString('base64'),
         });
+      }
 
-        const printResult = await sendRawPrintToWindowsPrinter(
-          targetPrinter,
-          buffer,
-          `KOT #${order.ticket_number} - ${cName}`
-        );
-
-        if (printResult.success) {
-          printedCounters.push(cName);
-        } else {
-          errors.push(`${cName}: ${printResult.error}`);
+      if (isWindows) {
+        let printedCount = 0;
+        for (const slip of slips) {
+          const res = await sendRawPrintToWindowsPrinter(
+            targetPrinter,
+            Buffer.from(slip.base64Bytes, 'base64'),
+            `KOT #${order.ticket_number} - ${slip.kotData.counterName}`
+          );
+          if (res.success) printedCount++;
+        }
+        if (printedCount > 0) {
+          return NextResponse.json({
+            success: true,
+            mode: 'server',
+            message: `KOT printed for ${printedCount} counter(s)`,
+            printer: targetPrinter,
+          });
         }
       }
 
-      if (printedCounters.length === 0 && errors.length > 0) {
-        return NextResponse.json(
-          { success: false, error: errors.join(', '), printer: targetPrinter },
-          { status: 500 }
-        );
-      }
-
+      // Cloud / client fallback for all slips
       return NextResponse.json({
         success: true,
-        message: `KOT printed for ${printedCounters.length} counter(s): ${printedCounters.join(', ')}`,
+        mode: 'client',
+        message: `KOT ready for all counters`,
         printer: targetPrinter,
-        partialErrors: errors.length > 0 ? errors : undefined,
+        slips,
       });
     }
 
     // Default: Single unified Master KOT with all items
-    const buffer = buildKotEscposBuffer({
+    const kotData: KotPrintData = {
       restaurantName,
       ticketNumber: order.ticket_number,
       orderType: order.order_type,
@@ -186,29 +204,36 @@ export async function POST(request: NextRequest) {
       counterName: 'ALL ITEMS',
       items: allItems,
       notes: order.notes,
-    });
+    };
 
-    const printResult = await sendRawPrintToWindowsPrinter(
-      targetPrinter,
-      buffer,
-      `KOT #${order.ticket_number} - ALL`
-    );
+    const buffer = buildKotEscposBuffer(kotData);
+    const base64Bytes = buffer.toString('base64');
 
-    if (!printResult.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: printResult.error || `Failed to print to ${targetPrinter}`,
-          printer: targetPrinter,
-        },
-        { status: 500 }
+    if (isWindows) {
+      const printResult = await sendRawPrintToWindowsPrinter(
+        targetPrinter,
+        buffer,
+        `KOT #${order.ticket_number} - ALL`
       );
+
+      if (printResult.success) {
+        return NextResponse.json({
+          success: true,
+          mode: 'server',
+          message: `Master KOT printed for all items`,
+          printer: targetPrinter,
+          itemCount: allItems.length,
+        });
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: `Master KOT printed for all items`,
+      mode: 'client',
+      message: `Master KOT ready for all items`,
       printer: targetPrinter,
+      kotData,
+      base64Bytes,
       itemCount: allItems.length,
     });
   } catch (error: any) {
@@ -219,4 +244,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

@@ -25,6 +25,7 @@ import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { checkTableAssignment } from '@/lib/table-capacity';
+import { printKotFromBrowser } from '@/lib/client-print';
 
 interface OrderDetailsViewProps {
   order: Order;
@@ -161,10 +162,10 @@ export function OrderDetailsView({
     setPrintMenuOpen(false);
     const toastId = toast.loading(
       counterName && counterName !== 'ALL'
-        ? `Printing KOT for ${counterName}...`
+        ? `Preparing KOT for ${counterName}...`
         : separateSlips
-        ? `Printing ${uniqueCounters.length} KOT slips...`
-        : `Printing Master KOT...`
+        ? `Preparing ${uniqueCounters.length} KOT slips...`
+        : `Preparing Master KOT...`
     );
 
     try {
@@ -188,7 +189,36 @@ export function OrderDetailsView({
         throw new Error(data.error || 'Failed to print KOT');
       }
 
-      toast.success(data.message || 'KOT sent to printer POS-80C!', { id: toastId });
+      // If server handled it directly (e.g. running on local Windows machine)
+      if (data.mode === 'server') {
+        toast.success(data.message || 'KOT printed to POS-80C!', { id: toastId });
+        return;
+      }
+
+      // Cloud hosted: Print via local bridge (silent) or 80mm browser thermal driver
+      if (data.slips && Array.isArray(data.slips)) {
+        for (const slip of data.slips) {
+          await printKotFromBrowser({
+            kotData: slip.kotData,
+            base64Bytes: slip.base64Bytes,
+            printerName: data.printer || 'POS-80C',
+          });
+        }
+        toast.success(`KOT printed for ${data.slips.length} counter(s)!`, { id: toastId });
+      } else if (data.kotData) {
+        const clientRes = await printKotFromBrowser({
+          kotData: data.kotData,
+          base64Bytes: data.base64Bytes,
+          printerName: data.printer || 'POS-80C',
+        });
+        if (clientRes.method === 'bridge') {
+          toast.success(clientRes.message || 'KOT sent to POS-80C!', { id: toastId });
+        } else {
+          toast.success('KOT thermal ticket printed!', { id: toastId });
+        }
+      } else {
+        toast.success('Print job completed', { id: toastId });
+      }
     } catch (err: any) {
       console.error('KOT print error:', err);
       toast.error(err.message || 'Print job failed. Check printer connection.', { id: toastId, duration: 4500 });
