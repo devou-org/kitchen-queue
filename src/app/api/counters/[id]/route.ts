@@ -18,15 +18,14 @@ async function resolveRestaurantId(request: NextRequest): Promise<string | null>
   return null;
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const restaurantId = await resolveRestaurantId(request);
     if (!restaurantId) {
       return NextResponse.json({ success: false, error: 'Restaurant not found or unauthorized' }, { status: 401 });
     }
 
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const { id } = await params;
     const data = await request.json();
 
     const updated = await updateCounter(restaurantId, id, data);
@@ -37,15 +36,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const restaurantId = await resolveRestaurantId(request);
     if (!restaurantId) {
       return NextResponse.json({ success: false, error: 'Restaurant not found or unauthorized' }, { status: 401 });
     }
 
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const { id } = await params;
     const deleted = await deleteCounter(restaurantId, id);
     return NextResponse.json({ success: true, data: { deleted } });
   } catch (error: any) {
