@@ -161,15 +161,27 @@ export function OrderDetailsView({
         .order-details-drawer.closing {
           animation: orderDrawerSlideOut 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
         }
+        .order-details-body,
+        .order-details-drawer {
+          scrollbar-width: thin;
+          scrollbar-color: #94A3B8 #F8FAFC;
+        }
+        .order-details-body::-webkit-scrollbar,
         .order-details-drawer::-webkit-scrollbar {
-          width: 5px;
+          width: 8px;
         }
+        .order-details-body::-webkit-scrollbar-track,
+        .order-details-drawer::-webkit-scrollbar-track {
+          background: #F8FAFC;
+        }
+        .order-details-body::-webkit-scrollbar-thumb,
         .order-details-drawer::-webkit-scrollbar-thumb {
-          background: #E2E8F0;
-          border-radius: 4px;
+          background: #94A3B8;
+          border-radius: 6px;
         }
+        .order-details-body::-webkit-scrollbar-thumb:hover,
         .order-details-drawer::-webkit-scrollbar-thumb:hover {
-          background: #CBD5E1;
+          background: #64748B;
         }
         @media (max-width: 480px) {
           .order-details-drawer {
@@ -220,7 +232,7 @@ export function OrderDetailsView({
           boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.16)',
           display: 'flex',
           flexDirection: 'column',
-          overflowY: 'auto',
+          overflow: 'hidden',
           borderRadius: 0,
           border: 'none',
           borderLeft: '1px solid #E2E8F0',
@@ -229,12 +241,10 @@ export function OrderDetailsView({
           boxSizing: 'border-box',
         }}
       >
-        {/* 1. STICKY HEADER */}
+        {/* 1. FIXED HEADER */}
         <div
           style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
+            flexShrink: 0,
             background: 'white',
             padding: '20px',
             borderBottom: '1px solid var(--border)',
@@ -242,6 +252,7 @@ export function OrderDetailsView({
             justifyContent: 'space-between',
             alignItems: 'flex-start',
             gap: '16px',
+            zIndex: 10,
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -333,8 +344,19 @@ export function OrderDetailsView({
         </div>
       </div>
 
-      {/* 2. VERTICAL CONTENT STACK */}
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      {/* 2. SCROLLABLE CONTENT BODY */}
+      <div
+        className="order-details-body"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingBottom: '80px',
+        }}
+      >
 
         {/* SECTION: CUSTOMER DETAILS */}
         <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9' }}>

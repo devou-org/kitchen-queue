@@ -19,6 +19,11 @@ export function LayoutMaximizeToggle({ className = '', style = {}, showText = fa
           opacity: 0.9;
           transform: translateY(-1px);
         }
+        @media (max-width: 768px) {
+          .layout-maximize-toggle-btn {
+            display: none !important;
+          }
+        }
       `}</style>
       <button
         onClick={toggleMaximize}
