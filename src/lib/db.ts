@@ -6,6 +6,7 @@ export default function sql(strings: TemplateStringsArray, ...values: any[]) {
   const text = strings.reduce((prev, curr, i) => prev + '$' + i + curr);
   return pool.query(text, values).then(res => res.rows);
 }
+export { sql };
 
 // ============================================
 // RESTAURANT & MODULE QUERIES

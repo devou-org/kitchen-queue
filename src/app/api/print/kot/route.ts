@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRestaurantBySlug, getOrderById, sql } from '@/lib/db';
+import sql, { getRestaurantBySlug, getOrderById } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { buildKotEscposBuffer, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
 
