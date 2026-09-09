@@ -122,7 +122,29 @@ async function runAutoMigration(sqlConnection: any) {
     await sqlConnection`
       CREATE INDEX IF NOT EXISTS idx_orders_table_session ON orders(table_session_id);
     `;
-    console.log("Auto-migrated menu, GST, AI analyst chat, and Table Management/Analytics columns/tables successfully!");
+    await sqlConnection`
+      CREATE TABLE IF NOT EXISTS print_jobs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          order_id UUID NULL,
+          ticket_number INT,
+          counter_name VARCHAR(100),
+          printer_name VARCHAR(100) DEFAULT 'POS-80C',
+          raw_base64 TEXT NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          printed_at TIMESTAMPTZ NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(restaurant_id, status, created_at);
+
+      CREATE TABLE IF NOT EXISTS print_agent_heartbeats (
+          restaurant_id UUID PRIMARY KEY REFERENCES restaurants(id) ON DELETE CASCADE,
+          printer_name VARCHAR(100) DEFAULT 'POS-80C',
+          ip_address VARCHAR(100),
+          last_heartbeat TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    console.log("Auto-migrated menu, GST, AI analyst chat, tables, and print_jobs successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
@@ -2194,4 +2216,119 @@ export async function autoCloseRestaurants() {
     client.release();
   }
 }
+
+// ============================================
+// CLOUD PRINT JOBS & AGENT HEARTBEAT QUERIES
+// ============================================
+
+export async function createPrintJob(restaurantId: string, data: {
+  order_id?: string;
+  ticket_number?: number;
+  counter_name?: string;
+  printer_name?: string;
+  raw_base64: string;
+}) {
+  try {
+    const rows = await sql`
+      INSERT INTO print_jobs (restaurant_id, order_id, ticket_number, counter_name, printer_name, raw_base64, status)
+      VALUES (${restaurantId}, ${data.order_id || null}, ${data.ticket_number || null}, ${data.counter_name || null}, ${data.printer_name || 'POS-80C'}, ${data.raw_base64}, 'PENDING')
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      const rows = await sql`
+        INSERT INTO print_jobs (restaurant_id, order_id, ticket_number, counter_name, printer_name, raw_base64, status)
+        VALUES (${restaurantId}, ${data.order_id || null}, ${data.ticket_number || null}, ${data.counter_name || null}, ${data.printer_name || 'POS-80C'}, ${data.raw_base64}, 'PENDING')
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    throw err;
+  }
+}
+
+export async function getPendingPrintJobs(restaurantId: string) {
+  try {
+    const rows = await sql`
+      SELECT * FROM print_jobs
+      WHERE restaurant_id = ${restaurantId} AND status = 'PENDING'
+      ORDER BY created_at ASC
+      LIMIT 10
+    `;
+    return rows;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function completePrintJob(restaurantId: string, jobId: string) {
+  try {
+    const rows = await sql`
+      UPDATE print_jobs
+      SET status = 'COMPLETED', printed_at = NOW()
+      WHERE id = ${jobId} AND restaurant_id = ${restaurantId}
+      RETURNING id
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function updateAgentHeartbeat(restaurantId: string, printerName = 'POS-80C', ipAddress = '') {
+  try {
+    const rows = await sql`
+      INSERT INTO print_agent_heartbeats (restaurant_id, printer_name, ip_address, last_heartbeat)
+      VALUES (${restaurantId}, ${printerName}, ${ipAddress}, NOW())
+      ON CONFLICT (restaurant_id) DO UPDATE
+      SET printer_name = ${printerName}, ip_address = ${ipAddress}, last_heartbeat = NOW()
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      const rows = await sql`
+        INSERT INTO print_agent_heartbeats (restaurant_id, printer_name, ip_address, last_heartbeat)
+        VALUES (${restaurantId}, ${printerName}, ${ipAddress}, NOW())
+        ON CONFLICT (restaurant_id) DO UPDATE
+        SET printer_name = ${printerName}, ip_address = ${ipAddress}, last_heartbeat = NOW()
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    throw err;
+  }
+}
+
+export async function getAgentHeartbeat(restaurantId: string) {
+  try {
+    const rows = await sql`
+      SELECT *, 
+        CASE WHEN last_heartbeat > NOW() - INTERVAL '15 seconds' THEN true ELSE false END as is_online,
+        EXTRACT(EPOCH FROM (NOW() - last_heartbeat))::integer as seconds_ago
+      FROM print_agent_heartbeats
+      WHERE restaurant_id = ${restaurantId}
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    return null;
+  }
+}
+
 

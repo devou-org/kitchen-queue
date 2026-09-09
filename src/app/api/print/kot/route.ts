@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql, { getRestaurantBySlug, getOrderById } from '@/lib/db';
+import sql, {
+  getRestaurantBySlug,
+  getOrderById,
+  createPrintJob,
+  getAgentHeartbeat,
+} from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { buildKotEscposBuffer, sendRawPrintToWindowsPrinter, KotPrintData } from '@/lib/escpos';
 
@@ -58,6 +63,10 @@ export async function POST(request: NextRequest) {
     const restaurantName = restaurant.name || 'QDINE';
     const isWindows = process.platform === 'win32';
 
+    // Check if cloud print agent is active on the cashier PC
+    const agentHeartbeat = await getAgentHeartbeat(restaurant.id);
+    const isAgentOnline = Boolean(agentHeartbeat?.is_online);
+
     // Group items or filter by counter
     const isAllCounters = !counterName || counterName.toUpperCase() === 'ALL' || counterName === '*';
 
@@ -96,14 +105,13 @@ export async function POST(request: NextRequest) {
       const buffer = buildKotEscposBuffer(kotData);
       const base64Bytes = buffer.toString('base64');
 
-      // If on Windows server with local printer attached, attempt direct raw print
+      // 1. If Windows host (local server dev)
       if (isWindows) {
         const printResult = await sendRawPrintToWindowsPrinter(
           targetPrinter,
           buffer,
           `KOT #${order.ticket_number} - ${counterName}`
         );
-
         if (printResult.success) {
           return NextResponse.json({
             success: true,
@@ -115,7 +123,27 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Hosted in Cloud (Linux) or local printer fallback -> client-side print
+      // 2. Queue for Cloud Print Agent
+      await createPrintJob(restaurant.id, {
+        order_id: order.id,
+        ticket_number: Number(order.ticket_number) || undefined,
+        counter_name: counterName,
+        printer_name: targetPrinter,
+        raw_base64: base64Bytes,
+      });
+
+      // If print agent is online on cashier PC, it will print in < 1 second!
+      if (isAgentOnline) {
+        return NextResponse.json({
+          success: true,
+          mode: 'agent',
+          message: `KOT sent to Cashier ${targetPrinter}!`,
+          printer: targetPrinter,
+          itemCount: filteredItems.length,
+        });
+      }
+
+      // 3. Fallback to client browser print if agent not detected
       return NextResponse.json({
         success: true,
         mode: 'client',
@@ -129,7 +157,6 @@ export async function POST(request: NextRequest) {
 
     // Printing ALL counters
     if (separateSlips) {
-      // Group items by counter and prepare slips
       const counterMap: Record<string, any[]> = {};
       for (const item of allItems) {
         const c = (item.counter || 'Unassigned').trim();
@@ -155,9 +182,16 @@ export async function POST(request: NextRequest) {
         };
 
         const buffer = buildKotEscposBuffer(kotData);
-        slips.push({
-          kotData,
-          base64Bytes: buffer.toString('base64'),
+        const base64Bytes = buffer.toString('base64');
+        slips.push({ kotData, base64Bytes });
+
+        // Queue each slip
+        await createPrintJob(restaurant.id, {
+          order_id: order.id,
+          ticket_number: Number(order.ticket_number) || undefined,
+          counter_name: cName,
+          printer_name: targetPrinter,
+          raw_base64: base64Bytes,
         });
       }
 
@@ -181,7 +215,15 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Cloud / client fallback for all slips
+      if (isAgentOnline) {
+        return NextResponse.json({
+          success: true,
+          mode: 'agent',
+          message: `${slips.length} KOT slips sent to Cashier ${targetPrinter}!`,
+          printer: targetPrinter,
+        });
+      }
+
       return NextResponse.json({
         success: true,
         mode: 'client',
@@ -225,6 +267,25 @@ export async function POST(request: NextRequest) {
           itemCount: allItems.length,
         });
       }
+    }
+
+    // Queue job
+    await createPrintJob(restaurant.id, {
+      order_id: order.id,
+      ticket_number: Number(order.ticket_number) || undefined,
+      counter_name: 'ALL',
+      printer_name: targetPrinter,
+      raw_base64: base64Bytes,
+    });
+
+    if (isAgentOnline) {
+      return NextResponse.json({
+        success: true,
+        mode: 'agent',
+        message: `Master KOT sent to Cashier ${targetPrinter}!`,
+        printer: targetPrinter,
+        itemCount: allItems.length,
+      });
     }
 
     return NextResponse.json({

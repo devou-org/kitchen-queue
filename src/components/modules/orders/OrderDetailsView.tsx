@@ -200,6 +200,12 @@ export function OrderDetailsView({
         return;
       }
 
+      // If handled via Cloud Print Agent on Cashier PC
+      if (data.mode === 'agent') {
+        toast.success(data.message || `KOT sent directly to Cashier ${targetPrinter}!`, { id: toastId });
+        return;
+      }
+
       // Cloud hosted: Print via local bridge (silent) or 80mm browser thermal driver
       if (data.slips && Array.isArray(data.slips)) {
         for (const slip of data.slips) {
