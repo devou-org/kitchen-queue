@@ -169,6 +169,10 @@ export function OrderDetailsView({
     );
 
     try {
+      const savedPrinter = typeof window !== 'undefined' ? localStorage.getItem('qdine_kot_printer_name') : null;
+      const targetPrinter = (savedPrinter || 'POS-80C').trim();
+      const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : null;
+
       const res = await fetch('/api/print/kot', {
         method: 'POST',
         headers: {
@@ -179,6 +183,7 @@ export function OrderDetailsView({
           orderId: order.id,
           counterName: counterName || 'ALL',
           separateSlips,
+          printerName: targetPrinter,
           orderData: order,
           slug,
         }),
@@ -201,7 +206,8 @@ export function OrderDetailsView({
           await printKotFromBrowser({
             kotData: slip.kotData,
             base64Bytes: slip.base64Bytes,
-            printerName: data.printer || 'POS-80C',
+            printerName: data.printer || targetPrinter,
+            localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
           });
         }
         toast.success(`KOT printed for ${data.slips.length} counter(s)!`, { id: toastId });
@@ -209,10 +215,11 @@ export function OrderDetailsView({
         const clientRes = await printKotFromBrowser({
           kotData: data.kotData,
           base64Bytes: data.base64Bytes,
-          printerName: data.printer || 'POS-80C',
+          printerName: data.printer || targetPrinter,
+          localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
         });
         if (clientRes.method === 'bridge') {
-          toast.success(clientRes.message || 'KOT sent to POS-80C!', { id: toastId });
+          toast.success(clientRes.message || `KOT sent to ${targetPrinter}!`, { id: toastId });
         } else {
           toast.success('KOT thermal ticket printed!', { id: toastId });
         }
