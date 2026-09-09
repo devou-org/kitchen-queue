@@ -15,8 +15,12 @@ import {
   StickyNote,
   CreditCard,
   MapPin,
-  CheckCircle2
+  CheckCircle2,
+  Printer,
+  ChevronDown,
+  Loader2,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -119,11 +123,89 @@ export function OrderDetailsView({
 
   const totalItemsCount = (order.items || []).reduce((acc, i) => acc + (i.quantity || 1), 0);
 
+  // Extract and group order items by counter
+  const itemsWithCounter = React.useMemo(() => {
+    return (order.items || []).filter((i: any) => (i.quantity || 0) > 0);
+  }, [order.items]);
+
+  const counterGroups = React.useMemo(() => {
+    const map: Record<string, typeof itemsWithCounter> = {};
+    for (const item of itemsWithCounter) {
+      const c = (item.counter || '').trim() || 'Unassigned';
+      if (!map[c]) map[c] = [];
+      map[c].push(item);
+    }
+    return map;
+  }, [itemsWithCounter]);
+
+  const uniqueCounters = React.useMemo(() => Object.keys(counterGroups), [counterGroups]);
+
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printMenuOpen, setPrintMenuOpen] = useState(false);
+  const printMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setPrintMenuOpen(false);
+      }
+    };
+    if (printMenuOpen) {
+      document.addEventListener('mousedown', handleOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [printMenuOpen]);
+
+  const handlePrintKot = async (counterName?: string, separateSlips = false) => {
+    setIsPrinting(true);
+    setPrintMenuOpen(false);
+    const toastId = toast.loading(
+      counterName && counterName !== 'ALL'
+        ? `Printing KOT for ${counterName}...`
+        : separateSlips
+        ? `Printing ${uniqueCounters.length} KOT slips...`
+        : `Printing Master KOT...`
+    );
+
+    try {
+      const res = await fetch('/api/print/kot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': slug,
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          counterName: counterName || 'ALL',
+          separateSlips,
+          orderData: order,
+          slug,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to print KOT');
+      }
+
+      toast.success(data.message || 'KOT sent to printer POS-80C!', { id: toastId });
+    } catch (err: any) {
+      console.error('KOT print error:', err);
+      toast.error(err.message || 'Print job failed. Check printer connection.', { id: toastId, duration: 4500 });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   if (!mounted) return null;
 
   return createPortal(
     <>
       <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
         @keyframes orderBackdropFadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -300,6 +382,161 @@ export function OrderDetailsView({
           </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Print KOT Button */}
+          <div ref={printMenuRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (uniqueCounters.length <= 1) {
+                  handlePrintKot(uniqueCounters[0] || 'ALL');
+                } else {
+                  setPrintMenuOpen(!printMenuOpen);
+                }
+              }}
+              disabled={isPrinting || itemsWithCounter.length === 0}
+              className="btn btn-secondary btn-sm"
+              style={{
+                padding: '0 10px',
+                height: '30px',
+                fontSize: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: 600,
+                borderRadius: '8px',
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                color: '#0F172A',
+                cursor: isPrinting ? 'wait' : 'pointer',
+              }}
+              title={
+                uniqueCounters.length <= 1
+                  ? `Print KOT (${uniqueCounters[0] || 'All Items'}) to POS-80C`
+                  : 'Print KOT by Counter'
+              }
+            >
+              {isPrinting ? (
+                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Printer size={13} style={{ color: 'var(--primary, #2563eb)' }} />
+              )}
+              <span>Print KOT</span>
+              {uniqueCounters.length > 1 && (
+                <ChevronDown size={12} style={{ color: '#64748B', marginLeft: '-2px' }} />
+              )}
+            </button>
+
+            {/* Dropdown Menu when multiple counters exist */}
+            {printMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 6px)',
+                  right: 0,
+                  zIndex: 100,
+                  background: '#FFFFFF',
+                  borderRadius: '8px',
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid #E2E8F0',
+                  padding: '6px',
+                  minWidth: '220px',
+                }}
+              >
+                <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8' }}>
+                  Print KOT by Counter
+                </div>
+
+                {/* Print individual counters */}
+                {uniqueCounters.map((cName) => {
+                  const count = counterGroups[cName]?.length || 0;
+                  return (
+                    <button
+                      key={cName}
+                      type="button"
+                      onClick={() => handlePrintKot(cName)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#0F172A',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <span>{cName}</span>
+                      <span style={{ fontSize: '11px', color: '#64748B', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                        {count} {count === 1 ? 'item' : 'items'}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                <div style={{ height: '1px', background: '#F1F5F9', margin: '4px 0' }} />
+
+                {/* Option: Separate slips for all counters */}
+                <button
+                  type="button"
+                  onClick={() => handlePrintKot('ALL', true)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '7px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: 'var(--primary, #2563eb)',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#EFF6FF')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span>All Counters (Separate Slips)</span>
+                  <span style={{ fontSize: '10px', opacity: 0.8 }}>{uniqueCounters.length} slips</span>
+                </button>
+
+                {/* Option: Combined master KOT */}
+                <button
+                  type="button"
+                  onClick={() => handlePrintKot('ALL', false)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '7px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#64748B',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span>Combined Master KOT</span>
+                  <span style={{ fontSize: '10px' }}>{itemsWithCounter.length} items</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <Link
             prefetch={false}
             href={editUrl}
@@ -448,9 +685,30 @@ export function OrderDetailsView({
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
                         }}
                       >
-                        {item.product_name}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.product_name}
+                        </span>
+                        {item.counter && (
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              backgroundColor: '#EEF2FF',
+                              color: '#4F46E5',
+                              border: '1px solid #E0E7FF',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {item.counter}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '11px', color: '#64748B' }}>
                         {formatPrice(item.price_at_purchase)} each
