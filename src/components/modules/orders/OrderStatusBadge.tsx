@@ -69,11 +69,11 @@ export default function OrderStatusBadge({ status, className = '' }: OrderStatus
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '5px',
-        padding: '2px 7px',
-        borderRadius: '4px',
-        fontSize: '11px',
-        fontWeight: 600,
+        gap: '6px',
+        padding: '4px 10px',
+        borderRadius: '8px',
+        fontSize: '12px',
+        fontWeight: 700,
         letterSpacing: '0.02em',
         textTransform: 'uppercase',
         backgroundColor: config.bg,
@@ -85,8 +85,8 @@ export default function OrderStatusBadge({ status, className = '' }: OrderStatus
     >
       <span
         style={{
-          width: '5px',
-          height: '5px',
+          width: '6px',
+          height: '6px',
           borderRadius: '50%',
           backgroundColor: config.dot,
           flexShrink: 0,

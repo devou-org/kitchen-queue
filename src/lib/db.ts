@@ -535,11 +535,12 @@ export async function createProduct(data: {
   status: string;
   category: string;
   dietary_preference?: string;
+  counter?: string;
 }) {
   const rows = await sql`
-    INSERT INTO products (restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference)
+    INSERT INTO products (restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference, counter)
     VALUES (${data.restaurant_id}, ${data.name}, ${data.description}, ${data.price}, ${data.image_url}, 
-            ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'})
+            ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'}, ${data.counter || null})
     RETURNING *
   `;
   return rows[0];
@@ -556,6 +557,7 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
   category: string;
   is_active: boolean;
   dietary_preference: string;
+  counter: string;
 }>) {
   const client = await pool.connect();
   try {
@@ -581,6 +583,7 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
         category = COALESCE($8, category),
         is_active = COALESCE($9, is_active),
         dietary_preference = COALESCE($10, dietary_preference),
+        counter = COALESCE($13, counter),
         updated_at = NOW()
       WHERE restaurant_id = $11 AND id = $12
       RETURNING *
@@ -589,7 +592,7 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
         data.name ?? null, data.description ?? null, data.price ?? null, data.image_url ?? null,
         data.stock_quantity ?? null, data.buffer_quantity ?? null, data.status ?? null,
         data.category ?? null, data.is_active ?? null, data.dietary_preference ?? null,
-        restaurantId, id
+        restaurantId, id, data.counter ?? null
       ]
     );
 
@@ -632,7 +635,7 @@ export async function getOrders(restaurantId: string, filters: {
     if (filters.status) {
       if (sort === 'DESC') {
         return await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status} 
             AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
@@ -643,7 +646,7 @@ export async function getOrders(restaurantId: string, filters: {
         `;
       }
       return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status} 
           AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
@@ -656,7 +659,7 @@ export async function getOrders(restaurantId: string, filters: {
       const statuses = filters.status_in.split(',');
       if (sort === 'DESC') {
         return await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
             AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
@@ -667,7 +670,7 @@ export async function getOrders(restaurantId: string, filters: {
         `;
       }
       return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
           AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
@@ -679,7 +682,7 @@ export async function getOrders(restaurantId: string, filters: {
     } else {
       if (sort === 'DESC') {
         return await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
           ORDER BY o.business_date DESC,
@@ -689,7 +692,7 @@ export async function getOrders(restaurantId: string, filters: {
         `;
       }
       return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
         ORDER BY o.business_date ASC,
@@ -703,13 +706,13 @@ export async function getOrders(restaurantId: string, filters: {
   if (filters.status) {
     if (sort === 'DESC') {
       return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status}
         ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
       `;
     }
     return await sql`
-      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
       FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status}
       ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
     `;
@@ -719,13 +722,13 @@ export async function getOrders(restaurantId: string, filters: {
     const statuses = filters.status_in.split(',');
     if (sort === 'DESC') {
       return await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
           ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
         `;
     }
     return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
         ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
       `;
@@ -733,13 +736,13 @@ export async function getOrders(restaurantId: string, filters: {
 
   if (sort === 'DESC') {
     return await sql`
-      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
       FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
       ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
     `;
   }
   return await sql`
-    SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+    SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
     ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
   `;
@@ -877,7 +880,7 @@ export async function getOrderById(restaurantId: string, id: string) {
         'product_id', oi.product_id, 
         'quantity', oi.quantity, 
         'price_at_purchase', oi.price_at_purchase,
-        'product_name', p.name,
+        'product_name', p.name, 'counter', p.counter,
         'product_image', p.image_url
       ) ORDER BY oi.id) as items
     FROM orders o 
@@ -912,7 +915,7 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
         'product_id', oi.product_id,
         'quantity', oi.quantity, 
         'price_at_purchase', oi.price_at_purchase,
-        'product_name', p.name,
+        'product_name', p.name, 'counter', p.counter,
         'product_image', p.image_url
       ) ORDER BY oi.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
@@ -952,7 +955,7 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
           'product_id', oi.product_id,
           'quantity', oi.quantity, 
           'price_at_purchase', oi.price_at_purchase,
-          'product_name', p.name
+          'product_name', p.name, 'counter', p.counter
         ) ORDER BY oi.id) 
         FROM order_items oi 
         LEFT JOIN products p ON p.id = oi.product_id 
@@ -1565,8 +1568,25 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
       ) AS t(pid, qty, price)
     `;
 
-    nextTotalPrice = insertItems.reduce((acc, item) => acc + (item.price_at_purchase * item.quantity), 0);
-    nextTotalPrice = Math.round(nextTotalPrice * 100) / 100;
+    const newSubtotal = Math.round(insertItems.reduce((acc, item) => acc + (item.price_at_purchase * item.quantity), 0) * 100) / 100;
+    const gstType = existingOrder.gst_type || 'NONE';
+    const gstRate = Number(existingOrder.gst_rate) || 0;
+    let newGstAmount = 0;
+
+    if (gstType === 'REGULAR' && gstRate > 0) {
+      newGstAmount = Math.round((newSubtotal * gstRate / 100) * 100) / 100;
+      nextTotalPrice = Math.round((newSubtotal + newGstAmount) * 100) / 100;
+    } else {
+      nextTotalPrice = newSubtotal;
+    }
+
+    await sql`
+      UPDATE orders
+      SET subtotal = ${newSubtotal},
+          gst_amount = ${newGstAmount},
+          total_price = ${nextTotalPrice}
+      WHERE id = ${id} AND restaurant_id = ${restaurantId}
+    `;
   }
 
   const rows = await sql`
@@ -1730,7 +1750,7 @@ export async function setQueueNumber(restaurantId: string, number: number) {
 export async function getPendingQueueOrders() {
   const rows = await sql`
     SELECT o.*, s.name as staff_name, 
-      json_agg(json_build_object('product_name', p.name, 'quantity', oi.quantity) ORDER BY oi.id) as items
+      json_agg(json_build_object('product_name', p.name, 'counter', p.counter, 'quantity', oi.quantity) ORDER BY oi.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
@@ -1846,6 +1866,65 @@ export async function getKitchenSnapshot(restaurantId: string, businessDate?: st
     ORDER BY p.name ASC
   `;
   return rows;
+}
+
+// ============================================
+// COUNTERS QUERIES
+// ============================================
+
+export async function getCounters(restaurantId: string) {
+  const rows = await sql`
+    SELECT * FROM counters 
+    WHERE restaurant_id = ${restaurantId}
+    ORDER BY display_order ASC, created_at ASC
+  `;
+  return rows;
+}
+
+export async function createCounter(restaurantId: string, data: { name: string, code?: string, display_order?: number }) {
+  const rows = await sql`
+    INSERT INTO counters (restaurant_id, name, code, display_order, is_active)
+    VALUES (${restaurantId}, ${data.name}, ${data.code || null}, ${data.display_order || 0}, true)
+    RETURNING *
+  `;
+  return rows[0];
+}
+
+export async function updateCounter(restaurantId: string, id: string, data: { name?: string, code?: string, display_order?: number, is_active?: boolean }) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `
+      UPDATE counters SET
+        name = COALESCE($1, name),
+        code = COALESCE($2, code),
+        display_order = COALESCE($3, display_order),
+        is_active = COALESCE($4, is_active),
+        updated_at = NOW()
+      WHERE id = $5 AND restaurant_id = $6
+      RETURNING *
+      `,
+      [
+        data.name ?? null,
+        data.code ?? null,
+        data.display_order ?? null,
+        data.is_active ?? null,
+        id,
+        restaurantId
+      ]
+    );
+    return result.rows[0] || null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCounter(restaurantId: string, id: string) {
+  const result = await pool.query(
+    `DELETE FROM counters WHERE id = $1 AND restaurant_id = $2`,
+    [id, restaurantId]
+  );
+  return result.rowCount ? result.rowCount > 0 : false;
 }
 
 // ============================================

@@ -8,6 +8,7 @@ interface OrderTypeBadgeProps {
   variant?: 'default' | 'minimal';
   showIcon?: boolean;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export function getOrderTypeConfig(type?: string) {
@@ -50,6 +51,7 @@ export default function OrderTypeBadge({
   variant = 'default',
   showIcon = true,
   className = '',
+  style = {},
 }: OrderTypeBadgeProps) {
   const config = getOrderTypeConfig(type);
   const Icon = config.icon;
@@ -61,15 +63,16 @@ export default function OrderTypeBadge({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '5px',
-          fontSize: '12px',
-          fontWeight: 500,
-          color: '#334155',
+          gap: '6px',
+          fontSize: '15px',
+          fontWeight: 700,
+          color: '#0F172A',
           whiteSpace: 'nowrap',
           lineHeight: 1.2,
+          ...style,
         }}
       >
-        {showIcon && <Icon size={13} style={{ color: '#64748b', flexShrink: 0 }} />}
+        {showIcon && <Icon size={16} style={{ color: '#0F172A', flexShrink: 0 }} />}
         {config.label}
       </span>
     );

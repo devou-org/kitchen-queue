@@ -27,6 +27,7 @@ export interface Product {
   category: string;
   is_active: boolean;
   dietary_preference?: string;
+  counter?: string;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +40,7 @@ export interface OrderItem {
   price_at_purchase: number;
   product_name?: string;
   product_image?: string;
+  counter?: string;
 }
 
 export interface Order {
@@ -168,4 +170,14 @@ export interface OrderFilters {
   sort?: 'ASC' | 'DESC';
   page?: number;
   per_page?: number;
+}
+export interface Counter {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  code?: string | null;
+  display_order?: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }

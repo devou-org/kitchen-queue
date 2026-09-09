@@ -10,8 +10,9 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store } from 'lucide-react';
 import AdminProductForm from '@/components/AdminProductForm';
+import { CounterDrawer } from '@/components/CounterDrawer';
 
 interface ExtractedProduct {
   id: string;
@@ -50,6 +51,9 @@ export default function AdminProducts() {
   // Product Form Modal state (Add / Edit)
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Counter Drawer state (Manage / Add Counters)
+  const [counterDrawerOpen, setCounterDrawerOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -320,6 +324,29 @@ export default function AdminProducts() {
               <Sparkles size={16} style={{ color: aiEnabled ? '#ffffff' : '#cbd5e1', animation: aiEnabled ? 'iconPulse 2s infinite ease-in-out' : 'none' }} /> Upload Menu
             </button>
             <button
+              type="button"
+              onClick={() => setCounterDrawerOpen(true)}
+              style={{
+                height: '42px',
+                padding: '0 18px',
+                borderRadius: '8px',
+                backgroundColor: '#ffffff',
+                color: 'var(--text-primary, #0f172a)',
+                border: '1px solid var(--border, #cbd5e1)',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Store size={16} style={{ color: 'var(--primary)' }} /> Counters
+            </button>
+            <button
               onClick={() => {
                 setEditingProduct(null);
                 setFormModalOpen(true);
@@ -368,6 +395,7 @@ export default function AdminProducts() {
                 <tr>
                   <th>Product</th>
                   <th>Category</th>
+                  <th>Counter</th>
                   <th>Price</th>
                   {showOnlineOrdering && <th>Stock / Buffer</th>}
                   <th>Status</th>
@@ -393,6 +421,15 @@ export default function AdminProducts() {
                       </div>
                     </td>
                     <td>{p.category}</td>
+                    <td>
+                      {p.counter ? (
+                        <span style={{ padding: '4px 8px', backgroundColor: '#f1f5f9', borderRadius: '4px', fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                          {p.counter}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Unassigned</span>
+                      )}
+                    </td>
                     <td style={{ fontWeight: 600 }}>{formatPrice(p.price)}</td>
                     {showOnlineOrdering && (
                       <td>
@@ -1009,6 +1046,14 @@ export default function AdminProducts() {
         </div>,
         document.body
       )}
+
+      {/* Slide-over Counters Management Drawer */}
+      <CounterDrawer
+        isOpen={counterDrawerOpen}
+        onClose={() => setCounterDrawerOpen(false)}
+        slug={Array.isArray(slug) ? slug[0] : (slug || '')}
+        onCountersChange={fetchProducts}
+      />
 
     </AdminContentWrapper>
   );

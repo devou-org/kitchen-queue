@@ -38,6 +38,7 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
+  const [counterFilter, setCounterFilter] = useState('');
   const [readySearch, setReadySearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -52,7 +53,22 @@ export default function AdminOrders() {
   const [queueStatuses, setQueueStatuses] = useState<string[]>([]);
   const [statusesLoaded, setStatusesLoaded] = useState(false);
   const [tables, setTables] = useState<any[]>([]);
+  const [counters, setCounters] = useState<any[]>([]);
   const { restaurant } = useRestaurant();
+
+  useEffect(() => {
+    fetch('/api/counters', {
+      headers: {
+        'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || '',
+        'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || ''}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) setCounters(data.data);
+      })
+      .catch(() => {});
+  }, [slug]);
 
   useEffect(() => {
     try {
@@ -305,9 +321,17 @@ export default function AdminOrders() {
   const defaultStatus = allStatuses[0] || 'PENDING';
   const activeStatuses = allStatuses.slice(1);
 
+  let filteredOrders = orders;
+  if (counterFilter) {
+    filteredOrders = filteredOrders.map(order => {
+      const filteredItems = (order.items || []).filter(item => item.counter === counterFilter);
+      return { ...order, items: filteredItems };
+    }).filter(order => order.items && order.items.length > 0);
+  }
+
   const queryTerm = readySearch.trim().toLowerCase();
   const displayedOrders = queryTerm
-    ? orders.filter(order => {
+    ? filteredOrders.filter(order => {
         const ticket = String(order.ticket_number).padStart(3, '0').toLowerCase();
         const rawTicket = String(order.ticket_number).toLowerCase();
         const customer = (order.customer_name || '').toLowerCase();
@@ -321,7 +345,7 @@ export default function AdminOrders() {
           || table.includes(queryTerm)
           || hasItem;
       })
-    : orders;
+    : filteredOrders;
 
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
@@ -425,6 +449,20 @@ export default function AdminOrders() {
                 }}
                 style={{ width: '200px' }}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
+              />
+            </div>
+
+            {/* Counter Dropdown (200px) */}
+            <div style={{ width: '200px' }}>
+              <CustomSelect
+                value={counterFilter}
+                onChange={(val) => setCounterFilter(val)}
+                options={[
+                  { value: '', label: 'All Counters' },
+                  ...counters.map(c => ({ value: c.name, label: c.name }))
+                ]}
+                buttonStyle={{ height: '38px', fontSize: '13px' }}
+                style={{ width: '200px' }}
               />
             </div>
           </div>

@@ -29,9 +29,13 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
   const showOnlineOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [counters, setCounters] = useState<any[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [addingCategory, setAddingCategory] = useState(false);
+  const [showAddCounter, setShowAddCounter] = useState(false);
+  const [newCounterName, setNewCounterName] = useState('');
+  const [addingCounter, setAddingCounter] = useState(false);
 
   const [form, setForm] = useState({
     name: initialData?.name || '',
@@ -42,10 +46,12 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
     buffer_quantity: initialData?.buffer_quantity?.toString() || '0',
     image_url: initialData?.image_url || '',
     dietary_preference: initialData?.dietary_preference || 'NON_VEG',
+    counter: initialData?.counter || '',
   });
 
   useEffect(() => {
     fetchCategories();
+    fetchCounters();
   }, []);
 
   const fetchCategories = async () => {
@@ -56,6 +62,23 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
       }
     } catch (err) {
       console.error('Failed to load categories', err);
+    }
+  };
+
+  const fetchCounters = async () => {
+    try {
+      const res = await fetch('/api/counters', {
+        headers: {
+          'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : (slug || '')) as string,
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || ''}`
+        }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setCounters(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load counters', err);
     }
   };
 
@@ -97,6 +120,44 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
     }
   };
 
+  const handleAddCounter = async () => {
+    const trimmed = newCounterName.trim();
+    if (!trimmed) return;
+
+    if (counters.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('Counter already exists');
+      return;
+    }
+
+    setAddingCounter(true);
+    try {
+      const res = await fetch('/api/counters', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token')}`,
+          'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : (slug || '')) as string
+        },
+        body: JSON.stringify({ name: trimmed }),
+        cache: 'no-store'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCounters(prev => [...prev, data.data].sort((a,b) => (a.name || '').localeCompare(b.name || '')));
+        setForm(f => ({ ...f, counter: data.data.name }));
+        setNewCounterName('');
+        setShowAddCounter(false);
+        toast.success('Counter added');
+      } else {
+        toast.error(data.error || 'Failed to add counter');
+      }
+    } catch {
+      toast.error('Error adding counter');
+    } finally {
+      setAddingCounter(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.price || !form.category) {
@@ -123,6 +184,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
       buffer_quantity: isNaN(bufferVal) ? 0 : bufferVal,
       image_url: form.image_url.trim(),
       dietary_preference: form.dietary_preference,
+      counter: form.counter.trim(),
     };
 
     try {
@@ -397,6 +459,65 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                     style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', backgroundColor: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
                   >
                     {addingCategory ? 'Adding...' : 'Save'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                  Counter Assignment
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCounter(!showAddCounter)}
+                  style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Plus size={14} /> Add Counter
+                </button>
+              </div>
+
+              <select
+                value={form.counter}
+                onChange={e => setForm(f => ({ ...f, counter: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '14px',
+                  color: '#0f172a',
+                  backgroundColor: '#ffffff',
+                  outline: 'none'
+                }}
+              >
+                <option value="">Unassigned</option>
+                {form.counter && !counters.find(c => c.name === form.counter) && (
+                  <option value={form.counter}>{form.counter}</option>
+                )}
+                {counters.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+
+              {showAddCounter && (
+                <div style={{ marginTop: '10px', display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                  <input
+                    type="text"
+                    value={newCounterName}
+                    onChange={e => setNewCounterName(e.target.value)}
+                    placeholder="New counter name (e.g. Counter 1, Bakery)"
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddCounter())}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCounter}
+                    disabled={addingCounter}
+                    style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', backgroundColor: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                  >
+                    {addingCounter ? 'Adding...' : 'Save'}
                   </button>
                 </div>
               )}

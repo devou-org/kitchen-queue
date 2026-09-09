@@ -23,7 +23,7 @@
   --radius-full: 9999px;
 }
 
-.admin-layout, .staff-layout {
+.admin-layout, .staff-layout, .order-details-drawer {
   --radius: 8px;
   --radius-sm: 8px;
   --radius-lg: 8px;
@@ -651,7 +651,7 @@ tr:hover td {
 
 @media (min-width: 769px) {
   .admin-layout {
-    zoom: 0.90;
+    zoom: 0.95;
   }
 }
 

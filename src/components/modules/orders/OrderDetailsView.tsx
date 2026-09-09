@@ -148,6 +148,15 @@ export function OrderDetailsView({
         }
         .order-details-drawer {
           animation: orderDrawerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          --radius: 8px;
+          --radius-sm: 8px;
+          --radius-lg: 8px;
+          --radius-full: 8px;
+        }
+        .order-details-drawer .btn,
+        .order-details-drawer button,
+        .order-details-drawer a.btn {
+          border-radius: 8px !important;
         }
         .order-details-drawer.closing {
           animation: orderDrawerSlideOut 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
@@ -227,57 +236,57 @@ export function OrderDetailsView({
             top: 0,
             zIndex: 10,
             background: 'white',
-            padding: '16px 20px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: '12px',
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-            <span
-              style={{
-                fontSize: '18px',
-                fontWeight: 800,
-                color: '#0F172A',
-                fontFamily: 'monospace, var(--font-mono)',
-              }}
-            >
-              #{String(order.ticket_number).padStart(3, '0')}
-            </span>
-            <OrderTypeBadge type={order.order_type} variant="minimal" />
-            <OrderStatusBadge status={order.status} />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px', color: '#64748B', flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <Calendar size={12} style={{ color: '#94A3B8' }} />
-              {formatDateTime(order.created_at)}
-            </span>
-            {order.table_number && (
+            padding: '20px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '16px',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
               <span
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontWeight: 700,
-                  fontSize: '11px',
-                  color: '#92400E',
-                  backgroundColor: '#FEF3C7',
-                  border: '1px solid #FDE68A',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  lineHeight: 1.3,
+                  fontSize: '18px',
+                  fontWeight: 800,
+                  color: '#0F172A',
+                  fontFamily: 'monospace, var(--font-mono)',
                 }}
               >
-                <MapPin size={12} style={{ color: '#D97706', flexShrink: 0 }} />
-                {order.table_number.toLowerCase().startsWith('table') ? order.table_number : `Table ${order.table_number}`}
+                #{String(order.ticket_number).padStart(3, '0')}
               </span>
-            )}
+              <OrderTypeBadge type={order.order_type} variant="minimal" />
+              <OrderStatusBadge status={order.status} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748B', flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <Calendar size={13} style={{ color: '#94A3B8' }} />
+                {formatDateTime(order.created_at)}
+              </span>
+              {order.table_number && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    color: '#92400E',
+                    backgroundColor: '#FEF3C7',
+                    border: '1px solid #FDE68A',
+                    padding: '3px 9px',
+                    borderRadius: '6px',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  <MapPin size={12} style={{ color: '#D97706', flexShrink: 0 }} />
+                  {order.table_number.toLowerCase().startsWith('table') ? order.table_number : `Table ${order.table_number}`}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Link
@@ -292,6 +301,7 @@ export function OrderDetailsView({
               alignItems: 'center',
               gap: '4px',
               fontWeight: 600,
+              borderRadius: '8px',
             }}
             title="Edit Order"
           >
@@ -304,7 +314,7 @@ export function OrderDetailsView({
             style={{
               background: '#F1F5F9',
               border: 'none',
-              borderRadius: '6px',
+              borderRadius: '8px',
               width: '30px',
               height: '30px',
               display: 'flex',
@@ -327,13 +337,13 @@ export function OrderDetailsView({
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
 
         {/* SECTION: CUSTOMER DETAILS */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '10px' }}>
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '12px' }}>
             Customer Details
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <User size={14} style={{ color: '#94A3B8', flexShrink: 0 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <User size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
                 {order.customer_name || 'Guest'}
               </span>
@@ -345,8 +355,8 @@ export function OrderDetailsView({
             </div>
 
             {order.phone && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Phone size={14} style={{ color: '#94A3B8', flexShrink: 0 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
                 <a
                   href={`tel:${order.phone}`}
                   style={{ fontSize: '12px', color: '#334155', textDecoration: 'none' }}
@@ -356,8 +366,8 @@ export function OrderDetailsView({
               </div>
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={14} style={{ color: '#94A3B8', flexShrink: 0 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Users size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
               <span style={{ fontSize: '12px', color: '#475569' }}>
                 {order.party_size || 1} {Number(order.party_size) === 1 ? 'Guest' : 'Guests'}
               </span>
@@ -454,7 +464,11 @@ export function OrderDetailsView({
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
               <span>Subtotal</span>
               <span style={{ fontWeight: 600, color: '#334155', fontVariantNumeric: 'tabular-nums' }}>
-                {formatPrice(order.subtotal || (order.gst_amount ? order.total_price - order.gst_amount : order.total_price))}
+                {formatPrice(
+                  (order.items && order.items.length > 0)
+                    ? order.items.reduce((acc, item) => acc + (Number(item.price_at_purchase || 0) * Number(item.quantity || 0)), 0)
+                    : (order.subtotal || (order.gst_amount ? order.total_price - order.gst_amount : order.total_price))
+                )}
               </span>
             </div>
 
@@ -553,7 +567,7 @@ export function OrderDetailsView({
                     className="btn btn-primary btn-sm"
                     onClick={() => handleUpdateStatus('PAID')}
                     disabled={actionLoading || !paymentMethod}
-                    style={{ height: '34px', padding: '0 12px', fontSize: '12px' }}
+                    style={{ height: '34px', padding: '0 12px', fontSize: '12px', borderRadius: '8px' }}
                   >
                     Confirm
                   </button>
@@ -620,7 +634,7 @@ export function OrderDetailsView({
                 className="btn btn-secondary btn-sm"
                 onClick={handleUpdateTable}
                 disabled={actionLoading || loading || tempTableNumber === (order.table_number || '')}
-                style={{ height: '36px', padding: '0 12px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                style={{ height: '36px', padding: '0 12px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '8px' }}
               >
                 Save
               </button>
