@@ -144,7 +144,13 @@ async function runAutoMigration(sqlConnection: any) {
           last_heartbeat TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `;
-    console.log("Auto-migrated menu, GST, AI analyst chat, tables, and print_jobs successfully!");
+    await sqlConnection`
+      ALTER TABLE counters
+      ADD COLUMN IF NOT EXISTS printer_name VARCHAR(100) DEFAULT 'POS-80C',
+      ADD COLUMN IF NOT EXISTS printer_type VARCHAR(50) DEFAULT 'DEFAULT',
+      ADD COLUMN IF NOT EXISTS printer_address VARCHAR(200) NULL;
+    `;
+    console.log("Auto-migrated menu, GST, AI analyst chat, tables, counters printer configs, and print_jobs successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
@@ -1896,24 +1902,111 @@ export async function getKitchenSnapshot(restaurantId: string, businessDate?: st
 // ============================================
 
 export async function getCounters(restaurantId: string) {
-  const rows = await sql`
-    SELECT * FROM counters 
-    WHERE restaurant_id = ${restaurantId}
-    ORDER BY display_order ASC, created_at ASC
-  `;
-  return rows;
+  try {
+    const rows = await sql`
+      SELECT * FROM counters 
+      WHERE restaurant_id = ${restaurantId}
+      ORDER BY display_order ASC, created_at ASC
+    `;
+    return rows;
+  } catch (err: any) {
+    if (err.message?.includes('column') || err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      const rows = await sql`
+        SELECT * FROM counters 
+        WHERE restaurant_id = ${restaurantId}
+        ORDER BY display_order ASC, created_at ASC
+      `;
+      return rows;
+    }
+    throw err;
+  }
 }
 
-export async function createCounter(restaurantId: string, data: { name: string, code?: string, display_order?: number }) {
-  const rows = await sql`
-    INSERT INTO counters (restaurant_id, name, code, display_order, is_active)
-    VALUES (${restaurantId}, ${data.name}, ${data.code || null}, ${data.display_order || 0}, true)
-    RETURNING *
-  `;
-  return rows[0];
+export async function getCounterByName(restaurantId: string, name: string) {
+  try {
+    const rows = await sql`
+      SELECT * FROM counters 
+      WHERE restaurant_id = ${restaurantId} AND LOWER(TRIM(name)) = LOWER(TRIM(${name}))
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  } catch (err: any) {
+    if (err.message?.includes('column') || err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      const rows = await sql`
+        SELECT * FROM counters 
+        WHERE restaurant_id = ${restaurantId} AND LOWER(TRIM(name)) = LOWER(TRIM(${name}))
+        LIMIT 1
+      `;
+      return rows[0] || null;
+    }
+    return null;
+  }
 }
 
-export async function updateCounter(restaurantId: string, id: string, data: { name?: string, code?: string, display_order?: number, is_active?: boolean }) {
+export async function createCounter(restaurantId: string, data: {
+  name: string;
+  code?: string;
+  display_order?: number;
+  printer_name?: string;
+  printer_type?: string;
+  printer_address?: string;
+}) {
+  try {
+    const rows = await sql`
+      INSERT INTO counters (
+        restaurant_id, name, code, display_order, is_active,
+        printer_name, printer_type, printer_address
+      )
+      VALUES (
+        ${restaurantId},
+        ${data.name},
+        ${data.code || null},
+        ${data.display_order || 0},
+        true,
+        ${data.printer_name || 'POS-80C'},
+        ${data.printer_type || 'DEFAULT'},
+        ${data.printer_address || null}
+      )
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('column') || err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      const rows = await sql`
+        INSERT INTO counters (
+          restaurant_id, name, code, display_order, is_active,
+          printer_name, printer_type, printer_address
+        )
+        VALUES (
+          ${restaurantId},
+          ${data.name},
+          ${data.code || null},
+          ${data.display_order || 0},
+          true,
+          ${data.printer_name || 'POS-80C'},
+          ${data.printer_type || 'DEFAULT'},
+          ${data.printer_address || null}
+        )
+        RETURNING *
+      `;
+      return rows[0];
+    }
+    throw err;
+  }
+}
+
+export async function updateCounter(restaurantId: string, id: string, data: {
+  name?: string;
+  code?: string;
+  display_order?: number;
+  is_active?: boolean;
+  printer_name?: string;
+  printer_type?: string;
+  printer_address?: string;
+}) {
   const client = await pool.connect();
   try {
     const result = await client.query(
@@ -1923,8 +2016,11 @@ export async function updateCounter(restaurantId: string, id: string, data: { na
         code = COALESCE($2, code),
         display_order = COALESCE($3, display_order),
         is_active = COALESCE($4, is_active),
+        printer_name = COALESCE($5, printer_name),
+        printer_type = COALESCE($6, printer_type),
+        printer_address = COALESCE($7, printer_address),
         updated_at = NOW()
-      WHERE id = $5 AND restaurant_id = $6
+      WHERE id = $8 AND restaurant_id = $9
       RETURNING *
       `,
       [
@@ -1932,11 +2028,46 @@ export async function updateCounter(restaurantId: string, id: string, data: { na
         data.code ?? null,
         data.display_order ?? null,
         data.is_active ?? null,
+        data.printer_name ?? null,
+        data.printer_type ?? null,
+        data.printer_address ?? null,
         id,
         restaurantId
       ]
     );
     return result.rows[0] || null;
+  } catch (err: any) {
+    if (err.message?.includes('column') || err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      const result = await client.query(
+        `
+        UPDATE counters SET
+          name = COALESCE($1, name),
+          code = COALESCE($2, code),
+          display_order = COALESCE($3, display_order),
+          is_active = COALESCE($4, is_active),
+          printer_name = COALESCE($5, printer_name),
+          printer_type = COALESCE($6, printer_type),
+          printer_address = COALESCE($7, printer_address),
+          updated_at = NOW()
+        WHERE id = $8 AND restaurant_id = $9
+        RETURNING *
+        `,
+        [
+          data.name ?? null,
+          data.code ?? null,
+          data.display_order ?? null,
+          data.is_active ?? null,
+          data.printer_name ?? null,
+          data.printer_type ?? null,
+          data.printer_address ?? null,
+          id,
+          restaurantId
+        ]
+      );
+      return result.rows[0] || null;
+    }
+    throw err;
   } finally {
     client.release();
   }

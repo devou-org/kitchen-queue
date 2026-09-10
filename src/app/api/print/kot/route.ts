@@ -4,6 +4,8 @@ import sql, {
   getOrderById,
   createPrintJob,
   getAgentHeartbeat,
+  getCounterByName,
+  getCounters,
 } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { buildKotEscposBuffer, sendRawPrintToWindowsPrinter, KotPrintData } from '@/lib/escpos';
@@ -88,6 +90,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Check if this counter has a dedicated configured printer
+      let counterTargetPrinter = targetPrinter;
+      try {
+        const counterRecord = await getCounterByName(restaurant.id, counterName);
+        if (counterRecord?.printer_name && counterRecord.printer_name.trim()) {
+          counterTargetPrinter = counterRecord.printer_name.trim();
+        }
+      } catch {}
+
       const kotData: KotPrintData = {
         restaurantName,
         ticketNumber: order.ticket_number,
@@ -108,7 +119,7 @@ export async function POST(request: NextRequest) {
       // 1. If Windows host (local server dev)
       if (isWindows) {
         const printResult = await sendRawPrintToWindowsPrinter(
-          targetPrinter,
+          counterTargetPrinter,
           buffer,
           `KOT #${order.ticket_number} - ${counterName}`
         );
@@ -117,7 +128,7 @@ export async function POST(request: NextRequest) {
             success: true,
             mode: 'server',
             message: `KOT printed for ${counterName}`,
-            printer: targetPrinter,
+            printer: counterTargetPrinter,
             itemCount: filteredItems.length,
           });
         }
@@ -128,7 +139,7 @@ export async function POST(request: NextRequest) {
         order_id: order.id,
         ticket_number: Number(order.ticket_number) || undefined,
         counter_name: counterName,
-        printer_name: targetPrinter,
+        printer_name: counterTargetPrinter,
         raw_base64: base64Bytes,
       });
 
@@ -137,8 +148,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           mode: 'agent',
-          message: `KOT sent to Cashier ${targetPrinter}!`,
-          printer: targetPrinter,
+          message: `KOT sent to ${counterTargetPrinter} for ${counterName}!`,
+          printer: counterTargetPrinter,
           itemCount: filteredItems.length,
         });
       }
@@ -148,7 +159,7 @@ export async function POST(request: NextRequest) {
         success: true,
         mode: 'client',
         message: `KOT ready for ${counterName}`,
-        printer: targetPrinter,
+        printer: counterTargetPrinter,
         kotData,
         base64Bytes,
         itemCount: filteredItems.length,
@@ -164,9 +175,22 @@ export async function POST(request: NextRequest) {
         counterMap[c].push(item);
       }
 
-      const slips: Array<{ kotData: KotPrintData; base64Bytes: string }> = [];
+      const slips: Array<{ kotData: KotPrintData; base64Bytes: string; printerName: string }> = [];
+
+      // Look up all counter printer configurations
+      const counterPrinterMap: Record<string, string> = {};
+      try {
+        const countersList = await getCounters(restaurant.id);
+        for (const c of countersList) {
+          if (c.name && c.printer_name) {
+            counterPrinterMap[c.name.trim().toLowerCase()] = c.printer_name.trim();
+          }
+        }
+      } catch {}
 
       for (const [cName, cItems] of Object.entries(counterMap)) {
+        const slipPrinter = counterPrinterMap[cName.trim().toLowerCase()] || targetPrinter;
+
         const kotData: KotPrintData = {
           restaurantName,
           ticketNumber: order.ticket_number,
@@ -183,14 +207,14 @@ export async function POST(request: NextRequest) {
 
         const buffer = buildKotEscposBuffer(kotData);
         const base64Bytes = buffer.toString('base64');
-        slips.push({ kotData, base64Bytes });
+        slips.push({ kotData, base64Bytes, printerName: slipPrinter });
 
-        // Queue each slip
+        // Queue each slip to its dedicated counter printer
         await createPrintJob(restaurant.id, {
           order_id: order.id,
           ticket_number: Number(order.ticket_number) || undefined,
           counter_name: cName,
-          printer_name: targetPrinter,
+          printer_name: slipPrinter,
           raw_base64: base64Bytes,
         });
       }

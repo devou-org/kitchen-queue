@@ -187,6 +187,8 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
         toast.success(printResult.message || 'Test printed instantly via Bluetooth!', { id: toastId });
       } else if (printResult.method === 'serial') {
         toast.success(printResult.message || 'Test printed instantly via USB!', { id: toastId });
+      } else if (printResult.method === 'rawbt') {
+        toast.success(printResult.message || 'Test printed instantly via RawBT!', { id: toastId });
       } else {
         toast.success('Test print ticket opened in thermal driver!', { id: toastId });
       }

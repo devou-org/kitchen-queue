@@ -178,6 +178,9 @@ export interface Counter {
   code?: string | null;
   display_order?: number;
   is_active: boolean;
+  printer_name?: string | null;
+  printer_type?: 'DEFAULT' | 'BLUETOOTH' | 'USB' | 'NETWORK' | string | null;
+  printer_address?: string | null;
   created_at?: string;
   updated_at?: string;
 }

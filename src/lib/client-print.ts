@@ -17,19 +17,19 @@ export interface ClientPrintOptions {
  */
 export async function printKotFromBrowser(options: ClientPrintOptions): Promise<{
   success: boolean;
-  method: 'bluetooth' | 'serial' | 'bridge' | 'browser';
+  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser';
   message?: string;
 }> {
   const { kotData, base64Bytes, printerName = 'POS-80C', localBridgeUrl = 'http://127.0.0.1:9123/print' } = options;
 
-  // 1. Try Direct Hardware (Bluetooth or USB Serial)
+  // 1. Try Direct Hardware (Bluetooth, RawBT, or USB Serial)
   const hardwareResult = await printUnifiedThermalTicket({
     kotData,
     base64Bytes,
     printerName,
   });
 
-  if (hardwareResult.method === 'bluetooth' || hardwareResult.method === 'serial') {
+  if (hardwareResult.method === 'bluetooth' || hardwareResult.method === 'serial' || hardwareResult.method === 'rawbt') {
     return {
       success: true,
       method: hardwareResult.method,

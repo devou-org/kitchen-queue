@@ -9,7 +9,8 @@ import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { ChefHat, Search, X } from 'lucide-react';
+import { ChefHat, Search, X, Printer, Bluetooth, BluetoothConnected, Loader2 } from 'lucide-react';
+import { printUnifiedThermalTicket, connectBluetoothPrinter, getHardwarePrinterState, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { OrderTableRow, OrderTableHeader } from '@/components/modules/orders/OrderTableRow';
 import OrderDetailsView from '@/components/modules/orders/OrderDetailsView';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
@@ -55,6 +56,59 @@ export default function AdminOrders() {
   const [tables, setTables] = useState<any[]>([]);
   const [counters, setCounters] = useState<any[]>([]);
   const { restaurant } = useRestaurant();
+  const [autoPrintKot, setAutoPrintKot] = useState(true);
+  const [btStatus, setBtStatus] = useState({ connected: false, name: null as string | null });
+  const [connectingBt, setConnectingBt] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedCounter = localStorage.getItem('qdine_station_counter');
+      if (savedCounter !== null) setCounterFilter(savedCounter);
+      const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
+      if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint !== 'false');
+
+      const hw = getHardwarePrinterState();
+      setBtStatus({ connected: hw.bluetoothConnected, name: hw.bluetoothDeviceName });
+
+      tryAutoConnectBluetooth().then((connected) => {
+        if (connected) {
+          const updated = getHardwarePrinterState();
+          setBtStatus({ connected: updated.bluetoothConnected, name: updated.bluetoothDeviceName });
+        }
+      });
+    }
+  }, []);
+
+  const handleCounterFilterChange = (val: string) => {
+    setCounterFilter(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qdine_station_counter', val);
+    }
+  };
+
+  const toggleAutoPrint = () => {
+    const nextVal = !autoPrintKot;
+    setAutoPrintKot(nextVal);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qdine_auto_print_kot', String(nextVal));
+    }
+    toast.success(nextVal ? '🖨️ Auto-Print KOT: Enabled' : '⏸️ Auto-Print KOT: Paused');
+  };
+
+  const handleQuickBtConnect = async () => {
+    setConnectingBt(true);
+    try {
+      const res = await connectBluetoothPrinter();
+      if (res.success) {
+        toast.success(`Connected to ${res.deviceName}!`);
+        setBtStatus({ connected: true, name: res.deviceName || null });
+      } else if (res.error) {
+        toast.error(res.error);
+      }
+    } finally {
+      setConnectingBt(false);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/counters', {
@@ -275,13 +329,54 @@ export default function AdminOrders() {
       }
     };
 
+    const handleKotAutoPrint = async (data: any) => {
+      // Check if auto-print is enabled on this device
+      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
+      if (!autoPrint) return;
+
+      // Filter by counter if this station is assigned to a specific counter
+      const assignedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_station_counter') || '') : '';
+      if (assignedStation && assignedStation !== '' && assignedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
+        console.log(`[Auto-Print] Station is "${assignedStation}"; skipping "${data.counter_name}" slip.`);
+        return;
+      }
+
+      toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: '🖨️',
+        duration: 3000,
+      });
+
+      try {
+        const result = await printUnifiedThermalTicket({
+          base64Bytes: data.base64Bytes,
+          kotData: data.kotData,
+          printerName: data.printer_name,
+          isAutoPrint: true,
+        });
+        if (result.success) {
+          toast.success(`🖨️ Auto-printed: ${data.counter_name} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            id: `print-${data.order_id}-${data.counter_name}`,
+          });
+        } else {
+          toast.error(result.message || '⚠️ Thermal printer not paired. Tap "Pair Printer" at the top.', {
+            id: `print-unpaired`,
+            duration: 6000,
+          });
+        }
+      } catch (err: any) {
+        console.error('Auto-print execution error:', err);
+      }
+    };
+
     channel.bind('new_order', handleNewOrder);
     channel.bind('order_update', handleOrderUpdate);
+    channel.bind('kot_auto_print', handleKotAutoPrint);
 
     return () => {
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       channel.unbind('new_order', handleNewOrder);
       channel.unbind('order_update', handleOrderUpdate);
+      channel.unbind('kot_auto_print', handleKotAutoPrint);
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
@@ -456,10 +551,10 @@ export default function AdminOrders() {
             <div style={{ width: '200px' }}>
               <CustomSelect
                 value={counterFilter}
-                onChange={(val) => setCounterFilter(val)}
+                onChange={(val) => handleCounterFilterChange(val)}
                 options={[
                   { value: '', label: 'All Counters' },
-                  ...counters.map(c => ({ value: c.name, label: c.name }))
+                  ...counters.map(c => ({ value: c.name, label: `${c.name} Station` }))
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
                 style={{ width: '200px' }}
@@ -468,12 +563,71 @@ export default function AdminOrders() {
           </div>
         }
         action={
-          <button
-            className="btn-minimal"
-            onClick={() => setShowKitchenSnapshot(true)}
-          >
-            <ChefHat size={16} style={{ color: 'var(--primary)' }} /> Kitchen Snapshot
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Auto-Print Toggle Button */}
+            <button
+              onClick={toggleAutoPrint}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '38px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: autoPrintKot ? '1px solid #86EFAC' : '1px solid var(--border)',
+                background: autoPrintKot ? '#F0FDF4' : '#F8FAFC',
+                color: autoPrintKot ? '#166534' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title={autoPrintKot ? 'Auto-Print is ON: Thermal KOT prints automatically when orders enter PREPARING' : 'Auto-Print is Paused'}
+            >
+              <Printer size={15} style={{ color: autoPrintKot ? '#16A34A' : '#94A3B8' }} />
+              <span>{autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}</span>
+            </button>
+
+            {/* Quick Bluetooth Connect/Status Button */}
+            <button
+              onClick={handleQuickBtConnect}
+              disabled={connectingBt}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '38px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: btStatus.connected ? '1px solid #BFDBFE' : '1px solid var(--border)',
+                background: btStatus.connected ? '#EFF6FF' : '#F8FAFC',
+                color: btStatus.connected ? '#1E40AF' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title={btStatus.connected ? `Connected to ${btStatus.name || 'Bluetooth Printer'}` : 'Pair Bluetooth Thermal Printer'}
+            >
+              {connectingBt ? (
+                <Loader2 size={15} className="animate-spin text-blue-600" />
+              ) : btStatus.connected ? (
+                <BluetoothConnected size={15} style={{ color: '#2563EB' }} />
+              ) : (
+                <Bluetooth size={15} style={{ color: '#94A3B8' }} />
+              )}
+              <span className="hidden sm:inline">
+                {btStatus.connected ? (btStatus.name ? btStatus.name.slice(0, 10) : 'Paired') : 'Pair Printer'}
+              </span>
+            </button>
+
+            <button
+              className="btn-minimal"
+              onClick={() => setShowKitchenSnapshot(true)}
+            >
+              <ChefHat size={16} style={{ color: 'var(--primary)' }} /> Kitchen Snapshot
+            </button>
+          </div>
         }
       />
 

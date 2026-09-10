@@ -4,6 +4,7 @@ import { Order, OrderItem } from '@/types';
 import { verifyToken, requireAdmin, getAuthContext } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
 import { validatePhone } from '@/lib/validators';
+import { autoQueueAndBroadcastKot } from '@/lib/kot-auto-print';
 
 const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
 
@@ -274,6 +275,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       order = await completeOrderAndBill(restaurant.id, id, status, is_paid, table_number, payment_method);
 
       console.log(`✅ Order Updated: Order #${existing.ticket_number} → Status: ${order.status}, Table: ${order.table_number}, Paid: ${order.is_paid}`);
+
+      // 🖨️ AUTO-PRINT KOT PER COUNTER when transitioning to PREPARING
+      if (status === 'PREPARING') {
+        autoQueueAndBroadcastKot(restaurant.id, id).catch((kotErr) => {
+          console.error('❌ Automatic KOT print error:', kotErr);
+        });
+      }
 
       // 🔔 BROADCAST UPDATE
       try {

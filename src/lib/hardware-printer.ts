@@ -34,10 +34,14 @@ let activeUsbEndpoint: number = 1;
 // Common BLE Service UUIDs used by ESC/POS thermal printers
 const BLE_THERMAL_SERVICES = [
   '000018f0-0000-1000-8000-00805f9b34fb', // Standard POS
+  '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 / CC2541 / Universal POS
   '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC Transparent UART
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service (NUS)
   'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
   '0000ff00-0000-1000-8000-00805f9b34fb',
-  '0000fee7-0000-1000-8000-00805f9b34fb',
+  '0000fee7-0000-1000-8000-00805f9b34fb', // Tencent/WeChat POS
+  '0000fff0-0000-1000-8000-00805f9b34fb',
+  '0000fe00-0000-1000-8000-00805f9b34fb',
   '0000ae00-0000-1000-8000-00805f9b34fb',
   '0000af00-0000-1000-8000-00805f9b34fb',
 ];
@@ -217,6 +221,76 @@ export async function writeBytesToBluetooth(bytes: Uint8Array): Promise<void> {
   }
 }
 
+/**
+ * Attempt to reconnect to a previously paired Bluetooth thermal printer silently
+ */
+export async function tryAutoConnectBluetooth(): Promise<boolean> {
+  if (typeof window === 'undefined' || !isBluetoothSupported() || !(navigator as any).bluetooth?.getDevices) {
+    return false;
+  }
+  try {
+    const devices = await (navigator as any).bluetooth.getDevices();
+    if (!devices || devices.length === 0) return false;
+
+    const savedName = localStorage.getItem('qdine_bt_printer_name');
+    const targetDevice = (savedName ? devices.find((d: any) => d.name === savedName) : null) || devices[0];
+
+    if (!targetDevice) return false;
+
+    let server = targetDevice.gatt;
+    if (!server.connected) {
+      server = await targetDevice.gatt.connect();
+    }
+
+    let writeChar: any = null;
+    for (const serviceUuid of BLE_THERMAL_SERVICES) {
+      try {
+        const service = await server.getPrimaryService(serviceUuid);
+        const characteristics = await service.getCharacteristics();
+        for (const char of characteristics) {
+          if (char.properties.write || char.properties.writeWithoutResponse) {
+            writeChar = char;
+            break;
+          }
+        }
+        if (writeChar) break;
+      } catch {}
+    }
+
+    if (!writeChar) {
+      try {
+        const services = await server.getPrimaryServices();
+        for (const service of services) {
+          try {
+            const characteristics = await service.getCharacteristics();
+            for (const char of characteristics) {
+              if (char.properties.write || char.properties.writeWithoutResponse) {
+                writeChar = char;
+                break;
+              }
+            }
+            if (writeChar) break;
+          } catch {}
+        }
+      } catch {}
+    }
+
+    if (writeChar) {
+      activeBluetoothDevice = targetDevice;
+      activeBluetoothChar = writeChar;
+      targetDevice.addEventListener('gattserverdisconnected', () => {
+        console.log('Bluetooth printer disconnected');
+        activeBluetoothChar = null;
+      });
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.debug('Bluetooth auto-connect skipped/failed:', err);
+    return false;
+  }
+}
+
 // ============================================================
 // 2. WEB SERIAL / USB ENGINE
 // ============================================================
@@ -309,6 +383,46 @@ export function printViaRawBt(base64Bytes: string): boolean {
   }
 }
 
+/**
+ * Send raw ESC/POS binary bytes to RawBT WebSocket Service (Port 40213).
+ * This prints silently in the background on Android without opening any tab or dialog!
+ */
+export function printViaRawBtWebSocket(bytes: Uint8Array, timeoutMs: number = 1500): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+
+    try {
+      const socket = new WebSocket('ws://127.0.0.1:40213/');
+      socket.binaryType = 'arraybuffer';
+
+      const timer = setTimeout(() => {
+        try { socket.close(); } catch {}
+        resolve(false);
+      }, timeoutMs);
+
+      socket.onopen = () => {
+        socket.send(bytes);
+        clearTimeout(timer);
+        setTimeout(() => {
+          try { socket.close(1000, 'Print complete'); } catch {}
+          resolve(true);
+        }, 120);
+      };
+
+      socket.onerror = () => {
+        clearTimeout(timer);
+        resolve(false);
+      };
+
+      socket.onclose = () => {
+        clearTimeout(timer);
+      };
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
 // ============================================================
 // 4. UNIFIED PRINT DISPATCHER
 // ============================================================
@@ -318,21 +432,23 @@ export interface UnifiedPrintOptions {
   kotData: KotPrintData;
   printerName?: string;
   forceBrowser?: boolean;
+  isAutoPrint?: boolean; // When true, NEVER open the browser built-in print dialog/tab!
 }
 
 /**
  * Dispatch print job to the most direct, highest-priority hardware connection:
  * 1. Web Bluetooth (if paired & active)
  * 2. Web Serial / USB (if connected & active)
- * 3. Android RawBT (if on Android mobile)
- * 4. Hidden iframe 80mm thermal receipt (Universal fallback / Chrome Kiosk mode)
+ * 3. Android RawBT WebSocket (Port 40213 - 100% silent, background)
+ * 4. Android RawBT URL Intent
+ * 5. Hidden iframe 80mm thermal receipt (Manual print only; never on auto-print)
  */
 export async function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise<{
   success: boolean;
   method: 'bluetooth' | 'serial' | 'rawbt' | 'browser';
   message?: string;
 }> {
-  const { base64Bytes, kotData, printerName = 'POS-80C', forceBrowser = false } = options;
+  const { base64Bytes, kotData, printerName = 'POS-80C', forceBrowser = false, isAutoPrint = false } = options;
 
   // Convert base64 to Uint8Array if provided
   let rawBytes: Uint8Array | null = null;
@@ -348,7 +464,25 @@ export async function printUnifiedThermalTicket(options: UnifiedPrintOptions): P
   }
 
   if (!forceBrowser && rawBytes) {
-    // 1. Try Bluetooth if active
+    const preferredType = typeof window !== 'undefined' ? localStorage.getItem('qdine_preferred_printer_type') : null;
+
+    // Check if RawBT is explicitly preferred
+    if (preferredType === 'rawbt' && base64Bytes) {
+      const sent = printViaRawBt(base64Bytes);
+      if (sent) {
+        return {
+          success: true,
+          method: 'rawbt',
+          message: `Sent directly to RawBT Android Print Service!`,
+        };
+      }
+    }
+
+    // 1. Try Bluetooth if active or attempt silent auto-reconnect
+    if (!activeBluetoothChar || !activeBluetoothDevice?.gatt?.connected) {
+      await tryAutoConnectBluetooth();
+    }
+
     if (activeBluetoothChar && activeBluetoothDevice?.gatt?.connected) {
       try {
         await writeBytesToBluetooth(rawBytes);
@@ -358,7 +492,7 @@ export async function printUnifiedThermalTicket(options: UnifiedPrintOptions): P
           message: `Printed instantly to ${activeBluetoothDevice.name || 'Bluetooth Printer'}!`,
         };
       } catch (err: any) {
-        console.warn('Bluetooth print failed, falling back:', err.message);
+        console.warn('Bluetooth print failed, trying alternatives:', err.message);
       }
     }
 
@@ -372,12 +506,34 @@ export async function printUnifiedThermalTicket(options: UnifiedPrintOptions): P
           message: `Printed instantly to USB Printer (${printerName})!`,
         };
       } catch (err: any) {
-        console.warn('USB print failed, falling back:', err.message);
+        console.warn('USB print failed, trying alternatives:', err.message);
       }
     }
+
+    // 3. Try RawBT WebSocket on Android (Port 40213 - 100% silent background printing)
+    try {
+      const rawBtWsOk = await printViaRawBtWebSocket(rawBytes);
+      if (rawBtWsOk) {
+        return {
+          success: true,
+          method: 'rawbt',
+          message: `Printed silently via RawBT Android Print Service!`,
+        };
+      }
+    } catch {}
   }
 
-  // 3. Fallback: Browser 80mm Thermal Receipt (Works with Chrome Kiosk Mode for 0-dialog silent print)
+  // ⚠️ CRITICAL: If this was triggered automatically by incoming order (Auto-Print),
+  // NEVER open the browser's built-in print preview tab/dialog!
+  if (isAutoPrint) {
+    return {
+      success: false,
+      method: 'browser',
+      message: 'Thermal printer not paired. Tap "Pair Printer" at the top to connect Bluetooth, or start RawBT.',
+    };
+  }
+
+  // 4. Fallback: Browser 80mm Thermal Receipt (Only for MANUAL clicks, e.g. "Print Ticket" button)
   return new Promise((resolve) => {
     try {
       const html = generateThermalReceiptHtml(kotData);

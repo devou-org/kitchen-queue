@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrders, getOrderStats, createOrder, createUser, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken, requireAdmin } from '@/lib/auth';
 import { pusherServer } from '@/lib/pusher';
+import { autoQueueAndBroadcastKot } from '@/lib/kot-auto-print';
 
 export async function GET(request: NextRequest) {
   try {
@@ -176,6 +177,13 @@ export async function POST(request: NextRequest) {
       await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'new_order', sseData);
     } catch (pushErr) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
+    }
+
+    // 🖨️ AUTO-PRINT KOT PER COUNTER if order is PREPARING upon creation
+    if (order && order.status === 'PREPARING') {
+      autoQueueAndBroadcastKot(restaurant.id, order.id).catch((kotErr) => {
+        console.error('❌ Automatic KOT print error on order creation:', kotErr);
+      });
     }
 
     return NextResponse.json({
