@@ -234,7 +234,17 @@ export async function connectSerialPrinter(): Promise<{ success: boolean; device
 
   try {
     const port = await (navigator as any).serial.requestPort();
-    await port.open({ baudRate: 9600 }); // Standard POS baud rate
+    try {
+      await port.open({ baudRate: 9600 });
+    } catch (openErr: any) {
+      // Common Windows error when printer is locked by Windows Print Spooler (USB001)
+      if (openErr.message?.includes('Failed to open') || openErr.name === 'NetworkError') {
+        throw new Error(
+          'This USB printer is locked by Windows Print Spooler. For USB POS-80C, use Chrome Kiosk Mode (--kiosk-printing) for 1-click silent printing, or pair via Bluetooth.'
+        );
+      }
+      throw openErr;
+    }
 
     activeSerialPort = port;
 
