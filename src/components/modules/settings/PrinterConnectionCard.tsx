@@ -410,6 +410,7 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
         </div>
 
         {/* 2. USB / Serial Thermal Printer */}
+        {/* 2. USB Thermal Printer (POS-80C) */}
         <div
           style={{
             padding: '16px',
@@ -417,6 +418,8 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
             border: '1px solid',
             borderColor: hardwareState.serialConnected ? '#BBF7D0' : '#E2E8F0',
             backgroundColor: hardwareState.serialConnected ? '#F0FDF4' : '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            backgroundColor: '#F8FAFC',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -436,6 +439,7 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
                 }}
               >
                 <Usb size={16} style={{ color: hardwareState.serialConnected ? '#16A34A' : '#64748B' }} />
+                <Usb size={16} style={{ color: '#2563EB' }} />
                 USB Thermal Printer (POS-80C)
               </span>
 
@@ -469,15 +473,32 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
                   Not Connected
                 </span>
               )}
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#15803D',
+                  background: '#DCFCE7',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                }}
+              >
+                <CheckCircle2 size={12} /> Windows Driver
+              </span>
             </div>
 
             <p style={{ fontSize: '12px', color: '#475569', margin: '0 0 4px 0' }}>
               {hardwareState.serialConnected
                 ? `Active Device: ${hardwareState.serialDeviceName || 'POS-80C'}`
                 : 'Connect thermal receipt printer via USB / COM cable directly.'}
+              Plugged in via USB and installed in Windows as <strong>{printerName}</strong>.
             </p>
             <span style={{ fontSize: '11px', color: '#64748B' }}>
               Direct in-browser hardware access (Chrome / Edge on Windows & Mac).
+              For 1-click silent printing with zero popups, launch with <strong>Start-QDine-Silent-POS.bat</strong>.
             </span>
           </div>
 
@@ -525,6 +546,24 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
               type="button"
               onClick={handleSendTestPrint}
               disabled={testingPrint}
+              className="btn btn-primary btn-sm"
+              style={{
+                height: '32px',
+                fontSize: '12px',
+                fontWeight: 700,
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              {testingPrint ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+              <span>Test Print to {printerName}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowKioskGuide(true)}
               className="btn btn-secondary btn-sm"
               style={{
                 height: '32px',
@@ -537,6 +576,8 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
             >
               <Printer size={13} />
               <span>Test</span>
+              <Terminal size={13} />
+              <span>Kiosk Setup</span>
             </button>
           </div>
         </div>
