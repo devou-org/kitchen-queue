@@ -224,7 +224,11 @@ export function OrderDetailsView({
           printerName: data.printer || targetPrinter,
           localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
         });
-        if (clientRes.method === 'bridge') {
+        if (clientRes.method === 'bluetooth') {
+          toast.success(clientRes.message || 'KOT printed via Bluetooth!', { id: toastId });
+        } else if (clientRes.method === 'serial') {
+          toast.success(clientRes.message || 'KOT printed via USB!', { id: toastId });
+        } else if (clientRes.method === 'bridge') {
           toast.success(clientRes.message || `KOT sent to ${targetPrinter}!`, { id: toastId });
         } else {
           toast.success('KOT thermal ticket printed!', { id: toastId });

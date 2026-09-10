@@ -2221,6 +2221,8 @@ export async function autoCloseRestaurants() {
 // CLOUD PRINT JOBS & AGENT HEARTBEAT QUERIES
 // ============================================
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function createPrintJob(restaurantId: string, data: {
   order_id?: string;
   ticket_number?: number;
@@ -2228,10 +2230,11 @@ export async function createPrintJob(restaurantId: string, data: {
   printer_name?: string;
   raw_base64: string;
 }) {
+  const validOrderId = data.order_id && UUID_REGEX.test(data.order_id) ? data.order_id : null;
   try {
     const rows = await sql`
       INSERT INTO print_jobs (restaurant_id, order_id, ticket_number, counter_name, printer_name, raw_base64, status)
-      VALUES (${restaurantId}, ${data.order_id || null}, ${data.ticket_number || null}, ${data.counter_name || null}, ${data.printer_name || 'POS-80C'}, ${data.raw_base64}, 'PENDING')
+      VALUES (${restaurantId}, ${validOrderId}, ${data.ticket_number || null}, ${data.counter_name || null}, ${data.printer_name || 'POS-80C'}, ${data.raw_base64}, 'PENDING')
       RETURNING *
     `;
     return rows[0];
@@ -2240,7 +2243,7 @@ export async function createPrintJob(restaurantId: string, data: {
       await runAutoMigration(sql);
       const rows = await sql`
         INSERT INTO print_jobs (restaurant_id, order_id, ticket_number, counter_name, printer_name, raw_base64, status)
-        VALUES (${restaurantId}, ${data.order_id || null}, ${data.ticket_number || null}, ${data.counter_name || null}, ${data.printer_name || 'POS-80C'}, ${data.raw_base64}, 'PENDING')
+        VALUES (${restaurantId}, ${validOrderId}, ${data.ticket_number || null}, ${data.counter_name || null}, ${data.printer_name || 'POS-80C'}, ${data.raw_base64}, 'PENDING')
         RETURNING *
       `;
       return rows[0];
