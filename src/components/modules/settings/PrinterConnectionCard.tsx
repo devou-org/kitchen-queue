@@ -409,15 +409,11 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
           </div>
         </div>
 
-        {/* 2. USB / Serial Thermal Printer */}
         {/* 2. USB Thermal Printer (POS-80C) */}
         <div
           style={{
             padding: '16px',
             borderRadius: '10px',
-            border: '1px solid',
-            borderColor: hardwareState.serialConnected ? '#BBF7D0' : '#E2E8F0',
-            backgroundColor: hardwareState.serialConnected ? '#F0FDF4' : '#F8FAFC',
             border: '1px solid #E2E8F0',
             backgroundColor: '#F8FAFC',
             display: 'flex',
