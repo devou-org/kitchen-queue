@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPrice } from '@/lib/format';
+import { inventoryService, InventoryItem } from '@/app/services/inventory.api';
 import { inventoryService } from '@/app/services/inventory.api';
 import { adminService } from '@/app/services/admin.api';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
@@ -53,6 +54,7 @@ import { useParams } from 'next/navigation';
 
 export default function AdminInventorySummary() {
   const { slug } = useParams();
+  const [items, setItems] = useState<InventoryItem[]>([]);
   const [items, setItems] = useState<SalesItem[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
