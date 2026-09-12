@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { formatPrice } from '@/lib/format';
 import { inventoryService } from '@/app/services/inventory.api';
 import { adminService } from '@/app/services/admin.api';
@@ -49,11 +50,8 @@ const getIcon = (cat: string) => {
 
 const PAGE_SIZE = 10;
 
-import { useParams } from 'next/navigation';
-
 export default function AdminInventorySummary() {
   const { slug } = useParams();
-  const [items, setItems] = useState<InventoryItem[]>([]);
   const [items, setItems] = useState<SalesItem[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
