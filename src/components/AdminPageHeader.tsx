@@ -4,20 +4,23 @@ import { LayoutMaximizeToggle } from './LayoutMaximizeToggle';
 
 interface AdminPageHeaderProps {
   title?: React.ReactNode;
+  subtitle?: React.ReactNode;
   description?: React.ReactNode;
   action?: React.ReactNode;
   backLink?: React.ReactNode;
   hideMaximize?: boolean;
   search?: React.ReactNode;
+  style?: React.CSSProperties;
 }
 
-export function AdminPageHeader({ title, description, action, backLink, hideMaximize = false, search }: AdminPageHeaderProps) {
-  const hasLeftContent = Boolean(backLink || title || search || description);
+export function AdminPageHeader({ title, subtitle, description, action, backLink, hideMaximize = false, search, style = {} }: AdminPageHeaderProps) {
+  const descText = description || subtitle;
+  const hasLeftContent = Boolean(backLink || title || search || descText);
 
   return (
-    <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: description ? 'flex-start' : 'center', flexWrap: 'wrap', gap: '16px' }}>
+    <div style={{ paddingTop: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: descText ? 'flex-start' : 'center', flexWrap: 'wrap', gap: '16px', ...style }}>
       {hasLeftContent && (
-        <div style={{ flex: 1, minWidth: search ? '240px' : 'auto', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'nowrap' }}>
           {backLink && (
             <div style={{ width: '100%', marginBottom: '4px' }}>
               {backLink}
@@ -29,7 +32,7 @@ export function AdminPageHeader({ title, description, action, backLink, hideMaxi
             </h1>
           )}
           {search && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
               {search}
             </div>
           )}

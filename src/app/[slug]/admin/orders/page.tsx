@@ -9,8 +9,9 @@ import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { adminService } from '@/app/services/admin.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { ChefHat, Search, X, Printer, Bluetooth, BluetoothConnected, Loader2 } from 'lucide-react';
-import { printUnifiedThermalTicket, connectBluetoothPrinter, getHardwarePrinterState, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
+import { ChefHat, Search, X, Printer, Store, Loader2 } from 'lucide-react';
+import { printUnifiedThermalTicket } from '@/lib/hardware-printer';
+import { CounterDrawer } from '@/components/CounterDrawer';
 import { OrderTableRow, OrderTableHeader } from '@/components/modules/orders/OrderTableRow';
 import OrderDetailsView from '@/components/modules/orders/OrderDetailsView';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
@@ -57,8 +58,7 @@ export default function AdminOrders() {
   const [counters, setCounters] = useState<any[]>([]);
   const { restaurant } = useRestaurant();
   const [autoPrintKot, setAutoPrintKot] = useState(true);
-  const [btStatus, setBtStatus] = useState({ connected: false, name: null as string | null });
-  const [connectingBt, setConnectingBt] = useState(false);
+  const [counterDrawerOpen, setCounterDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -66,16 +66,6 @@ export default function AdminOrders() {
       if (savedCounter !== null) setCounterFilter(savedCounter);
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
       if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint !== 'false');
-
-      const hw = getHardwarePrinterState();
-      setBtStatus({ connected: hw.bluetoothConnected, name: hw.bluetoothDeviceName });
-
-      tryAutoConnectBluetooth().then((connected) => {
-        if (connected) {
-          const updated = getHardwarePrinterState();
-          setBtStatus({ connected: updated.bluetoothConnected, name: updated.bluetoothDeviceName });
-        }
-      });
     }
   }, []);
 
@@ -95,22 +85,8 @@ export default function AdminOrders() {
     toast.success(nextVal ? '🖨️ Auto-Print KOT: Enabled' : '⏸️ Auto-Print KOT: Paused');
   };
 
-  const handleQuickBtConnect = async () => {
-    setConnectingBt(true);
-    try {
-      const res = await connectBluetoothPrinter();
-      if (res.success) {
-        toast.success(`Connected to ${res.deviceName}!`);
-        setBtStatus({ connected: true, name: res.deviceName || null });
-      } else if (res.error) {
-        toast.error(res.error);
-      }
-    } finally {
-      setConnectingBt(false);
-    }
-  };
-
-  useEffect(() => {
+  const fetchCounters = useCallback(() => {
+    if (!slug) return;
     fetch('/api/counters', {
       headers: {
         'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || '',
@@ -123,6 +99,10 @@ export default function AdminOrders() {
       })
       .catch(() => {});
   }, [slug]);
+
+  useEffect(() => {
+    fetchCounters();
+  }, [fetchCounters]);
 
   useEffect(() => {
     try {
@@ -452,10 +432,11 @@ export default function AdminOrders() {
   return (
     <AdminContentWrapper fullWidth>
       <AdminPageHeader
+        style={{ paddingTop: '16px' }}
         search={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
             {/* Search Input */}
-            <div style={{ position: 'relative', width: '220px' }}>
+            <div style={{ position: 'relative', width: '185px', flexShrink: 0 }}>
               <Search
                 size={15}
                 style={{
@@ -469,7 +450,7 @@ export default function AdminOrders() {
               />
               <input
                 type="text"
-                placeholder="Search ticket, customer, table..."
+                placeholder="Search ticket, customer..."
                 value={readySearch}
                 onChange={(e) => setReadySearch(e.target.value)}
                 style={{
@@ -512,8 +493,8 @@ export default function AdminOrders() {
               )}
             </div>
 
-            {/* Status Dropdown (200px) */}
-            <div style={{ width: '200px' }}>
+            {/* Status Dropdown (135px) */}
+            <div style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -530,25 +511,25 @@ export default function AdminOrders() {
                 }
                 disabled={!statusesLoaded}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
-                style={{ width: '200px' }}
+                style={{ width: '135px' }}
               />
             </div>
 
-            {/* Order Type Dropdown (200px) */}
-            <div style={{ width: '200px' }}>
+            {/* Order Type Dropdown (145px) */}
+            <div style={{ width: '145px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
                   setOrderTypeFilter(val);
                   setPage(1);
                 }}
-                style={{ width: '200px' }}
+                style={{ width: '145px' }}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
               />
             </div>
 
-            {/* Counter Dropdown (200px) */}
-            <div style={{ width: '200px' }}>
+            {/* Counter Dropdown (140px) */}
+            <div style={{ width: '140px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -557,7 +538,7 @@ export default function AdminOrders() {
                   ...counters.map(c => ({ value: c.name, label: `${c.name} Station` }))
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
-                style={{ width: '200px' }}
+                style={{ width: '140px' }}
               />
             </div>
           </div>
@@ -588,10 +569,9 @@ export default function AdminOrders() {
               <span>{autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}</span>
             </button>
 
-            {/* Quick Bluetooth Connect/Status Button */}
+            {/* Counters & Hardware Drawer Trigger */}
             <button
-              onClick={handleQuickBtConnect}
-              disabled={connectingBt}
+              onClick={() => setCounterDrawerOpen(true)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -601,24 +581,16 @@ export default function AdminOrders() {
                 borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: 600,
-                border: btStatus.connected ? '1px solid #BFDBFE' : '1px solid var(--border)',
-                background: btStatus.connected ? '#EFF6FF' : '#F8FAFC',
-                color: btStatus.connected ? '#1E40AF' : 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+                background: '#FFFFFF',
+                color: '#0F172A',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
-              title={btStatus.connected ? `Connected to ${btStatus.name || 'Bluetooth Printer'}` : 'Pair Bluetooth Thermal Printer'}
+              title="Configure Kitchen Counters & Thermal Hardware"
             >
-              {connectingBt ? (
-                <Loader2 size={15} className="animate-spin text-blue-600" />
-              ) : btStatus.connected ? (
-                <BluetoothConnected size={15} style={{ color: '#2563EB' }} />
-              ) : (
-                <Bluetooth size={15} style={{ color: '#94A3B8' }} />
-              )}
-              <span className="hidden sm:inline">
-                {btStatus.connected ? (btStatus.name ? btStatus.name.slice(0, 10) : 'Paired') : 'Pair Printer'}
-              </span>
+              <Store size={15} style={{ color: '#2563EB' }} />
+              <span className="hidden sm:inline">Counters & Hardware</span>
             </button>
 
             <button
@@ -758,6 +730,13 @@ export default function AdminOrders() {
         isOpen={showKitchenSnapshot}
         onClose={() => setShowKitchenSnapshot(false)}
         businessDate={restaurant ? getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time) : undefined}
+      />
+
+      <CounterDrawer
+        isOpen={counterDrawerOpen}
+        onClose={() => setCounterDrawerOpen(false)}
+        slug={(Array.isArray(slug) ? slug[0] : slug) || ''}
+        onCountersChange={fetchCounters}
       />
     </AdminContentWrapper>
   );

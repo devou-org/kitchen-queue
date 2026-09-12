@@ -9,7 +9,6 @@ import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Ma
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
-import { PrinterConnectionCard } from '@/components/modules/settings/PrinterConnectionCard';
 
 export default function AdminSettings() {
   const params = useParams();
@@ -645,9 +644,6 @@ export default function AdminSettings() {
             </form>
           </div>
           */}
-
-          {/* Connection Status & Hardware Printer Settings */}
-          <PrinterConnectionCard restaurantName={restaurant?.name || 'QDINE'} slug={slug} />
 
           {/* GST Information Card (Read-Only) */}
           <div className="card">

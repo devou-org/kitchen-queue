@@ -17,7 +17,7 @@ export function AdminContentWrapper({ children, className = '', style = {}, full
     <>
       <style>{`
         .admin-wrapper-inner {
-          padding: 20px 32px;
+          padding: 28px 32px 24px 32px;
           max-width: 1200px;
           margin: 0 auto;
           width: 100%;
@@ -28,19 +28,19 @@ export function AdminContentWrapper({ children, className = '', style = {}, full
           max-width: 100% !important;
         }
         .admin-wrapper-inner.is-maximized {
-          padding: 12px 20px !important;
+          padding: 20px 24px 16px 24px !important;
           min-height: 100vh;
           display: flex;
           flex-direction: column;
         }
         @media (max-width: 768px) {
           .admin-wrapper-inner {
-            padding: 16px 12px;
+            padding: 20px 16px 16px 16px;
           }
         }
         @media (max-width: 640px) {
           .admin-wrapper-inner {
-            padding: 12px 8px;
+            padding: 16px 12px 12px 12px;
           }
         }
       `}</style>

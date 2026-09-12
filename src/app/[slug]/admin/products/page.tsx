@@ -10,7 +10,7 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store } from 'lucide-react';
+import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes } from 'lucide-react';
 import AdminProductForm from '@/components/AdminProductForm';
 import { CounterDrawer } from '@/components/CounterDrawer';
 
@@ -323,6 +323,28 @@ export default function AdminProducts() {
             >
               <Sparkles size={16} style={{ color: aiEnabled ? '#ffffff' : '#cbd5e1', animation: aiEnabled ? 'iconPulse 2s infinite ease-in-out' : 'none' }} /> Upload Menu
             </button>
+            <Link
+              href={`/${slug}/admin/inventory/recipes`}
+              prefetch={false}
+              style={{
+                height: '42px',
+                padding: '0 16px',
+                borderRadius: '8px',
+                backgroundColor: '#ffffff',
+                color: '#0f172a',
+                border: '1px solid var(--border, #cbd5e1)',
+                fontWeight: 700,
+                fontSize: '13px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <ChefHat size={16} style={{ color: '#2563eb' }} /> BOM Recipes
+            </Link>
             <button
               type="button"
               onClick={() => setCounterDrawerOpen(true)}

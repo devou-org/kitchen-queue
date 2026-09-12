@@ -150,7 +150,172 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS printer_type VARCHAR(50) DEFAULT 'DEFAULT',
       ADD COLUMN IF NOT EXISTS printer_address VARCHAR(200) NULL;
     `;
-    console.log("Auto-migrated menu, GST, AI analyst chat, tables, counters printer configs, and print_jobs successfully!");
+    // Inventory tables
+    await sqlConnection`
+      CREATE TABLE IF NOT EXISTS inventory_categories (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(100) NOT NULL,
+          description TEXT,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(restaurant_id, name)
+      );
+      CREATE TABLE IF NOT EXISTS inventory_units (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(50) NOT NULL,
+          short_code VARCHAR(20) NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(restaurant_id, short_code)
+      );
+      CREATE TABLE IF NOT EXISTS suppliers (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(150) NOT NULL,
+          contact_person VARCHAR(100),
+          phone VARCHAR(30),
+          email VARCHAR(150),
+          address TEXT,
+          gst_number VARCHAR(30),
+          outstanding_balance NUMERIC(12,2) DEFAULT 0.00,
+          is_active BOOLEAN DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS inventory_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(150) NOT NULL,
+          category_id UUID REFERENCES inventory_categories(id) ON DELETE SET NULL,
+          unit VARCHAR(20) NOT NULL DEFAULT 'kg',
+          current_stock NUMERIC(12,3) NOT NULL DEFAULT 0.000,
+          min_stock NUMERIC(12,3) NOT NULL DEFAULT 0.000,
+          max_stock NUMERIC(12,3) NULL,
+          cost_per_unit NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
+          storage_location VARCHAR(100),
+          track_batches BOOLEAN DEFAULT false,
+          track_expiry BOOLEAN DEFAULT false,
+          is_active BOOLEAN DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_inventory_items_rest ON inventory_items(restaurant_id);
+      CREATE INDEX IF NOT EXISTS idx_inventory_items_stock ON inventory_items(restaurant_id, current_stock, min_stock);
+
+      CREATE TABLE IF NOT EXISTS inventory_batches (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+          batch_number VARCHAR(100) NOT NULL,
+          initial_quantity NUMERIC(12,3) NOT NULL,
+          current_quantity NUMERIC(12,3) NOT NULL,
+          cost_per_unit NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          expiry_date DATE NULL,
+          received_date DATE NOT NULL DEFAULT CURRENT_DATE,
+          supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
+          status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_inventory_batches_item ON inventory_batches(item_id, status);
+
+      CREATE TABLE IF NOT EXISTS stock_movements (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+          batch_id UUID REFERENCES inventory_batches(id) ON DELETE SET NULL,
+          movement_type VARCHAR(30) NOT NULL,
+          quantity NUMERIC(12,3) NOT NULL,
+          balance_after NUMERIC(12,3) NOT NULL,
+          unit_cost NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          total_cost NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          reference_type VARCHAR(50),
+          reference_id VARCHAR(100),
+          reason TEXT,
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_stock_movements_item ON stock_movements(item_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS purchase_orders (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
+          po_number VARCHAR(100) NOT NULL,
+          invoice_number VARCHAR(100),
+          received_date DATE NOT NULL DEFAULT CURRENT_DATE,
+          status VARCHAR(30) NOT NULL DEFAULT 'RECEIVED',
+          subtotal NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          total_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          payment_status VARCHAR(30) NOT NULL DEFAULT 'UNPAID',
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS purchase_order_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+          quantity NUMERIC(12,3) NOT NULL,
+          unit VARCHAR(20) NOT NULL,
+          unit_price NUMERIC(12,2) NOT NULL,
+          tax_rate NUMERIC(5,2) DEFAULT 0.00,
+          total_price NUMERIC(12,2) NOT NULL,
+          batch_number VARCHAR(100),
+          expiry_date DATE
+      );
+
+      CREATE TABLE IF NOT EXISTS wastages (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+          batch_id UUID REFERENCES inventory_batches(id) ON DELETE SET NULL,
+          quantity NUMERIC(12,3) NOT NULL,
+          unit VARCHAR(20) NOT NULL,
+          unit_cost NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          total_cost NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+          reason VARCHAR(50) NOT NULL,
+          notes TEXT,
+          logged_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_wastages_rest ON wastages(restaurant_id, logged_at DESC);
+
+      CREATE TABLE IF NOT EXISTS stock_adjustments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+          system_stock NUMERIC(12,3) NOT NULL,
+          physical_stock NUMERIC(12,3) NOT NULL,
+          adjusted_quantity NUMERIC(12,3) NOT NULL,
+          reason TEXT NOT NULL,
+          adjusted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS recipes (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+          instructions TEXT,
+          yield_servings INT NOT NULL DEFAULT 1,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(restaurant_id, product_id)
+      );
+      CREATE TABLE IF NOT EXISTS recipe_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+          quantity NUMERIC(12,3) NOT NULL,
+          unit VARCHAR(20) NOT NULL,
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_recipe_items_recipe ON recipe_items(recipe_id);
+    `;
+    console.log("Auto-migrated menu, GST, tables, counters, and inventory schema successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
@@ -1227,6 +1392,14 @@ export async function createOrder(data: {
       `,
       [orderId, productIds, quantities, prices]
     );
+
+    // Auto-deduct inventory ingredients for products with configured BOM recipes
+    try {
+      const { deductInventoryForOrder } = await import('@/lib/inventory');
+      await deductInventoryForOrder(client, data.restaurant_id, orderId, normalizedItems);
+    } catch (invErr) {
+      console.error('Non-blocking inventory auto-deduction error:', invErr);
+    }
 
     await client.query('COMMIT');
     return await getOrderById(data.restaurant_id, orderId);

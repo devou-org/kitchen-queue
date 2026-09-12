@@ -77,10 +77,10 @@ export default function AdminInventorySummary() {
 
       if (invRes.success && invRes.data) setItems(invRes.data);
       if (catRes.success && catRes.data) {
-        const uniqueCats = Array.from(new Set(
+        const uniqueCats = Array.from(new Set<string>(
           catRes.data
             .map((c: any) => c.name?.trim())
-            .filter((name: string) => name && name !== 'All')
+            .filter((name: string) => Boolean(name && name !== 'All'))
         ));
         setCategories(['All', ...uniqueCats]);
       }
