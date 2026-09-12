@@ -276,6 +276,7 @@ export default function AdminInventorySummary() {
                       </td>
                       <td style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>
                         {formatPrice(item.price)}
+                        {formatPrice(item.price ?? 0)}
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)', fontSize: '15px' }}>
                         {formatPrice(Number(item.total_revenue))}
