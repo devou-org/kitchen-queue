@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPrice } from '@/lib/format';
-import { inventoryService, InventoryItem } from '@/app/services/inventory.api';
 import { inventoryService } from '@/app/services/inventory.api';
 import { adminService } from '@/app/services/admin.api';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
