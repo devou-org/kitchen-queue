@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
-import { inventoryService } from '@/app/services/inventory.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Eye, Layers, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';

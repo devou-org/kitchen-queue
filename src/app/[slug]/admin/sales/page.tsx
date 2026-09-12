@@ -2,13 +2,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { formatPrice } from '@/lib/format';
-import { inventoryService, InventoryItem } from '@/app/services/inventory.api';
+import { inventoryService } from '@/app/services/inventory.api';
 import { adminService } from '@/app/services/admin.api';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { Search } from 'lucide-react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
+
+export interface SalesItem {
+  id: string;
+  product_name: string;
+  category: string;
+  price?: number;
+  total_quantity: number;
+  total_revenue: number;
+  [key: string]: any;
+}
 
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
   'MAIN COURSE': { bg: 'rgba(151,19,69,0.1)', color: '#971345' },
@@ -43,7 +53,7 @@ import { useParams } from 'next/navigation';
 
 export default function AdminInventorySummary() {
   const { slug } = useParams();
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [items, setItems] = useState<SalesItem[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
