@@ -850,7 +850,6 @@ export default function AdminProducts() {
                       padding: '10px 22px',
                       borderRadius: '8px',
                       border: 'none',
-                      backgroundColor: '#0f172a',
                       backgroundColor: 'var(--primary, #971345)',
                       color: '#ffffff',
                       fontWeight: 700,
