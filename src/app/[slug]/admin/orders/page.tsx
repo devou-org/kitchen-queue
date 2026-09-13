@@ -62,7 +62,6 @@ export default function AdminOrders() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedCounter = localStorage.getItem('qdine_station_counter');
       const savedCounter = localStorage.getItem('qdine_orders_counter_filter');
       if (savedCounter !== null) setCounterFilter(savedCounter);
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');

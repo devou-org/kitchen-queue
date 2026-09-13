@@ -212,7 +212,6 @@ export function OrderDetailsView({
           await printKotFromBrowser({
             kotData: slip.kotData,
             base64Bytes: slip.base64Bytes,
-            printerName: data.printer || targetPrinter,
             printerName: slip.printerName || data.printer || targetPrinter,
             counterId: slip.counterId,
             counterName: slip.kotData?.counterName,

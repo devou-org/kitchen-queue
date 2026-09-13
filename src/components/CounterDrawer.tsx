@@ -157,7 +157,6 @@ export function CounterDrawer({ isOpen, onClose, slug, onCountersChange }: Count
     );
 
     try {
-      const res = await connectBluetoothPrinter(counter?.id);
       const res = await connectBluetoothPrinter(counter?.id, counter?.name);
       if (res.success && res.deviceName) {
         toast.success(

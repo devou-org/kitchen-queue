@@ -11,8 +11,6 @@
  * ============================================================
  */
 
-import { getOrderById, getRestaurantById, getCounters, createPrintJob } from '@/lib/db';
-import { buildKotEscposBuffer, KotPrintData } from '@/lib/escpos';
 import sql, { getOrderById, getRestaurantById, getCounters, createPrintJob } from '@/lib/db';
 import { buildKotEscposBuffer, KotPrintData, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
 import { pusherServer } from '@/lib/pusher';
@@ -51,8 +49,7 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
 
     // Look up all counter printer configurations
     const countersList = await getCounters(restaurantId);
-    const counterPrinterMap: Record<string, { printerName: string; printerType: string; printerAddress?: string }> = {};
-    const counterPrinterMap: Record<string, { id: string; printerName: string; printerType: string; printerAddress?: string }> = {};
+    const counterPrinterMap: Record<string, { id?: string; printerName: string; printerType: string; printerAddress?: string }> = {};
     for (const c of countersList) {
       if (c.name) {
         counterPrinterMap[c.name.trim().toLowerCase()] = {
