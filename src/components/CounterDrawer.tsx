@@ -633,7 +633,6 @@ export function CounterDrawer({ isOpen, onClose, slug, onCountersChange }: Count
                   style={{
                     padding: '9px 16px',
                     borderRadius: '8px',
-                    backgroundColor: '#0F172A',
                     backgroundColor: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     border: 'none',
@@ -1321,8 +1320,6 @@ export function CounterDrawer({ isOpen, onClose, slug, onCountersChange }: Count
                               style={{
                                 padding: '6px 12px',
                                 borderRadius: '6px',
-                                border: '1px solid #0F172A',
-                                backgroundColor: '#0F172A',
                                 border: '1px solid var(--primary, #971345)',
                                 backgroundColor: 'var(--primary, #971345)',
                                 color: '#FFFFFF',

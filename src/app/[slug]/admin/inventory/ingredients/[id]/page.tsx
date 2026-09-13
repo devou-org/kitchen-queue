@@ -832,7 +832,6 @@ export default function IngredientDetailPage() {
                     padding: '8px 18px',
                     borderRadius: '8px',
                     border: 'none',
-                    background: '#0F172A',
                     background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '12px',
