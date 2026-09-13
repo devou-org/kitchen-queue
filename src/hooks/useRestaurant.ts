@@ -38,6 +38,14 @@ let lastFetchTime = 0;
 let fetchPromise: Promise<RestaurantContext | null> | null = null;
 const listeners = new Set<(data: RestaurantContext | null) => void>();
 
+export function invalidateRestaurantCache() {
+  cached = null;
+  lastFetchTime = 0;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('restaurant-updated'));
+  }
+}
+
 export async function fetchRestaurant(force = false): Promise<RestaurantContext | null> {
   const now = Date.now();
   if (fetchPromise) return fetchPromise;
@@ -120,11 +128,13 @@ export function useRestaurant() {
     };
 
     window.addEventListener('focus', revalidate);
+    window.addEventListener('restaurant-updated', () => fetchRestaurant(true));
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       listeners.delete(handler);
       window.removeEventListener('focus', revalidate);
+      window.removeEventListener('restaurant-updated', () => fetchRestaurant(true));
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);

@@ -384,6 +384,9 @@ export default function RestaurantDetails() {
       const data = await res.json();
       if (data.success) {
         toast.success(`${ALL_MODULES.find(m => m.key === moduleKey)?.label} subscription updated!`);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('restaurant-updated'));
+        }
         
         // Auto-add statuses if enabled
         if (isEnabled && moduleKey === 'ONLINE_ORDERING') {

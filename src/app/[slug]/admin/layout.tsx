@@ -18,7 +18,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const { isMaximized } = useAdminLayout();
-  const { restaurant, loading: resLoading } = useRestaurant();
+  const { restaurant, loading: resLoading, refresh } = useRestaurant();
   const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
   const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
@@ -57,11 +57,16 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
     if (!resLoading && restaurant && restaurant.modules?.INVENTORY !== true) {
       if (pathname.startsWith(`/${slug}/admin/inventory`)) {
-        const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
-        router.replace(`/${slug}/admin/${target}`);
+        // Double-check with a fresh fetch in case the module was just enabled in another tab/window
+        refresh().then((latest) => {
+          if (latest && latest.modules?.INVENTORY !== true) {
+            const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
+            router.replace(`/${slug}/admin/${target}`);
+          }
+        });
       }
     }
-  }, [restaurant, resLoading, pathname, router, slug, showOrdering, showQueue]);
+  }, [restaurant, resLoading, pathname, router, slug, showOrdering, showQueue, refresh]);
 
   // If on login page, render children without sidebar
   if (pathname === `/${slug}/admin/login`) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRestaurantBySlug, getRestaurantModules } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
  * GET /api/restaurant
@@ -56,6 +57,10 @@ export async function GET(request: NextRequest) {
         // Derived channel name so clients don't have to construct it themselves
         pusher_channel: `queue-channel-${restaurant.id}`,
         modules,
+      },
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       },
     });
   } catch (error) {
