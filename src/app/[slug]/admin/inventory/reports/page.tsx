@@ -96,8 +96,6 @@ export default function InventoryReportsPage() {
             borderRadius: '8px',
             fontSize: '13px',
             fontWeight: tab === 'valuation' ? 800 : 600,
-            border: tab === 'valuation' ? '2px solid #0F172A' : '1px solid #CBD5E1',
-            backgroundColor: tab === 'valuation' ? '#0F172A' : '#FFFFFF',
             border: tab === 'valuation' ? '2px solid var(--primary, #971345)' : '1px solid #CBD5E1',
             backgroundColor: tab === 'valuation' ? 'var(--primary, #971345)' : '#FFFFFF',
             color: tab === 'valuation' ? '#FFFFFF' : '#64748B',
