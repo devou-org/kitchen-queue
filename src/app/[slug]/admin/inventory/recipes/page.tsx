@@ -567,10 +567,10 @@ export default function RecipesPage() {
               >
                 <div>
                   <div style={{ fontSize: '11px', color: '#64748B' }}>
-                    Menu Selling Price: {formatPrice(selectedProduct.price)}
+                    Menu Selling Price: {formatPrice(selectedProduct?.price || 0)}
                   </div>
                   <div style={{ fontSize: '11px', color: '#16A34A', fontWeight: 600 }}>
-                    Estimated Margin: {formatPrice(Math.max(0, selectedProduct.price - computedRecipeCost))}
+                    Estimated Margin: {formatPrice(Math.max(0, (selectedProduct?.price || 0) - computedRecipeCost))}
                   </div>
                 </div>
                 <div style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A' }}>
