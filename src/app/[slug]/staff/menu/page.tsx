@@ -8,10 +8,13 @@ import { productService } from '@/app/services/products.api';
 import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import { useParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { checkTableAssignment } from '@/lib/table-capacity';
+import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
+import { printKotFromBrowser } from '@/lib/client-print';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -98,12 +101,19 @@ function ProductCard({ product, quantity, onUpdate }: {
 
 export default function StaffMenuPage() {
   const { restaurant } = useRestaurant();
+  const params = useParams();
+  const slug = (params?.slug as string) || restaurant?.slug || '';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
+
+  useEffect(() => {
+    tryAutoConnectBluetooth();
+  }, []);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [tables, setTables] = useState<any[]>([]);
@@ -199,11 +209,42 @@ export default function StaffMenuPage() {
       fetchTables();
     });
 
+    const handleKotAutoPrint = async (data: any) => {
+      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
+      if (!autoPrint) return;
+
+      const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
+      if (dedicatedStation && dedicatedStation !== '' && dedicatedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
+        return;
+      }
+
+      toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: '🖨️',
+        duration: 3000,
+      });
+
+      try {
+        await printUnifiedThermalTicket({
+          base64Bytes: data.base64Bytes,
+          kotData: data.kotData,
+          printerName: data.printer_name,
+          counterId: data.counter_id,
+          counterName: data.counter_name,
+          isAutoPrint: true,
+        });
+      } catch (err: any) {
+        console.error('Auto-print execution error on staff menu:', err);
+      }
+    };
+
+    channel.bind('kot_auto_print', handleKotAutoPrint);
+
     return () => {
       channel.unbind('product_updated');
       channel.unbind('product_deleted');
       channel.unbind('new_order');
       channel.unbind('order_update');
+      channel.unbind('kot_auto_print', handleKotAutoPrint);
       pusherClient?.unsubscribe(channelName);
     };
   }, [restaurant, fetchTables]);
@@ -314,10 +355,60 @@ export default function StaffMenuPage() {
 
       if (res.success && res.data) {
         toast.success(`Order placed successfully! Ticket #${res.data.ticket_number}`);
+        const createdOrder = res.data;
+        toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
         setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN' });
         await fetchTables();
+
+        // 🖨️ Immediately print KOT tickets for this staff POS order
+        const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
+        if (autoPrint && createdOrder.id) {
+          const toastId = toast.loading('🖨️ Generating KOT tickets...');
+          try {
+            const printRes = await fetch('/api/print/kot', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-restaurant-slug': slug,
+              },
+              body: JSON.stringify({
+                orderId: createdOrder.id,
+                separateSlips: true,
+                orderData: createdOrder,
+                slug,
+              }),
+            });
+            const printData = await printRes.json();
+            if (printData.success) {
+              if (printData.slips && Array.isArray(printData.slips)) {
+                for (const slip of printData.slips) {
+                  await printKotFromBrowser({
+                    kotData: slip.kotData,
+                    base64Bytes: slip.base64Bytes,
+                    printerName: slip.printerName || printData.printer,
+                    counterId: slip.counterId,
+                    counterName: slip.kotData?.counterName,
+                  });
+                }
+                toast.success(`KOT printed for ${printData.slips.length} counter(s)!`, { id: toastId });
+              } else if (printData.kotData) {
+                await printKotFromBrowser({
+                  kotData: printData.kotData,
+                  base64Bytes: printData.base64Bytes,
+                  printerName: printData.printer,
+                });
+                toast.success('KOT printed successfully!', { id: toastId });
+              }
+            } else {
+              toast.dismiss(toastId);
+            }
+          } catch (printErr: any) {
+            console.error('POS order print error:', printErr);
+            toast.dismiss(toastId);
+          }
+        }
       } else {
         toast.error(res.error || 'Failed to place order');
       }
