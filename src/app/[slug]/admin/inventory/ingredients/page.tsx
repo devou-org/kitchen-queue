@@ -23,6 +23,8 @@ import toast from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { InventoryNav } from '@/components/modules/inventory/InventoryNav';
+import { InventoryModal } from '@/components/modules/inventory/InventoryModal';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { inventoryService } from '@/app/services/inventory.api';
 import { InventoryItem, InventoryCategory, InventoryUnit, Supplier } from '@/types/inventory';
 import { formatPrice } from '@/lib/format';
@@ -245,6 +247,7 @@ export default function IngredientsPage() {
               padding: '0 16px',
               borderRadius: '8px',
               background: '#0F172A',
+              background: 'var(--primary, #971345)',
               color: '#FFFFFF',
               fontSize: '13px',
               fontWeight: 700,
@@ -311,46 +314,30 @@ export default function IngredientsPage() {
         {/* Filter Dropdowns */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {/* Category */}
-          <select
+          <CustomSelect
+            style={{ width: '190px' }}
+            buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            style={{
-              height: '38px',
-              padding: '0 12px',
-              borderRadius: '8px',
-              border: '1px solid var(--border)',
-              background: '#FFFFFF',
-              fontSize: '13px',
-              color: '#0F172A',
-            }}
-          >
-            <option value="">All Categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setSelectedCategory(val)}
+            options={[
+              { value: '', label: 'All Categories' },
+              ...categories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
 
           {/* Stock Status */}
-          <select
+          <CustomSelect
+            style={{ width: '170px' }}
+            buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            style={{
-              height: '38px',
-              padding: '0 12px',
-              borderRadius: '8px',
-              border: '1px solid var(--border)',
-              background: '#FFFFFF',
-              fontSize: '13px',
-              color: '#0F172A',
-            }}
-          >
-            <option value="">All Stock Levels</option>
-            <option value="IN_STOCK">In Stock</option>
-            <option value="LOW_STOCK">Low Stock</option>
-            <option value="OUT_OF_STOCK">Out of Stock</option>
-          </select>
+            onChange={(val) => setSelectedStatus(val)}
+            options={[
+              { value: '', label: 'All Stock Levels' },
+              { value: 'IN_STOCK', label: 'In Stock' },
+              { value: 'LOW_STOCK', label: 'Low Stock' },
+              { value: 'OUT_OF_STOCK', label: 'Out of Stock' },
+            ]}
+          />
 
           {(search || selectedCategory || selectedStatus) && (
             <button
@@ -410,6 +397,7 @@ export default function IngredientsPage() {
               padding: '8px 16px',
               borderRadius: '8px',
               background: '#0F172A',
+              background: 'var(--primary, #971345)',
               color: '#FFFFFF',
               fontSize: '13px',
               fontWeight: 700,
@@ -614,62 +602,14 @@ export default function IngredientsPage() {
       )}
 
       {/* Add / Edit Ingredient Modal */}
-      {modalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '560px',
-              maxWidth: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              borderRadius: '16px',
-              border: '1px solid var(--border)',
-              background: '#FFFFFF',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '18px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            }}
-          >
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Boxes size={20} style={{ color: '#2563EB' }} />
-                <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                  {editingItem ? 'Edit Ingredient' : 'Add New Ingredient'}
-                </h3>
-              </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: '6px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  color: '#64748B',
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSaveItem} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <InventoryModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingItem ? 'Edit Ingredient' : 'Add New Ingredient'}
+        icon={<Boxes size={20} style={{ color: '#2563EB' }} />}
+        maxWidth="600px"
+      >
+        <form onSubmit={handleSaveItem} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* Ingredient Name */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
@@ -708,26 +648,16 @@ export default function IngredientsPage() {
                       + New
                     </button>
                   </div>
-                  <select
+                  <CustomSelect
+                    buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                     value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '9px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '13px',
-                      backgroundColor: '#FFFFFF',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormCategory(val)}
+                    placeholder="Select Category"
+                    options={[
+                      { value: '', label: 'Select Category' },
+                      ...categories.map((c) => ({ value: c.id, label: c.name })),
+                    ]}
+                  />
 
                   {/* Inline quick create category */}
                   {showAddCat && (
@@ -754,25 +684,15 @@ export default function IngredientsPage() {
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Measurement Unit *
                   </label>
-                  <select
+                  <CustomSelect
+                    buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                     value={formUnit}
-                    onChange={(e) => setFormUnit(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '9px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '13px',
-                      backgroundColor: '#FFFFFF',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    {units.map((u) => (
-                      <option key={u.short_code} value={u.short_code}>
-                        {u.name} ({u.short_code})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormUnit(val)}
+                    options={units.map((u) => ({
+                      value: u.short_code,
+                      label: `${u.name} (${u.short_code})`,
+                    }))}
+                  />
                 </div>
               </div>
 
@@ -874,26 +794,16 @@ export default function IngredientsPage() {
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Preferred Supplier
                   </label>
-                  <select
+                  <CustomSelect
+                    buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                     value={formSupplierId}
-                    onChange={(e) => setFormSupplierId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '9px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '13px',
-                      backgroundColor: '#FFFFFF',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    <option value="">None / Multiple</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormSupplierId(val)}
+                    placeholder="None / Multiple"
+                    options={[
+                      { value: '', label: 'None / Multiple' },
+                      ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -985,6 +895,7 @@ export default function IngredientsPage() {
                     borderRadius: '8px',
                     border: 'none',
                     backgroundColor: '#0F172A',
+                    backgroundColor: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '13px',
                     fontWeight: 700,
@@ -999,9 +910,7 @@ export default function IngredientsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </InventoryModal>
     </AdminContentWrapper>
   );
 }

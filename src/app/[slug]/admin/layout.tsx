@@ -22,6 +22,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
   const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
+  // Controlled via Super Admin Subscription Modules
+  const showInventory = restaurant?.modules?.INVENTORY === true;
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
@@ -52,7 +54,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         router.replace(`/${slug}/admin/${target}`);
       }
     }
-  }, [restaurant, resLoading, pathname, router, slug, showQueue]);
+
+    if (!resLoading && restaurant && restaurant.modules?.INVENTORY !== true) {
+      if (pathname.startsWith(`/${slug}/admin/inventory`)) {
+        const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
+        router.replace(`/${slug}/admin/${target}`);
+      }
+    }
+  }, [restaurant, resLoading, pathname, router, slug, showOrdering, showQueue]);
 
   // If on login page, render children without sidebar
   if (pathname === `/${slug}/admin/login`) {
@@ -113,7 +122,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
-    { name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> },
+    ...(showInventory ? [{ name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/sales`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),

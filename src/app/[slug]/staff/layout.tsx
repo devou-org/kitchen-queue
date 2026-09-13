@@ -105,6 +105,7 @@ function StaffLayoutInner({ children }: { children: React.ReactNode }) {
             <div style={{
               width: '40px', height: '40px', borderRadius: '8px',
               backgroundColor: '#000000', color: 'white',
+              backgroundColor: 'var(--primary)', color: 'white',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontWeight: 800, fontSize: '18px', flexShrink: 0,
               overflow: 'hidden'

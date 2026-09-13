@@ -22,6 +22,8 @@ import toast from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { InventoryNav } from '@/components/modules/inventory/InventoryNav';
+import { InventoryModal } from '@/components/modules/inventory/InventoryModal';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { inventoryService } from '@/app/services/inventory.api';
 import { PurchaseOrder, Supplier, InventoryItem } from '@/types/inventory';
 import { formatPrice } from '@/lib/format';
@@ -233,6 +235,7 @@ export default function PurchasesPage() {
               padding: '0 16px',
               borderRadius: '8px',
               background: '#0F172A',
+              background: 'var(--primary, #971345)',
               color: '#FFFFFF',
               fontSize: '13px',
               fontWeight: 700,
@@ -430,71 +433,30 @@ export default function PurchasesPage() {
       </div>
 
       {/* Receive Stock Modal */}
-      {modalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '740px',
-              maxWidth: '100%',
-              maxHeight: '92vh',
-              overflowY: 'auto',
-              borderRadius: '16px',
-              background: '#FFFFFF',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Truck size={20} style={{ color: '#0F172A' }} />
-                <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                  Receive Stock Delivery
-                </h3>
-              </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitReceive} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <InventoryModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Receive Stock Delivery"
+        icon={<Truck size={20} style={{ color: '#0F172A' }} />}
+        maxWidth="780px"
+      >
+        <form onSubmit={handleSubmitReceive} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Header Info */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Supplier
                   </label>
-                  <select
+                  <CustomSelect
+                    buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                     value={formSupplierId}
-                    onChange={(e) => setFormSupplierId(e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF' }}
-                  >
-                    <option value="">Direct / Walk-in Market</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormSupplierId(val)}
+                    placeholder="Direct / Walk-in Market"
+                    options={[
+                      { value: '', label: 'Direct / Walk-in Market' },
+                      ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+                    ]}
+                  />
                 </div>
 
                 <div>
@@ -526,15 +488,16 @@ export default function PurchasesPage() {
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Payment Status
                   </label>
-                  <select
+                  <CustomSelect
+                    buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                     value={formPaymentStatus}
-                    onChange={(e) => setFormPaymentStatus(e.target.value as any)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF' }}
-                  >
-                    <option value="PAID">Paid in Full</option>
-                    <option value="UNPAID">Unpaid (Add to Outstanding)</option>
-                    <option value="PARTIAL">Partial</option>
-                  </select>
+                    onChange={(val) => setFormPaymentStatus(val as any)}
+                    options={[
+                      { value: 'PAID', label: 'Paid in Full' },
+                      { value: 'UNPAID', label: 'Unpaid (Add to Outstanding)' },
+                      { value: 'PARTIAL', label: 'Partial' },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -586,19 +549,19 @@ export default function PurchasesPage() {
                         {/* Ingredient */}
                         <div>
                           <label style={{ fontSize: '10px', fontWeight: 700, color: '#64748B' }}>Ingredient</label>
-                          <select
+                          <CustomSelect
+                            buttonStyle={{ height: '36px', borderRadius: '6px', fontSize: '12px' }}
                             value={line.item_id}
-                            onChange={(e) => handleItemSelect(idx, e.target.value)}
-                            required
-                            style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px', backgroundColor: '#FFFFFF' }}
-                          >
-                            <option value="">Select Item</option>
-                            {items.map((it) => (
-                              <option key={it.id} value={it.id}>
-                                {it.name} ({it.unit})
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(val) => handleItemSelect(idx, val)}
+                            placeholder="Select Item"
+                            options={[
+                              { value: '', label: 'Select Item' },
+                              ...items.map((it) => ({
+                                value: it.id,
+                                label: `${it.name} (${it.unit})`,
+                              })),
+                            ]}
+                          />
                         </div>
 
                         {/* Quantity */}
@@ -731,6 +694,7 @@ export default function PurchasesPage() {
                     borderRadius: '8px',
                     border: 'none',
                     background: '#0F172A',
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '13px',
                     fontWeight: 700,
@@ -745,9 +709,7 @@ export default function PurchasesPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </InventoryModal>
     </AdminContentWrapper>
   );
 }

@@ -23,6 +23,7 @@ import toast from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { InventoryNav } from '@/components/modules/inventory/InventoryNav';
+import { InventoryModal } from '@/components/modules/inventory/InventoryModal';
 import { inventoryService } from '@/app/services/inventory.api';
 import { Supplier } from '@/types/inventory';
 import { formatPrice } from '@/lib/format';
@@ -171,6 +172,7 @@ export default function SuppliersPage() {
               padding: '0 16px',
               borderRadius: '8px',
               background: '#0F172A',
+              background: 'var(--primary, #971345)',
               color: '#FFFFFF',
               fontSize: '13px',
               fontWeight: 700,
@@ -354,47 +356,14 @@ export default function SuppliersPage() {
       )}
 
       {/* Add / Edit Supplier Modal */}
-      {modalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '480px',
-              maxWidth: '100%',
-              borderRadius: '16px',
-              background: '#FFFFFF',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Building2 size={18} style={{ color: '#0F172A' }} />
-                <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                  {editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
-                </h3>
-              </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <InventoryModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
+        icon={<Building2 size={18} style={{ color: '#0F172A' }} />}
+        maxWidth="500px"
+      >
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                   Company / Supplier Name *
@@ -507,6 +476,7 @@ export default function SuppliersPage() {
                     borderRadius: '8px',
                     border: 'none',
                     background: '#0F172A',
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -521,9 +491,7 @@ export default function SuppliersPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </InventoryModal>
     </AdminContentWrapper>
   );
 }

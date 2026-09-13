@@ -88,6 +88,7 @@ export default function InventoryDashboardPage() {
                 padding: '0 14px',
                 borderRadius: '8px',
                 background: '#0F172A',
+                background: 'var(--primary, #971345)',
                 color: '#FFFFFF',
                 fontSize: '13px',
                 fontWeight: 700,

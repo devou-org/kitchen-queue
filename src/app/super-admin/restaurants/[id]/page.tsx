@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
-import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart, Receipt, MapPin, Navigation } from 'lucide-react';
+import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart, Receipt, MapPin, Navigation, Boxes } from 'lucide-react';
 type Module = {
   module_name: string;
   is_enabled: boolean;
@@ -29,6 +29,7 @@ const ALL_MODULES = [
   { key: 'DIGITAL_MENU', label: 'Digital Menu', desc: 'Allows customers to view products and details on their phones.', icon: <ClipboardList size={16} /> },
   { key: 'ONLINE_ORDERING', label: 'Online Ordering', desc: 'Enables online checkout, payments, and shopping carts.', icon: <ShoppingCart size={16} /> },
   { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', desc: 'Tracks active order tokens and served tokens for kitchen screen.', icon: <Ticket size={16} /> },
+  { key: 'INVENTORY', label: 'Inventory Management', desc: 'Tracks raw food ingredients, recipes (BOM), stock deliveries, and wastage.', icon: <Boxes size={16} /> },
 ];
 
 const S: Record<string, React.CSSProperties> = {
@@ -767,7 +768,7 @@ export default function RestaurantDetails() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
                 {ALL_MODULES.map(mod => {
                   const mData = (restaurant.modules || []).find(m => m.module_name === mod.key);
-                  const isEnabled = mData ? mData.is_enabled : true;
+                  const isEnabled = mData ? mData.is_enabled : (mod.key === 'INVENTORY' ? false : true);
 
                   return (
                     <div key={mod.key} style={{

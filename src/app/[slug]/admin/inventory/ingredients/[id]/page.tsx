@@ -23,6 +23,8 @@ import toast from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { InventoryNav } from '@/components/modules/inventory/InventoryNav';
+import { InventoryModal } from '@/components/modules/inventory/InventoryModal';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { inventoryService } from '@/app/services/inventory.api';
 import { InventoryItem, InventoryBatch, StockMovement } from '@/types/inventory';
 import { formatPrice } from '@/lib/format';
@@ -576,47 +578,14 @@ export default function IngredientDetailPage() {
       </div>
 
       {/* Record Wastage Modal */}
-      {wastageModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '460px',
-              maxWidth: '100%',
-              borderRadius: '16px',
-              background: '#FFFFFF',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Trash2 size={18} style={{ color: '#DC2626' }} />
-                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                  Record Wastage: {item.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setWastageModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleRecordWastage} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <InventoryModal
+        isOpen={wastageModalOpen}
+        onClose={() => setWastageModalOpen(false)}
+        title={`Record Wastage: ${item?.name || ''}`}
+        icon={<Trash2 size={18} style={{ color: '#DC2626' }} />}
+        maxWidth="480px"
+      >
+        <form onSubmit={handleRecordWastage} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                   Quantity Lost ({item.unit}) *
@@ -647,26 +616,19 @@ export default function IngredientDetailPage() {
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Deduct from Batch (Optional)
                   </label>
-                  <select
+                  <CustomSelect
+                    buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                     value={wasteBatchId}
-                    onChange={(e) => setWasteBatchId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '9px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '13px',
-                      backgroundColor: '#FFFFFF',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    <option value="">General Stock</option>
-                    {item.batches.map((b: InventoryBatch) => (
-                      <option key={b.id} value={b.id}>
-                        {b.batch_number} (Qty: {b.current_quantity} {item.unit})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setWasteBatchId(val)}
+                    placeholder="General Stock"
+                    options={[
+                      { value: '', label: 'General Stock' },
+                      ...item.batches.map((b: InventoryBatch) => ({
+                        value: b.id,
+                        label: `${b.batch_number} (Qty: ${b.current_quantity} ${item.unit})`,
+                      })),
+                    ]}
+                  />
                 </div>
               )}
 
@@ -675,27 +637,20 @@ export default function IngredientDetailPage() {
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                   Reason for Loss *
                 </label>
-                <select
+                <CustomSelect
+                  buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                   value={wasteReason}
-                  onChange={(e) => setWasteReason(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '9px 10px',
-                    borderRadius: '8px',
-                    border: '1px solid #CBD5E1',
-                    fontSize: '13px',
-                    backgroundColor: '#FFFFFF',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <option value="SPOILAGE">Spoiled / Rotting</option>
-                  <option value="EXPIRED">Expired Past Best-Before</option>
-                  <option value="DAMAGED">Damaged in Transit / Kitchen</option>
-                  <option value="OVERPRODUCTION">Overproduction / Leftover</option>
-                  <option value="WRONG_PREPARATION">Wrong Preparation / Burnt</option>
-                  <option value="STAFF_CONSUMPTION">Staff Food Consumption</option>
-                  <option value="OTHER">Other Reason</option>
-                </select>
+                  onChange={(val) => setWasteReason(val)}
+                  options={[
+                    { value: 'SPOILAGE', label: 'Spoiled / Rotting' },
+                    { value: 'EXPIRED', label: 'Expired Past Best-Before' },
+                    { value: 'DAMAGED', label: 'Damaged in Transit / Kitchen' },
+                    { value: 'OVERPRODUCTION', label: 'Overproduction / Leftover' },
+                    { value: 'WRONG_PREPARATION', label: 'Wrong Preparation / Burnt' },
+                    { value: 'STAFF_CONSUMPTION', label: 'Staff Food Consumption' },
+                    { value: 'OTHER', label: 'Other Reason' },
+                  ]}
+                />
               </div>
 
               {/* Notes */}
@@ -774,52 +729,17 @@ export default function IngredientDetailPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </InventoryModal>
 
       {/* Adjust Stock (Stock Take) Modal */}
-      {adjustmentModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '460px',
-              maxWidth: '100%',
-              borderRadius: '16px',
-              background: '#FFFFFF',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={18} style={{ color: '#2563EB' }} />
-                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                  Physical Stock Count: {item.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setAdjustmentModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleRecordAdjustment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <InventoryModal
+        isOpen={adjustmentModalOpen}
+        onClose={() => setAdjustmentModalOpen(false)}
+        title={`Physical Stock Count: ${item?.name || ''}`}
+        icon={<Sliders size={18} style={{ color: '#2563EB' }} />}
+        maxWidth="480px"
+      >
+        <form onSubmit={handleRecordAdjustment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ padding: '10px 12px', backgroundColor: '#F8FAFC', borderRadius: '8px', fontSize: '12px', color: '#475569' }}>
                 <div>System Current Stock: <strong>{item.current_stock} {item.unit}</strong></div>
               </div>
@@ -913,6 +833,7 @@ export default function IngredientDetailPage() {
                     borderRadius: '8px',
                     border: 'none',
                     background: '#0F172A',
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -927,9 +848,7 @@ export default function IngredientDetailPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </InventoryModal>
     </AdminContentWrapper>
   );
 }

@@ -21,6 +21,7 @@ const MODULE_RULES = [
   { pathPrefix: '/cart', module: 'ONLINE_ORDERING' },
   { pathPrefix: '/order-status', module: 'ONLINE_ORDERING' },
   { pathPrefix: '/menu', module: 'DIGITAL_MENU' },
+  { pathPrefix: '/admin/inventory', module: 'INVENTORY' },
 ];
 
 // ==========================================
@@ -178,6 +179,10 @@ async function handleModulePermissions(request: NextRequest, slug: string, subPa
           if (!isEnabled) {
             // Module is disabled, redirect to a safe route (menu is usually safe)
             // If the disabled module IS the menu, we could redirect to a dedicated 403/unavailable page
+            // Module is disabled, redirect to a safe route
+            if (subPath.startsWith('/admin')) {
+              return NextResponse.redirect(new URL(`/${slug}/admin/products`, request.url));
+            }
             if (requiredModule === 'DIGITAL_MENU') {
               return NextResponse.rewrite(new URL('/404', request.url)); // Next.js default 404
             }

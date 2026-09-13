@@ -20,6 +20,8 @@ import toast from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { InventoryNav } from '@/components/modules/inventory/InventoryNav';
+import { InventoryModal } from '@/components/modules/inventory/InventoryModal';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { inventoryService } from '@/app/services/inventory.api';
 import { productService } from '@/app/services/products.api';
 import { Product } from '@/types';
@@ -366,6 +368,8 @@ export default function RecipesPage() {
                     borderRadius: '8px',
                     border: '1px solid #CBD5E1',
                     background: isConfigured ? '#FFFFFF' : '#0F172A',
+                    border: isConfigured ? '1px solid #CBD5E1' : 'none',
+                    background: isConfigured ? '#FFFFFF' : 'var(--primary, #971345)',
                     color: isConfigured ? '#0F172A' : '#FFFFFF',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -386,55 +390,15 @@ export default function RecipesPage() {
       )}
 
       {/* Configure Recipe Modal */}
-      {modalOpen && selectedProduct && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '680px',
-              maxWidth: '100%',
-              maxHeight: '92vh',
-              overflowY: 'auto',
-              borderRadius: '16px',
-              background: '#FFFFFF',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}
-          >
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ChefHat size={20} style={{ color: '#0F172A' }} />
-                <div>
-                  <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                    Recipe BOM: {selectedProduct.name}
-                  </h3>
-                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                    Define portions deducted per order of this dish.
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveRecipe} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <InventoryModal
+        isOpen={modalOpen && Boolean(selectedProduct)}
+        onClose={() => setModalOpen(false)}
+        title={`Recipe BOM: ${selectedProduct?.name || ''}`}
+        subtitle="Define portions deducted per order of this dish."
+        icon={<ChefHat size={20} style={{ color: '#0F172A' }} />}
+        maxWidth="720px"
+      >
+        <form onSubmit={handleSaveRecipe} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Servings */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
                 <div>
@@ -515,19 +479,19 @@ export default function RecipesPage() {
                         {/* Ingredient Select */}
                         <div>
                           <label style={{ fontSize: '10px', fontWeight: 700, color: '#64748B' }}>Ingredient</label>
-                          <select
+                          <CustomSelect
+                            buttonStyle={{ height: '36px', borderRadius: '6px', fontSize: '12px' }}
                             value={line.item_id}
-                            onChange={(e) => handleItemSelect(idx, e.target.value)}
-                            required
-                            style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px', backgroundColor: '#FFFFFF' }}
-                          >
-                            <option value="">Select Ingredient</option>
-                            {ingredients.map((it) => (
-                              <option key={it.id} value={it.id}>
-                                {it.name} ({it.unit})
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(val) => handleItemSelect(idx, val)}
+                            placeholder="Select Ingredient"
+                            options={[
+                              { value: '', label: 'Select Ingredient' },
+                              ...ingredients.map((it) => ({
+                                value: it.id,
+                                label: `${it.name} (${it.unit})`,
+                              })),
+                            ]}
+                          />
                         </div>
 
                         {/* Quantity */}
@@ -642,6 +606,7 @@ export default function RecipesPage() {
                     borderRadius: '8px',
                     border: 'none',
                     background: '#0F172A',
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '13px',
                     fontWeight: 700,
@@ -656,9 +621,7 @@ export default function RecipesPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </InventoryModal>
     </AdminContentWrapper>
   );
 }

@@ -19,6 +19,8 @@ import toast from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { InventoryNav } from '@/components/modules/inventory/InventoryNav';
+import { InventoryModal } from '@/components/modules/inventory/InventoryModal';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { inventoryService } from '@/app/services/inventory.api';
 import { WastageRecord, StockAdjustment, InventoryItem, WastageReason } from '@/types/inventory';
 import { formatPrice } from '@/lib/format';
@@ -419,61 +421,31 @@ export default function WastageAndAdjustmentsPage() {
       )}
 
       {/* Record Wastage Modal */}
-      {wastageModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '460px',
-              maxWidth: '100%',
-              borderRadius: '16px',
-              background: '#FFFFFF',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Trash2 size={18} style={{ color: '#DC2626' }} />
-                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                  Record Food Wastage
-                </h3>
-              </div>
-              <button onClick={() => setWastageModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleRecordWastage} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <InventoryModal
+        isOpen={wastageModalOpen}
+        onClose={() => setWastageModalOpen(false)}
+        title="Record Food Wastage"
+        icon={<Trash2 size={18} style={{ color: '#DC2626' }} />}
+        maxWidth="480px"
+      >
+        <form onSubmit={handleRecordWastage} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                   Select Ingredient *
                 </label>
-                <select
+                <CustomSelect
+                  buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                   value={wasteItemId}
-                  onChange={(e) => setWasteItemId(e.target.value)}
-                  required
-                  style={{ width: '100%', padding: '9px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF' }}
-                >
-                  <option value="">Select Item</option>
-                  {items.map((it) => (
-                    <option key={it.id} value={it.id}>
-                      {it.name} (Available: {it.current_stock} {it.unit})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setWasteItemId(val)}
+                  placeholder="Select Item"
+                  options={[
+                    { value: '', label: 'Select Item' },
+                    ...items.map((it) => ({
+                      value: it.id,
+                      label: `${it.name} (Available: ${it.current_stock} ${it.unit})`,
+                    })),
+                  ]}
+                />
               </div>
 
               <div>
@@ -496,19 +468,20 @@ export default function WastageAndAdjustmentsPage() {
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                   Reason for Wastage *
                 </label>
-                <select
+                <CustomSelect
+                  buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                   value={wasteReason}
-                  onChange={(e) => setWasteReason(e.target.value as any)}
-                  style={{ width: '100%', padding: '9px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF' }}
-                >
-                  <option value="SPOILAGE">Spoiled / Rotting</option>
-                  <option value="EXPIRED">Expired Past Best-Before</option>
-                  <option value="DAMAGED">Damaged in Transit / Kitchen</option>
-                  <option value="OVERPRODUCTION">Overproduction / Leftover</option>
-                  <option value="WRONG_PREPARATION">Wrong Preparation / Burnt</option>
-                  <option value="STAFF_CONSUMPTION">Staff Food Consumption</option>
-                  <option value="OTHER">Other Reason</option>
-                </select>
+                  onChange={(val) => setWasteReason(val as any)}
+                  options={[
+                    { value: 'SPOILAGE', label: 'Spoiled / Rotting' },
+                    { value: 'EXPIRED', label: 'Expired Past Best-Before' },
+                    { value: 'DAMAGED', label: 'Damaged in Transit / Kitchen' },
+                    { value: 'OVERPRODUCTION', label: 'Overproduction / Leftover' },
+                    { value: 'WRONG_PREPARATION', label: 'Wrong Preparation / Burnt' },
+                    { value: 'STAFF_CONSUMPTION', label: 'Staff Food Consumption' },
+                    { value: 'OTHER', label: 'Other Reason' },
+                  ]}
+                />
               </div>
 
               <div>
@@ -560,70 +533,38 @@ export default function WastageAndAdjustmentsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </InventoryModal>
 
       {/* Stock Take Count Modal */}
-      {adjModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '460px',
-              maxWidth: '100%',
-              borderRadius: '16px',
-              background: '#FFFFFF',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={18} style={{ color: '#2563EB' }} />
-                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                  Stock Take Count Reconciliation
-                </h3>
-              </div>
-              <button onClick={() => setAdjModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleRecordAdjustment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <InventoryModal
+        isOpen={adjModalOpen}
+        onClose={() => setAdjModalOpen(false)}
+        title="Stock Take Count Reconciliation"
+        icon={<Sliders size={18} style={{ color: '#2563EB' }} />}
+        maxWidth="480px"
+      >
+        <form onSubmit={handleRecordAdjustment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '4px' }}>
                   Select Ingredient *
                 </label>
-                <select
+                <CustomSelect
+                  buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px' }}
                   value={adjItemId}
-                  onChange={(e) => {
-                    setAdjItemId(e.target.value);
-                    const it = items.find((x) => x.id === e.target.value);
+                  onChange={(val) => {
+                    setAdjItemId(val);
+                    const it = items.find((x) => x.id === val);
                     if (it) setPhysicalCount(String(it.current_stock));
                   }}
-                  required
-                  style={{ width: '100%', padding: '9px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF' }}
-                >
-                  <option value="">Select Item</option>
-                  {items.map((it) => (
-                    <option key={it.id} value={it.id}>
-                      {it.name} (Current: {it.current_stock} {it.unit})
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Item"
+                  options={[
+                    { value: '', label: 'Select Item' },
+                    ...items.map((it) => ({
+                      value: it.id,
+                      label: `${it.name} (Current: ${it.current_stock} ${it.unit})`,
+                    })),
+                  ]}
+                />
               </div>
 
               {selectedAdjItem && (
@@ -697,6 +638,7 @@ export default function WastageAndAdjustmentsPage() {
                     borderRadius: '8px',
                     border: 'none',
                     background: '#0F172A',
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -711,9 +653,7 @@ export default function WastageAndAdjustmentsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </InventoryModal>
     </AdminContentWrapper>
   );
 }

@@ -512,8 +512,9 @@ export async function createRestaurant(data: {
   }
 
   // Seed default modules for the new restaurant
-  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT'];
-  const enabledModules = data.modules || ALL_MODULES;
+  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY'];
+  const defaultEnabledModules = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT'];
+  const enabledModules = data.modules || defaultEnabledModules;
 
   for (const mod of ALL_MODULES) {
     await sql`

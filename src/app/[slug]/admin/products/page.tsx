@@ -848,6 +848,7 @@ export default function AdminProducts() {
                       borderRadius: '8px',
                       border: 'none',
                       backgroundColor: '#0f172a',
+                      backgroundColor: 'var(--primary, #971345)',
                       color: '#ffffff',
                       fontWeight: 700,
                       fontSize: '13px',
