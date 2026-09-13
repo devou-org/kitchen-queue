@@ -181,9 +181,11 @@ export async function POST(request: NextRequest) {
 
     // 🖨️ AUTO-PRINT KOT PER COUNTER when order is placed
     if (order) {
-      autoQueueAndBroadcastKot(restaurant.id, order.id).catch((kotErr) => {
+      try {
+        await autoQueueAndBroadcastKot(restaurant.id, order.id);
+      } catch (kotErr) {
         console.error('❌ Automatic KOT print error on order creation:', kotErr);
-      });
+      }
     }
 
     return NextResponse.json({

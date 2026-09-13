@@ -422,9 +422,26 @@ export async function tryAutoConnectBluetooth(): Promise<boolean> {
     if (writeChar) {
       activeBluetoothDevice = targetDevice;
       activeBluetoothChar = writeChar;
+      const deviceName = targetDevice.name || 'Bluetooth Thermal Printer';
+      const conn: ActiveBtConnection = { device: targetDevice, char: writeChar, name: deviceName };
+      activeBtConnections.set(deviceName, conn);
+
+      // Rehydrate counter associations from localStorage
+      if (typeof window !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('qdine_bt_counter_')) {
+            const counterKey = key.replace('qdine_bt_counter_', '');
+            activeBtConnections.set(counterKey, conn);
+          }
+        }
+      }
+
       targetDevice.addEventListener('gattserverdisconnected', () => {
         console.log('Bluetooth printer disconnected');
         activeBluetoothChar = null;
+        activeBluetoothDevice = null;
+        activeBtConnections.delete(deviceName);
       });
       return true;
     }
@@ -777,35 +794,24 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     } catch {}
   }
 
-  // ⚠️ CRITICAL: If this was triggered automatically by incoming order (Auto-Print),
-  // NEVER open the browser's built-in print preview tab/dialog!
-  if (isAutoPrint) {
-    return {
-      success: false,
-      method: 'browser',
-      message: 'Thermal printer not paired. Tap "Pair Printer" at the top to connect Bluetooth, or start RawBT.',
-    };
-  }
-
-  // 4. Fallback: Browser 80mm Thermal Receipt (Only for MANUAL clicks, e.g. "Print Ticket" button)
+  // 5. Fallback: Browser 80mm Thermal Receipt
+  // When no direct Bluetooth/Serial/RawBT hardware is connected, this prints via the OS thermal receipt driver.
+  // In Chrome Kiosk Mode (--kiosk-printing), this prints 100% silently and automatically.
   return new Promise((resolve) => {
     try {
       const html = generateThermalReceiptHtml(kotData);
 
-      const iframeId = 'kot-print-iframe';
-      let iframe = document.getElementById(iframeId) as HTMLIFrameElement;
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = iframeId;
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = 'none';
-        iframe.style.zIndex = '-9999';
-        document.body.appendChild(iframe);
-      }
+      const iframeId = `kot-print-iframe-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const iframe = document.createElement('iframe');
+      iframe.id = iframeId;
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      iframe.style.zIndex = '-9999';
+      document.body.appendChild(iframe);
 
       const doc = iframe.contentWindow?.document;
       if (!doc) throw new Error('Cannot access print frame');
@@ -818,10 +824,13 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
         try {
           iframe.contentWindow?.focus();
           iframe.contentWindow?.print();
+          setTimeout(() => {
+            try { iframe.remove(); } catch {}
+          }, 60000);
           resolve({
             success: true,
             method: 'browser',
-            message: `KOT printed for ${printerName}`,
+            message: `KOT printed for ${counterName || kotData.counterName || printerName}`,
           });
         } catch {
           resolve({

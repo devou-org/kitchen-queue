@@ -7,10 +7,9 @@ import { Order } from '@/types';
 import { getCurrentBusinessDate } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
-import { adminService } from '@/app/services/admin.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ChefHat, Search, X, Printer, Store, Loader2 } from 'lucide-react';
-import { printUnifiedThermalTicket } from '@/lib/hardware-printer';
+import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { OrderTableRow, OrderTableHeader } from '@/components/modules/orders/OrderTableRow';
 import OrderDetailsView from '@/components/modules/orders/OrderDetailsView';
@@ -66,13 +65,14 @@ export default function AdminOrders() {
       if (savedCounter !== null) setCounterFilter(savedCounter);
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
       if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint !== 'false');
+
+      tryAutoConnectBluetooth();
     }
   }, []);
 
   const handleCounterFilterChange = (val: string) => {
     setCounterFilter(val);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('qdine_station_counter', val);
       localStorage.setItem('qdine_orders_counter_filter', val);
     }
   };

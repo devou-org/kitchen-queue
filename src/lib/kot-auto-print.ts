@@ -15,7 +15,7 @@ import sql, { getOrderById, getRestaurantById, getCounters, createPrintJob } fro
 import { buildKotEscposBuffer, KotPrintData, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
 import { pusherServer } from '@/lib/pusher';
 
-export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: string) {
+export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: string, forceBroadcast: boolean = false) {
   try {
     const order = await getOrderById(restaurantId, orderId);
     if (!order) return;
@@ -24,17 +24,19 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
     if (allItems.length === 0) return;
 
     // Check if KOT jobs for this order were already queued to prevent duplicate prints
-    try {
-      const existingJobs = await sql`
-        SELECT id FROM print_jobs 
-        WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} 
-        LIMIT 1
-      `;
-      if (existingJobs && existingJobs.length > 0) {
-        console.log(`ℹ️ KOT print jobs already exist for Order #${order.ticket_number}, skipping duplicate generation.`);
-        return;
-      }
-    } catch {}
+    if (!forceBroadcast) {
+      try {
+        const existingJobs = await sql`
+          SELECT id FROM print_jobs 
+          WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} 
+          LIMIT 1
+        `;
+        if (existingJobs && existingJobs.length > 0) {
+          console.log(`ℹ️ KOT print jobs already exist for Order #${order.ticket_number}, skipping duplicate generation.`);
+          return;
+        }
+      } catch {}
+    }
 
     const restaurant = await getRestaurantById(restaurantId);
     const restaurantName = restaurant?.name || 'QDINE';

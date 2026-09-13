@@ -53,7 +53,6 @@ export default function StaffOrders() {
   const handleCounterFilterChange = (val: string) => {
     setCounterFilter(val);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('qdine_station_counter', val);
       localStorage.setItem('qdine_orders_counter_filter', val);
     }
   };

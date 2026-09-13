@@ -278,9 +278,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       // 🖨️ AUTO-PRINT KOT PER COUNTER when transitioning to PREPARING
       if (status === 'PREPARING') {
-        autoQueueAndBroadcastKot(restaurant.id, id).catch((kotErr) => {
+        try {
+          await autoQueueAndBroadcastKot(restaurant.id, id, true);
+        } catch (kotErr) {
           console.error('❌ Automatic KOT print error:', kotErr);
-        });
+        }
       }
 
       // 🔔 BROADCAST UPDATE
