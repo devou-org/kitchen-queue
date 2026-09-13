@@ -88,8 +88,21 @@ export default function InventoryReportsPage() {
       <InventoryNav />
 
       {/* Report Sub Tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x',
+          paddingBottom: '4px',
+        }}
+        className="no-scrollbar"
+      >
         <button
+          type="button"
           onClick={() => setTab('valuation')}
           style={{
             padding: '8px 16px',
@@ -100,12 +113,18 @@ export default function InventoryReportsPage() {
             backgroundColor: tab === 'valuation' ? 'var(--primary, #971345)' : '#FFFFFF',
             color: tab === 'valuation' ? '#FFFFFF' : '#64748B',
             cursor: 'pointer',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
           }}
         >
           Stock Valuation Report
         </button>
 
         <button
+          type="button"
           onClick={() => setTab('consumption')}
           style={{
             padding: '8px 16px',
@@ -116,12 +135,18 @@ export default function InventoryReportsPage() {
             backgroundColor: tab === 'consumption' ? '#EFF6FF' : '#FFFFFF',
             color: tab === 'consumption' ? '#2563EB' : '#64748B',
             cursor: 'pointer',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
           }}
         >
           Consumption & Ledger
         </button>
 
         <button
+          type="button"
           onClick={() => setTab('wastage')}
           style={{
             padding: '8px 16px',
@@ -132,12 +157,18 @@ export default function InventoryReportsPage() {
             backgroundColor: tab === 'wastage' ? '#FEF2F2' : '#FFFFFF',
             color: tab === 'wastage' ? '#DC2626' : '#64748B',
             cursor: 'pointer',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
           }}
         >
           Wastage Breakdown
         </button>
 
         <button
+          type="button"
           onClick={() => setTab('category')}
           style={{
             padding: '8px 16px',
@@ -148,6 +179,11 @@ export default function InventoryReportsPage() {
             backgroundColor: tab === 'category' ? '#F0FDF4' : '#FFFFFF',
             color: tab === 'category' ? '#16A34A' : '#64748B',
             cursor: 'pointer',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
           }}
         >
           Category Valuation

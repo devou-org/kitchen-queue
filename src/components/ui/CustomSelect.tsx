@@ -56,21 +56,34 @@ export function CustomSelect<T extends string = string>({
     }
   }, [isOpen, direction]);
 
-  const selectedOption = options.find((opt) => opt.value === value) || (options.length > 0 ? options[0] : null);
+  const selectedOption = options.find((opt) => opt.value === value) ?? null;
   const OptionIcon = selectedOption?.icon || DefaultIcon;
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleOutsideInteraction = (event: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleOutsideInteraction);
+    document.addEventListener('touchstart', handleOutsideInteraction, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideInteraction);
+      document.removeEventListener('touchstart', handleOutsideInteraction);
+    };
   }, []);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%', ...style }} className={className}>
+    <div
+      ref={containerRef}
+      style={{
+        position: 'relative',
+        width: '100%',
+        zIndex: isOpen ? 60 : undefined,
+        ...style,
+      }}
+      className={className}
+    >
       <button
         type="button"
         disabled={disabled}
@@ -87,11 +100,13 @@ export function CustomSelect<T extends string = string>({
           borderRadius: 'var(--radius-sm, 8px)',
           fontWeight: 600,
           fontSize: '14px',
-          color: 'var(--text-primary)',
+          color: selectedOption ? 'var(--text-primary)' : '#94A3B8',
           cursor: disabled ? 'not-allowed' : 'pointer',
           opacity: disabled ? 0.6 : 1,
           transition: 'all 0.2s ease',
           boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
           ...buttonStyle,
         }}
       >
@@ -130,6 +145,7 @@ export function CustomSelect<T extends string = string>({
             overflowY: 'auto',
             maxHeight: '340px',
             padding: '4px',
+            WebkitOverflowScrolling: 'touch',
             ...dropdownStyle,
           }}
         >
@@ -141,7 +157,12 @@ export function CustomSelect<T extends string = string>({
               <button
                 key={String(option.value)}
                 type="button"
-                onClick={() => {
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   onChange(option.value);
                   setIsOpen(false);
                 }}
@@ -150,15 +171,18 @@ export function CustomSelect<T extends string = string>({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '8px 12px',
+                  padding: '10px 12px',
                   borderRadius: '6px',
                   border: 'none',
-                  background: isSelected ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
-                  color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
+                  background: isSelected ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
+                  color: isSelected ? 'var(--primary, #971345)' : 'var(--text-primary, #0F172A)',
                   fontWeight: isSelected ? 700 : 500,
                   fontSize: '13.5px',
                   cursor: 'pointer',
                   textAlign: 'left',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  userSelect: 'none',
                   transition: 'background 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
@@ -173,14 +197,14 @@ export function CustomSelect<T extends string = string>({
                     <ItemIcon
                       size={16}
                       style={{
-                        color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
+                        color: isSelected ? 'var(--primary, #971345)' : 'var(--text-secondary, #64748B)',
                         flexShrink: 0,
                       }}
                     />
                   )}
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{option.label}</span>
                 </div>
-                {isSelected && <Check size={14} style={{ color: 'var(--primary)', flexShrink: 0, marginLeft: '8px' }} />}
+                {isSelected && <Check size={14} style={{ color: 'var(--primary, #971345)', flexShrink: 0, marginLeft: '8px' }} />}
               </button>
             );
           })}

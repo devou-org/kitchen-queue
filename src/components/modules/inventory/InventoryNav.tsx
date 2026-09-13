@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname, useParams, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Boxes,
@@ -12,9 +12,13 @@ import {
 } from 'lucide-react';
 
 export function InventoryNav() {
-  const pathname = usePathname();
-  const { slug } = useParams();
-  const slugStr = Array.isArray(slug) ? slug[0] : slug;
+  const router = useRouter();
+  const pathname = usePathname() || '';
+  const params = useParams();
+  
+  // Robust slug resolution: prioritize params, fallback to path segment
+  const rawSlug = params?.slug;
+  const slugStr = (Array.isArray(rawSlug) ? rawSlug[0] : rawSlug) || pathname.split('/').filter(Boolean)[0] || '';
   const basePath = `/${slugStr}/admin/inventory`;
 
   const tabs = [
@@ -56,13 +60,18 @@ export function InventoryNav() {
     },
   ];
 
+  // Normalize pathname: remove search params and trailing slash for reliable active state comparison
+  const cleanPath = pathname.split('?')[0].replace(/\/+$/, '');
+
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: '8px',
         overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-x',
         padding: '4px 0 16px 0',
         borderBottom: '1px solid var(--border, #E2E8F0)',
         marginBottom: '20px',
@@ -70,28 +79,39 @@ export function InventoryNav() {
       className="no-scrollbar"
     >
       {tabs.map((tab) => {
+        const cleanHref = tab.href.replace(/\/+$/, '');
         const isActive = tab.exact
-          ? pathname === tab.href
-          : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          ? cleanPath === cleanHref
+          : cleanPath === cleanHref || cleanPath.startsWith(`${cleanHref}/`);
 
         return (
           <Link
             key={tab.name}
             href={tab.href}
-            prefetch={false}
+            onClick={(e) => {
+              // Ensure immediate programmatic navigation on touch/tablet devices
+              if (!e.defaultPrevented && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+                router.push(tab.href);
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '8px 14px',
+              padding: '9px 15px',
               borderRadius: '8px',
               fontSize: '13px',
               fontWeight: isActive ? 700 : 500,
               color: isActive ? '#FFFFFF' : '#64748B',
-              backgroundColor: isActive ? 'var(--primary, #0F172A)' : '#F8FAFC',
+              backgroundColor: isActive ? 'var(--primary, #971345)' : '#F8FAFC',
               border: isActive ? '1px solid transparent' : '1px solid #E2E8F0',
               textDecoration: 'none',
               whiteSpace: 'nowrap',
+              flexShrink: 0,
+              cursor: 'pointer',
+              userSelect: 'none',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
               transition: 'all 0.15s ease',
             }}
           >

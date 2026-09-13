@@ -94,7 +94,8 @@ export function getHardwarePrinterState(): HardwarePrinterState {
  */
 export function isBluetoothConnectedForCounter(
   counterId?: string,
-  printerName?: string
+  printerName?: string,
+  counterName?: string
 ): { connected: boolean; deviceName: string | null } {
   // 1. Direct match by counter ID
   if (counterId && activeBtConnections.has(counterId)) {
@@ -104,7 +105,15 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 2. Direct match by configured printer device name
+  // 2. Direct match by counter name
+  if (counterName && activeBtConnections.has(counterName.trim().toLowerCase())) {
+    const conn = activeBtConnections.get(counterName.trim().toLowerCase())!;
+    if (conn.device?.gatt?.connected) {
+      return { connected: true, deviceName: conn.name };
+    }
+  }
+
+  // 3. Direct match by configured printer device name
   if (printerName && activeBtConnections.has(printerName)) {
     const conn = activeBtConnections.get(printerName)!;
     if (conn.device?.gatt?.connected) {
@@ -112,7 +121,7 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 3. Counter ID stored preference
+  // 4. Counter ID stored preference
   if (counterId && typeof window !== 'undefined') {
     const savedName = localStorage.getItem(`qdine_bt_counter_${counterId}`);
     if (savedName && activeBtConnections.has(savedName)) {
@@ -123,11 +132,20 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 4. If single printer is connected and printer_name matches
-  if (activeBluetoothDevice?.gatt?.connected) {
-    if (printerName && activeBluetoothDevice.name === printerName) {
-      return { connected: true, deviceName: activeBluetoothDevice.name };
+  // 5. Counter Name stored preference
+  if (counterName && typeof window !== 'undefined') {
+    const savedName = localStorage.getItem(`qdine_bt_counter_${counterName.trim().toLowerCase()}`);
+    if (savedName && activeBtConnections.has(savedName)) {
+      const conn = activeBtConnections.get(savedName)!;
+      if (conn.device?.gatt?.connected) {
+        return { connected: true, deviceName: conn.name };
+      }
     }
+  }
+
+  // 6. Universal fallback: If a Bluetooth printer is connected, route tickets to it
+  if (activeBluetoothDevice?.gatt?.connected) {
+    return { connected: true, deviceName: activeBluetoothDevice.name };
   }
 
   return { connected: false, deviceName: null };
@@ -140,7 +158,7 @@ export function isBluetoothConnectedForCounter(
 /**
  * Pair and connect to a Bluetooth thermal printer (optionally mapped to counter)
  */
-export async function connectBluetoothPrinter(counterId?: string): Promise<{ success: boolean; deviceName?: string; error?: string }> {
+export async function connectBluetoothPrinter(counterId?: string, counterName?: string): Promise<{ success: boolean; deviceName?: string; error?: string }> {
   if (!isBluetoothSupported()) {
     return {
       success: false,
@@ -215,6 +233,12 @@ export async function connectBluetoothPrinter(counterId?: string): Promise<{ suc
         localStorage.setItem(`qdine_bt_counter_${counterId}`, deviceName);
       }
     }
+    if (counterName) {
+      activeBtConnections.set(counterName.trim().toLowerCase(), conn);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`qdine_bt_counter_${counterName.trim().toLowerCase()}`, deviceName);
+      }
+    }
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_bt_printer_name', deviceName);
@@ -226,6 +250,7 @@ export async function connectBluetoothPrinter(counterId?: string): Promise<{ suc
       console.log(`Bluetooth printer disconnected: ${deviceName}`);
       activeBtConnections.delete(deviceName);
       if (counterId) activeBtConnections.delete(counterId);
+      if (counterName) activeBtConnections.delete(counterName.trim().toLowerCase());
       if (activeBluetoothDevice === device) {
         activeBluetoothChar = null;
       }
@@ -279,13 +304,22 @@ export async function disconnectBluetoothPrinter(counterId?: string, printerName
 export async function writeBytesToBluetooth(
   bytes: Uint8Array,
   targetPrinterName?: string,
-  counterId?: string
+  counterId?: string,
+  counterName?: string
 ): Promise<void> {
   let writeChar: any = null;
   let targetDevice: any = null;
 
   if (counterId && activeBtConnections.has(counterId)) {
     const conn = activeBtConnections.get(counterId)!;
+    if (conn.device?.gatt?.connected) {
+      writeChar = conn.char;
+      targetDevice = conn.device;
+    }
+  }
+
+  if (!writeChar && counterName && activeBtConnections.has(counterName.trim().toLowerCase())) {
+    const conn = activeBtConnections.get(counterName.trim().toLowerCase())!;
     if (conn.device?.gatt?.connected) {
       writeChar = conn.char;
       targetDevice = conn.device;
@@ -581,6 +615,7 @@ export interface UnifiedPrintOptions {
   kotData: KotPrintData;
   printerName?: string;
   counterId?: string;
+  counterName?: string;
   forceBrowser?: boolean;
   isAutoPrint?: boolean; // When true, NEVER open the browser built-in print dialog/tab!
 }
@@ -616,7 +651,8 @@ export function enqueuePrintJob<T>(job: () => Promise<T>): Promise<T> {
  * 2. Web Serial / USB (if connected & active)
  * 3. Android RawBT WebSocket (Port 40213 - 100% silent, background)
  * 4. Android RawBT URL Intent
- * 5. Hidden iframe 80mm thermal receipt (Manual print only; never on auto-print)
+ * 5. Local HTTP Bridge on Windows (Port 9123 - 100% silent, background)
+ * 6. Hidden iframe 80mm thermal receipt (Manual print only; never on auto-print)
  */
 export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise<{
   success: boolean;
@@ -631,7 +667,7 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
   method: 'bluetooth' | 'serial' | 'rawbt' | 'browser';
   message?: string;
 }> {
-  const { base64Bytes, kotData, printerName = 'POS-80C', counterId, forceBrowser = false, isAutoPrint = false } = options;
+  const { base64Bytes, kotData, printerName = 'POS-80C', counterId, counterName = kotData?.counterName, forceBrowser = false, isAutoPrint = false } = options;
 
   // Convert base64 to Uint8Array if provided
   let rawBytes: Uint8Array | null = null;
@@ -662,16 +698,16 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     }
 
     // 1. Try Bluetooth if active or attempt silent auto-reconnect
-    const btCheck = isBluetoothConnectedForCounter(counterId, printerName);
+    const btCheck = isBluetoothConnectedForCounter(counterId, printerName, counterName);
     if (!btCheck.connected && (!activeBluetoothChar || !activeBluetoothDevice?.gatt?.connected)) {
       await tryAutoConnectBluetooth();
     }
 
-    const btNow = isBluetoothConnectedForCounter(counterId, printerName);
+    const btNow = isBluetoothConnectedForCounter(counterId, printerName, counterName);
     const isBtActive = btNow.connected || (activeBluetoothChar && activeBluetoothDevice?.gatt?.connected);
     if (isBtActive) {
       try {
-        await writeBytesToBluetooth(rawBytes, printerName, counterId);
+        await writeBytesToBluetooth(rawBytes, printerName, counterId, counterName);
         return {
           success: true,
           method: 'bluetooth',
@@ -707,6 +743,36 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
           method: 'rawbt',
           message: `Printed silently via RawBT Android Print Service!`,
         };
+      }
+    } catch {}
+
+    // 4. Try Local HTTP Bridge on Windows (Port 9123 - 100% silent background printing)
+    try {
+      const localBridgeUrl = (typeof window !== 'undefined' && localStorage.getItem('qdine_printer_bridge_url')) || 'http://127.0.0.1:9123/print';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+      const bridgeRes = await fetch(localBridgeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          printerName,
+          base64Bytes,
+          docName: `KOT #${kotData.ticketNumber} - ${counterName || kotData.counterName || 'Counter'}`,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (bridgeRes.ok) {
+        const bridgeData = await bridgeRes.json();
+        if (bridgeData.success) {
+          return {
+            success: true,
+            method: 'serial',
+            message: `Printed silently via local bridge to ${printerName}!`,
+          };
+        }
       }
     } catch {}
   }

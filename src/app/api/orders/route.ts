@@ -179,8 +179,8 @@ export async function POST(request: NextRequest) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
     }
 
-    // 🖨️ AUTO-PRINT KOT PER COUNTER if order is PREPARING upon creation
-    if (order && order.status === 'PREPARING') {
+    // 🖨️ AUTO-PRINT KOT PER COUNTER when order is placed
+    if (order) {
       autoQueueAndBroadcastKot(restaurant.id, order.id).catch((kotErr) => {
         console.error('❌ Automatic KOT print error on order creation:', kotErr);
       });

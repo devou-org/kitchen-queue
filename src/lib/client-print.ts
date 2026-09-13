@@ -5,6 +5,8 @@ export interface ClientPrintOptions {
   kotData: KotPrintData;
   base64Bytes?: string;
   printerName?: string;
+  counterId?: string;
+  counterName?: string;
   localBridgeUrl?: string; // fallback if local bridge is running
 }
 
@@ -21,12 +23,15 @@ export async function printKotFromBrowser(options: ClientPrintOptions): Promise<
   message?: string;
 }> {
   const { kotData, base64Bytes, printerName = 'POS-80C', localBridgeUrl = 'http://127.0.0.1:9123/print' } = options;
+  const { kotData, base64Bytes, printerName = 'POS-80C', counterId, counterName = kotData?.counterName, localBridgeUrl = 'http://127.0.0.1:9123/print' } = options;
 
   // 1. Try Direct Hardware (Bluetooth, RawBT, or USB Serial)
   const hardwareResult = await printUnifiedThermalTicket({
     kotData,
     base64Bytes,
     printerName,
+    counterId,
+    counterName,
   });
 
   if (hardwareResult.method === 'bluetooth' || hardwareResult.method === 'serial' || hardwareResult.method === 'rawbt') {

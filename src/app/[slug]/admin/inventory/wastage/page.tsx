@@ -201,8 +201,21 @@ export default function WastageAndAdjustmentsPage() {
       <InventoryNav />
 
       {/* Sub tabs: Wastage vs Adjustments */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x',
+          paddingBottom: '4px',
+        }}
+        className="no-scrollbar"
+      >
         <button
+          type="button"
           onClick={() => setTab('wastage')}
           style={{
             padding: '8px 18px',
@@ -216,6 +229,11 @@ export default function WastageAndAdjustmentsPage() {
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
           }}
         >
           <Trash2 size={14} />
@@ -223,6 +241,7 @@ export default function WastageAndAdjustmentsPage() {
         </button>
 
         <button
+          type="button"
           onClick={() => setTab('adjustments')}
           style={{
             padding: '8px 18px',
@@ -236,6 +255,11 @@ export default function WastageAndAdjustmentsPage() {
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
           }}
         >
           <Sliders size={14} />

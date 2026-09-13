@@ -13,6 +13,8 @@
 
 import { getOrderById, getRestaurantById, getCounters, createPrintJob } from '@/lib/db';
 import { buildKotEscposBuffer, KotPrintData } from '@/lib/escpos';
+import sql, { getOrderById, getRestaurantById, getCounters, createPrintJob } from '@/lib/db';
+import { buildKotEscposBuffer, KotPrintData, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
 import { pusherServer } from '@/lib/pusher';
 
 export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: string) {
@@ -22,6 +24,19 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
 
     const allItems = (order.items || []).filter((i: any) => (i.quantity || 0) > 0);
     if (allItems.length === 0) return;
+
+    // Check if KOT jobs for this order were already queued to prevent duplicate prints
+    try {
+      const existingJobs = await sql`
+        SELECT id FROM print_jobs 
+        WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} 
+        LIMIT 1
+      `;
+      if (existingJobs && existingJobs.length > 0) {
+        console.log(`ℹ️ KOT print jobs already exist for Order #${order.ticket_number}, skipping duplicate generation.`);
+        return;
+      }
+    } catch {}
 
     const restaurant = await getRestaurantById(restaurantId);
     const restaurantName = restaurant?.name || 'QDINE';
@@ -37,9 +52,11 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
     // Look up all counter printer configurations
     const countersList = await getCounters(restaurantId);
     const counterPrinterMap: Record<string, { printerName: string; printerType: string; printerAddress?: string }> = {};
+    const counterPrinterMap: Record<string, { id: string; printerName: string; printerType: string; printerAddress?: string }> = {};
     for (const c of countersList) {
       if (c.name) {
         counterPrinterMap[c.name.trim().toLowerCase()] = {
+          id: c.id,
           printerName: (c.printer_name || 'POS-80C').trim(),
           printerType: c.printer_type || 'DEFAULT',
           printerAddress: c.printer_address || undefined,
@@ -47,9 +64,12 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
       }
     }
 
+    const isWindows = process.platform === 'win32';
+
     // Process each counter slip
     for (const [cName, cItems] of Object.entries(counterMap)) {
       const conf = counterPrinterMap[cName.trim().toLowerCase()] || {
+        id: undefined,
         printerName: 'POS-80C',
         printerType: 'DEFAULT',
       };
@@ -72,6 +92,25 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
       const base64Bytes = buffer.toString('base64');
 
       // 1. Queue into database print_jobs (for Windows PC / Cloud Print Agent)
+      // 1. Direct hardware print if running on Windows (Cashier / Counter PC)
+      if (isWindows) {
+        try {
+          const winRes = await sendRawPrintToWindowsPrinter(
+            conf.printerName,
+            buffer,
+            `KOT #${order.ticket_number} - ${cName}`
+          );
+          if (winRes.success) {
+            console.log(`🖨️ [Windows] Printed KOT #${order.ticket_number} [${cName}] to "${conf.printerName}"`);
+          } else {
+            console.warn(`⚠️ [Windows] Print failed for ${cName} on "${conf.printerName}": ${winRes.error}`);
+          }
+        } catch (winErr) {
+          console.error('Windows direct print error:', winErr);
+        }
+      }
+
+      // 2. Queue into database print_jobs (for Windows PC / Cloud Print Agent)
       await createPrintJob(restaurantId, {
         order_id: order.id,
         ticket_number: Number(order.ticket_number) || undefined,
@@ -81,10 +120,12 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
       });
 
       // 2. Broadcast realtime Pusher event for Android Phones / Tablets
+      // 3. Broadcast realtime Pusher event for Android Phones / Tablets / Browser
       try {
         await pusherServer.trigger(`queue-channel-${restaurantId}`, 'kot_auto_print', {
           order_id: order.id,
           ticket_number: order.ticket_number,
+          counter_id: conf.id,
           counter_name: cName,
           printer_name: conf.printerName,
           printer_type: conf.printerType,

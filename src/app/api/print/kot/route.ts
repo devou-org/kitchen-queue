@@ -175,21 +175,25 @@ export async function POST(request: NextRequest) {
         counterMap[c].push(item);
       }
 
-      const slips: Array<{ kotData: KotPrintData; base64Bytes: string; printerName: string }> = [];
+      const slips: Array<{ kotData: KotPrintData; base64Bytes: string; printerName: string; counterId?: string }> = [];
 
       // Look up all counter printer configurations
-      const counterPrinterMap: Record<string, string> = {};
+      const counterPrinterMap: Record<string, { id?: string; printerName: string }> = {};
       try {
         const countersList = await getCounters(restaurant.id);
         for (const c of countersList) {
-          if (c.name && c.printer_name) {
-            counterPrinterMap[c.name.trim().toLowerCase()] = c.printer_name.trim();
+          if (c.name) {
+            counterPrinterMap[c.name.trim().toLowerCase()] = {
+              id: c.id,
+              printerName: (c.printer_name || targetPrinter).trim(),
+            };
           }
         }
       } catch {}
 
       for (const [cName, cItems] of Object.entries(counterMap)) {
-        const slipPrinter = counterPrinterMap[cName.trim().toLowerCase()] || targetPrinter;
+        const conf = counterPrinterMap[cName.trim().toLowerCase()] || { id: undefined, printerName: targetPrinter };
+        const slipPrinter = conf.printerName;
 
         const kotData: KotPrintData = {
           restaurantName,
@@ -207,7 +211,7 @@ export async function POST(request: NextRequest) {
 
         const buffer = buildKotEscposBuffer(kotData);
         const base64Bytes = buffer.toString('base64');
-        slips.push({ kotData, base64Bytes, printerName: slipPrinter });
+        slips.push({ kotData, base64Bytes, printerName: slipPrinter, counterId: conf.id });
 
         // Queue each slip to its dedicated counter printer
         await createPrintJob(restaurant.id, {
@@ -223,7 +227,7 @@ export async function POST(request: NextRequest) {
         let printedCount = 0;
         for (const slip of slips) {
           const res = await sendRawPrintToWindowsPrinter(
-            targetPrinter,
+            slip.printerName || targetPrinter,
             Buffer.from(slip.base64Bytes, 'base64'),
             `KOT #${order.ticket_number} - ${slip.kotData.counterName}`
           );

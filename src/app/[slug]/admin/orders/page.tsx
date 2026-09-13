@@ -63,6 +63,7 @@ export default function AdminOrders() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedCounter = localStorage.getItem('qdine_station_counter');
+      const savedCounter = localStorage.getItem('qdine_orders_counter_filter');
       if (savedCounter !== null) setCounterFilter(savedCounter);
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
       if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint !== 'false');
@@ -73,6 +74,7 @@ export default function AdminOrders() {
     setCounterFilter(val);
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_station_counter', val);
+      localStorage.setItem('qdine_orders_counter_filter', val);
     }
   };
 
@@ -314,10 +316,10 @@ export default function AdminOrders() {
       const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
       if (!autoPrint) return;
 
-      // Filter by counter if this station is assigned to a specific counter
-      const assignedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_station_counter') || '') : '';
-      if (assignedStation && assignedStation !== '' && assignedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
-        console.log(`[Auto-Print] Station is "${assignedStation}"; skipping "${data.counter_name}" slip.`);
+      // Only filter if this station is an explicitly locked dedicated KDS station
+      const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
+      if (dedicatedStation && dedicatedStation !== '' && dedicatedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
+        console.log(`[Auto-Print] Station is dedicated to "${dedicatedStation}"; skipping "${data.counter_name}" slip.`);
         return;
       }
 
@@ -331,6 +333,8 @@ export default function AdminOrders() {
           base64Bytes: data.base64Bytes,
           kotData: data.kotData,
           printerName: data.printer_name,
+          counterId: data.counter_id,
+          counterName: data.counter_name,
           isAutoPrint: true,
         });
         if (result.success) {
