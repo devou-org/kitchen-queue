@@ -14,7 +14,7 @@ import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
-import { printKotFromBrowser } from '@/lib/client-print';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -99,7 +99,7 @@ function ProductCard({ product, quantity, onUpdate }: {
   );
 }
 
-export default function StaffMenuPage() {
+export default function AdminPosPage() {
   const { restaurant } = useRestaurant();
   const params = useParams();
   const slug = (params?.slug as string) || restaurant?.slug || '';
@@ -238,7 +238,7 @@ export default function StaffMenuPage() {
           });
         }
       } catch (err: any) {
-        console.error('Auto-print execution error on staff menu:', err);
+        console.error('Auto-print execution error on admin POS menu:', err);
       }
     };
 
@@ -319,7 +319,7 @@ export default function StaffMenuPage() {
         product_id: id,
         name: product.name,
         price: product.price,
-        quantity: Math.min(newQty, 50), // allow staff to order more
+        quantity: Math.min(newQty, 50), // allow staff/admin to order more
         image_url: product.image_url,
         status: product.status,
       });
@@ -343,7 +343,7 @@ export default function StaffMenuPage() {
         price_at_purchase: item.price
       }));
 
-      // Generate a mock phone if not provided for staff orders
+      // Generate a mock phone if not provided for admin/staff orders
       const phoneToUse = orderForm.phone || `+910000000000`;
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
@@ -399,8 +399,8 @@ export default function StaffMenuPage() {
     });
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px' }}>
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px', paddingBottom: '90px' }}>
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', alignItems: 'center' }}>
         <div style={{ position: 'relative', width: '100%', flex: 1 }}>
           <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
@@ -412,6 +412,7 @@ export default function StaffMenuPage() {
             style={{ width: '100%', paddingLeft: '40px' }}
           />
         </div>
+        <LayoutMaximizeToggle />
       </div>
 
       {/* Categories */}
@@ -445,7 +446,7 @@ export default function StaffMenuPage() {
       </div>
 
       {totalItems > 0 && (
-        <div style={{ position: 'fixed', bottom: '80px', left: 0, right: 0, padding: '0 16px', zIndex: 40, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ position: 'fixed', bottom: '24px', left: 0, right: 0, padding: '0 16px', zIndex: 40, display: 'flex', justifyContent: 'center' }}>
           <button
             className="btn btn-primary"
             onClick={() => setCheckoutOpen(true)}

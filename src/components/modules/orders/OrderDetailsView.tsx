@@ -26,6 +26,7 @@ import OrderStatusBadge from './OrderStatusBadge';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printKotFromBrowser } from '@/lib/client-print';
+import { generateBillReceiptHtml } from '@/lib/thermal-receipt-html';
 
 interface OrderDetailsViewProps {
   order: Order;
@@ -243,6 +244,71 @@ export function OrderDetailsView({
       toast.error(err.message || 'Print job failed. Check printer connection.', { id: toastId, duration: 4500 });
     } finally {
       setIsPrinting(false);
+    }
+  };
+
+  const [isPrintingBill, setIsPrintingBill] = useState(false);
+
+  const handlePrintBill = () => {
+    if (isPrintingBill) return;
+    setIsPrintingBill(true);
+    const toastId = toast.loading('🖨️ Preparing bill...');
+    try {
+      const billHtml = generateBillReceiptHtml({
+        restaurantName: (order as any).restaurant_name || undefined,
+        ticketNumber: order.ticket_number,
+        orderType: order.order_type || 'DINE_IN',
+        tableNumber: order.table_number || undefined,
+        customerName: order.customer_name || undefined,
+        phone: order.phone || undefined,
+        staffName: order.staff_name || undefined,
+        createdAt: order.created_at,
+        items: (order.items || []).map((i: any) => ({
+          name: i.product_name || i.name,
+          product_name: i.product_name,
+          quantity: i.quantity,
+          price_at_purchase: i.price_at_purchase,
+          notes: i.notes,
+        })),
+        subtotal: order.subtotal,
+        gstAmount: order.gst_amount,
+        gstRate: order.gst_rate,
+        gstType: order.gst_type,
+        totalPrice: order.total_price,
+        paymentMethod: order.payment_method || undefined,
+        notes: order.notes || undefined,
+      });
+
+      const iframeId = `bill-print-iframe-${Date.now()}`;
+      const iframe = document.createElement('iframe');
+      iframe.id = iframeId;
+      iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;z-index:-9999';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (!doc) throw new Error('Cannot access print frame');
+      doc.open();
+      doc.write(billHtml);
+      doc.close();
+
+      const triggerPrint = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => { try { iframe.remove(); } catch {} }, 60000);
+          toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, { id: toastId });
+        } catch {
+          toast.success('Bill print initiated!', { id: toastId });
+        }
+        setIsPrintingBill(false);
+      };
+
+      iframe.onload = triggerPrint;
+      setTimeout(triggerPrint, 500);
+    } catch (err: any) {
+      console.error('Bill print error:', err);
+      toast.error(err.message || 'Failed to print bill.', { id: toastId });
+      setIsPrintingBill(false);
     }
   };
 
@@ -585,6 +651,37 @@ export function OrderDetailsView({
               </div>
             )}
           </div>
+
+          {/* Print Bill Button */}
+          <button
+            type="button"
+            onClick={handlePrintBill}
+            disabled={isPrintingBill || (order.items || []).length === 0}
+            className="btn btn-secondary btn-sm"
+            style={{
+              padding: '0 10px',
+              height: '30px',
+              fontSize: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontWeight: 600,
+              borderRadius: '8px',
+              background: isPrintingBill ? '#F8FAFC' : '#ECFDF5',
+              border: '1px solid #6EE7B7',
+              color: '#065F46',
+              cursor: isPrintingBill ? 'wait' : 'pointer',
+              flexShrink: 0,
+            }}
+            title="Print customer bill / receipt"
+          >
+            {isPrintingBill ? (
+              <Loader2 size={13} style={{ animation: 'spin 1s linear infinite', color: '#065F46' }} />
+            ) : (
+              <CreditCard size={13} style={{ color: '#059669' }} />
+            )}
+            <span>Print Bill</span>
+          </button>
 
           <Link
             prefetch={false}
