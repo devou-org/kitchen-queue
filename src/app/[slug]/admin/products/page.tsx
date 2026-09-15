@@ -280,9 +280,74 @@ export default function AdminProducts() {
 
   return (
     <AdminContentWrapper>
+      <style>{`
+        /* Product-page-only responsive rules: other admin screens keep their current layout. */
+        .products-table-scroll-hint {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .products-page-header,
+          .products-page-header .admin-header-left,
+          .products-page-header .admin-header-right {
+            flex: 1 1 100% !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            margin-left: 0 !important;
+          }
+
+          .products-actions {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            width: 100% !important;
+            gap: 8px !important;
+          }
+
+          .products-actions > a,
+          .products-actions > button {
+            width: 100% !important;
+            min-width: 0;
+            justify-content: center;
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+          }
+
+          .products-search-input {
+            max-width: 100% !important;
+            width: 100% !important;
+          }
+
+          .products-table-viewport {
+            overflow-x: auto !important;
+            overscroll-behavior-x: contain;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .products-table-viewport .products-table {
+            min-width: 860px;
+          }
+
+          .products-table-scroll-hint {
+            display: block;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            background: #F8FAFC;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .products-actions {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+        }
+      `}</style>
       <AdminPageHeader
+        className="products-page-header"
         action={
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div className="products-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <style dangerouslySetInnerHTML={{ __html: `
               @keyframes iconPulse {
                 0%, 100% { transform: scale(1); opacity: 1; }
@@ -403,19 +468,20 @@ export default function AdminProducts() {
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
           <input
             type="search"
-            className="input"
+            className="input products-search-input"
             placeholder="Search products by name or category..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ maxWidth: '400px' }}
+            style={{ maxWidth: '400px', width: '100%' }}
           />
         </div>
 
-        <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
+        <div className="products-table-scroll-hint" aria-hidden="true">Swipe left to view all product details</div>
+        <div className="table-wrapper products-table-viewport" style={{ border: 'none', borderRadius: 0 }}>
           {loading ? (
             <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : (
-            <table>
+            <table className="products-table">
               <thead>
                 <tr>
                   <th>Product</th>

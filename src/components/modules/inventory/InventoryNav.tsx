@@ -64,62 +64,69 @@ export function InventoryNav() {
   const cleanPath = pathname.split('?')[0].replace(/\/+$/, '');
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        touchAction: 'pan-x',
-        padding: '4px 0 16px 0',
-        borderBottom: '1px solid var(--border, #E2E8F0)',
-        marginBottom: '20px',
-      }}
-      className="no-scrollbar"
-    >
-      {tabs.map((tab) => {
-        const cleanHref = tab.href.replace(/\/+$/, '');
-        const isActive = tab.exact
-          ? cleanPath === cleanHref
-          : cleanPath === cleanHref || cleanPath.startsWith(`${cleanHref}/`);
+    <>
+      <style>{`
+        .inventory-nav-scroll {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          overflow-x: auto;
+          overscroll-behavior-x: contain;
+          -webkit-overflow-scrolling: touch;
+          touch-action: pan-x;
+          padding: 4px 12px 14px 0;
+          border-bottom: 1px solid var(--border, #E2E8F0);
+          margin-bottom: 20px;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .inventory-nav-scroll::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+      <div className="inventory-nav-scroll">
+        {tabs.map((tab) => {
+          const cleanHref = tab.href.replace(/\/+$/, '');
+          const isActive = tab.exact
+            ? cleanPath === cleanHref
+            : cleanPath === cleanHref || cleanPath.startsWith(`${cleanHref}/`);
 
-        return (
-          <Link
-            key={tab.name}
-            href={tab.href}
-            onClick={(e) => {
-              // Ensure immediate programmatic navigation on touch/tablet devices
-              if (!e.defaultPrevented && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-                router.push(tab.href);
-              }
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '9px 15px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: isActive ? 700 : 500,
-              color: isActive ? '#FFFFFF' : '#64748B',
-              backgroundColor: isActive ? 'var(--primary, #971345)' : '#F8FAFC',
-              border: isActive ? '1px solid transparent' : '1px solid #E2E8F0',
-              textDecoration: 'none',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              cursor: 'pointer',
-              userSelect: 'none',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            {tab.icon}
-            <span>{tab.name}</span>
-          </Link>
-        );
-      })}
-    </div>
+          return (
+            <Link
+              key={tab.name}
+              href={tab.href}
+              onClick={(e) => {
+                if (!e.defaultPrevented && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+                  router.push(tab.href);
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 15px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? '#FFFFFF' : '#64748B',
+                backgroundColor: isActive ? 'var(--primary, #971345)' : '#F8FAFC',
+                border: isActive ? '1px solid transparent' : '1px solid #E2E8F0',
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                cursor: 'pointer',
+                userSelect: 'none',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {tab.icon}
+              <span>{tab.name}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </>
   );
 }
