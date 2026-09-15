@@ -1362,6 +1362,9 @@ export async function createOrder(data: {
       tableSessionId = sessionInfo.tableSessionId;
     }
 
+    const isUuid = (str?: string | null) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+    const validStaffId = isUuid(data.staff_id) ? data.staff_id : null;
+
     const orderResult = await client.query(
       `
         INSERT INTO orders (
@@ -1374,7 +1377,7 @@ export async function createOrder(data: {
       `,
       [
         data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
-        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, data.staff_id || null, 
+        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN'
       ]
