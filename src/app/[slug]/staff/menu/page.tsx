@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
 import { Product, CartItem, ProductStatus } from '@/types';
@@ -12,6 +13,7 @@ import { Search } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { checkTableAssignment } from '@/lib/table-capacity';
+import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -98,6 +100,67 @@ function ProductCard({ product, quantity, onUpdate }: {
 
 export default function StaffMenuPage() {
   const { restaurant } = useRestaurant();
+  const params = useParams();
+  const slug = (params?.slug as string) || restaurant?.slug || '';
+  const printedSlipsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    tryAutoConnectBluetooth();
+  }, []);
+
+  const printOrderSlips = useCallback(async (orderId: string, orderData?: any) => {
+    const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
+    if (!autoPrint) return;
+
+    const currentSlug = slug || (Array.isArray(params?.slug) ? params?.slug[0] : params?.slug) || '';
+    try {
+      const printRes = await fetch('/api/print/kot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': currentSlug,
+        },
+        body: JSON.stringify({
+          orderId,
+          separateSlips: true,
+          orderData,
+          slug: currentSlug,
+        }),
+      });
+      const printData = await printRes.json();
+      if (printData.success) {
+        if (printData.slips && Array.isArray(printData.slips)) {
+          for (const slip of printData.slips) {
+            const slipKey = `${orderId}-${slip.kotData?.counterName || 'all'}`;
+            if (printedSlipsRef.current.has(slipKey)) continue;
+            printedSlipsRef.current.add(slipKey);
+            await printUnifiedThermalTicket({
+              kotData: slip.kotData,
+              base64Bytes: slip.base64Bytes,
+              printerName: slip.printerName,
+              counterId: slip.counterId,
+              counterName: slip.kotData?.counterName,
+              isAutoPrint: true,
+            });
+          }
+        } else if (printData.kotData) {
+          const slipKey = `${orderId}-all`;
+          if (!printedSlipsRef.current.has(slipKey)) {
+            printedSlipsRef.current.add(slipKey);
+            await printUnifiedThermalTicket({
+              kotData: printData.kotData,
+              base64Bytes: printData.base64Bytes,
+              printerName: printData.printer,
+              isAutoPrint: true,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('KOT auto-print error on POS:', err);
+    }
+  }, [slug, params?.slug]);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [loading, setLoading] = useState(true);
