@@ -27,6 +27,7 @@ import { CustomSelect } from '@/components/ui/CustomSelect';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printKotFromBrowser } from '@/lib/client-print';
 import { generateBillReceiptHtml } from '@/lib/thermal-receipt-html';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 interface OrderDetailsViewProps {
   order: Order;
@@ -51,6 +52,7 @@ export function OrderDetailsView({
   onStatusChange,
   loading = false,
 }: OrderDetailsViewProps) {
+  const { restaurant } = useRestaurant();
   const [mounted, setMounted] = useState(false);
   const [tempStatus, setTempStatus] = useState(order.status);
   const [tempTableNumber, setTempTableNumber] = useState(order.table_number || '');
@@ -255,12 +257,17 @@ export function OrderDetailsView({
     const toastId = toast.loading('🖨️ Preparing bill...');
     try {
       const billHtml = generateBillReceiptHtml({
-        restaurantName: (order as any).restaurant_name || undefined,
+        restaurantName: restaurant?.name || (order as any).restaurant_name || undefined,
+        logoUrl: restaurant?.logo_url || undefined,
+        address: restaurant?.address || undefined,
+        phone: restaurant?.phone || undefined,
+        gstNumber: restaurant?.gst_number || undefined,
+        primaryColor: restaurant?.primary_color || '#16a34a',
         ticketNumber: order.ticket_number,
         orderType: order.order_type || 'DINE_IN',
         tableNumber: order.table_number || undefined,
         customerName: order.customer_name || undefined,
-        phone: order.phone || undefined,
+        customerPhone: order.phone || undefined,
         staffName: order.staff_name || undefined,
         createdAt: order.created_at,
         items: (order.items || []).map((i: any) => ({
@@ -291,7 +298,10 @@ export function OrderDetailsView({
       doc.write(billHtml);
       doc.close();
 
+      let printed = false;
       const triggerPrint = () => {
+        if (printed) return;
+        printed = true;
         try {
           iframe.contentWindow?.focus();
           iframe.contentWindow?.print();

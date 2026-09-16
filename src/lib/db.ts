@@ -145,10 +145,29 @@ async function runAutoMigration(sqlConnection: any) {
       );
     `;
     await sqlConnection`
+      CREATE TABLE IF NOT EXISTS counters (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(100) NOT NULL,
+          code VARCHAR(50) NULL,
+          display_order INT DEFAULT 0,
+          is_active BOOLEAN DEFAULT true,
+          printer_name VARCHAR(100) DEFAULT 'POS-80C',
+          printer_type VARCHAR(50) DEFAULT 'DEFAULT',
+          printer_address VARCHAR(200) NULL,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
       ALTER TABLE counters
+      ADD COLUMN IF NOT EXISTS code VARCHAR(50) NULL,
+      ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
       ADD COLUMN IF NOT EXISTS printer_name VARCHAR(100) DEFAULT 'POS-80C',
       ADD COLUMN IF NOT EXISTS printer_type VARCHAR(50) DEFAULT 'DEFAULT',
       ADD COLUMN IF NOT EXISTS printer_address VARCHAR(200) NULL;
+
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS counter VARCHAR(255);
     `;
     // Inventory tables
     await sqlConnection`
