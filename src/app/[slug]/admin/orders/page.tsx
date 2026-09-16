@@ -434,12 +434,115 @@ export default function AdminOrders() {
 
   return (
     <AdminContentWrapper fullWidth>
+      <style>{`
+        /* Kept page-scoped so the mobile behavior of other admin screens is unchanged. */
+        .orders-toolbar,
+        .orders-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+        }
+
+        .orders-table-scroll-hint {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .orders-page-header,
+          .orders-page-header .admin-header-left,
+          .orders-page-header .admin-header-right,
+          .orders-page-header .admin-header-search {
+            flex: 1 1 100% !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .orders-toolbar {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            width: 100% !important;
+            min-width: 0 !important;
+            gap: 8px !important;
+          }
+
+          .orders-toolbar > .orders-search-control {
+            grid-column: 1 / -1;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .orders-toolbar > .orders-filter-control,
+          .orders-toolbar .orders-select,
+          .orders-toolbar .orders-select > button {
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .orders-actions {
+            width: 100% !important;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+          }
+
+          .orders-table-card {
+            min-height: auto !important;
+          }
+
+          .orders-table-viewport {
+            overflow-x: auto !important;
+            overscroll-behavior-x: contain;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .orders-table-viewport .orders-table {
+            min-width: 840px;
+          }
+
+          .orders-table-scroll-hint {
+            display: block;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            background: #F8FAFC;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .orders-toolbar {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+          }
+
+          .orders-toolbar > .orders-search-control,
+          .orders-toolbar > .orders-filter-control {
+            width: 100% !important;
+          }
+
+          .orders-actions {
+            display: flex !important;
+            width: 100% !important;
+            flex-wrap: wrap;
+            gap: 8px !important;
+          }
+
+          .orders-actions > button,
+          .orders-actions > a,
+          .orders-actions > div {
+            flex: 1 1 auto;
+          }
+        }
+      `}</style>
       <AdminPageHeader
+        className="orders-page-header"
         style={{ paddingTop: '16px' }}
         search={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+          <div className="orders-toolbar">
             {/* Search Input */}
-            <div style={{ position: 'relative', width: '185px', flexShrink: 0 }}>
+            <div className="orders-search-control" style={{ position: 'relative', width: '185px', flexShrink: 0 }}>
               <Search
                 size={15}
                 style={{
@@ -497,7 +600,7 @@ export default function AdminOrders() {
             </div>
 
             {/* Status Dropdown (135px) */}
-            <div style={{ width: '135px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -514,25 +617,27 @@ export default function AdminOrders() {
                 }
                 disabled={!statusesLoaded}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
+                className="orders-select"
                 style={{ width: '135px' }}
               />
             </div>
 
             {/* Order Type Dropdown (145px) */}
-            <div style={{ width: '145px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '145px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
                   setOrderTypeFilter(val);
                   setPage(1);
                 }}
+                className="orders-select"
                 style={{ width: '145px' }}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
               />
             </div>
 
             {/* Counter Dropdown (140px) */}
-            <div style={{ width: '140px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '140px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -541,13 +646,14 @@ export default function AdminOrders() {
                   ...counters.map(c => ({ value: c.name, label: `${c.name} Station` }))
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
+                className="orders-select"
                 style={{ width: '140px' }}
               />
             </div>
           </div>
         }
         action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="orders-actions">
             {/* Auto-Print Toggle Button */}
             <button
               onClick={toggleAutoPrint}
