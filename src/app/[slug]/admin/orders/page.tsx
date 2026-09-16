@@ -699,7 +699,10 @@ export default function AdminOrders() {
               title="Configure Kitchen Counters & Thermal Hardware"
             >
               <Store size={15} style={{ color: '#2563EB' }} />
-              <span className="hidden sm:inline">Counters & Hardware</span>
+              <span>
+                <span className="inline sm:hidden">Counters</span>
+                <span className="hidden sm:inline">Counters & Hardware</span>
+              </span>
             </button>
 
             <button
