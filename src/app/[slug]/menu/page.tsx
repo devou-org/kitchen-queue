@@ -10,6 +10,7 @@ import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { Search, MapPin, Ticket, ClipboardList } from 'lucide-react';
+import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -409,6 +410,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
+  const [dietaryFilter, setDietaryFilter] = useState<DietaryPreferenceFilter>('ALL');
   const [isServiceActive, setIsServiceActive] = useState(true);
   const [serviceMessage, setServiceMessage] = useState('');
 
@@ -616,7 +618,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     .filter(p => {
       const matchCat = category === 'All' || p.category === category;
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+      const pref = p.dietary_preference || 'NON_VEG';
+      const matchDietary = dietaryFilter === 'ALL' || (dietaryFilter === 'VEG' ? pref === 'VEG' : pref === 'NON_VEG');
+      return matchCat && matchSearch && matchDietary;
     })
     .sort((a, b) => {
       const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
@@ -830,6 +834,11 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               }}
             />
           </div>
+        </div>
+
+        {/* Dietary Preference Filter (Veg / Non-Veg / All) */}
+        <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
         </div>
 
         {/* Category Filter */}

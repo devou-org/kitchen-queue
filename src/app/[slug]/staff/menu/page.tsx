@@ -12,6 +12,7 @@ import { useParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
+import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { printKotFromBrowser } from '@/lib/client-print';
@@ -110,6 +111,7 @@ export default function StaffMenuPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
+  const [dietaryFilter, setDietaryFilter] = useState<DietaryPreferenceFilter>('ALL');
 
   useEffect(() => {
     tryAutoConnectBluetooth();
@@ -434,7 +436,9 @@ export default function StaffMenuPage() {
     .filter(p => {
       const matchCat = category === 'All' || p.category === category;
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+      const pref = p.dietary_preference || 'NON_VEG';
+      const matchDietary = dietaryFilter === 'ALL' || (dietaryFilter === 'VEG' ? pref === 'VEG' : pref === 'NON_VEG');
+      return matchCat && matchSearch && matchDietary;
     })
     .sort((a, b) => {
       const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
@@ -444,8 +448,8 @@ export default function StaffMenuPage() {
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px' }}>
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-        <div style={{ position: 'relative', width: '100%', flex: 1 }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
           <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
             type="search"
@@ -456,6 +460,7 @@ export default function StaffMenuPage() {
             style={{ width: '100%', paddingLeft: '40px' }}
           />
         </div>
+        <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
       </div>
 
       {/* Categories */}
