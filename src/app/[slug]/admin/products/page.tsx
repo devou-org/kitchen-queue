@@ -10,10 +10,11 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes } from 'lucide-react';
+import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes, Layers } from 'lucide-react';
 import AdminProductForm from '@/components/AdminProductForm';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
+import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 
 interface ExtractedProduct {
   id: string;
@@ -57,6 +58,9 @@ export default function AdminProducts() {
 
   // Counter Drawer state (Manage / Add Counters)
   const [counterDrawerOpen, setCounterDrawerOpen] = useState(false);
+
+  // Category Reorder Modal state
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -441,6 +445,29 @@ export default function AdminProducts() {
               }}
             >
               <Store size={16} style={{ color: '#ffffff' }} /> Counters
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategoryModalOpen(true)}
+              style={{
+                height: '42px',
+                padding: '0 18px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--primary, #0f172a)',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Layers size={16} style={{ color: '#ffffff' }} /> Reorder Categories
             </button>
             <button
               onClick={() => {
@@ -1151,6 +1178,14 @@ export default function AdminProducts() {
         onClose={() => setCounterDrawerOpen(false)}
         slug={Array.isArray(slug) ? slug[0] : (slug || '')}
         onCountersChange={fetchProducts}
+      />
+
+      {/* Reorder Food Categories Modal */}
+      <CategoryReorderModal
+        isOpen={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        slug={Array.isArray(slug) ? slug[0] : (slug || '')}
+        onReordered={fetchProducts}
       />
 
     </AdminContentWrapper>
