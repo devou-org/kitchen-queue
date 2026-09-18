@@ -1187,7 +1187,6 @@ export default function AdminProducts() {
         isOpen={categoryModalOpen}
         onClose={() => setCategoryModalOpen(false)}
         slug={Array.isArray(slug) ? slug[0] : (slug || '')}
-        onReordered={fetchProducts}
       />
 
     </AdminContentWrapper>

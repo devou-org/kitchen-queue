@@ -13,9 +13,11 @@ Implemented persistent, restaurant-scoped food category reordering across the Ad
 2. **Backend API Endpoints**:
    - **`GET /api/categories`**: Retrieves categories for the active restaurant ordered by `sort_order ASC`.
    - **`POST /api/categories`**: Creates a new category and assigns `sort_order = max(sort_order) + 10` (appends to the end of the list).
-   - **`POST /api/categories/reorder`**: Swaps `sort_order` values between neighboring categories inside a single database transaction.
+   - **`POST /api/categories/reorder`**: Swaps `sort_order` values or accepts batch `orderedCategoryIds` to update all category sequences in a single database transaction (`updateCategorySequence`).
 
-3. **Form Category Control (`AdminProductForm.tsx`)**:
+3. **Batch Reordering UX Optimization (`CategoryReorderModal.tsx`)**:
+   - Up/Down arrow buttons reorder items **instantly in local UI state** without firing network calls on each click.
+   - Fires a **single batch API request** when the user clicks **Done / Save**, applying the new sequence across Admin, POS, and Customer menus at once.
    - Relocated category management into the **Product Form** directly under *Basic Details* next to `Category *`.
    - Features **`⇅ Reorder`** and **`+ Add Category`** triggers right above the category dropdown.
    - Removed standalone button from the main Admin header bar to keep the page layout clean and uncluttered.

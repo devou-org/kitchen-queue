@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp, ArrowDown, Layers, X, Plus, Loader2 } from 'lucide-react';
+import { ArrowUp, ArrowDown, Layers, X, Plus, Loader2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface CategoryItem {
@@ -21,8 +21,9 @@ interface CategoryReorderModalProps {
 export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: CategoryReorderModalProps) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [addingCat, setAddingCat] = useState(false);
 
@@ -44,6 +45,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         setCategories(data.data);
+        setIsDirty(false);
       }
     } catch {
       toast.error('Failed to load categories');
@@ -58,9 +60,29 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
     }
   }, [isOpen, loadCategories]);
 
-  const handleMove = async (categoryId: string, direction: 'up' | 'down') => {
-    setReorderingId(categoryId);
+  // Local reordering without instant API call
+  const handleMoveLocal = (index: number, direction: 'up' | 'down') => {
+    const swapIdx = direction === 'up' ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= categories.length) return;
+
+    const newCats = [...categories];
+    const temp = newCats[index];
+    newCats[index] = newCats[swapIdx];
+    newCats[swapIdx] = temp;
+
+    setCategories(newCats);
+    setIsDirty(true);
+  };
+
+  const handleSaveAndClose = async () => {
+    if (!isDirty) {
+      onClose();
+      return;
+    }
+
+    setSaving(true);
     try {
+      const orderedCategoryIds = categories.map((c) => c.id);
       const res = await fetch('/api/categories/reorder', {
         method: 'POST',
         headers: {
@@ -68,20 +90,24 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
           'x-restaurant-slug': slug,
           'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`,
         },
-        body: JSON.stringify({ categoryId, direction }),
+        body: JSON.stringify({ orderedCategoryIds }),
       });
       const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setCategories(data.data);
+      if (data.success) {
+        if (Array.isArray(data.data)) {
+          setCategories(data.data);
+        }
+        setIsDirty(false);
         if (onReordered) onReordered();
-        toast.success('Category reordered');
+        toast.success('Category order saved');
+        onClose();
       } else {
-        toast.error(data.error || 'Failed to reorder');
+        toast.error(data.error || 'Failed to save category order');
       }
     } catch {
-      toast.error('Error reordering category');
+      toast.error('Error saving category order');
     } finally {
-      setReorderingId(null);
+      setSaving(false);
     }
   };
 
@@ -90,7 +116,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
     const trimmed = newCatName.trim();
     if (!trimmed) return;
 
-    if (categories.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) {
+    if (categories.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
       toast.error('Category already exists');
       return;
     }
@@ -276,7 +302,6 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
             categories.map((cat, index) => {
               const isFirst = index === 0;
               const isLast = index === categories.length - 1;
-              const isUpdating = reorderingId === cat.id;
 
               return (
                 <div
@@ -315,12 +340,12 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                     </span>
                   </div>
 
-                  {/* Move Up / Down Buttons */}
+                  {/* Move Up / Down Buttons (Local Reorder) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <button
                       type="button"
-                      onClick={() => handleMove(cat.id, 'up')}
-                      disabled={isFirst || isUpdating}
+                      onClick={() => handleMoveLocal(index, 'up')}
+                      disabled={isFirst || saving}
                       title={isFirst ? 'Already at top' : 'Move Up'}
                       style={{
                         width: '32px',
@@ -329,7 +354,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                         border: '1px solid #CBD5E1',
                         backgroundColor: isFirst ? '#F1F5F9' : '#FFFFFF',
                         color: isFirst ? '#94A3B8' : '#0F172A',
-                        cursor: isFirst || isUpdating ? 'not-allowed' : 'pointer',
+                        cursor: isFirst || saving ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -341,8 +366,8 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleMove(cat.id, 'down')}
-                      disabled={isLast || isUpdating}
+                      onClick={() => handleMoveLocal(index, 'down')}
+                      disabled={isLast || saving}
                       title={isLast ? 'Already at bottom' : 'Move Down'}
                       style={{
                         width: '32px',
@@ -351,7 +376,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                         border: '1px solid #CBD5E1',
                         backgroundColor: isLast ? '#F1F5F9' : '#FFFFFF',
                         color: isLast ? '#94A3B8' : '#0F172A',
-                        cursor: isLast || isUpdating ? 'not-allowed' : 'pointer',
+                        cursor: isLast || saving ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -369,22 +394,45 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
         </div>
 
         {/* Footer */}
-        <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #E2E8F0', textAlign: 'right' }}>
+        <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
           <button
             type="button"
             onClick={onClose}
+            disabled={saving}
             style={{
-              padding: '8px 18px',
+              padding: '8px 16px',
               borderRadius: '8px',
               background: '#F1F5F9',
-              color: '#334155',
+              color: '#475569',
               border: 'none',
               fontWeight: 600,
               fontSize: '13px',
-              cursor: 'pointer',
+              cursor: saving ? 'not-allowed' : 'pointer',
             }}
           >
-            Done
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveAndClose}
+            disabled={saving}
+            style={{
+              padding: '8px 20px',
+              borderRadius: '8px',
+              background: 'var(--primary, #0f172a)',
+              color: '#FFFFFF',
+              border: 'none',
+              fontWeight: 600,
+              fontSize: '13px',
+              cursor: saving ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: saving ? 0.7 : 1,
+            }}
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+            <span>{saving ? 'Saving...' : 'Done'}</span>
           </button>
         </div>
       </div>

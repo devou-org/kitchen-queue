@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { reorderCategories, getRestaurantBySlug } from '@/lib/db';
+import { reorderCategories, updateCategorySequence, getRestaurantBySlug } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -22,10 +22,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { categoryId, direction } = body;
+    const { categoryId, direction, orderedCategoryIds } = body;
+
+    if (Array.isArray(orderedCategoryIds) && orderedCategoryIds.length > 0) {
+      const result = await updateCategorySequence(restaurantId, orderedCategoryIds);
+      if (!result.success) {
+        return NextResponse.json({ success: false, error: result.error || 'Failed to update category order' }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, data: result.categories });
+    }
 
     if (!categoryId || (direction !== 'up' && direction !== 'down')) {
-      return NextResponse.json({ success: false, error: 'categoryId and direction ("up" | "down") are required' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'categoryId and direction ("up" | "down") or orderedCategoryIds are required' }, { status: 400 });
     }
 
     const result = await reorderCategories(restaurantId, categoryId, direction);
@@ -39,3 +47,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: error?.message || 'Failed to reorder category' }, { status: 500 });
   }
 }
+

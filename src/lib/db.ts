@@ -2392,6 +2392,33 @@ export async function reorderCategories(restaurantId: string, categoryId: string
   }
 }
 
+export async function updateCategorySequence(restaurantId: string, orderedCategoryIds: string[]) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (let i = 0; i < orderedCategoryIds.length; i++) {
+      await client.query(
+        `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+        [(i + 1) * 10, orderedCategoryIds[i], restaurantId]
+      );
+    }
+    await client.query('COMMIT');
+
+    const updatedRes = await client.query(
+      `SELECT * FROM categories WHERE restaurant_id = $1 ORDER BY sort_order ASC, name ASC`,
+      [restaurantId]
+    );
+    return { success: true, categories: updatedRes.rows };
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error updating category sequence:', err);
+    return { success: false, error: err.message || 'Failed to update category sequence' };
+  } finally {
+    client.release();
+  }
+}
+
+
 // ============================================
 // USER QUERIES
 // ============================================
