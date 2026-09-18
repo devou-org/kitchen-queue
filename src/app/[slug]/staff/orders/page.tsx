@@ -326,12 +326,77 @@ export default function StaffOrders() {
 
   return (
     <AdminContentWrapper fullWidth>
+      <style>{`
+        /* Staff Orders — responsive rules for laptop (≤1280px), tablet, and mobile (≤640px) */
+        .staff-orders-toolbar,
+        .staff-orders-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+        }
+
+        .staff-orders-table-scroll-hint {
+          display: none;
+        }
+
+        /* Laptops & Tablets: Stack toolbar and actions into 2 clean rows below 1280px */
+        @media (max-width: 1280px) {
+          .staff-orders-page-header,
+          .staff-orders-page-header .admin-header-left,
+          .staff-orders-page-header .admin-header-right,
+          .staff-orders-page-header .admin-header-search {
+            flex: 1 1 100% !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .staff-orders-toolbar {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            width: 100% !important;
+            gap: 8px !important;
+          }
+
+          .staff-orders-actions {
+            display: flex !important;
+            width: 100% !important;
+            flex-wrap: wrap !important;
+            justify-content: flex-start !important;
+            gap: 8px !important;
+          }
+        }
+
+        /* Mobile Screens: Full-width stacked controls below 640px */
+        @media (max-width: 640px) {
+          .staff-orders-toolbar {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+          }
+
+          .staff-orders-toolbar > .staff-orders-search-control,
+          .staff-orders-toolbar > .staff-orders-filter-control,
+          .staff-orders-toolbar .staff-orders-select,
+          .staff-orders-toolbar .staff-orders-select > button {
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .staff-orders-actions > button,
+          .staff-orders-actions > a,
+          .staff-orders-actions > div {
+            flex: 1 1 auto;
+          }
+        }
+      `}</style>
       <AdminPageHeader
+        className="staff-orders-page-header"
         style={{ paddingTop: '16px' }}
         search={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+          <div className="staff-orders-toolbar">
             {/* Search Input */}
-            <div style={{ position: 'relative', width: '185px', flexShrink: 0 }}>
+            <div className="staff-orders-search-control" style={{ position: 'relative', width: '185px', flexShrink: 0 }}>
               <Search
                 size={15}
                 style={{
@@ -389,7 +454,7 @@ export default function StaffOrders() {
             </div>
 
             {/* Status Dropdown (135px) */}
-            <div style={{ width: '135px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -403,7 +468,7 @@ export default function StaffOrders() {
             </div>
 
             {/* Order Type Dropdown (145px) */}
-            <div style={{ width: '145px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '145px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
@@ -416,7 +481,7 @@ export default function StaffOrders() {
             </div>
 
             {/* Counter Dropdown (140px) */}
-            <div style={{ width: '140px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '140px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -431,7 +496,7 @@ export default function StaffOrders() {
           </div>
         }
         action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="staff-orders-actions">
             {/* Auto-Print Toggle Button */}
             <button
               onClick={toggleAutoPrint}
@@ -444,15 +509,16 @@ export default function StaffOrders() {
                 borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: 600,
-                border: autoPrintKot ? '1px solid #86EFAC' : '1px solid var(--border)',
-                background: autoPrintKot ? '#F0FDF4' : '#F8FAFC',
-                color: autoPrintKot ? '#166534' : 'var(--text-secondary)',
+                border: 'none',
+                background: autoPrintKot ? '#F0FDF4' : 'var(--primary, #0f172a)',
+                color: autoPrintKot ? '#166534' : '#ffffff',
                 cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                 transition: 'all 0.15s ease',
               }}
               title={autoPrintKot ? 'Auto-Print is ON: Thermal KOT prints automatically when orders enter PREPARING' : 'Auto-Print is Paused'}
             >
-              <Printer size={15} style={{ color: autoPrintKot ? '#16A34A' : '#94A3B8' }} />
+              <Printer size={15} style={{ color: autoPrintKot ? '#16A34A' : '#ffffff' }} />
               <span>{autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}</span>
             </button>
 
@@ -468,23 +534,39 @@ export default function StaffOrders() {
                 borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: 600,
-                border: '1px solid var(--border)',
-                background: '#FFFFFF',
-                color: '#0F172A',
+                border: 'none',
+                background: 'var(--primary, #0f172a)',
+                color: '#ffffff',
                 cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                 transition: 'all 0.15s ease',
               }}
               title="Configure Kitchen Counters & Thermal Hardware"
             >
-              <Store size={15} style={{ color: '#2563EB' }} />
+              <Store size={15} style={{ color: '#ffffff' }} />
               <span className="hidden sm:inline">Counters & Hardware</span>
             </button>
 
             <button
-              className="btn-minimal"
               onClick={() => setShowKitchenSnapshot(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '38px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: 'none',
+                background: 'var(--primary, #0f172a)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                transition: 'all 0.15s ease',
+              }}
             >
-              <ChefHat size={16} style={{ color: 'var(--primary)' }} /> Kitchen Snapshot
+              <ChefHat size={16} style={{ color: '#ffffff' }} /> Kitchen Snapshot
             </button>
           </div>
         }

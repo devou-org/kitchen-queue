@@ -435,7 +435,7 @@ export default function AdminOrders() {
   return (
     <AdminContentWrapper fullWidth>
       <style>{`
-        /* Kept page-scoped so the mobile behavior of other admin screens is unchanged. */
+        /* Page-scoped responsive rules to support laptops (up to 1280px), tablets, and mobile screens. */
         .orders-toolbar,
         .orders-actions {
           display: flex;
@@ -448,7 +448,8 @@ export default function AdminOrders() {
           display: none;
         }
 
-        @media (max-width: 768px) {
+        /* Laptops & Tablets: Stack toolbar and action buttons into 2 clean rows below 1280px */
+        @media (max-width: 1280px) {
           .orders-page-header,
           .orders-page-header .admin-header-left,
           .orders-page-header .admin-header-right,
@@ -459,30 +460,18 @@ export default function AdminOrders() {
           }
 
           .orders-toolbar {
-            display: grid !important;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            display: flex !important;
+            flex-wrap: wrap !important;
             width: 100% !important;
-            min-width: 0 !important;
             gap: 8px !important;
           }
 
-          .orders-toolbar > .orders-search-control {
-            grid-column: 1 / -1;
-            width: 100% !important;
-            min-width: 0 !important;
-          }
-
-          .orders-toolbar > .orders-filter-control,
-          .orders-toolbar .orders-select,
-          .orders-toolbar .orders-select > button {
-            width: 100% !important;
-            min-width: 0 !important;
-          }
-
           .orders-actions {
+            display: flex !important;
             width: 100% !important;
-            flex-wrap: wrap;
-            justify-content: flex-start;
+            flex-wrap: wrap !important;
+            justify-content: flex-start !important;
+            gap: 8px !important;
           }
 
           .orders-table-card {
@@ -510,7 +499,8 @@ export default function AdminOrders() {
           }
         }
 
-        @media (max-width: 480px) {
+        /* Mobile Screens: Full-width stacked controls below 640px */
+        @media (max-width: 640px) {
           .orders-toolbar {
             display: flex !important;
             flex-direction: column !important;
@@ -518,15 +508,11 @@ export default function AdminOrders() {
           }
 
           .orders-toolbar > .orders-search-control,
-          .orders-toolbar > .orders-filter-control {
+          .orders-toolbar > .orders-filter-control,
+          .orders-toolbar .orders-select,
+          .orders-toolbar .orders-select > button {
             width: 100% !important;
-          }
-
-          .orders-actions {
-            display: flex !important;
-            width: 100% !important;
-            flex-wrap: wrap;
-            gap: 8px !important;
+            min-width: 0 !important;
           }
 
           .orders-actions > button,
@@ -666,15 +652,16 @@ export default function AdminOrders() {
                 borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: 600,
-                border: autoPrintKot ? '1px solid #86EFAC' : '1px solid var(--border)',
-                background: autoPrintKot ? '#F0FDF4' : '#F8FAFC',
-                color: autoPrintKot ? '#166534' : 'var(--text-secondary)',
+                border: 'none',
+                background: autoPrintKot ? '#F0FDF4' : 'var(--primary, #0f172a)',
+                color: autoPrintKot ? '#166534' : '#ffffff',
                 cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                 transition: 'all 0.15s ease',
               }}
               title={autoPrintKot ? 'Auto-Print is ON: Thermal KOT prints automatically when orders enter PREPARING' : 'Auto-Print is Paused'}
             >
-              <Printer size={15} style={{ color: autoPrintKot ? '#16A34A' : '#94A3B8' }} />
+              <Printer size={15} style={{ color: autoPrintKot ? '#16A34A' : '#ffffff' }} />
               <span>{autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}</span>
             </button>
 
@@ -690,23 +677,42 @@ export default function AdminOrders() {
                 borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: 600,
-                border: '1px solid var(--border)',
-                background: '#FFFFFF',
-                color: '#0F172A',
+                border: 'none',
+                background: 'var(--primary, #0f172a)',
+                color: '#ffffff',
                 cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                 transition: 'all 0.15s ease',
               }}
               title="Configure Kitchen Counters & Thermal Hardware"
             >
-              <Store size={15} style={{ color: '#2563EB' }} />
-              <span className="hidden sm:inline">Counters & Hardware</span>
+              <Store size={15} style={{ color: '#ffffff' }} />
+              <span>
+                <span className="inline sm:hidden">Counters</span>
+                <span className="hidden sm:inline">Counters & Hardware</span>
+              </span>
             </button>
 
             <button
-              className="btn-minimal"
               onClick={() => setShowKitchenSnapshot(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '38px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: 'none',
+                background: 'var(--primary, #0f172a)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                transition: 'all 0.15s ease',
+              }}
             >
-              <ChefHat size={16} style={{ color: 'var(--primary)' }} /> Kitchen Snapshot
+              <ChefHat size={16} style={{ color: '#ffffff' }} /> Kitchen Snapshot
             </button>
           </div>
         }
