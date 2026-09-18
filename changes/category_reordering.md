@@ -15,11 +15,11 @@ Implemented persistent, restaurant-scoped food category reordering across the Ad
    - **`POST /api/categories`**: Creates a new category and assigns `sort_order = max(sort_order) + 10` (appends to the end of the list).
    - **`POST /api/categories/reorder`**: Swaps `sort_order` values between neighboring categories inside a single database transaction.
 
-3. **Admin Reorder Modal (`CategoryReorderModal.tsx`)**:
-   - Integrated a **"Reorder Categories"** button on the Admin Products page (`/[slug]/admin/products`).
-   - Features ▲ **Move Up** and ▼ **Move Down** controls with position badges.
-   - Automatically disables Move Up for the top category and Move Down for the bottom category.
-   - Includes inline quick-add for new categories.
+3. **Form Category Control (`AdminProductForm.tsx`)**:
+   - Relocated category management into the **Product Form** directly under *Basic Details* next to `Category *`.
+   - Features **`⇅ Reorder`** and **`+ Add Category`** triggers right above the category dropdown.
+   - Removed standalone button from the main Admin header bar to keep the page layout clean and uncluttered.
+   - When categories are reordered or added, the form's category `<select>` dropdown instantly updates to match the new sequence.
 
 4. **Staff POS & Customer Menu Integration (`sortCategoriesByConfig`)**:
    - Created reusable utility `sortCategoriesByConfig` in `src/lib/category-order.ts`.

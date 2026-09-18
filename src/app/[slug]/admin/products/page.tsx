@@ -447,29 +447,6 @@ export default function AdminProducts() {
               <Store size={16} style={{ color: '#ffffff' }} /> Counters
             </button>
             <button
-              type="button"
-              onClick={() => setCategoryModalOpen(true)}
-              style={{
-                height: '42px',
-                padding: '0 18px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--primary, #0f172a)',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Layers size={16} style={{ color: '#ffffff' }} /> Reorder Categories
-            </button>
-            <button
               onClick={() => {
                 setEditingProduct(null);
                 setFormModalOpen(true);
