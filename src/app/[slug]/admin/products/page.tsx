@@ -488,7 +488,7 @@ export default function AdminProducts() {
             <button
               type="button"
               onClick={() => setCategoryModalOpen(true)}
-              title="Reorder Food Categories"
+              title="Click to reorder food categories for Staff POS & Customer Menu"
               style={{
                 height: '38px',
                 padding: '0 12px',
