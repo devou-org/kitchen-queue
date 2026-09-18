@@ -139,7 +139,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 1000000,
         padding: '16px',
       }}
     >
