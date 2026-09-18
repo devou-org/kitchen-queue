@@ -488,10 +488,11 @@ export default function AdminProducts() {
             <button
               type="button"
               onClick={() => setCategoryModalOpen(true)}
-              title="Click to reorder food categories for Staff POS & Customer Menu"
+              title="Reorder Categories"
               style={{
+                width: '38px',
                 height: '38px',
-                padding: '0 12px',
+                padding: 0,
                 borderRadius: '8px',
                 border: '1px solid var(--border, #cbd5e1)',
                 backgroundColor: '#FFFFFF',
@@ -499,16 +500,13 @@ export default function AdminProducts() {
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                fontSize: '13px',
-                fontWeight: 600,
+                justifyContent: 'center',
                 boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
                 transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
-              <ArrowUpDown size={15} style={{ color: 'var(--primary, #0f172a)' }} />
-              <span>Reorder Categories</span>
+              <ArrowUpDown size={16} style={{ color: 'var(--primary, #0f172a)' }} />
             </button>
             <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
           </div>

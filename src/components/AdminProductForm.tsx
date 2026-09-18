@@ -424,7 +424,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   <button
                     type="button"
                     onClick={() => setReorderModalOpen(true)}
-                    title="Click to reorder food categories for Staff POS & Customer Menu"
+                    title="Reorder Categories"
                     style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   >
                     <ArrowUpDown size={14} /> Reorder
