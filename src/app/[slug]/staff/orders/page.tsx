@@ -398,7 +398,7 @@ export default function StaffOrders() {
         search={
           <div className="staff-orders-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
             {/* Search Input */}
-            <div className="staff-orders-search-control" style={{ position: 'relative', width: '260px', flexShrink: 0 }}>
+            <div className="staff-orders-search-control" style={{ position: 'relative', width: '220px', minWidth: '160px', flexShrink: 1 }}>
               <Search
                 size={15}
                 style={{
@@ -456,7 +456,7 @@ export default function StaffOrders() {
             </div>
 
             {/* Status Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '140px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -465,25 +465,25 @@ export default function StaffOrders() {
                 }}
                 options={allStatuses.map((s) => ({ value: s, label: s }))}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
-                style={{ width: '140px' }}
+                style={{ width: '130px' }}
               />
             </div>
 
             {/* Order Type Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '160px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '145px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
                   setOrderTypeFilter(val);
                   setPage(1);
                 }}
-                style={{ width: '160px' }}
+                style={{ width: '145px' }}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
               />
             </div>
 
             {/* Counter Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '150px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -492,7 +492,7 @@ export default function StaffOrders() {
                   ...counters.map(c => ({ value: c.name, label: `${c.name} Station` }))
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
-                style={{ width: '150px' }}
+                style={{ width: '135px' }}
               />
             </div>
 

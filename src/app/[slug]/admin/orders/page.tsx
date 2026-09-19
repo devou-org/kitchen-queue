@@ -530,7 +530,7 @@ export default function AdminOrders() {
         search={
           <div className="orders-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
             {/* Search Input */}
-            <div className="orders-search-control" style={{ position: 'relative', width: '260px', flexShrink: 0 }}>
+            <div className="orders-search-control" style={{ position: 'relative', width: '220px', minWidth: '160px', flexShrink: 1 }}>
               <Search
                 size={15}
                 style={{
@@ -588,7 +588,7 @@ export default function AdminOrders() {
             </div>
 
             {/* Status Dropdown */}
-            <div className="orders-filter-control" style={{ width: '140px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -606,12 +606,12 @@ export default function AdminOrders() {
                 disabled={!statusesLoaded}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
                 className="orders-select"
-                style={{ width: '140px' }}
+                style={{ width: '130px' }}
               />
             </div>
 
             {/* Order Type Dropdown */}
-            <div className="orders-filter-control" style={{ width: '160px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '145px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
@@ -619,13 +619,13 @@ export default function AdminOrders() {
                   setPage(1);
                 }}
                 className="orders-select"
-                style={{ width: '160px' }}
+                style={{ width: '145px' }}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
               />
             </div>
 
             {/* Counter Dropdown */}
-            <div className="orders-filter-control" style={{ width: '150px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -635,7 +635,7 @@ export default function AdminOrders() {
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
                 className="orders-select"
-                style={{ width: '150px' }}
+                style={{ width: '135px' }}
               />
             </div>
 
