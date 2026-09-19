@@ -16,6 +16,7 @@ import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryF
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { printKotFromBrowser } from '@/lib/client-print';
+import { sortCategoriesByConfig } from '@/lib/category-order';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -150,7 +151,14 @@ export default function StaffMenuPage() {
   useEffect(() => {
     const initPage = async () => {
       try {
-        const res = await productService.getProducts();
+        const [res, catRes] = await Promise.all([
+          productService.getProducts(),
+          fetch('/api/categories', {
+            headers: { 'x-restaurant-slug': slug as string },
+            cache: 'no-store'
+          }).then(r => r.json()).catch(() => ({ success: false, data: [] }))
+        ]);
+
         if (res.success && res.data) {
           const parsedData = res.data.map(p => ({
             ...p,
@@ -159,12 +167,12 @@ export default function StaffMenuPage() {
             buffer_quantity: Number(p.buffer_quantity)
           }));
           setProducts(parsedData);
-          const uniqueCats = Array.from(new Set(
-            parsedData
-              .map((p: Product) => p.category?.trim())
-              .filter((cat: string) => cat && cat !== 'All')
-          ));
-          setCategories(['All', ...uniqueCats]);
+
+          const configured = (catRes.success && Array.isArray(catRes.data)) ? catRes.data : [];
+          const productCats = parsedData.map((p: Product) => p.category?.trim()).filter(Boolean);
+          const sortedCats = sortCategoriesByConfig(productCats, configured);
+
+          setCategories(['All', ...sortedCats]);
         }
 
         await fetchTables();
@@ -175,7 +183,7 @@ export default function StaffMenuPage() {
       }
     };
     initPage();
-  }, [fetchTables]);
+  }, [fetchTables, slug]);
 
   // Pusher for real-time updates
   useEffect(() => {

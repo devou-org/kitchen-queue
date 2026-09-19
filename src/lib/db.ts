@@ -2281,32 +2281,165 @@ export async function deleteCounter(restaurantId: string, id: string) {
 // CATEGORY QUERIES
 // ============================================
 
-export async function getCategories() {
+export async function getCategories(restaurantId?: string) {
   try {
-    const rows = await sql`SELECT * FROM categories ORDER BY name ASC`;
-    return rows;
+    if (restaurantId) {
+      // 1. Auto-sync any product categories that haven't been added to categories table yet
+      await sql`
+        INSERT INTO categories (restaurant_id, name, sort_order)
+        SELECT 
+          p.restaurant_id,
+          TRIM(p.category) as name,
+          COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = p.restaurant_id), 0) + 10 as sort_order
+        FROM products p
+        WHERE p.restaurant_id = ${restaurantId}
+          AND p.category IS NOT NULL 
+          AND TRIM(p.category) != ''
+          AND NOT EXISTS (
+            SELECT 1 FROM categories c 
+            WHERE c.restaurant_id = p.restaurant_id 
+              AND LOWER(c.name) = LOWER(TRIM(p.category))
+          )
+        GROUP BY p.restaurant_id, TRIM(p.category)
+        ON CONFLICT DO NOTHING
+      `;
+
+      // 2. Fetch all categories for this restaurant ordered by sort_order
+      const rows = await sql`
+        SELECT * FROM categories 
+        WHERE restaurant_id = ${restaurantId} 
+        ORDER BY sort_order ASC, name ASC
+      `;
+      return rows;
+    } else {
+      const rows = await sql`SELECT * FROM categories ORDER BY sort_order ASC, name ASC`;
+      return rows;
+    }
   } catch (err) {
     console.warn('⚠️ categories table fetch failed, falling back to products table categories:', err);
-    // Fallback: Get unique categories from products table to satisfy the UI
-    const fallbackRows = await sql`
-      SELECT DISTINCT TRIM(category) as name, MIN(id::text) as id 
-      FROM products 
-      WHERE category IS NOT NULL AND category != ''
-      GROUP BY TRIM(category)
-      ORDER BY name ASC
-    `;
-    return fallbackRows;
+    return [];
   }
 }
 
-export async function createCategory(name: string) {
-  const rows = await sql`
-    INSERT INTO categories (name) VALUES (${name})
-    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-    RETURNING *
-  `;
-  return rows[0];
+export async function createCategory(name: string, restaurantId?: string) {
+  let nextOrder = 10;
+  if (restaurantId) {
+    const maxRes = await sql`SELECT COALESCE(MAX(sort_order), 0) as max_order FROM categories WHERE restaurant_id = ${restaurantId}`;
+    nextOrder = (Number(maxRes[0]?.max_order) || 0) + 10;
+  }
+
+  if (restaurantId) {
+    const rows = await sql`
+      INSERT INTO categories (restaurant_id, name, sort_order) 
+      VALUES (${restaurantId}, ${name}, ${nextOrder})
+      ON CONFLICT (restaurant_id, name) DO UPDATE SET name = EXCLUDED.name
+      RETURNING *
+    `;
+    return rows[0];
+  } else {
+    const rows = await sql`
+      INSERT INTO categories (name, sort_order) 
+      VALUES (${name}, ${nextOrder})
+      RETURNING *
+    `;
+    return rows[0];
+  }
 }
+
+export async function reorderCategories(restaurantId: string, categoryId: string, direction: 'up' | 'down') {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get current list of categories sorted by sort_order
+    const res = await client.query(
+      `SELECT id, name, sort_order FROM categories WHERE restaurant_id = $1 ORDER BY sort_order ASC, name ASC`,
+      [restaurantId]
+    );
+    const categories = res.rows;
+
+    const targetIdx = categories.findIndex(c => c.id === categoryId);
+    if (targetIdx === -1) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Category not found' };
+    }
+
+    const swapIdx = direction === 'up' ? targetIdx - 1 : targetIdx + 1;
+    if (swapIdx < 0 || swapIdx >= categories.length) {
+      await client.query('ROLLBACK');
+      return { success: true, categories }; // Already at top/bottom limit
+    }
+
+    const targetCat = categories[targetIdx];
+    const swapCat = categories[swapIdx];
+
+    // Swap sort_orders in a single transaction
+    await client.query(
+      `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+      [swapCat.sort_order, targetCat.id, restaurantId]
+    );
+    await client.query(
+      `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+      [targetCat.sort_order, swapCat.id, restaurantId]
+    );
+
+    // If both had identical sort_orders, reassign clean sequential sort_orders (10, 20, 30...)
+    if (targetCat.sort_order === swapCat.sort_order) {
+      // Re-sort with swapped elements
+      const reordered = [...categories];
+      reordered[targetIdx] = swapCat;
+      reordered[swapIdx] = targetCat;
+
+      for (let i = 0; i < reordered.length; i++) {
+        await client.query(
+          `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+          [(i + 1) * 10, reordered[i].id, restaurantId]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    const updatedRes = await client.query(
+      `SELECT * FROM categories WHERE restaurant_id = $1 ORDER BY sort_order ASC, name ASC`,
+      [restaurantId]
+    );
+    return { success: true, categories: updatedRes.rows };
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error reordering categories:', err);
+    return { success: false, error: err.message || 'Failed to reorder categories' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateCategorySequence(restaurantId: string, orderedCategoryIds: string[]) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (let i = 0; i < orderedCategoryIds.length; i++) {
+      await client.query(
+        `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+        [(i + 1) * 10, orderedCategoryIds[i], restaurantId]
+      );
+    }
+    await client.query('COMMIT');
+
+    const updatedRes = await client.query(
+      `SELECT * FROM categories WHERE restaurant_id = $1 ORDER BY sort_order ASC, name ASC`,
+      [restaurantId]
+    );
+    return { success: true, categories: updatedRes.rows };
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error updating category sequence:', err);
+    return { success: false, error: err.message || 'Failed to update category sequence' };
+  } finally {
+    client.release();
+  }
+}
+
 
 // ============================================
 // USER QUERIES

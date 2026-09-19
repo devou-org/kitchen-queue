@@ -10,10 +10,11 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes } from 'lucide-react';
+import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes, Layers, ArrowUpDown } from 'lucide-react';
 import AdminProductForm from '@/components/AdminProductForm';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
+import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 
 interface ExtractedProduct {
   id: string;
@@ -57,6 +58,9 @@ export default function AdminProducts() {
 
   // Counter Drawer state (Manage / Add Counters)
   const [counterDrawerOpen, setCounterDrawerOpen] = useState(false);
+
+  // Category Reorder Modal state
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -480,7 +484,32 @@ export default function AdminProducts() {
             onChange={e => setSearch(e.target.value)}
             style={{ maxWidth: '400px', width: '100%', flex: 1 }}
           />
-          <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setCategoryModalOpen(true)}
+              title="Reorder Categories"
+              style={{
+                width: '38px',
+                height: '38px',
+                padding: 0,
+                borderRadius: '8px',
+                border: '1px solid var(--border, #cbd5e1)',
+                backgroundColor: '#FFFFFF',
+                color: 'var(--primary, #0f172a)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+            >
+              <ArrowUpDown size={16} style={{ color: 'var(--primary, #0f172a)' }} />
+            </button>
+            <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
+          </div>
         </div>
 
         <div className="products-table-scroll-hint" aria-hidden="true">Swipe left to view all product details</div>
@@ -1151,6 +1180,13 @@ export default function AdminProducts() {
         onClose={() => setCounterDrawerOpen(false)}
         slug={Array.isArray(slug) ? slug[0] : (slug || '')}
         onCountersChange={fetchProducts}
+      />
+
+      {/* Reorder Food Categories Modal */}
+      <CategoryReorderModal
+        isOpen={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        slug={Array.isArray(slug) ? slug[0] : (slug || '')}
       />
 
     </AdminContentWrapper>
