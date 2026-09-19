@@ -12,7 +12,7 @@ interface OrderTypeFilterProps {
 }
 
 const OPTIONS = [
-  { value: '', label: 'All Order Types', icon: Filter },
+  { value: '', label: 'All Orders', icon: Filter },
   { value: 'DINE_IN', label: 'Dine-in', icon: Utensils },
   { value: 'TAKEAWAY', label: 'Takeaway', icon: ShoppingBag },
 ];
