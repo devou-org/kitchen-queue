@@ -640,7 +640,7 @@ export default function AdminOrders() {
             </div>
 
             {/* Far Right Action Buttons */}
-            <div className="orders-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <div className="orders-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexGrow: 1 }}>
               {/* Auto-Print Toggle Button */}
               <button
                 onClick={toggleAutoPrint}
