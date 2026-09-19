@@ -395,8 +395,8 @@ export default function StaffOrders() {
         style={{ paddingTop: '16px' }}
         search={
           <div className="staff-orders-toolbar">
-            {/* Search Input (240px) */}
-            <div className="staff-orders-search-control" style={{ position: 'relative', width: '240px', flexShrink: 0 }}>
+            {/* Search Input (320px) */}
+            <div className="staff-orders-search-control" style={{ position: 'relative', width: '320px', flexShrink: 0 }}>
               <Search
                 size={15}
                 style={{

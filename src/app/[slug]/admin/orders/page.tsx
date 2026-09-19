@@ -527,8 +527,8 @@ export default function AdminOrders() {
         style={{ paddingTop: '16px' }}
         search={
           <div className="orders-toolbar">
-            {/* Search Input (240px) */}
-            <div className="orders-search-control" style={{ position: 'relative', width: '240px', flexShrink: 0 }}>
+            {/* Search Input (320px) */}
+            <div className="orders-search-control" style={{ position: 'relative', width: '320px', flexShrink: 0 }}>
               <Search
                 size={15}
                 style={{
