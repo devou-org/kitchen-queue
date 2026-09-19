@@ -528,9 +528,9 @@ export default function AdminOrders() {
         style={{ paddingTop: '16px' }}
         hideMaximize={true}
         search={
-          <div className="orders-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
+          <div className="orders-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap', width: '100%', minWidth: 0 }}>
             {/* Search Input */}
-            <div className="orders-search-control" style={{ position: 'relative', width: '220px', minWidth: '160px', flexShrink: 1 }}>
+            <div className="orders-search-control" style={{ position: 'relative', width: '190px', minWidth: '130px', flexShrink: 1 }}>
               <Search
                 size={15}
                 style={{
@@ -588,7 +588,7 @@ export default function AdminOrders() {
             </div>
 
             {/* Status Dropdown */}
-            <div className="orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '120px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -606,12 +606,12 @@ export default function AdminOrders() {
                 disabled={!statusesLoaded}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
                 className="orders-select"
-                style={{ width: '130px' }}
+                style={{ width: '120px' }}
               />
             </div>
 
             {/* Order Type Dropdown */}
-            <div className="orders-filter-control" style={{ width: '145px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
@@ -619,13 +619,13 @@ export default function AdminOrders() {
                   setPage(1);
                 }}
                 className="orders-select"
-                style={{ width: '145px' }}
+                style={{ width: '130px' }}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
               />
             </div>
 
             {/* Counter Dropdown */}
-            <div className="orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '125px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -635,84 +635,84 @@ export default function AdminOrders() {
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '13px' }}
                 className="orders-select"
-                style={{ width: '135px' }}
+                style={{ width: '125px' }}
               />
             </div>
+          </div>
+        }
+        action={
+          <div className="orders-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {/* Auto-Print Toggle Button */}
+            <button
+              onClick={toggleAutoPrint}
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                border: 'none',
+                background: autoPrintKot ? '#16A34A' : 'var(--primary, #0f172a)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+              title={autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}
+            >
+              <Printer size={18} style={{ color: '#ffffff' }} />
+            </button>
 
-            {/* Far Right Action Buttons */}
-            <div className="orders-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexGrow: 1 }}>
-              {/* Auto-Print Toggle Button */}
-              <button
-                onClick={toggleAutoPrint}
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: autoPrintKot ? '#16A34A' : 'var(--primary, #0f172a)',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                title={autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}
-              >
-                <Printer size={18} style={{ color: '#ffffff' }} />
-              </button>
+            {/* Counters & Hardware Drawer Trigger */}
+            <button
+              onClick={() => setCounterDrawerOpen(true)}
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--primary, #0f172a)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+              title="Counters & Hardware"
+            >
+              <Store size={18} style={{ color: '#ffffff' }} />
+            </button>
 
-              {/* Counters & Hardware Drawer Trigger */}
-              <button
-                onClick={() => setCounterDrawerOpen(true)}
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'var(--primary, #0f172a)',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                title="Counters & Hardware"
-              >
-                <Store size={18} style={{ color: '#ffffff' }} />
-              </button>
+            {/* Kitchen Snapshot Button */}
+            <button
+              onClick={() => setShowKitchenSnapshot(true)}
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--primary, #0f172a)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+              title="Kitchen Snapshot"
+            >
+              <ChefHat size={18} style={{ color: '#ffffff' }} />
+            </button>
 
-              {/* Kitchen Snapshot Button */}
-              <button
-                onClick={() => setShowKitchenSnapshot(true)}
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'var(--primary, #0f172a)',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                title="Kitchen Snapshot"
-              >
-                <ChefHat size={18} style={{ color: '#ffffff' }} />
-              </button>
-
-              {/* Maximize Layout Toggle */}
-              <LayoutMaximizeToggle />
-            </div>
+            {/* Maximize Layout Toggle */}
+            <LayoutMaximizeToggle />
           </div>
         }
       />
