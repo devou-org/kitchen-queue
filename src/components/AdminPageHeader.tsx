@@ -84,7 +84,8 @@ export function AdminPageHeader({
           <div
             className="admin-header-left"
             style={{
-              flex: '1 1 auto',
+              flex: '1 1 100%',
+              width: '100%',
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
@@ -111,7 +112,8 @@ export function AdminPageHeader({
                   gap: '10px',
                   flexWrap: 'wrap',
                   minWidth: 0,
-                  flex: '1 1 auto',
+                  width: '100%',
+                  flex: '1 1 100%',
                 }}
               >
                 {search}
