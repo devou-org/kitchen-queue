@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3 } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
@@ -49,7 +49,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         pathname.startsWith(`/${slug}/admin/pos`) || 
         pathname.startsWith(`/${slug}/admin/orders`) || 
         pathname.startsWith(`/${slug}/admin/statements`) || 
-        pathname.startsWith(`/${slug}/admin/sales`);
+        pathname.startsWith(`/${slug}/admin/sales`) ||
+        pathname.startsWith(`/${slug}/admin/analytics`);
       if (isUnauthorizedPath) {
         const target = showQueue ? 'queue' : 'products';
         router.replace(`/${slug}/admin/${target}`);
@@ -130,8 +131,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     { name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showInventory ? [{ name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/sales`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
     { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
     { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
@@ -221,7 +221,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="sidebar-nav">
           {navLinks.map((link) => {
-            const isActive = pathname.startsWith(link.href);
+            const isActive = pathname.startsWith(link.href) ||
+              (link.name === 'Analytics' && (pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)));
             return (
               <Link key={link.name} 
                 href={link.href} 

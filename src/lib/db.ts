@@ -2045,6 +2045,21 @@ export async function getTopProducts(restaurantId: string, dateFrom: string, dat
   return rows;
 }
 
+export async function getPaymentMethodAnalytics(restaurantId: string, dateFrom: string, dateTo: string) {
+  const rows = await sql`
+    SELECT 
+      COALESCE(NULLIF(UPPER(TRIM(payment_method)), ''), 'PENDING / OTHER') as payment_method,
+      COUNT(*)::int as order_count,
+      COALESCE(SUM(total_price), 0)::float as total_revenue
+    FROM orders WHERE restaurant_id = ${restaurantId}
+      AND business_date BETWEEN ${dateFrom} AND ${dateTo}
+      AND is_paid = true AND status = 'PAID'
+    GROUP BY payment_method
+    ORDER BY total_revenue DESC
+  `;
+  return rows;
+}
+
 export async function getDashboardStats(restaurantId: string) {
   const statsRows = await sql`
     SELECT 

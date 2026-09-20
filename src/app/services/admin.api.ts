@@ -62,6 +62,20 @@ class AdminService {
     }
   }
 
+  async getPaymentMethodAnalytics(date_from?: string, date_to?: string): Promise<ApiResponse<any[]>> {
+    try {
+      const qs = new URLSearchParams({ type: 'payment-methods' });
+      if (date_from) qs.append('date_from', date_from);
+      if (date_to) qs.append('date_to', date_to);
+      const res = await fetch(`/api/analytics?${qs.toString()}`, {
+        headers: this.getAuthHeaders(),
+      });
+      return await res.json();
+    } catch {
+      return { success: false, error: 'Network error fetching payment methods' };
+    }
+  }
+
   async getPeakHours(): Promise<ApiResponse<any[]>> {
     try {
       const res = await fetch('/api/analytics?type=peak-hours', {
@@ -73,10 +87,21 @@ class AdminService {
     }
   }
 
-  async getTopProducts(limit = 10): Promise<ApiResponse<any[]>> {
+  async getTopProducts(
+    options: { limit?: number; date_from?: string; date_to?: string } | number = 10
+  ): Promise<ApiResponse<any[]>> {
     try {
-      const res = await fetch(`/api/analytics?type=top-products&limit=${limit}`, {
+      const qs = new URLSearchParams({ type: 'top-products' });
+      if (typeof options === 'number') {
+        qs.set('limit', String(options));
+      } else {
+        if (options.limit) qs.set('limit', String(options.limit));
+        if (options.date_from) qs.set('date_from', options.date_from);
+        if (options.date_to) qs.set('date_to', options.date_to);
+      }
+      const res = await fetch(`/api/analytics?${qs.toString()}`, {
         headers: this.getAuthHeaders(),
+        cache: 'no-store',
       });
       return await res.json();
     } catch {
