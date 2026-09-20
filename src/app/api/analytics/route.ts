@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDailyAnalytics, getPeakHours, getTopProducts, getDashboardStats, getKitchenSnapshot, getRestaurantBySlug } from '@/lib/db';
+import { getDailyAnalytics, getPeakHours, getTopProducts, getDashboardStats, getKitchenSnapshot, getPaymentMethodAnalytics, getRestaurantBySlug } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 
 const getDateRange = (req: NextRequest) => {
@@ -64,6 +64,10 @@ export async function GET(request: NextRequest) {
     if (type === 'kitchen-snapshot') {
       const bDate = searchParams.get('business_date') || undefined;
       const data = await getKitchenSnapshot(restaurant.id, bDate);
+      return NextResponse.json({ success: true, data });
+    }
+    if (type === 'payment-methods') {
+      const data = await getPaymentMethodAnalytics(restaurant.id, date_from, date_to);
       return NextResponse.json({ success: true, data });
     }
 
