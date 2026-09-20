@@ -217,10 +217,10 @@ export function SalesAnalyticsChart({
               <TrendingUp size={22} strokeWidth={2.5} />
             </div>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, margin: 0, color: '#0F172A' }}>
                 Sales & Performance Graph
               </h3>
-              <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0 0' }}>
+              <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0 0', fontWeight: 400 }}>
                 {dateFrom && dateTo ? `${dateFrom} to ${dateTo}` : 'Daily sales volume & revenue analysis'}
               </p>
             </div>
@@ -246,7 +246,7 @@ export function SalesAnalyticsChart({
             style={{
               padding: '6px 12px',
               fontSize: '12px',
-              fontWeight: activeMetric === 'revenue' ? 700 : 500,
+              fontWeight: activeMetric === 'revenue' ? 600 : 500,
               borderRadius: '6px',
               border: 'none',
               cursor: 'pointer',
@@ -270,7 +270,7 @@ export function SalesAnalyticsChart({
             style={{
               padding: '6px 12px',
               fontSize: '12px',
-              fontWeight: activeMetric === 'orders' ? 700 : 500,
+              fontWeight: activeMetric === 'orders' ? 600 : 500,
               borderRadius: '6px',
               border: 'none',
               cursor: 'pointer',
@@ -294,7 +294,7 @@ export function SalesAnalyticsChart({
             style={{
               padding: '6px 12px',
               fontSize: '12px',
-              fontWeight: activeMetric === 'top_items' ? 700 : 500,
+              fontWeight: activeMetric === 'top_items' ? 600 : 500,
               borderRadius: '6px',
               border: 'none',
               cursor: 'pointer',
@@ -318,7 +318,7 @@ export function SalesAnalyticsChart({
             style={{
               padding: '6px 12px',
               fontSize: '12px',
-              fontWeight: activeMetric === 'payment_methods' ? 700 : 500,
+              fontWeight: activeMetric === 'payment_methods' ? 600 : 500,
               borderRadius: '6px',
               border: 'none',
               cursor: 'pointer',
@@ -349,37 +349,37 @@ export function SalesAnalyticsChart({
           marginBottom: '16px',
           padding: '10px 14px',
           backgroundColor: '#F8FAFC',
-          borderRadius: '8px',
+          borderRadius: '12px',
           border: '1px solid #E2E8F0',
         }}
       >
         <div>
-          <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Period Revenue</span>
-          <div style={{ fontSize: '15px', fontWeight: 800, color: primaryColor }}>
+          <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Period Revenue</span>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: primaryColor }}>
             {formatPrice(totalRev)}
           </div>
         </div>
         <div>
-          <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Total Completed Orders</span>
-          <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+          <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Total Completed Orders</span>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>
             {totalOrd.toLocaleString()} orders
           </div>
         </div>
         {topPayment && (
           <div>
-            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Top Payment Channel</span>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
+            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Top Payment Channel</span>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
               {topPayment.name} ({formatPrice(topPayment.revenue)})
             </div>
           </div>
         )}
         {topProduct && (
           <div>
-            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Best Selling Dish</span>
+            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Best Selling Dish</span>
             <div
               style={{
                 fontSize: '14px',
-                fontWeight: 700,
+                fontWeight: 600,
                 color: '#0F172A',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
@@ -670,13 +670,13 @@ export function SalesAnalyticsChart({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                         <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: p.color, flexShrink: 0 }} />
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                           <div style={{ fontSize: '11px', color: '#64748B' }}>{p.orders} transactions</div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>{formatPrice(p.revenue)}</div>
-                        <div style={{ fontSize: '11px', color: p.color, fontWeight: 700 }}>{pct}% of sales</div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>{formatPrice(p.revenue)}</div>
+                        <div style={{ fontSize: '11px', color: p.color, fontWeight: 600 }}>{pct}% of sales</div>
                       </div>
                     </div>
                   );
