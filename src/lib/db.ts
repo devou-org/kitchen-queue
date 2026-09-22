@@ -348,8 +348,11 @@ async function runAutoMigration(sqlConnection: any) {
 
       ALTER TABLE staffs
       ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES roles(id) ON DELETE SET NULL;
+
+      ALTER TABLE admins
+      ADD COLUMN IF NOT EXISTS name VARCHAR(100);
     `;
-    console.log("Auto-migrated menu, GST, tables, counters, inventory, and roles schema successfully!");
+    console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, and admins schema successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
