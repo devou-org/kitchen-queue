@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStaffs, createStaff, getRestaurantBySlug } from '@/lib/db';
-import { hashPassword } from '@/lib/auth';
+import { updateRole, deleteRole, getRestaurantBySlug } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 
-export async function GET(request: NextRequest) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireAdmin(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -18,55 +17,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    const staffs = await getStaffs(restaurant.id);
-    return NextResponse.json({ success: true, data: staffs });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const user = await requireAdmin(request);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  if (!user.isAdmin && (!user.permissions || !user.permissions.includes('staff'))) {
-    return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
-  }
-
-  try {
-    const slug = request.headers.get('x-restaurant-slug') || 'demo';
-    const restaurant = await getRestaurantBySlug(slug);
-    if (!restaurant) {
-      return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
-    }
-
+    const { id } = await params;
     const body = await request.json();
-    const { name, email, phone, password, role, role_id, is_active } = body;
 
-    if (!name || !email || !password) {
-      return NextResponse.json({ success: false, error: 'Name, email, and password are required' }, { status: 400 });
-    }
-
-    const hashedPassword = await hashPassword(password);
-
-    const staff = await createStaff(restaurant.id, {
-      name,
-      email,
-      phone,
-      password: hashedPassword,
-      role: role || 'STAFF',
-      role_id: role_id || null,
-      is_active: is_active !== undefined ? is_active : true
-    });
-
-    return NextResponse.json({ success: true, data: staff });
+    const updated = await updateRole(restaurant.id, id, body);
+    return NextResponse.json({ success: true, data: updated });
   } catch (error: any) {
-    if (error.message?.includes('staffs_email_key')) {
-      return NextResponse.json({ success: false, error: 'User with this email already exists' }, { status: 400 });
+    if (error.message?.includes('roles_restaurant_id_name_key') || error.message?.includes('duplicate key')) {
+      return NextResponse.json({ success: false, error: 'A role with this name already exists' }, { status: 400 });
     }
-    if (error.message?.includes('limit reached')) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 403 });
-    }
+    console.error('Error updating role:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireAdmin(request);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (!user.isAdmin && (!user.permissions || !user.permissions.includes('staff'))) {
+    return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
+  }
+
+  try {
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
+    const restaurant = await getRestaurantBySlug(slug);
+    if (!restaurant) {
+      return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
+    const { id } = await params;
+    await deleteRole(restaurant.id, id);
+    return NextResponse.json({ success: true, message: 'Role deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting role:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
+

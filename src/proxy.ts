@@ -50,9 +50,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${slug}/admin/orders`, request.url));
   }
   
-  // Redirect exact /slug/staff to /slug/staff/orders
-  if (section === 'staff' && pathname.endsWith('/staff')) {
-    return NextResponse.redirect(new URL(`/${slug}/staff/orders`, request.url));
+  // Redirect /slug/staff paths to /slug/admin/orders
+  if (section === 'staff') {
+    return NextResponse.redirect(new URL(`/${slug}/admin/orders`, request.url));
   }
 
   const pathSegments = pathname.split('/').filter(Boolean);
@@ -130,25 +130,19 @@ async function handleRBAC(request: NextRequest, slug: string, subPath: string) {
         if (!token) return NextResponse.redirect(new URL(`/${slug}/admin/login`, request.url));
 
         const payload = await verifyToken(token);
-        if (!payload?.isAdmin) {
+        // Allow both System Admin and Staff in the unified admin portal
+        if (!payload || (!payload.isAdmin && !payload.isStaff)) {
           const response = NextResponse.redirect(new URL(`/${slug}/admin/login`, request.url));
           response.cookies.delete('admin_token');
+          response.cookies.delete('admin_logged_in');
           return response;
+        }
+
+        if (payload.isStaff && payload.restaurantSlug && payload.restaurantSlug !== slug) {
+          return NextResponse.redirect(new URL(`/${payload.restaurantSlug}/admin/orders`, request.url));
         }
       } else if (rule.role === 'STAFF') {
-        const token = request.cookies.get('staff_token')?.value;
-        if (!token) return NextResponse.redirect(new URL(`/${slug}/staff/login`, request.url));
-
-        const payload = await verifyToken(token);
-        if (!payload?.isStaff) {
-          const response = NextResponse.redirect(new URL(`/${slug}/staff/login`, request.url));
-          response.cookies.delete('staff_token');
-          return response;
-        }
-        
-        if (payload.restaurantSlug !== slug) {
-          return NextResponse.redirect(new URL(`/${payload.restaurantSlug}/staff/orders`, request.url));
-        }
+        return NextResponse.redirect(new URL(`/${slug}/admin/orders`, request.url));
       }
     }
   }

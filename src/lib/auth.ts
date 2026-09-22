@@ -59,6 +59,8 @@ export interface JWTPayload {
   restaurantName?: string;
   isStaff?: boolean;
   role?: string;
+  roleId?: string;
+  permissions?: string[];
   iat?: number;
   exp?: number;
 }
