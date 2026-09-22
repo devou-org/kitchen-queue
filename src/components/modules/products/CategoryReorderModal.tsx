@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp, ArrowDown, Layers, X, Plus, Loader2, Check } from 'lucide-react';
+import { ArrowUp, ArrowDown, Layers, X, Plus, Loader2, Check, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface CategoryItem {
@@ -145,6 +145,32 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
       toast.error('Error adding category');
     } finally {
       setAddingCat(false);
+    }
+  };
+
+  const handleDeleteCategory = async (cat: CategoryItem) => {
+    if (!window.confirm(`Are you sure you want to delete category "${cat.name}"?`)) return;
+
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': slug,
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`,
+        },
+        body: JSON.stringify({ id: cat.id, name: cat.name }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Category "${cat.name}" deleted`);
+        await loadCategories();
+        if (onReordered) onReordered();
+      } else {
+        toast.error(data.error || 'Failed to delete category');
+      }
+    } catch {
+      toast.error('Error deleting category');
     }
   };
 
@@ -385,6 +411,28 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                       }}
                     >
                       <ArrowDown size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(cat)}
+                      disabled={saving}
+                      title={`Delete "${cat.name}"`}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        border: '1px solid #FECDD3',
+                        backgroundColor: '#FFF1F2',
+                        color: '#E11D48',
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                        marginLeft: '4px',
+                      }}
+                    >
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
