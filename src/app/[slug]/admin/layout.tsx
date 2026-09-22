@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3 } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3, LogOut } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
@@ -16,6 +16,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { slug } = useParams();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const { isMaximized } = useAdminLayout();
   const { restaurant, loading: resLoading, refresh } = useRestaurant();
@@ -27,7 +28,6 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
-    const adminToken = localStorage.getItem('admin_token');
     const hasCookie = document.cookie.includes('admin_logged_in=1');
     
     // Allow access to login page
@@ -38,10 +38,84 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
     if (!hasCookie) {
       router.push(`/${slug}/admin/login`);
-    } else {
+      return;
+    }
+
+    // Try loading saved user from localStorage
+    const localUser = authService.getAdminUser();
+    if (localUser) {
+      setCurrentUser(localUser);
       setLoading(false);
     }
+
+    // Refresh user info in background to ensure latest permissions
+    authService.refresh().then(res => {
+      if (res.success && res.user) {
+        setCurrentUser(res.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('admin_user', JSON.stringify(res.user));
+        }
+      }
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
   }, [pathname, router, slug]);
+
+  const isSuperAdminOrOwner = currentUser?.is_admin === true || (currentUser?.permissions && currentUser.permissions.includes('*'));
+
+  const allNavLinks = [
+    ...(showOrdering ? [{ key: 'pos', name: 'POS Terminal', href: `/${slug}/admin/pos`, icon: <Store size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'orders', name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
+    ...(!showOrdering && showQueue ? [{ key: 'queue', name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
+    { key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
+    { key: 'products', name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
+    ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'staff', name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
+    { key: 'billing', name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
+    { key: 'settings', name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
+  ];
+
+  // Filter links dynamically based on user role permissions
+  const navLinks = allNavLinks.filter(link => {
+    if (isSuperAdminOrOwner) return true;
+    if (!currentUser) return true; // default before user is loaded
+    const perms = currentUser.permissions || [];
+    return perms.includes(link.key);
+  });
+
+  // Route protection for unauthorized direct navigation
+  useEffect(() => {
+    if (loading || !currentUser || pathname === `/${slug}/admin/login`) return;
+    if (isSuperAdminOrOwner) return;
+
+    if (pathname.startsWith(`/${slug}/admin/ai-analyst`)) {
+      const perms = currentUser.permissions || [];
+      const firstAllowed = allNavLinks.find(link => perms.includes(link.key));
+      if (firstAllowed) {
+        router.replace(firstAllowed.href);
+      } else {
+        router.replace(`/${slug}/admin/orders`);
+      }
+      return;
+    }
+
+    const currentModule = allNavLinks.find(link => pathname.startsWith(link.href) || 
+      (link.key === 'analytics' && (pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)))
+    );
+
+    if (currentModule) {
+      const perms = currentUser.permissions || [];
+      if (!perms.includes(currentModule.key)) {
+        // Find first permitted route
+        const firstAllowed = allNavLinks.find(link => perms.includes(link.key));
+        if (firstAllowed) {
+          router.replace(firstAllowed.href);
+        }
+      }
+    }
+  }, [pathname, currentUser, loading, isSuperAdminOrOwner, router, slug]);
 
   useEffect(() => {
     if (!resLoading && restaurant && restaurant.modules?.ONLINE_ORDERING === false) {
@@ -123,19 +197,6 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     }
     router.push(`/${slug}/admin/login`);
   };
-
-  const navLinks = [
-    ...(showOrdering ? [{ name: 'POS Terminal', href: `/${slug}/admin/pos`, icon: <Store size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
-    ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
-    { name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
-    { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
-    ...(showInventory ? [{ name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
-    { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
-    { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
-  ];
 
   if (restaurant?.billing_status === 'SUSPENDED') {
     return (
@@ -219,6 +280,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             {restaurant?.name || 'Renjz'} Admin
           </h2>
         </div>
+
         <nav className="sidebar-nav">
           {navLinks.map((link) => {
             const isActive = pathname.startsWith(link.href) ||
@@ -239,14 +301,120 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div style={{ padding: '20px', borderTop: '1px solid var(--border)', flexShrink: 0, marginTop: 'auto' }}>
+        <div style={{ padding: '16px', borderTop: '1px solid var(--border)', flexShrink: 0, marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {(showOrdering || showDigitalMenu) && <ServiceToggle />}
-          <button 
-            className="sidebar-logout-btn" 
-            onClick={handleLogout}
-          >
-            Log Out →
-          </button>
+
+          {currentUser ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              padding: '10px 12px',
+              borderRadius: '12px',
+              background: '#F9FAFB',
+              border: '1px solid var(--border)',
+            }}>
+              {/* Initial Avatar */}
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: isSuperAdminOrOwner ? '#EEF2FF' : '#F3F4F6',
+                color: isSuperAdminOrOwner ? '#4F46E5' : '#374151',
+                fontWeight: 600,
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
+              </div>
+
+              {/* User Details */}
+              <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    color: 'var(--text-primary)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}>
+                    {currentUser.name || 'Team Member'}
+                  </span>
+                  <span style={{
+                    padding: '1px 6px',
+                    borderRadius: '999px',
+                    fontSize: '9px',
+                    fontWeight: 600,
+                    background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
+                    color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    textTransform: 'capitalize',
+                  }}>
+                    {isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')}
+                  </span>
+                </div>
+                <div style={{
+                  fontSize: '11px',
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  marginTop: '1px',
+                }}>
+                  {currentUser.email}
+                </div>
+              </div>
+
+              {/* Small Logout Button */}
+              <button
+                onClick={handleLogout}
+                title="Log Out"
+                aria-label="Log Out"
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                  padding: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#EF4444';
+                  e.currentTarget.style.borderColor = '#FCA5A5';
+                  e.currentTarget.style.background = '#FEF2F2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.background = '#FFFFFF';
+                }}
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+          ) : (
+            <button 
+              className="sidebar-logout-btn" 
+              onClick={handleLogout}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: 0 }}
+            >
+              <span>Log Out</span>
+              <LogOut size={15} />
+            </button>
+          )}
         </div>
       </aside>
 
@@ -262,7 +430,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         {children}
-        {!isMaximized && <AIAnalystWidget />}
+        {!isMaximized && isSuperAdminOrOwner && <AIAnalystWidget />}
       </main>
     </div>
     </>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDailyAnalytics, getPeakHours, getTopProducts, getDashboardStats, getKitchenSnapshot, getPaymentMethodAnalytics, getRestaurantBySlug } from '@/lib/db';
+import { getDailyAnalytics, getPeakHours, getTopProducts, getDashboardStats, getKitchenSnapshot, getPaymentMethodAnalytics, getRestaurantBySlug, pool } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 
 const getDateRange = (req: NextRequest) => {
@@ -37,9 +37,33 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'dashboard';
 
-    // Staff role restrictions: Staff can only access kitchen-snapshot
-    if (admin.isStaff && !admin.isAdmin && type !== 'kitchen-snapshot') {
-      return NextResponse.json({ success: false, error: 'Forbidden: Staff access is limited to kitchen snapshot' }, { status: 403 });
+    // Permission check for analytics
+    let hasAnalyticsPerm = admin.isAdmin || (admin.permissions && (admin.permissions.includes('analytics') || admin.permissions.includes('*')));
+
+    // If permissions not on token, fallback to database check for staff
+    if (!hasAnalyticsPerm && admin.isStaff && admin.userId) {
+      try {
+        const staffRes = await pool.query(
+          `SELECT r.permissions FROM staffs s
+           LEFT JOIN roles r ON r.id = s.role_id
+           WHERE s.id = $1`,
+          [admin.userId]
+        );
+        if (staffRes.rows.length > 0 && staffRes.rows[0].permissions) {
+          const dbPerms = Array.isArray(staffRes.rows[0].permissions)
+            ? staffRes.rows[0].permissions
+            : (typeof staffRes.rows[0].permissions === 'string' ? JSON.parse(staffRes.rows[0].permissions) : []);
+          if (dbPerms.includes('analytics') || dbPerms.includes('*')) {
+            hasAnalyticsPerm = true;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching staff permissions from DB in analytics route:', err);
+      }
+    }
+
+    if (!hasAnalyticsPerm && type !== 'kitchen-snapshot') {
+      return NextResponse.json({ success: false, error: 'Forbidden: Insufficient permissions for analytics' }, { status: 403 });
     }
 
     const { date_from, date_to } = getDateRange(request);
