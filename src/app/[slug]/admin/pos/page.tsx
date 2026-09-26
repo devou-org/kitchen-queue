@@ -15,8 +15,6 @@ import { OrderType } from '@/types';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
-import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
-import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -110,7 +108,6 @@ export default function AdminPosPage() {
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [dietaryFilter, setDietaryFilter] = useState<DietaryPreferenceFilter>('ALL');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
 
@@ -389,15 +386,10 @@ export default function AdminPosPage() {
     totalPrice = subtotal + gstAmount;
   }
 
-
-
   const filtered = products
     .filter(p => {
       const matchCat = category === 'All' || p.category === category;
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-      const pref = (p.dietary_preference || 'NON_VEG').toUpperCase();
-      const matchDietary = dietaryFilter === 'ALL' || (dietaryFilter === 'VEG' ? pref === 'VEG' : pref === 'NON_VEG');
-      return matchCat && matchSearch && matchDietary;
       return matchCat && matchSearch;
     })
     .sort((a, b) => {
@@ -407,236 +399,6 @@ export default function AdminPosPage() {
     });
 
   return (
-    <AdminContentWrapper fullWidth>
-      <div style={{ position: 'relative', width: '100%' }}>
-        {/* Far Right Top Expand Button (Top Right of Content Container) */}
-        <div style={{ position: 'absolute', top: '8px', right: 0, zIndex: 10 }}>
-          <LayoutMaximizeToggle />
-        </div>
-
-        <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', paddingBottom: '90px' }}>
-          {/* Search Bar & Dietary Filter (Aligned with POS Menu Grid) */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', paddingRight: '48px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-              <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-              <input
-                type="search"
-                className="input"
-                placeholder="Search item name..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ width: '100%', paddingLeft: '40px' }}
-              />
-            </div>
-            <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
-          </div>
-
-          {/* Categories */}
-          <div style={{ paddingBottom: '16px', display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                style={{
-                  padding: '6px 16px',
-                  borderRadius: 'var(--radius-full)',
-                  border: '1.5px solid',
-                  borderColor: cat === category ? 'var(--primary)' : 'var(--border)',
-                  background: cat === category ? 'var(--primary)' : 'white',
-                  color: cat === category ? 'white' : 'var(--text-secondary)',
-                  fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
-                }}
-              >{cat}</button>
-            ))}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '14px' }}>
-            {filtered.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                quantity={cart.get(product.id)?.quantity || 0}
-                onUpdate={handleUpdate}
-              />
-            ))}
-          </div>
-
-          {totalItems > 0 && (
-            <div style={{ position: 'fixed', bottom: '24px', left: 0, right: 0, padding: '0 16px', zIndex: 40, display: 'flex', justifyContent: 'center' }}>
-              <button
-                className="btn btn-primary"
-                onClick={() => setCheckoutOpen(true)}
-                style={{ width: '100%', maxWidth: '400px', borderRadius: '8px', height: '48px', fontSize: '15px', fontWeight: 700, display: 'flex', justifyContent: 'space-between', padding: '0 20px', boxShadow: '0 8px 20px rgba(0,0,0,0.2)' }}
-              >
-                <span>{totalItems} items</span>
-                <span>Checkout {formatPrice(totalPrice)}</span>
-              </button>
-            </div>
-          )}
-
-          {/* Cart / Checkout Drawer Modal */}
-          {checkoutOpen && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-              <div className="animate-fade-in" style={{ background: 'white', borderTopLeftRadius: '16px', borderTopRightRadius: '16px', padding: '24px', maxHeight: '90vh', overflowY: 'auto', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 800 }}>Complete Order ({totalItems} items)</h2>
-                  <button onClick={() => setCheckoutOpen(false)} className="btn btn-sm" style={{ padding: '4px 12px' }}>Close</button>
-                </div>
-
-                <div style={{ marginBottom: '24px' }}>
-                  {Array.from(cart.values()).map(item => (
-                    <div key={item.product_id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                      <span>{item.quantity}x {item.name}</span>
-                      <span style={{ fontWeight: 600 }}>{formatPrice(item.price * item.quantity)}</span>
-                    </div>
-                  ))}
-                  <div style={{ borderTop: '1px dashed var(--border)', margin: '12px 0', paddingTop: '12px' }}>
-                    {gstAmount > 0 ? (
-                      <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                          <span>Subtotal</span>
-                          <span>{formatPrice(subtotal)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                          <span>GST ({restaurant?.gst_rate || 0}%)</span>
-                          <span>{formatPrice(gstAmount)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px', paddingTop: '4px' }}>
-                          <span>Total</span>
-                          <span style={{ color: 'var(--primary)' }}>{formatPrice(totalPrice)}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px' }}>
-                        <span>Total</span>
-                        <span style={{ color: 'var(--primary)' }}>{formatPrice(totalPrice)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <form onSubmit={submitOrder} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <OrderTypeSelector
-                    value={(orderForm.order_type as OrderType) || 'DINE_IN'}
-                    onChange={(val) => setOrderForm({ ...orderForm, order_type: val })}
-                  />
-
-                  {orderForm.order_type !== 'TAKEAWAY' && (
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{ flex: 1 }}>
-                        <label className="label">Table Number *</label>
-                        {tables.length > 0 ? (
-                          <select
-                            className="input"
-                            value={orderForm.table_number}
-                            onChange={e => {
-                              const selectedNum = e.target.value;
-                              const matchedTable = tables.find((t: any) => t.table_number === selectedNum);
-                              setOrderForm({
-                                ...orderForm,
-                                table_number: selectedNum,
-                                party_size: matchedTable?.capacity ? Number(matchedTable.capacity) : orderForm.party_size
-                              });
-                            }}
-                          >
-                            <option value="">-- Select Table --</option>
-                            {tables
-                              .filter((t: any) => {
-                                const partySize = Number(orderForm.party_size) || 1;
-                                const check = checkTableAssignment(t, partySize, {
-                                  phone: orderForm.phone,
-                                  customerName: orderForm.customer_name,
-                                });
-                                const isCurrent = t.table_number === orderForm.table_number;
-                                return check.allowed || isCurrent;
-                              })
-                              .map((t: any) => {
-                                const partySize = Number(orderForm.party_size) || 1;
-                                const check = checkTableAssignment(t, partySize, {
-                                  phone: orderForm.phone,
-                                  customerName: orderForm.customer_name,
-                                });
-                                const cap = Number(t.capacity) || 0;
-                                const seated = check.occupiedSeats;
-
-                                const rawNum = String(t.table_number || '').trim();
-                                let tableLabel = rawNum;
-                                if (/^\d+$/.test(rawNum)) {
-                                  tableLabel = `T${rawNum}`;
-                                } else if (rawNum.toLowerCase().startsWith('t-')) {
-                                  tableLabel = `T-${rawNum.slice(2)}`;
-                                } else if (rawNum.toLowerCase().startsWith('t') && !rawNum.toLowerCase().startsWith('table')) {
-                                  tableLabel = `T${rawNum.slice(1)}`;
-                                } else if (rawNum.toLowerCase().startsWith('table #')) {
-                                  const c = rawNum.slice(7).trim();
-                                  tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
-                                } else if (rawNum.toLowerCase().startsWith('table ')) {
-                                  const c = rawNum.slice(6).trim();
-                                  tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
-                                }
-
-                                const freeSeats = Math.max(0, cap - seated);
-
-                                return (
-                                  <option key={t.id} value={t.table_number}>
-                                    {tableLabel} · {seated}/{cap} · {freeSeats} Free
-                                  </option>
-                                );
-                              })}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            className="input"
-                            placeholder="e.g. 12"
-                            value={orderForm.table_number}
-                            onChange={e => setOrderForm({ ...orderForm, table_number: e.target.value })}
-                          />
-                        )}
-                      </div>
-                      <div style={{ width: '100px' }}>
-                        <label className="label">Persons</label>
-                        <select
-                          className="input"
-                          value={orderForm.party_size}
-                          onChange={e => setOrderForm({ ...orderForm, party_size: parseInt(e.target.value) || 1 })}
-                          style={{ paddingRight: '30px' }}
-                        >
-                          {[...Array(10)].map((_, i) => (
-                            <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="label">Customer Name (Optional)</label>
-                    <input type="text" className="input" placeholder="Name" value={orderForm.customer_name} onChange={e => setOrderForm({ ...orderForm, customer_name: e.target.value })} />
-                  </div>
-
-                  <div>
-                    <label className="label">Customer Phone (Optional)</label>
-                    <input type="text" className="input" placeholder="99xxxxxxxx" value={orderForm.phone} onChange={e => setOrderForm({ ...orderForm, phone: e.target.value })} />
-                  </div>
-
-                  <div>
-                    <label className="label">Notes</label>
-                    <input type="text" className="input" placeholder="Less spicy, extra napkins..." value={orderForm.notes} onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} />
-                  </div>
-
-                  <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '8px' }} disabled={submitting}>
-                    {submitting ? 'Placing Order...' : 'Place Order Now'}
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </AdminContentWrapper>
-  );
-}
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px', paddingBottom: '90px' }}>
       <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', alignItems: 'center' }}>
         <div style={{ position: 'relative', width: '100%', flex: 1 }}>

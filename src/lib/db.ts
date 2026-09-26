@@ -2473,15 +2473,6 @@ export async function updateCategorySequence(restaurantId: string, orderedCatego
   }
 }
 
-export async function deleteCategory(idOrName: string, restaurantId?: string) {
-  if (restaurantId) {
-    await sql`DELETE FROM categories WHERE (id = ${idOrName} OR name = ${idOrName}) AND restaurant_id = ${restaurantId}`;
-  } else {
-    await sql`DELETE FROM categories WHERE id = ${idOrName} OR name = ${idOrName}`;
-  }
-  return { success: true };
-}
-
 
 // ============================================
 // USER QUERIES

@@ -422,6 +422,14 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <button
                     type="button"
+                    onClick={() => setReorderModalOpen(true)}
+                    title="Reorder Categories"
+                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <ArrowUpDown size={14} /> Reorder
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setShowAddCategory(!showAddCategory)}
                     style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   >
