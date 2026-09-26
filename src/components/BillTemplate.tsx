@@ -64,9 +64,25 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
       color: #1a1a1a; background: #fff; -webkit-font-smoothing: antialiased;
     }
     .bill-container { max-width: 380px; margin: 0 auto; padding: 28px 24px 20px; }
+    @page {
+      margin: 0;
+    }
     @media print {
-      body { background: #fff; }
-      .bill-container { padding: 10px 12px; }
+      html, body {
+        width: 100% !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .bill-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 4mm 12mm 16mm 10mm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        box-sizing: border-box !important;
+      }
     }
   </style>
 </head>
@@ -79,11 +95,36 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
   const handlePrint = useCallback(() => {
     if (!printRef.current) return;
     const html = buildBillHTML(printRef.current.innerHTML);
-    const printWindow = window.open('', '_blank', 'width=420,height=700');
-    if (!printWindow) return;
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.onload = () => setTimeout(() => printWindow.print(), 300);
+
+    const iframeId = `bill-print-modal-iframe-${Date.now()}`;
+    let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
+    if (iframe) iframe.remove();
+    iframe = document.createElement('iframe');
+    iframe.id = iframeId;
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;z-index:-9999';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    let printed = false;
+    const triggerPrint = () => {
+      if (printed) return;
+      printed = true;
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+        setTimeout(() => { try { iframe?.remove(); } catch {} }, 60000);
+      } catch (err) {
+        console.error('Modal print error:', err);
+      }
+    };
+
+    iframe.onload = triggerPrint;
+    setTimeout(triggerPrint, 500);
   }, [buildBillHTML]);
 
   const handleDownloadPDF = useCallback(async () => {
@@ -338,21 +379,22 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 {/* Header */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '2fr 0.5fr 1fr 1fr',
-                  gap: '8px',
-                  padding: '8px 0',
+                  gridTemplateColumns: 'minmax(0, 1.8fr) 24px 50px 58px',
+                  gap: '6px',
+                  padding: '6px 0',
                   borderBottom: '1px solid #e5e7eb',
+                  boxSizing: 'border-box',
                 }}>
                   <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Item
                   </span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     Qty
                   </span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     Price
                   </span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     Total
                   </span>
                 </div>
@@ -363,22 +405,24 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                     key={idx}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '2fr 0.5fr 1fr 1fr',
-                      gap: '8px',
-                      padding: '8px 0',
+                      gridTemplateColumns: 'minmax(0, 1.8fr) 24px 50px 58px',
+                      gap: '6px',
+                      padding: '6px 0',
                       borderBottom: '1px solid #f3f4f6',
+                      boxSizing: 'border-box',
+                      alignItems: 'center',
                     }}
                   >
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#1a1a1a' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#1a1a1a', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: 1.25 }}>
                       {item.product_name || 'Item'}
                     </span>
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: '#6b7280', textAlign: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', textAlign: 'center', whiteSpace: 'nowrap' }}>
                       {item.quantity}
                     </span>
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: '#6b7280', textAlign: 'right' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                       {formatPrice(item.price_at_purchase)}
                     </span>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#1a1a1a', textAlign: 'right' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#1a1a1a', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                       {formatPrice(item.price_at_purchase * item.quantity)}
                     </span>
                   </div>
@@ -386,7 +430,7 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
               </div>
 
               {/* Divider */}
-              <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '14px 0' }} />
+              <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '12px 0' }} />
 
               {/* Subtotal */}
               <div style={{
@@ -395,8 +439,8 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 alignItems: 'center',
                 padding: '4px 0',
               }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: '#374151' }}>Subtotal</span>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#374151' }}>{formatPrice(subtotal)}</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Subtotal</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatPrice(subtotal)}</span>
               </div>
 
               {/* GST Breakdown */}
@@ -404,16 +448,16 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#4b5563' }}>
                     <span style={{ fontSize: '12px', fontWeight: 500 }}>CGST {((order as any).gst_rate || 0) / 2}%</span>
-                    <span style={{ fontSize: '12px', fontWeight: 600 }}>{formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#4b5563' }}>
                     <span style={{ fontSize: '12px', fontWeight: 500 }}>SGST {((order as any).gst_rate || 0) / 2}%</span>
-                    <span style={{ fontSize: '12px', fontWeight: 600 }}>{formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}</span>
                   </div>
                   <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '4px 0' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#1a1a1a' }}>
                     <span style={{ fontSize: '13px', fontWeight: 600 }}>Total GST {((order as any).gst_rate || 0)}%</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700 }}>{formatPrice((order as any).gst_amount || 0)}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatPrice((order as any).gst_amount || 0)}</span>
                   </div>
                 </>
               )}
@@ -423,12 +467,12 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '12px 0',
+                padding: '10px 0',
                 marginTop: '4px',
                 borderTop: `2px solid ${primaryColor}`,
               }}>
-                <span style={{ fontSize: '16px', fontWeight: 800, color: '#1a1a1a' }}>Grand Total</span>
-                <span style={{ fontSize: '18px', fontWeight: 900, color: primaryColor }}>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a1a' }}>Grand Total</span>
+                <span style={{ fontSize: '17px', fontWeight: 900, color: primaryColor, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                   {formatPrice(order.total_price)}
                 </span>
               </div>

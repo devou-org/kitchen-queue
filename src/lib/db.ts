@@ -145,10 +145,29 @@ async function runAutoMigration(sqlConnection: any) {
       );
     `;
     await sqlConnection`
+      CREATE TABLE IF NOT EXISTS counters (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(100) NOT NULL,
+          code VARCHAR(50) NULL,
+          display_order INT DEFAULT 0,
+          is_active BOOLEAN DEFAULT true,
+          printer_name VARCHAR(100) DEFAULT 'POS-80C',
+          printer_type VARCHAR(50) DEFAULT 'DEFAULT',
+          printer_address VARCHAR(200) NULL,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
       ALTER TABLE counters
+      ADD COLUMN IF NOT EXISTS code VARCHAR(50) NULL,
+      ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
       ADD COLUMN IF NOT EXISTS printer_name VARCHAR(100) DEFAULT 'POS-80C',
       ADD COLUMN IF NOT EXISTS printer_type VARCHAR(50) DEFAULT 'DEFAULT',
       ADD COLUMN IF NOT EXISTS printer_address VARCHAR(200) NULL;
+
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS counter VARCHAR(255);
     `;
     // Inventory tables
     await sqlConnection`
@@ -314,8 +333,26 @@ async function runAutoMigration(sqlConnection: any) {
           created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_recipe_items_recipe ON recipe_items(recipe_id);
+
+      CREATE TABLE IF NOT EXISTS roles (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(100) NOT NULL,
+          description TEXT,
+          permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
+          is_default BOOLEAN DEFAULT false,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(restaurant_id, name)
+      );
+
+      ALTER TABLE staffs
+      ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES roles(id) ON DELETE SET NULL;
+
+      ALTER TABLE admins
+      ADD COLUMN IF NOT EXISTS name VARCHAR(100);
     `;
-    console.log("Auto-migrated menu, GST, tables, counters, and inventory schema successfully!");
+    console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, and admins schema successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
@@ -1362,6 +1399,9 @@ export async function createOrder(data: {
       tableSessionId = sessionInfo.tableSessionId;
     }
 
+    const isUuid = (str?: string | null) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+    const validStaffId = isUuid(data.staff_id) ? data.staff_id : null;
+
     const orderResult = await client.query(
       `
         INSERT INTO orders (
@@ -1374,7 +1414,7 @@ export async function createOrder(data: {
       `,
       [
         data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
-        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, data.staff_id || null, 
+        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN'
       ]
@@ -2023,6 +2063,21 @@ export async function getTopProducts(restaurantId: string, dateFrom: string, dat
   return rows;
 }
 
+export async function getPaymentMethodAnalytics(restaurantId: string, dateFrom: string, dateTo: string) {
+  const rows = await sql`
+    SELECT 
+      COALESCE(NULLIF(UPPER(TRIM(payment_method)), ''), 'PENDING / OTHER') as payment_method,
+      COUNT(*)::int as order_count,
+      COALESCE(SUM(total_price), 0)::float as total_revenue
+    FROM orders WHERE restaurant_id = ${restaurantId}
+      AND business_date BETWEEN ${dateFrom} AND ${dateTo}
+      AND is_paid = true AND status = 'PAID'
+    GROUP BY payment_method
+    ORDER BY total_revenue DESC
+  `;
+  return rows;
+}
+
 export async function getDashboardStats(restaurantId: string) {
   const statsRows = await sql`
     SELECT 
@@ -2461,24 +2516,184 @@ export async function getAdminByEmail(email: string) {
 }
 
 // ============================================
+// ROLES & PERMISSIONS QUERIES
+// ============================================
+
+export async function seedDefaultRoles(restaurantId: string) {
+  try {
+    const existing = await sql`SELECT id, name FROM roles WHERE restaurant_id = ${restaurantId}`;
+    if (existing.length === 0) {
+      const defaultRoles = [
+        { name: 'Waiter', description: 'Floor staff handling dine-in tables, table orders, and checking active orders', permissions: JSON.stringify(['pos', 'orders', 'tables']) },
+        { name: 'Kitchen Staff', description: 'Kitchen and chef display for viewing and preparing live orders', permissions: JSON.stringify(['orders']) },
+        { name: 'Cashier', description: 'Counter staff managing billing, POS orders, tables, and daily sales reports', permissions: JSON.stringify(['pos', 'orders', 'tables', 'analytics']) },
+        { name: 'Manager', description: 'General manager overseeing operations, menu items, inventory, analytics, and staff', permissions: JSON.stringify(['pos', 'orders', 'tables', 'products', 'inventory', 'analytics', 'staff']) },
+      ];
+
+      for (const r of defaultRoles) {
+        await sql`
+          INSERT INTO roles (restaurant_id, name, description, permissions, is_default)
+          VALUES (${restaurantId}, ${r.name}, ${r.description}, ${r.permissions}::jsonb, true)
+          ON CONFLICT (restaurant_id, name) DO NOTHING
+        `;
+      }
+    }
+
+    // Auto-link any existing staff without role_id to a matching role or Waiter by default
+    const unlinkedStaff = await sql`SELECT id, role FROM staffs WHERE restaurant_id = ${restaurantId} AND role_id IS NULL`;
+    if (unlinkedStaff.length > 0) {
+      const allRoles = await sql`SELECT id, LOWER(name) as name_lower FROM roles WHERE restaurant_id = ${restaurantId}`;
+      for (const st of unlinkedStaff) {
+        const staffRoleLower = (st.role || '').toLowerCase();
+        let matchedRole = allRoles.find((r: any) => r.name_lower === staffRoleLower || r.name_lower.includes(staffRoleLower));
+        if (!matchedRole) {
+          matchedRole = allRoles.find((r: any) => r.name_lower.includes('waiter')) || allRoles[0];
+        }
+        if (matchedRole) {
+          await sql`UPDATE staffs SET role_id = ${matchedRole.id} WHERE id = ${st.id}`;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error seeding default roles:', err);
+  }
+}
+
+export async function getRoles(restaurantId: string) {
+  try {
+    await seedDefaultRoles(restaurantId);
+    return await sql`
+      SELECT r.id, r.restaurant_id, r.name, r.description, r.permissions, r.is_default, r.created_at, r.updated_at,
+             COUNT(s.id)::integer as staff_count
+      FROM roles r
+      LEFT JOIN staffs s ON s.role_id = r.id
+      WHERE r.restaurant_id = ${restaurantId}
+      GROUP BY r.id
+      ORDER BY r.is_default DESC, r.name ASC
+    `;
+  } catch (err: any) {
+    if (err.message?.includes('roles') || err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      await seedDefaultRoles(restaurantId);
+      return await sql`
+        SELECT r.id, r.restaurant_id, r.name, r.description, r.permissions, r.is_default, r.created_at, r.updated_at,
+               COUNT(s.id)::integer as staff_count
+        FROM roles r
+        LEFT JOIN staffs s ON s.role_id = r.id
+        WHERE r.restaurant_id = ${restaurantId}
+        GROUP BY r.id
+        ORDER BY r.is_default DESC, r.name ASC
+      `;
+    }
+    throw err;
+  }
+}
+
+export async function getRoleById(restaurantId: string, id: string) {
+  const rows = await sql`SELECT * FROM roles WHERE restaurant_id = ${restaurantId} AND id = ${id} LIMIT 1`;
+  return rows[0] || null;
+}
+
+export async function createRole(restaurantId: string, data: { name: string; description?: string; permissions: string[] }) {
+  const permissionsJson = JSON.stringify(data.permissions || []);
+  const rows = await sql`
+    INSERT INTO roles (restaurant_id, name, description, permissions, is_default)
+    VALUES (${restaurantId}, ${data.name.trim()}, ${data.description?.trim() || null}, ${permissionsJson}::jsonb, false)
+    RETURNING id, name, description, permissions, is_default, created_at, updated_at
+  `;
+  return rows[0];
+}
+
+export async function updateRole(restaurantId: string, id: string, data: { name?: string; description?: string; permissions?: string[] }) {
+  const existing = await getRoleById(restaurantId, id);
+  if (!existing) throw new Error('Role not found');
+
+  const permissionsJson = data.permissions ? JSON.stringify(data.permissions) : null;
+
+  const rows = await sql`
+    UPDATE roles SET
+      name = COALESCE(${data.name ? data.name.trim() : null}, name),
+      description = COALESCE(${data.description !== undefined ? data.description.trim() : null}, description),
+      permissions = COALESCE(${permissionsJson}::jsonb, permissions),
+      updated_at = NOW()
+    WHERE restaurant_id = ${restaurantId} AND id = ${id}
+    RETURNING id, name, description, permissions, is_default, created_at, updated_at
+  `;
+
+  if (data.name) {
+    await sql`UPDATE staffs SET role = ${data.name.trim()} WHERE role_id = ${id}`;
+  }
+
+  return rows[0];
+}
+
+export async function deleteRole(restaurantId: string, id: string) {
+  const staffCountRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId} AND role_id = ${id}`;
+  if (staffCountRows[0].count > 0) {
+    throw new Error(`Cannot delete role because ${staffCountRows[0].count} staff member(s) are currently assigned to it. Please reassign them first.`);
+  }
+  await sql`DELETE FROM roles WHERE restaurant_id = ${restaurantId} AND id = ${id}`;
+}
+
+// ============================================
 // STAFF QUERIES
 // ============================================
 
 export async function getStaffs(restaurantId: string) {
-  return await sql`SELECT id, name, email, phone, role, is_active, created_at, updated_at FROM staffs WHERE restaurant_id = ${restaurantId} ORDER BY created_at DESC`;
+  try {
+    await seedDefaultRoles(restaurantId);
+    return await sql`
+      SELECT s.id, s.name, s.email, s.phone, s.role, s.role_id, s.is_active, s.created_at, s.updated_at,
+             r.name as role_name, r.permissions as role_permissions
+      FROM staffs s
+      LEFT JOIN roles r ON r.id = s.role_id
+      WHERE s.restaurant_id = ${restaurantId}
+      ORDER BY s.created_at DESC
+    `;
+  } catch (err: any) {
+    if (err.message?.includes('roles') || err.message?.includes('role_id')) {
+      await runAutoMigration(sql);
+      return await sql`
+        SELECT s.id, s.name, s.email, s.phone, s.role, s.role_id, s.is_active, s.created_at, s.updated_at,
+               r.name as role_name, r.permissions as role_permissions
+        FROM staffs s
+        LEFT JOIN roles r ON r.id = s.role_id
+        WHERE s.restaurant_id = ${restaurantId}
+        ORDER BY s.created_at DESC
+      `;
+    }
+    throw err;
+  }
 }
 
 export async function getStaffByEmail(email: string) {
-  const rows = await sql`SELECT * FROM staffs WHERE email = ${email} LIMIT 1`;
-  return rows[0] || null;
+  try {
+    const rows = await sql`
+      SELECT s.*, r.name as role_name, r.permissions as role_permissions
+      FROM staffs s
+      LEFT JOIN roles r ON r.id = s.role_id
+      WHERE s.email = ${email}
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  } catch (err: any) {
+    const rows = await sql`SELECT * FROM staffs WHERE email = ${email} LIMIT 1`;
+    return rows[0] || null;
+  }
 }
 
 export async function getStaffById(restaurantId: string, id: string) {
-  const rows = await sql`SELECT * FROM staffs WHERE restaurant_id = ${restaurantId} AND id = ${id} LIMIT 1`;
+  const rows = await sql`
+    SELECT s.*, r.name as role_name, r.permissions as role_permissions
+    FROM staffs s
+    LEFT JOIN roles r ON r.id = s.role_id
+    WHERE s.restaurant_id = ${restaurantId} AND s.id = ${id}
+    LIMIT 1
+  `;
   return rows[0] || null;
 }
 
-export async function createStaff(restaurantId: string, data: { name: string; email: string; phone?: string; password?: string; role?: string; is_active?: boolean }) {
+export async function createStaff(restaurantId: string, data: { name: string; email: string; phone?: string; password?: string; role?: string; role_id?: string; is_active?: boolean }) {
   // Limit staff creation per restaurant to 6
   const limit = 6;
   const countRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId}`;
@@ -2486,19 +2701,37 @@ export async function createStaff(restaurantId: string, data: { name: string; em
     throw new Error(`Staff limit reached (max ${limit} staff members per restaurant)`);
   }
 
+  let roleName = data.role || 'STAFF';
+  let roleId = data.role_id || null;
+
+  if (roleId) {
+    const roleRows = await sql`SELECT id, name FROM roles WHERE restaurant_id = ${restaurantId} AND id = ${roleId} LIMIT 1`;
+    if (roleRows[0]) {
+      roleName = roleRows[0].name;
+    }
+  }
+
   const rows = await sql`
-    INSERT INTO staffs (restaurant_id, name, email, phone, password, role, is_active) 
-    VALUES (${restaurantId}, ${data.name}, ${data.email}, ${data.phone || null}, ${data.password || null}, ${data.role || 'STAFF'}, ${data.is_active !== false}) 
-    RETURNING id, name, email, phone, role, is_active
+    INSERT INTO staffs (restaurant_id, name, email, phone, password, role, role_id, is_active) 
+    VALUES (${restaurantId}, ${data.name}, ${data.email}, ${data.phone || null}, ${data.password || null}, ${roleName}, ${roleId}, ${data.is_active !== false}) 
+    RETURNING id, name, email, phone, role, role_id, is_active
   `;
   return rows[0];
 }
 
-export async function updateStaff(restaurantId: string, id: string, data: Partial<{ name: string; email: string; phone: string; password?: string; role: string; is_active: boolean }>) {
+export async function updateStaff(restaurantId: string, id: string, data: Partial<{ name: string; email: string; phone: string; password?: string; role: string; role_id: string; is_active: boolean }>) {
   if (data.is_active === true) {
     const activeCountRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId} AND is_active = true AND id != ${id}`;
     if (activeCountRows[0].count >= 6) {
       throw new Error(`Active staff limit reached (max 6 active/online staff members allowed)`);
+    }
+  }
+
+  let roleName = data.role;
+  if (data.role_id) {
+    const roleRows = await sql`SELECT id, name FROM roles WHERE restaurant_id = ${restaurantId} AND id = ${data.role_id} LIMIT 1`;
+    if (roleRows[0]) {
+      roleName = roleRows[0].name;
     }
   }
 
@@ -2508,11 +2741,12 @@ export async function updateStaff(restaurantId: string, id: string, data: Partia
       email = COALESCE(${data.email ?? null}, email),
       phone = COALESCE(${data.phone ?? null}, phone),
       password = COALESCE(${data.password ?? null}, password),
-      role = COALESCE(${data.role ?? null}, role),
+      role = COALESCE(${roleName ?? null}, role),
+      role_id = COALESCE(${data.role_id ?? null}, role_id),
       is_active = COALESCE(${data.is_active ?? null}, is_active),
       updated_at = NOW()
     WHERE restaurant_id = ${restaurantId} AND id = ${id}
-    RETURNING id, name, email, phone, role, is_active
+    RETURNING id, name, email, phone, role, role_id, is_active
   `;
   return rows[0];
 }
