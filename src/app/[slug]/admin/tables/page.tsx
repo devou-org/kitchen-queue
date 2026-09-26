@@ -13,6 +13,7 @@ import { CreateTableModal } from '@/components/modules/tables/CreateTableModal';
 import { EditTableModal } from '@/components/modules/tables/EditTableModal';
 import { TableQRModal } from '@/components/modules/tables/TableQRModal';
 import { DeleteTableModal } from '@/components/modules/tables/DeleteTableModal';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 
 export default function AdminTablesPage() {
   const { slug } = useParams();
@@ -140,248 +141,336 @@ export default function AdminTablesPage() {
   const totalRemainingSeats = Math.max(0, totalCapacity - totalSeatedGuests);
 
   return (
-    <AdminContentWrapper>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
+      <style>{`
+        /* Page-scoped responsive rules to match orders page single-row header toolbar */
+        .tables-page-header {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 20px !important;
+          border-bottom: 1px solid var(--border) !important;
+          background: #FFFFFF !important;
+          box-sizing: border-box !important;
+        }
+
+        .tables-page-header .admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          gap: 12px !important;
+          width: 100% !important;
+        }
+
+        .tables-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          width: 100% !important;
+        }
+
+        .tables-search-control {
+          position: relative !important;
+          height: 38px !important;
+        }
+
+        .tables-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+        }
+
+        /* Mobile Screens: Full-width stacked controls below 640px */
+        @media (max-width: 640px) {
+          .tables-page-header {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 12px 16px !important;
+          }
+
+          .tables-toolbar {
+            display: flex !important;
+            flex-direction: column !important;
+            flex-wrap: wrap !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            width: 100% !important;
+          }
+
+          .tables-search-control {
+            flex: none !important;
+            height: 38px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .tables-stats-group {
+            flex-wrap: wrap !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
+          }
+
+          .tables-actions {
+            width: 100% !important;
+            margin-left: 0 !important;
+            justify-content: flex-start !important;
+          }
+
+          .tables-actions > button {
+            flex: 1 1 auto;
+          }
+        }
+      `}</style>
       <AdminPageHeader
-        action={
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button
-              onClick={fetchTables}
-              title="Refresh Table Status"
-              aria-label="Refresh Table Status"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '40px',
-                width: '40px',
-                borderRadius: '8px',
-                border: `1.5px solid ${primaryColor}`,
-                color: primaryColor,
-                background: '#FFFFFF',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxSizing: 'border-box'
-              }}
-            >
-              <RefreshCw size={18} />
-            </button>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="btn btn-primary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '40px',
-                gap: '6px',
-                background: primaryColor,
-                borderColor: primaryColor,
-                borderRadius: '8px',
-                padding: '0 18px',
-                fontWeight: 700,
-                boxSizing: 'border-box'
-              }}
-            >
-              <Plus size={18} /> Add Table
-            </button>
+        className="tables-page-header"
+        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        hideMaximize={true}
+        search={
+          <div className="tables-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap', width: '100%', minWidth: 0 }}>
+            {/* Search Input */}
+            <div className="tables-search-control" style={{ position: 'relative', width: '240px', flex: '0 0 240px', minWidth: '140px', maxWidth: '300px', flexShrink: 0 }}>
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94A3B8',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search table # or guest..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  height: '38px',
+                  paddingLeft: '30px',
+                  paddingRight: searchQuery ? '26px' : '8px',
+                  fontSize: '12px',
+                  borderRadius: '8px',
+                  background: 'white',
+                  border: '1px solid var(--border)',
+                  width: '100%',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                  outline: 'none',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    color: '#94A3B8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Minimal Stat / Filter Boxes: Total, Available, Occupied, Free Seats */}
+            <div className="tables-stats-group" style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+              {/* All / Total Tables */}
+              <button
+                type="button"
+                onClick={() => setFilter('ALL')}
+                style={{
+                  width: '150px',
+                  height: '38px',
+                  padding: '0 12px',
+                  background: '#FFFFFF',
+                  border: 'none',
+                  borderRight: '1px solid #E2E8F0',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxSizing: 'border-box',
+                  transition: 'opacity 0.15s ease',
+                }}
+              >
+                <span style={{ fontSize: '13px', fontWeight: filter === 'ALL' ? 700 : 500, color: filter === 'ALL' ? '#0F172A' : '#64748B' }}>
+                  Total
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+                  {tables.length}
+                </span>
+              </button>
+
+              {/* Available Tables */}
+              <button
+                type="button"
+                onClick={() => setFilter(filter === 'AVAILABLE' ? 'ALL' : 'AVAILABLE')}
+                style={{
+                  width: '150px',
+                  height: '38px',
+                  padding: '0 12px',
+                  background: '#FFFFFF',
+                  border: 'none',
+                  borderRight: '1px solid #E2E8F0',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxSizing: 'border-box',
+                  transition: 'opacity 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16A34A', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: filter === 'AVAILABLE' ? 700 : 500, color: filter === 'AVAILABLE' ? '#16A34A' : '#64748B' }}>
+                    Available
+                  </span>
+                </div>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#16A34A' }}>
+                  {availableCount}
+                </span>
+              </button>
+
+              {/* Occupied Tables */}
+              <button
+                type="button"
+                onClick={() => setFilter(filter === 'OCCUPIED' ? 'ALL' : 'OCCUPIED')}
+                style={{
+                  width: '150px',
+                  height: '38px',
+                  padding: '0 12px',
+                  background: '#FFFFFF',
+                  border: 'none',
+                  borderRight: '1px solid #E2E8F0',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxSizing: 'border-box',
+                  transition: 'opacity 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#EA580C', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: filter === 'OCCUPIED' ? 700 : 500, color: filter === 'OCCUPIED' ? '#EA580C' : '#64748B' }}>
+                    Occupied
+                  </span>
+                </div>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#EA580C' }}>
+                  {occupiedCount}
+                </span>
+              </button>
+
+              {/* Seats Info Box */}
+              <div
+                style={{
+                  width: '150px',
+                  height: '38px',
+                  padding: '0 12px',
+                  background: '#FFFFFF',
+                  border: 'none',
+                  borderRight: '1px solid #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Users size={14} color="#64748B" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#64748B' }}>
+                    Free Seats
+                  </span>
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: totalRemainingSeats > 0 ? '#16A34A' : '#DC2626' }}>
+                  {totalRemainingSeats}
+                  <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>/{totalCapacity}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Far Right Action Buttons */}
+            <div className="tables-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              {/* Refresh Button */}
+              <button
+                type="button"
+                onClick={fetchTables}
+                disabled={loading}
+                title="Refresh Table Status"
+                aria-label="Refresh Table Status"
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border, #E2E8F0)',
+                  background: '#FFFFFF',
+                  color: '#475569',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+              </button>
+
+              {/* Add Table Button */}
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="btn btn-primary"
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxSizing: 'border-box',
+                  background: primaryColor,
+                  borderColor: primaryColor,
+                }}
+              >
+                <Plus size={15} />
+                <span>Add Table</span>
+              </button>
+
+              {/* Maximize Layout Toggle */}
+              <LayoutMaximizeToggle />
+            </div>
           </div>
         }
       />
 
-      {/* Unified Stat Summary & Search Card Header */}
-      <div
-        style={{
-          background: '#FFFFFF',
-          borderRadius: '8px',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
-          padding: '12px',
-          marginBottom: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px'
-        }}
-      >
-        {/* Top Section: Stat Summary */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'stretch',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}
-        >
-          {/* Left Card: Total Tables in Restaurant Primary Color */}
-          <div
-            style={{
-              background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}E6 100%)`,
-              borderRadius: '8px',
-              padding: '16px 20px',
-              minWidth: '220px',
-              flex: '1 1 220px',
-              color: '#FFFFFF',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: `0 4px 14px ${primaryColor}33`
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF', opacity: 0.95 }}>
-                Total Tables
-              </span>
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ opacity: 0.9 }}
-              >
-                <ellipse cx="12" cy="7" rx="8" ry="3" />
-                <path d="M12 10v7" />
-                <line x1="8" y1="17" x2="16" y2="17" />
-              </svg>
-            </div>
-            <div style={{ fontSize: '30px', fontWeight: 800, marginTop: '12px', lineHeight: 1 }}>
-              {tables.length}
-            </div>
-          </div>
-
-          {/* Right Stat Items: Occupied, Reserved, Available */}
-          <div
-            style={{
-              flex: '3 1 400px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-around',
-              flexWrap: 'wrap',
-              padding: '4px 0'
-            }}
-          >
-            {/* Occupied */}
-            <div
-              style={{
-                flex: 1,
-                minWidth: '130px',
-                padding: '12px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderRight: '1px solid #F1F5F9'
-              }}
-            >
-              <span style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>Occupied</span>
-              <span style={{ fontSize: '22px', fontWeight: 800, color: '#E04F16' }}>{occupiedCount}</span>
-            </div>
-
-            {/* Reserved - disabled for now */}
-            {/* <div
-              style={{
-                flex: 1,
-                minWidth: '130px',
-                padding: '12px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderRight: '1px solid #F1F5F9'
-              }}
-            >
-              <span style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>Reserved</span>
-              <span style={{ fontSize: '22px', fontWeight: 800, color: '#2563EB' }}>{reservedCount}</span>
-            </div> */}
-
-            {/* Available */}
-            <div
-              style={{
-                flex: 1,
-                minWidth: '130px',
-                padding: '12px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <span style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>Available</span>
-              <span style={{ fontSize: '22px', fontWeight: 800, color: '#16A34A' }}>{availableCount}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Subtle Inner Divider */}
-        <div style={{ height: '1px', background: '#F1F5F9', margin: '2px 0' }} />
-
-        {/* Bottom Section: Search Box & Free Seats Indicator */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '12px',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            padding: '2px 4px'
-          }}
-        >
-          {/* Search Box */}
-          <div style={{ position: 'relative', minWidth: '240px', flex: '1 1 300px' }}>
-            <Search
-              size={16}
-              color="#94A3B8"
-              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-            />
-            <input
-              type="text"
-              placeholder="Search table # or guest..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 32px 8px 36px',
-                borderRadius: '8px',
-                border: '1.5px solid #E2E8F0',
-                fontSize: '13px',
-                outline: 'none',
-                background: '#F8FAFC',
-                color: '#0F172A',
-                transition: 'all 0.2s ease'
-              }}
-              onFocus={(e) => (e.target.style.borderColor = primaryColor)}
-              onBlur={(e) => (e.target.style.borderColor = '#E2E8F0')}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: '#94A3B8',
-                  cursor: 'pointer',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Seats Summary Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', background: '#F8FAFC', padding: '6px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-            <Users size={15} color={primaryColor} />
-            <span style={{ color: '#475569', fontWeight: 600 }}>
-              Free Seats: <strong style={{ color: totalRemainingSeats > 0 ? '#16A34A' : '#DC2626' }}>{totalRemainingSeats}</strong> / {totalCapacity}
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* Tables Content Area */}
+      <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
 
       {/* Tables Grid */}
       {loading ? (
@@ -431,6 +520,7 @@ export default function AdminTablesPage() {
           ))}
         </div>
       )}
+      </div>
 
       {/* Modals */}
       <CreateTableModal

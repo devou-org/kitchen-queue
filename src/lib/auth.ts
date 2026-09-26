@@ -99,9 +99,9 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
 
 export async function requireAdmin(request: Request | any): Promise<JWTPayload | null> {
   // --- TEST BYPASS (Development only) ---
-  if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
-    return { isAdmin: true, userId: 'test-admin' } as JWTPayload;
-  }
+  // if (process.env.NODE_ENV === 'development' && request.headers.get('x-test-bypass') === 'true') {
+  //   return { isAdmin: true, userId: 'test-admin' } as JWTPayload;
+  // }
 
   let adminToken: string | undefined;
   let staffToken: string | undefined;

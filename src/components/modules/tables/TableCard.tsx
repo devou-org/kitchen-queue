@@ -106,34 +106,7 @@ function TableVisualDiagram({
               : '0 2px 6px rgba(0, 0, 0, 0.03)',
             transition: 'all 0.2s ease'
           }}
-        >
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ fontSize: '16px', fontWeight: 900, color: isOccupied ? '#854D0E' : '#0F172A', letterSpacing: '-0.01em' }}>
-              {tableNumber}
-            </span>
-          </div>
-
-          <div
-            style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              background: isOccupied ? '#EAB308' : primaryColor,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '9px',
-              fontWeight: 900,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}
-          >
-            ✓
-          </div>
-        </div>
+        />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '8px', alignItems: 'center' }}>
           {rightChairs.map((occ, idx) => (

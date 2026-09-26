@@ -46,6 +46,7 @@ interface SalesAnalyticsChartProps {
   dateFrom?: string;
   dateTo?: string;
   loading?: boolean;
+  avgOrderValue?: number;
 }
 
 export function SalesAnalyticsChart({
@@ -56,6 +57,7 @@ export function SalesAnalyticsChart({
   dateFrom,
   dateTo,
   loading = false,
+  avgOrderValue,
 }: SalesAnalyticsChartProps) {
   const [activeMetric, setActiveMetric] = useState<'revenue' | 'orders' | 'top_items' | 'payment_methods'>('revenue');
   const [mounted, setMounted] = useState(false);
@@ -147,6 +149,8 @@ export function SalesAnalyticsChart({
   const peakDay = [...chartData].sort((a, b) => b.revenue - a.revenue)[0];
   const topProduct = topProducts[0];
   const topPayment = [...paymentChartData].sort((a, b) => b.revenue - a.revenue)[0];
+  const calculatedAvg = totalOrd > 0 ? totalRev / totalOrd : 0;
+  const displayAvgOrder = avgOrderValue !== undefined && avgOrderValue > 0 ? avgOrderValue : calculatedAvg;
 
   return (
     <div
@@ -363,6 +367,12 @@ export function SalesAnalyticsChart({
           <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Total Completed Orders</span>
           <div style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>
             {totalOrd.toLocaleString()} orders
+          </div>
+        </div>
+        <div>
+          <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Avg Order Value</span>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: '#6366F1' }}>
+            {formatPrice(displayAvgOrder)}
           </div>
         </div>
         {topPayment && (

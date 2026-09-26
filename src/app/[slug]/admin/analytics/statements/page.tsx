@@ -8,15 +8,17 @@ import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/forma
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AnalyticsNav } from '@/components/modules/analytics/AnalyticsNav';
-import { Download, Clock, Receipt } from 'lucide-react';
+import { Download, Clock, Receipt, Search, X } from 'lucide-react';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import BillTemplate from '@/components/BillTemplate';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 
 export default function AdminAnalyticsStatementsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
@@ -33,7 +35,12 @@ export default function AdminAnalyticsStatementsPage() {
   useEffect(() => {
     if (restaurant && !dateFrom && !dateTo) {
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
-      setDateFrom(bDate);
+      const [year, month, day] = bDate.split('-').map(Number);
+      const d = new Date(year, month - 1, day - 7);
+      const fromYear = d.getFullYear();
+      const fromMonth = String(d.getMonth() + 1).padStart(2, '0');
+      const fromDay = String(d.getDate()).padStart(2, '0');
+      setDateFrom(`${fromYear}-${fromMonth}-${fromDay}`);
       setDateTo(bDate);
     }
   }, [restaurant, dateFrom, dateTo]);
@@ -145,234 +152,420 @@ export default function AdminAnalyticsStatementsPage() {
     }
   };
 
+  const filteredOrders = orders.filter((order) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const ticket = String(order.ticket_number || '').toLowerCase();
+    const customer = (order.customer_name || '').toLowerCase();
+    const phone = (order.phone || '').toLowerCase();
+    const items = (order.items || []).map((i) => i.product_name).join(' ').toLowerCase();
+    return ticket.includes(q) || customer.includes(q) || phone.includes(q) || items.includes(q);
+  });
+
   return (
     <>
-      <AdminContentWrapper>
+      <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
+        <style>{`
+          .analytics-page-header {
+            height: 68px !important;
+            min-height: 68px !important;
+            display: flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 0 20px !important;
+            border-bottom: 1px solid var(--border) !important;
+            background: #FFFFFF !important;
+            box-sizing: border-box !important;
+          }
+
+          .analytics-page-header .admin-page-header-container {
+            height: 68px !important;
+            min-height: 68px !important;
+            display: flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            gap: 12px !important;
+            width: 100% !important;
+          }
+
+          .analytics-toolbar {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            gap: 8px !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .analytics-filters {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            gap: 8px !important;
+            min-width: 0 !important;
+          }
+
+          .analytics-actions {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            gap: 8px !important;
+            margin-left: auto !important;
+            flex-shrink: 0 !important;
+          }
+
+          @media (max-width: 768px) {
+            .analytics-page-header {
+              height: auto !important;
+              min-height: auto !important;
+              padding: 12px 16px !important;
+            }
+
+            .analytics-toolbar {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 10px !important;
+            }
+
+            .analytics-filters {
+              flex-wrap: wrap !important;
+              width: 100% !important;
+            }
+
+            .analytics-actions {
+              width: 100% !important;
+              margin-left: 0 !important;
+              justify-content: space-between !important;
+              flex-wrap: wrap !important;
+            }
+          }
+        `}</style>
         <AdminPageHeader
-          title="Analytics"
-          subtitle="Financial statements, GST breakdowns, collections ledgers, and order audits."
+          className="analytics-page-header"
+          style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+          hideMaximize={true}
+          search={
+            <div className="analytics-toolbar">
+              {/* Search Bar - First on the left */}
+              <div style={{ position: 'relative', width: '220px', flex: '0 0 220px', minWidth: '140px', maxWidth: '260px', flexShrink: 0 }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#94A3B8',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search ticket, customer..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    height: '38px',
+                    paddingLeft: '30px',
+                    paddingRight: searchQuery ? '26px' : '8px',
+                    fontSize: '12px',
+                    borderRadius: '8px',
+                    background: 'white',
+                    border: '1px solid var(--border)',
+                    width: '100%',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                    outline: 'none',
+                    color: 'var(--text-primary)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '6px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94A3B8',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Left Side: Statements Filters with separator */}
+              <div className="analytics-filters" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>From</span>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    style={{
+                      height: '38px',
+                      width: '135px',
+                      padding: '0 8px',
+                      fontSize: '12px',
+                      borderRadius: '8px',
+                      background: 'white',
+                      border: '1px solid var(--border)',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                      outline: 'none',
+                      color: 'var(--text-primary)',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>To</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    style={{
+                      height: '38px',
+                      width: '135px',
+                      padding: '0 8px',
+                      fontSize: '12px',
+                      borderRadius: '8px',
+                      background: 'white',
+                      border: '1px solid var(--border)',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                      outline: 'none',
+                      color: 'var(--text-primary)',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ width: '135px', flexShrink: 0 }}>
+                  <CustomSelect
+                    value={statusFilter}
+                    onChange={(val) => setStatusFilter(val)}
+                    options={[
+                      { value: '', label: 'All Statuses' },
+                      ...allStatuses.map((s) => ({ value: s, label: s })),
+                    ]}
+                    buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px' }}
+                    style={{ width: '135px' }}
+                  />
+                </div>
+                <div style={{ width: '130px', flexShrink: 0 }}>
+                  <CustomSelect
+                    value={paymentMethodFilter}
+                    onChange={(val) => setPaymentMethodFilter(val)}
+                    options={[
+                      { value: '', label: 'All Methods' },
+                      { value: 'UPI', label: 'UPI' },
+                      { value: 'CASH', label: 'Cash' },
+                      { value: 'CARD', label: 'Card' },
+                    ]}
+                    buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px' }}
+                    style={{ width: '130px' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={exportCSV}
+                  style={{
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#059669',
+                    background: 'rgba(5, 150, 105, 0.08)',
+                    border: '1px solid rgba(5, 150, 105, 0.25)',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Download size={14} /> <span>Export (CSV)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExpireOldOrders}
+                  disabled={expiring}
+                  style={{
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#DC2626',
+                    background: 'rgba(220, 38, 38, 0.08)',
+                    border: '1px solid rgba(220, 38, 38, 0.25)',
+                    whiteSpace: 'nowrap',
+                    cursor: expiring ? 'not-allowed' : 'pointer',
+                    opacity: expiring ? 0.6 : 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Clock size={14} /> <span>{expiring ? 'Expiring...' : 'Expire Old'}</span>
+                </button>
+              </div>
+
+              {/* Right Side: Sales & Statements tabs, and Maximize button */}
+              <div className="analytics-actions">
+                <AnalyticsNav inHeader={true} />
+
+                {/* Left Border Separator */}
+                <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                  <LayoutMaximizeToggle />
+                </div>
+              </div>
+            </div>
+          }
         />
 
-        {/* Header Sub Buttons (AnalyticsNav) */}
-        <AnalyticsNav />
-
-        {/* Date Range Filter */}
-        <div
-          className="card"
-          style={{
-            marginBottom: '20px',
-            display: 'flex',
-            gap: '16px',
-            alignItems: 'flex-end',
-            flexWrap: 'wrap',
-            borderRadius: '12px',
-          }}
-        >
-          <div>
-            <label className="label">From</label>
-            <input
-              type="date"
-              className="input"
-              value={dateFrom}
-              max={dateTo}
-              onChange={(e) => setDateFrom(e.target.value)}
-              style={{ width: '160px' }}
-            />
-          </div>
-          <div>
-            <label className="label">To</label>
-            <input
-              type="date"
-              className="input"
-              value={dateTo}
-              min={dateFrom}
-              onChange={(e) => setDateTo(e.target.value)}
-              style={{ width: '160px' }}
-            />
-          </div>
-          <div style={{ minWidth: '160px' }}>
-            <label className="label">Status</label>
-            <CustomSelect
-              value={statusFilter}
-              onChange={(val) => setStatusFilter(val)}
-              options={[
-                { value: '', label: 'All Statuses' },
-                ...allStatuses.map((s) => ({ value: s, label: s })),
-              ]}
-              style={{ width: '160px' }}
-            />
-          </div>
-          <div style={{ minWidth: '140px' }}>
-            <label className="label">Payment</label>
-            <CustomSelect
-              value={paymentMethodFilter}
-              onChange={(val) => setPaymentMethodFilter(val)}
-              options={[
-                { value: '', label: 'All Methods' },
-                { value: 'UPI', label: 'UPI' },
-                { value: 'CASH', label: 'Cash' },
-                { value: 'CARD', label: 'Card' },
-              ]}
-              style={{ width: '140px' }}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
-            <button
-              className="btn btn-ghost"
-              onClick={exportCSV}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: '#059669',
-                background: 'rgba(5, 150, 105, 0.1)',
-              }}
-            >
-              <Download size={16} /> Export (CSV)
-            </button>
-            <button
-              className="btn btn-ghost"
-              onClick={handleExpireOldOrders}
-              disabled={expiring}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: '#DC2626',
-                background: 'rgba(220, 38, 38, 0.1)',
-              }}
-            >
-              <Clock size={16} /> {expiring ? 'Expiring...' : 'Expire Old'}
-            </button>
-          </div>
-        </div>
+        <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
 
         {/* Summary Cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px',
-            marginBottom: '24px',
-          }}
-        >
-          <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
-            <p className="stat-label">Total Revenue</p>
-            <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>
-              {formatPrice(totalRevenue)}
-            </h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Revenue + GST</p>
-          </div>
-          <div className="stat-card">
-            <p className="stat-label">Net Revenue</p>
-            <h3 className="stat-value" style={{ color: 'var(--primary)' }}>
-              {formatPrice(restaurant?.gst_type === 'COMPOSITION' ? netRevenue : actualRevenue)}
-            </h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              {restaurant?.gst_type === 'COMPOSITION'
-                ? 'After GST Payable Deduction'
-                : 'Excluding Cancelled'}
-            </p>
+        <div style={{ padding: '16px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '12px',
+              marginBottom: '12px',
+            }}
+          >
+            <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)', background: '#FFFFFF' }}>
+              <p className="stat-label">Total Revenue</p>
+              <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>
+                {formatPrice(totalRevenue)}
+              </h3>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Revenue + GST</p>
+            </div>
+            <div className="stat-card" style={{ background: '#FFFFFF' }}>
+              <p className="stat-label">Net Revenue</p>
+              <h3 className="stat-value" style={{ color: 'var(--primary)' }}>
+                {formatPrice(restaurant?.gst_type === 'COMPOSITION' ? netRevenue : actualRevenue)}
+              </h3>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                {restaurant?.gst_type === 'COMPOSITION'
+                  ? 'After GST Payable Deduction'
+                  : 'Excluding Cancelled'}
+              </p>
+            </div>
+
+            {restaurant?.gst_type === 'REGULAR' && (
+              <div className="stat-card" style={{ borderLeftColor: '#059669', background: '#FFFFFF' }}>
+                <p className="stat-label">GST Collected</p>
+                <h3 className="stat-value" style={{ color: '#059669' }}>
+                  {formatPrice(gstCollected)}
+                </h3>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  On behalf of Govt
+                </p>
+              </div>
+            )}
+
+            {restaurant?.gst_type === 'COMPOSITION' && (
+              <div className="stat-card" style={{ borderLeftColor: '#EAB308', background: '#FFFFFF' }}>
+                <p className="stat-label">GST Payable</p>
+                <h3 className="stat-value" style={{ color: '#EAB308' }}>
+                  {formatPrice(gstPayable)}
+                </h3>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Deducted from Revenue
+                </p>
+              </div>
+            )}
+
+            {restaurant?.gst_type === 'NONE' && (
+              <div className="stat-card" style={{ borderLeftColor: '#6B7280', background: '#FFFFFF' }}>
+                <p className="stat-label">GST</p>
+                <h3 className="stat-value" style={{ color: '#6B7280' }}>
+                  {formatPrice(0)}
+                </h3>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  No GST applicable
+                </p>
+              </div>
+            )}
           </div>
 
-          {restaurant?.gst_type === 'REGULAR' && (
-            <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
-              <p className="stat-label">GST Collected</p>
+          {/* Collections & Orders Count Cards */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '12px',
+            }}
+          >
+            <div className="stat-card" style={{ borderLeftColor: '#059669', background: '#FFFFFF' }}>
+              <p className="stat-label">Gross Paid</p>
               <h3 className="stat-value" style={{ color: '#059669' }}>
-                {formatPrice(gstCollected)}
+                {formatPrice(totalPaidRevenue)}
               </h3>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                On behalf of Govt
+                Actual collected amount
               </p>
             </div>
-          )}
-
-          {restaurant?.gst_type === 'COMPOSITION' && (
-            <div className="stat-card" style={{ borderLeftColor: '#EAB308' }}>
-              <p className="stat-label">GST Payable</p>
-              <h3 className="stat-value" style={{ color: '#EAB308' }}>
-                {formatPrice(gstPayable)}
+            <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)', background: '#FFFFFF' }}>
+              <p className="stat-label">Total Orders</p>
+              <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>
+                {orderCount}
               </h3>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Deducted from Revenue
+                Received in period
               </p>
             </div>
-          )}
-
-          {restaurant?.gst_type === 'NONE' && (
-            <div className="stat-card" style={{ borderLeftColor: '#6B7280' }}>
-              <p className="stat-label">GST</p>
-              <h3 className="stat-value" style={{ color: '#6B7280' }}>
-                {formatPrice(0)}
+            <div className="stat-card" style={{ borderLeftColor: '#6366F1', background: '#FFFFFF' }}>
+              <p className="stat-label">Fulfillment</p>
+              <h3 className="stat-value" style={{ color: '#6366F1' }}>
+                {paidCount}
               </h3>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                No GST applicable
+                Paid status
               </p>
             </div>
-          )}
-        </div>
-
-        {/* Collections & Orders Count Cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px',
-            marginBottom: '24px',
-          }}
-        >
-          <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
-            <p className="stat-label">Gross Paid</p>
-            <h3 className="stat-value" style={{ color: '#059669' }}>
-              {formatPrice(totalPaidRevenue)}
-            </h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Actual collected amount
-            </p>
-          </div>
-          <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)' }}>
-            <p className="stat-label">Total Orders</p>
-            <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>
-              {orderCount}
-            </h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Received in period
-            </p>
-          </div>
-          <div className="stat-card" style={{ borderLeftColor: '#6366F1' }}>
-            <p className="stat-label">Fulfillment</p>
-            <h3 className="stat-value" style={{ color: '#6366F1' }}>
-              {paidCount}
-            </h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Paid status
-            </p>
           </div>
         </div>
 
-        {/* Orders Table */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden', borderRadius: '12px' }}>
-          <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto' }}>
+        {/* Orders Table - Flush with sidebar & header, no outer margin, no border-radius */}
+        <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflow: 'hidden', borderRadius: 0, margin: 0, padding: 0 }}>
+          <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
             {loading ? (
               <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}>
                 <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
               </div>
             ) : (
-              <table>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr>
-                    <th>Ticket</th>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ paddingLeft: '20px' }}>Ticket</th>
                     <th>Customer</th>
                     <th>Items</th>
                     <th style={{ textAlign: 'right' }}>Total</th>
                     <th style={{ textAlign: 'center' }}>Payment</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
                     <th>Date & Time</th>
-                    <th style={{ textAlign: 'center' }}>Action</th>
+                    <th style={{ textAlign: 'center', paddingRight: '20px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((order) => (
+                  {filteredOrders.map((order) => (
                     <tr
                       key={order.id}
                       onClick={() => {
@@ -381,7 +574,7 @@ export default function AdminAnalyticsStatementsPage() {
                       }}
                       style={{ cursor: 'pointer' }}
                     >
-                      <td style={{ fontWeight: 800, color: 'var(--primary)' }}>
+                      <td style={{ fontWeight: 800, color: 'var(--primary)', paddingLeft: '20px' }}>
                         #{String(order.ticket_number).padStart(3, '0')}
                       </td>
                       <td>
@@ -447,7 +640,7 @@ export default function AdminAnalyticsStatementsPage() {
                       <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                         {formatDateTime(order.created_at)}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center', paddingRight: '20px' }}>
                         <button
                           className="btn-ghost"
                           style={{
@@ -469,10 +662,10 @@ export default function AdminAnalyticsStatementsPage() {
                       </td>
                     </tr>
                   ))}
-                  {orders.length === 0 && (
+                  {filteredOrders.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                        No statements or orders found matching the filter criteria.
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)' }}>
+                        {searchQuery ? 'No statements or orders match your search criteria.' : 'No statements or orders found matching the filter criteria.'}
                       </td>
                     </tr>
                   )}
@@ -480,17 +673,18 @@ export default function AdminAnalyticsStatementsPage() {
               </table>
             )}
           </div>
-          {!loading && orders.length >= 200 && (
-            <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+          {!loading && filteredOrders.length >= 200 && (
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', background: '#FFFFFF' }}>
               <Pagination
                 currentPage={page}
-                totalPages={Math.ceil(orders.length / 50)}
+                totalPages={Math.ceil(filteredOrders.length / 50)}
                 onPageChange={(p) => setPage(p)}
                 pageSize={50}
-                totalRecords={orders.length}
+                totalRecords={filteredOrders.length}
               />
             </div>
           )}
+        </div>
         </div>
       </AdminContentWrapper>
 
