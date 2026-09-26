@@ -9,12 +9,14 @@ import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { useParams } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { AdminPageHeader } from '@/components/AdminPageHeader';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -399,21 +401,153 @@ export default function AdminPosPage() {
     });
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px', paddingBottom: '90px' }}>
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', alignItems: 'center' }}>
-        <div style={{ position: 'relative', width: '100%', flex: 1 }}>
-          <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-          <input
-            type="search"
-            className="input"
-            placeholder="Search item name..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', paddingLeft: '40px' }}
-          />
-        </div>
-        <LayoutMaximizeToggle />
-      </div>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%', paddingBottom: '90px' }}>
+      <style>{`
+        .pos-page-header {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 20px !important;
+          border-bottom: 1px solid var(--border) !important;
+          background: #FFFFFF !important;
+          box-sizing: border-box !important;
+        }
+
+        .pos-page-header .admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          gap: 12px !important;
+          width: 100% !important;
+        }
+
+        .pos-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 10px !important;
+          width: 100% !important;
+          min-width: 0 !important;
+        }
+
+        .pos-search-control {
+          position: relative !important;
+          width: 240px !important;
+          flex: 0 0 240px !important;
+          min-width: 140px !important;
+          max-width: 300px !important;
+          flex-shrink: 0 !important;
+        }
+
+        .pos-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+        }
+
+        @media (max-width: 768px) {
+          .pos-page-header {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 12px 16px !important;
+          }
+
+          .pos-toolbar {
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 10px !important;
+          }
+
+          .pos-search-control {
+            flex: 1 !important;
+            width: auto !important;
+            min-width: 0 !important;
+          }
+        }
+      `}</style>
+      <AdminPageHeader
+        className="pos-page-header"
+        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        hideMaximize={true}
+        search={
+          <div className="pos-toolbar">
+            {/* Search Input */}
+            <div className="pos-search-control">
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94A3B8',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search item name..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  height: '38px',
+                  paddingLeft: '30px',
+                  paddingRight: search ? '26px' : '8px',
+                  fontSize: '12px',
+                  borderRadius: '8px',
+                  background: 'white',
+                  border: '1px solid var(--border)',
+                  width: '100%',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                  outline: 'none',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    color: '#94A3B8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Right: Maximize Toggle should be last */}
+            <div className="pos-actions">
+              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <LayoutMaximizeToggle />
+              </div>
+            </div>
+          </div>
+        }
+      />
+
+      <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: '20px' }}>
 
       {/* Categories */}
       <div style={{ paddingBottom: '16px', display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
@@ -615,7 +749,8 @@ export default function AdminPosPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminContentWrapper>
   );
 }
 
