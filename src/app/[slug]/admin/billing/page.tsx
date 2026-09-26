@@ -78,7 +78,8 @@ export default function BillingPage() {
   useEffect(() => {
     fetch('/api/admin/billing', {
       headers: {
-        'x-restaurant-slug': slug as string
+        'x-restaurant-slug': slug as string,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`
       }
     })
       .then((res) => {
@@ -112,7 +113,8 @@ export default function BillingPage() {
 
     fetch(url.toString(), {
       headers: {
-        'x-restaurant-slug': slug as string
+        'x-restaurant-slug': slug as string,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`
       }
     })
       .then((res) => res.json())

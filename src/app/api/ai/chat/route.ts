@@ -17,8 +17,8 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = await requireAdmin(request);
-    if (!admin) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (!admin || !admin.isAdmin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: AI Analyst is restricted to store administrators only' }, { status: 403 });
     }
 
     // Check AI credits status
@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
     }
 
     const admin = await requireAdmin(request);
-    if (!admin) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (!admin || !admin.isAdmin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: AI Analyst is restricted to store administrators only' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -111,7 +111,7 @@ export async function DELETE(request: NextRequest) {
     if (!restaurant) return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
 
     const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    if (!admin || !admin.isAdmin) return NextResponse.json({ success: false, error: 'Unauthorized: AI Analyst is restricted to store administrators only' }, { status: 403 });
 
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');

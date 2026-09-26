@@ -13,16 +13,37 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const { restaurant } = useRestaurant();
 
+  const getTargetRoute = (user: any) => {
+    const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
+    const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
+
+    if (user?.is_admin || (user?.permissions && user.permissions.includes('*'))) {
+      return showOrdering ? 'orders' : (showQueue ? 'queue' : 'products');
+    }
+
+    const perms: string[] = user?.permissions || [];
+    if (perms.includes('pos') && showOrdering) return 'pos';
+    if (perms.includes('orders') && showOrdering) return 'orders';
+    if (perms.includes('tables')) return 'tables';
+    if (perms.includes('products')) return 'products';
+    if (perms.includes('inventory')) return 'inventory';
+    if (perms.includes('analytics') && showOrdering) return 'analytics';
+    if (perms.includes('staff')) return 'staff';
+    if (perms.includes('billing')) return 'billing';
+    if (perms.includes('settings')) return 'settings';
+
+    return showOrdering ? 'orders' : 'products';
+  };
+
   useEffect(() => {
     const checkAuth = async () => {
       const hasCookie = document.cookie.split('; ').find(row => row.startsWith('admin_logged_in='));
       if (hasCookie) {
         const res = await authService.refresh();
-        if (res.success && res.user?.is_admin) {
-          const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
-          const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
-          const target = showOrdering ? 'orders' : (showQueue ? 'queue' : 'products');
-          router.replace(`/${slug}/admin/${target}`);
+        if (res.success && (res.user?.is_admin || res.user?.is_staff)) {
+          const slugStr = (Array.isArray(slug) ? slug[0] : slug) || '';
+          const target = getTargetRoute(res.user);
+          window.location.assign(`/${slugStr}/admin/${target}`);
         }
       }
     };
@@ -37,14 +58,10 @@ export default function AdminLogin() {
     try {
       const data = await authService.adminLogin(email, password);
       if (data.success) {
-        if (data.token) {
-          // Tokens are handled via httpOnly cookies from the backend
-        }
-        const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
-        const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
-        const target = showOrdering ? 'orders' : (showQueue ? 'queue' : 'products');
-        toast.success('Welcome back, Admin!');
-        router.push(`/${slug}/admin/${target}`);
+        const slugStr = (Array.isArray(slug) ? slug[0] : slug) || '';
+        const target = getTargetRoute(data.user);
+        toast.success(`Welcome back, ${data.user?.name || 'Team Member'}!`);
+        window.location.assign(`/${slugStr}/admin/${target}`);
       } else {
         toast.error(data.error || 'Invalid credentials');
       }

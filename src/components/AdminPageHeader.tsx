@@ -36,9 +36,8 @@ export function AdminPageHeader({
           margin-bottom: 16px;
           display: flex;
           justify-content: space-between;
-          align-items: ${descText ? 'flex-start' : 'center'};
-          flex-wrap: wrap;
-          gap: 16px;
+          align-items: flex-start;
+          gap: 12px;
           width: 100%;
         }
 
@@ -72,15 +71,8 @@ export function AdminPageHeader({
           .admin-header-right {
             flex: 1 1 100% !important;
             width: 100% !important;
-            justify-content: flex-start !important;
+            justify-content: flex-end !important;
             margin-left: 0 !important;
-            flex-wrap: wrap !important;
-          }
-
-          .admin-header-right > div,
-          .admin-header-right > button,
-          .admin-header-right > a {
-            flex: 1 1 auto;
           }
         }
       `}</style>
@@ -92,12 +84,12 @@ export function AdminPageHeader({
           <div
             className="admin-header-left"
             style={{
-              flex: 1,
+              flex: '1 1 100%',
+              width: '100%',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
+              gap: '10px',
               flexWrap: 'wrap',
-              width: '100%',
               minWidth: 0,
             }}
           >
@@ -117,11 +109,11 @@ export function AdminPageHeader({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: '10px',
                   flexWrap: 'wrap',
-                  width: '100%',
                   minWidth: 0,
-                  flex: 1,
+                  width: '100%',
+                  flex: '1 1 100%',
                 }}
               >
                 {search}
@@ -147,10 +139,10 @@ export function AdminPageHeader({
             className="admin-header-right"
             style={{
               display: 'flex',
-              gap: '12px',
+              gap: '8px',
               alignItems: 'center',
               flexShrink: 0,
-              marginLeft: hasLeftContent ? undefined : 'auto',
+              marginLeft: 'auto',
             }}
           >
             {action}

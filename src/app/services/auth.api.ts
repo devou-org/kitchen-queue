@@ -10,6 +10,12 @@ export interface AuthResponse {
     email?: string;
     name: string;
     is_admin: boolean;
+    is_staff?: boolean;
+    role?: string;
+    role_id?: string;
+    permissions?: string[];
+    restaurant_id?: string;
+    restaurant_slug?: string;
   };
 }
 
@@ -73,7 +79,20 @@ class AuthService {
         },
         body: JSON.stringify({ email, password }),
       });
-      return await res.json();
+      const data = await res.json();
+      if (data.success && typeof window !== 'undefined') {
+        if (data.token) {
+          localStorage.setItem('admin_token', data.token);
+          localStorage.setItem('staff_token', data.token);
+        }
+        if (data.user) {
+          localStorage.setItem('admin_user', JSON.stringify(data.user));
+        }
+        if (typeof document !== 'undefined') {
+          document.cookie = 'admin_logged_in=1; path=/; max-age=7776000; SameSite=Lax';
+        }
+      }
+      return data;
     } catch (error) {
       return { success: false, error: 'Network error. Please try again.' };
     }
@@ -139,6 +158,7 @@ class AuthService {
       }
       if (!type || type === 'admin') {
         localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
       }
     }
     if (typeof document !== 'undefined') {
@@ -148,6 +168,7 @@ class AuthService {
       if (!type || type === 'admin') {
         document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie = 'staff_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       }
     }
   }
@@ -160,6 +181,12 @@ class AuthService {
   getUser() {
     if (typeof window === 'undefined') return null;
     const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  }
+
+  getAdminUser() {
+    if (typeof window === 'undefined') return null;
+    const user = localStorage.getItem('admin_user');
     return user ? JSON.parse(user) : null;
   }
 }

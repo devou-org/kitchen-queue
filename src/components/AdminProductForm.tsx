@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
-import { inventoryService } from '@/app/services/inventory.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Eye, Layers, ArrowLeft } from 'lucide-react';
+import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Eye, Layers, ArrowLeft, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
+import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 
 interface Category {
   id: string;
@@ -36,6 +36,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
   const [showAddCounter, setShowAddCounter] = useState(false);
   const [newCounterName, setNewCounterName] = useState('');
   const [addingCounter, setAddingCounter] = useState(false);
+  const [reorderModalOpen, setReorderModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: initialData?.name || '',
@@ -56,9 +57,17 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
 
   const fetchCategories = async () => {
     try {
-      const res = await inventoryService.getCategories();
-      if (res.success && res.data) {
-        setCategories(res.data);
+      const currentSlug = (Array.isArray(slug) ? slug[0] : (slug || '')) as string;
+      const res = await fetch('/api/categories', {
+        headers: {
+          'x-restaurant-slug': currentSlug,
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || ''}`
+        },
+        cache: 'no-store'
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setCategories(data.data);
       }
     } catch (err) {
       console.error('Failed to load categories', err);
@@ -234,6 +243,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
   const calculatedStatus = stockNum <= 0 ? 'OUT_OF_STOCK' : stockNum <= bufferNum ? 'LOW_STOCK' : 'AVAILABLE';
 
   return (
+  <>
     <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <style>{`
         .product-form-container {
@@ -409,13 +419,15 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
                   Category <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCategory(!showAddCategory)}
-                  style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <Plus size={14} /> Add Category
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCategory(!showAddCategory)}
+                    style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={14} /> Add Category
+                  </button>
+                </div>
               </div>
 
               <select
@@ -797,6 +809,14 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
       </div>
     </div>
   </form>
+
+  <CategoryReorderModal
+    isOpen={reorderModalOpen}
+    onClose={() => setReorderModalOpen(false)}
+    slug={(Array.isArray(slug) ? slug[0] : (slug || '')) as string}
+    onReordered={fetchCategories}
+  />
+  </>
   );
 }
 
