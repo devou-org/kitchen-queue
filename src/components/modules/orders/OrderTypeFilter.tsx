@@ -1,5 +1,5 @@
 import React from 'react';
-import { Utensils, ShoppingBag, Filter } from 'lucide-react';
+import { Utensils, ShoppingBag } from 'lucide-react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 
 interface OrderTypeFilterProps {
@@ -12,7 +12,7 @@ interface OrderTypeFilterProps {
 }
 
 const OPTIONS = [
-  { value: '', label: 'All Orders', icon: Filter },
+  { value: '', label: 'All Orders' },
   { value: 'DINE_IN', label: 'Dine-in', icon: Utensils },
   { value: 'TAKEAWAY', label: 'Takeaway', icon: ShoppingBag },
 ];

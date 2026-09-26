@@ -3,7 +3,11 @@ import Link from 'next/link';
 import { usePathname, useParams, useRouter } from 'next/navigation';
 import { TrendingUp, Wallet } from 'lucide-react';
 
-export function AnalyticsNav() {
+interface AnalyticsNavProps {
+  inHeader?: boolean;
+}
+
+export function AnalyticsNav({ inHeader = false }: AnalyticsNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname() || '';
   const params = useParams();
@@ -46,14 +50,14 @@ export function AnalyticsNav() {
         .analytics-nav-scroll {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           overflow-x: auto;
           overscroll-behavior-x: contain;
           -webkit-overflow-scrolling: touch;
           touch-action: pan-x;
-          padding: 4px 12px 14px 0;
-          border-bottom: 1px solid var(--border, #E2E8F0);
-          margin-bottom: 20px;
+          padding: ${inHeader ? '0' : '4px 12px 14px 0'};
+          border-bottom: ${inHeader ? 'none' : '1px solid var(--border, #E2E8F0)'};
+          margin-bottom: ${inHeader ? '0' : '20px'};
           scrollbar-width: none;
           -ms-overflow-style: none;
         }
@@ -78,9 +82,11 @@ export function AnalyticsNav() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '9px 16px',
+                height: inHeader ? '38px' : 'auto',
+                boxSizing: 'border-box',
+                padding: inHeader ? '0 12px' : '9px 16px',
                 borderRadius: '8px',
-                fontSize: '13px',
+                fontSize: inHeader ? '12px' : '13px',
                 fontWeight: isActive ? 700 : 500,
                 color: isActive ? '#FFFFFF' : '#64748B',
                 backgroundColor: isActive ? 'var(--primary, #971345)' : '#F8FAFC',

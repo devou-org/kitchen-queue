@@ -13,6 +13,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import { Search } from 'lucide-react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 
 export interface SalesItem {
   id: string;
@@ -64,12 +65,14 @@ export default function AdminSalesAnalyticsPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [page, setPage] = useState(1);
-  const [dateFrom, setDateFrom] = useState(() =>
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
-  );
   const [dateTo, setDateTo] = useState(() =>
     new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
   );
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  });
   const [orderCount, setOrderCount] = useState(0);
   const [overallRevenue, setOverallRevenue] = useState(0);
   const [dailyData, setDailyData] = useState<any[]>([]);
@@ -153,60 +156,176 @@ export default function AdminSalesAnalyticsPage() {
   const avgOrderValue = orderCount > 0 ? overallRevenue / orderCount : 0;
 
   return (
-    <AdminContentWrapper>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
+      <style>{`
+        .analytics-page-header {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 20px !important;
+          border-bottom: 1px solid var(--border) !important;
+          background: #FFFFFF !important;
+          box-sizing: border-box !important;
+        }
+
+        .analytics-page-header .admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          gap: 12px !important;
+          width: 100% !important;
+        }
+
+        .analytics-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          width: 100% !important;
+          min-width: 0 !important;
+        }
+
+        .analytics-filters {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          min-width: 0 !important;
+        }
+
+        .analytics-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+        }
+
+        @media (max-width: 640px) {
+          .analytics-page-header {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 12px 16px !important;
+          }
+
+          .analytics-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+
+          .analytics-filters {
+            flex-wrap: wrap !important;
+            width: 100% !important;
+          }
+
+          .analytics-actions {
+            width: 100% !important;
+            margin-left: 0 !important;
+            justify-content: space-between !important;
+            flex-wrap: wrap !important;
+          }
+        }
+      `}</style>
       <AdminPageHeader
-        title="Analytics"
-        subtitle="Comprehensive sales insights, top-selling dishes, and revenue tracking."
+        className="analytics-page-header"
+        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        hideMaximize={true}
+        search={
+          <div className="analytics-toolbar">
+            {/* Left Side: Date Filters (From, To, Apply) */}
+            <div className="analytics-filters">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>From</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  style={{
+                    height: '38px',
+                    width: '135px',
+                    padding: '0 8px',
+                    fontSize: '12px',
+                    borderRadius: '8px',
+                    background: 'white',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                    outline: 'none',
+                    color: 'var(--text-primary)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>To</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  style={{
+                    height: '38px',
+                    width: '135px',
+                    padding: '0 8px',
+                    fontSize: '12px',
+                    borderRadius: '8px',
+                    background: 'white',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                    outline: 'none',
+                    color: 'var(--text-primary)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  fetchData();
+                  setPage(1);
+                }}
+                style={{
+                  height: '38px',
+                  padding: '0 16px',
+                  borderRadius: '8px',
+                  background: 'var(--primary, #971345)',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Apply
+              </button>
+            </div>
+
+            {/* Right Side: Sales and Statements tabs, and Maximize button */}
+            <div className="analytics-actions">
+              <AnalyticsNav inHeader={true} />
+
+              {/* Left Border Separator */}
+              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <LayoutMaximizeToggle />
+              </div>
+            </div>
+          </div>
+        }
       />
 
-      {/* Header Sub Buttons (AnalyticsNav) */}
-      <AnalyticsNav />
-
-      {/* Date Range Filter */}
-      <div
-        className="card"
-        style={{
-          marginBottom: '20px',
-          display: 'flex',
-          gap: '16px',
-          alignItems: 'flex-end',
-          flexWrap: 'wrap',
-          borderRadius: '12px',
-        }}
-      >
-        <div>
-          <label className="label">From</label>
-          <input
-            type="date"
-            className="input"
-            value={dateFrom}
-            max={dateTo}
-            onChange={(e) => setDateFrom(e.target.value)}
-            style={{ width: '160px' }}
-          />
-        </div>
-        <div>
-          <label className="label">To</label>
-          <input
-            type="date"
-            className="input"
-            value={dateTo}
-            min={dateFrom}
-            onChange={(e) => setDateTo(e.target.value)}
-            style={{ width: '160px' }}
-          />
-        </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            fetchData();
-            setPage(1);
-          }}
-          style={{ marginBottom: '2px' }}
-        >
-          Apply
-        </button>
-      </div>
+      <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
 
       {/* Sales Graph */}
       <SalesAnalyticsChart
@@ -217,45 +336,8 @@ export default function AdminSalesAnalyticsPage() {
         dateFrom={dateFrom}
         dateTo={dateTo}
         loading={loading}
+        avgOrderValue={avgOrderValue}
       />
-
-      {/* Summary Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '24px',
-        }}
-      >
-        <div className="stat-card" style={{ borderLeftColor: 'var(--primary)' }}>
-          <p className="stat-label">Total Revenue</p>
-          <h3 className="stat-value" style={{ color: 'var(--primary)' }}>
-            {formatPrice(displayRevenue)}
-          </h3>
-          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Revenue from completed orders
-          </p>
-        </div>
-        <div className="stat-card" style={{ borderLeftColor: '#059669' }}>
-          <p className="stat-label">Units Sold</p>
-          <h3 className="stat-value" style={{ color: '#059669' }}>
-            {totalUnits.toLocaleString()}
-          </h3>
-          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Total items purchased
-          </p>
-        </div>
-        <div className="stat-card" style={{ borderLeftColor: '#6366F1' }}>
-          <p className="stat-label">Avg Order Value</p>
-          <h3 className="stat-value" style={{ color: '#6366F1' }}>
-            {formatPrice(avgOrderValue)}
-          </h3>
-          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Per completed order
-          </p>
-        </div>
-      </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -405,6 +487,7 @@ export default function AdminSalesAnalyticsPage() {
             />
           </div>
         )}
+      </div>
       </div>
     </AdminContentWrapper>
   );

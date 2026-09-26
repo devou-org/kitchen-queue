@@ -5,10 +5,11 @@ import {
   Plus, Trash2, Edit2, ShieldAlert, Key, UserCheck, UserX, 
   Smartphone, Mail, Shield, CheckSquare, Square, Store, ClipboardList, 
   LayoutGrid, UtensilsCrossed, Boxes, BarChart3, Users, Receipt, Settings,
-  CheckCircle2, Info
+  CheckCircle2, Info, Search, X
 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { ADMIN_MODULES } from '@/lib/admin-modules';
 import toast from 'react-hot-toast';
 
@@ -27,6 +28,7 @@ const MODULE_ICONS: Record<string, any> = {
 export default function StaffAdminPage() {
   const { slug } = useParams();
   const [activeTab, setActiveTab] = useState<'staff' | 'roles'>('staff');
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Staff state
   const [staffs, setStaffs] = useState<any[]>([]);
@@ -294,446 +296,637 @@ export default function StaffAdminPage() {
         : [])
     : [];
 
+  const filteredStaffs = staffs.filter(staff => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const name = (staff.name || '').toLowerCase();
+    const email = (staff.email || '').toLowerCase();
+    const phone = (staff.phone || '').toLowerCase();
+    const role = (staff.role_name || staff.role || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || phone.includes(q) || role.includes(q);
+  });
+
+  const filteredRoles = roles.filter(role => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const name = (role.name || '').toLowerCase();
+    const desc = (role.description || '').toLowerCase();
+    return name.includes(q) || desc.includes(q);
+  });
+
   return (
     <>
-      <AdminContentWrapper>
-        {/* Header with Sub-tab Switcher and Action Button */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-            <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                Staff & Roles Management
-              </h1>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>
-                Control team access, configure custom roles, and assign granular module permissions.
-              </p>
+      <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
+        <style>{`
+          .staff-page-header {
+            height: 68px !important;
+            min-height: 68px !important;
+            display: flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 0 20px !important;
+            border-bottom: 1px solid var(--border) !important;
+            background: #FFFFFF !important;
+            box-sizing: border-box !important;
+          }
+
+          .staff-page-header .admin-page-header-container {
+            height: 68px !important;
+            min-height: 68px !important;
+            display: flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            gap: 12px !important;
+            width: 100% !important;
+          }
+
+          .staff-toolbar {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            gap: 8px !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .staff-actions {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            gap: 8px !important;
+            margin-left: auto !important;
+            flex-shrink: 0 !important;
+          }
+
+          @media (max-width: 768px) {
+            .staff-page-header {
+              height: auto !important;
+              min-height: auto !important;
+              padding: 12px 16px !important;
+            }
+
+            .staff-toolbar {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 10px !important;
+            }
+
+            .staff-actions {
+              width: 100% !important;
+              margin-left: 0 !important;
+              justify-content: space-between !important;
+              flex-wrap: wrap !important;
+            }
+          }
+        `}</style>
+        <AdminPageHeader
+          className="staff-page-header"
+          style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+          hideMaximize={true}
+          search={
+            <div className="staff-toolbar">
+              {/* Search Bar - First on the left */}
+              <div style={{ position: 'relative', width: '240px', flex: '0 0 240px', minWidth: '140px', maxWidth: '300px', flexShrink: 0 }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#94A3B8',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder={activeTab === 'staff' ? 'Search staff name, email...' : 'Search roles...'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    height: '38px',
+                    paddingLeft: '30px',
+                    paddingRight: searchQuery ? '26px' : '8px',
+                    fontSize: '12px',
+                    borderRadius: '8px',
+                    background: 'white',
+                    border: '1px solid var(--border)',
+                    width: '100%',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                    outline: 'none',
+                    color: 'var(--text-primary)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '6px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94A3B8',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Sub Tabs Switcher - Next with a left separator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, borderLeft: '1px solid #E2E8F0', paddingLeft: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('staff')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: activeTab === 'staff' ? 700 : 500,
+                    color: activeTab === 'staff' ? '#FFFFFF' : '#64748B',
+                    backgroundColor: activeTab === 'staff' ? 'var(--primary, #971345)' : '#F8FAFC',
+                    border: activeTab === 'staff' ? '1px solid transparent' : '1px solid #E2E8F0',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <Users size={14} />
+                  <span>Staff Members</span>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      padding: '1px 6px',
+                      borderRadius: '999px',
+                      background: activeTab === 'staff' ? 'rgba(255, 255, 255, 0.25)' : '#E2E8F0',
+                      color: activeTab === 'staff' ? '#FFFFFF' : '#475569',
+                      marginLeft: '2px',
+                    }}
+                  >
+                    {staffs.length}/6
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('roles')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: activeTab === 'roles' ? 700 : 500,
+                    color: activeTab === 'roles' ? '#FFFFFF' : '#64748B',
+                    backgroundColor: activeTab === 'roles' ? 'var(--primary, #971345)' : '#F8FAFC',
+                    border: activeTab === 'roles' ? '1px solid transparent' : '1px solid #E2E8F0',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <Shield size={14} />
+                  <span>Roles & Permissions</span>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      padding: '1px 6px',
+                      borderRadius: '999px',
+                      background: activeTab === 'roles' ? 'rgba(255, 255, 255, 0.25)' : '#E2E8F0',
+                      color: activeTab === 'roles' ? '#FFFFFF' : '#475569',
+                      marginLeft: '2px',
+                    }}
+                  >
+                    {roles.length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Right Side Actions */}
+              <div className="staff-actions">
+                {activeTab === 'staff' ? (
+                  <button
+                    type="button"
+                    onClick={() => openStaffModal()}
+                    disabled={staffs.length >= 6}
+                    style={{
+                      height: '38px',
+                      padding: '0 14px',
+                      borderRadius: '8px',
+                      background: 'var(--primary, #971345)',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      border: 'none',
+                      cursor: staffs.length >= 6 ? 'not-allowed' : 'pointer',
+                      opacity: staffs.length >= 6 ? 0.5 : 1,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={staffs.length >= 6 ? 'Maximum staff limit reached (6 max)' : 'Add Staff Member'}
+                  >
+                    <Plus size={15} />
+                    <span>Add Staff Member</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openRoleModal()}
+                    style={{
+                      height: '38px',
+                      padding: '0 14px',
+                      borderRadius: '8px',
+                      background: 'var(--primary, #971345)',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <Plus size={15} />
+                    <span>Create New Role</span>
+                  </button>
+                )}
+
+                {/* Left Border Separator */}
+                <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                  <LayoutMaximizeToggle />
+                </div>
+              </div>
             </div>
+          }
+        />
 
-            {activeTab === 'staff' ? (
-              <button
-                className="btn btn-primary"
-                onClick={() => openStaffModal()}
-                disabled={staffs.length >= 6}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 18px',
-                  fontWeight: 600,
-                  borderRadius: '12px',
-                  opacity: staffs.length >= 6 ? 0.5 : 1,
-                  cursor: staffs.length >= 6 ? 'not-allowed' : 'pointer'
-                }}
-                title={staffs.length >= 6 ? 'Maximum staff limit reached (6 max)' : 'Add Staff'}
-              >
-                <Plus size={18} /> Add Staff Member
-              </button>
-            ) : (
-              <button
-                className="btn btn-primary"
-                onClick={() => openRoleModal()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 18px',
-                  fontWeight: 600,
-                  borderRadius: '12px'
-                }}
-              >
-                <Plus size={18} /> Create New Role
-              </button>
-            )}
-          </div>
-
-          {/* Sub Navigation Tabs */}
-          <div style={{
-            display: 'inline-flex',
-            background: '#F1F5F9',
-            padding: '4px',
-            borderRadius: '12px',
-            alignSelf: 'flex-start',
-            gap: '4px'
-          }}>
-            <button
-              onClick={() => setActiveTab('staff')}
-              style={{
-                padding: '8px 18px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 600,
-                border: 'none',
-                cursor: 'pointer',
-                background: activeTab === 'staff' ? 'white' : 'transparent',
-                color: activeTab === 'staff' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                boxShadow: activeTab === 'staff' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Users size={16} /> Staff Members
-              <span style={{
-                fontSize: '11px',
-                padding: '2px 8px',
-                borderRadius: '999px',
-                background: activeTab === 'staff' ? '#EEF2FF' : '#E2E8F0',
-                color: activeTab === 'staff' ? '#4F46E5' : '#64748B'
-              }}>
-                {staffs.length}/6
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('roles')}
-              style={{
-                padding: '8px 18px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 600,
-                border: 'none',
-                cursor: 'pointer',
-                background: activeTab === 'roles' ? 'white' : 'transparent',
-                color: activeTab === 'roles' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                boxShadow: activeTab === 'roles' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Shield size={16} /> Roles & Permissions
-              <span style={{
-                fontSize: '11px',
-                padding: '2px 8px',
-                borderRadius: '999px',
-                background: activeTab === 'roles' ? '#EEF2FF' : '#E2E8F0',
-                color: activeTab === 'roles' ? '#4F46E5' : '#64748B'
-              }}>
-                {roles.length}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {loading ? (
-          <div style={{ padding: '80px', display: 'flex', justifyContent: 'center' }}>
-            <div className="loader" />
-          </div>
-        ) : activeTab === 'staff' ? (
-          /* ============================================
-             STAFF MEMBERS TAB
-             ============================================ */
-          <div className="card" style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border)', background: 'white' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)', background: '#F9FAFB' }}>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px' }}>Member Name</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px' }}>Email</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px' }}>Assigned Role</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px' }}>Allowed Modules</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px' }}>Status</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px', textAlign: 'center', width: '110px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {staffs.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      No staff members found. Add your first team member to grant access!
-                    </td>
-                  </tr>
-                ) : staffs.map(staff => {
-                  let perms: string[] = [];
-                  if (staff.role_permissions) {
-                    perms = Array.isArray(staff.role_permissions)
-                      ? staff.role_permissions
-                      : typeof staff.role_permissions === 'string'
-                        ? JSON.parse(staff.role_permissions)
-                        : [];
-                  } else if (staff.role === 'KITCHEN') {
-                    perms = ['orders'];
-                  } else {
-                    perms = ['pos', 'orders', 'tables'];
-                  }
-
-                  const displayRole = staff.role_name || staff.role || 'Staff';
-
-                  return (
-                    <tr key={staff.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }}>
-                      <td style={{ padding: '16px 18px' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px' }}>{staff.name}</div>
-                        {staff.phone && (
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
-                            <Smartphone size={12} /> {staff.phone}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 18px', color: 'var(--text-primary)', fontSize: '13px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Mail size={14} style={{ color: 'var(--text-secondary)' }} />
-                          {staff.email}
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px 18px' }}>
-                        <span style={{ 
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          padding: '4px 10px', 
-                          borderRadius: '8px', 
-                          fontSize: '12px', 
-                          fontWeight: 600,
-                          background: displayRole.toLowerCase().includes('admin') ? '#EEF2FF' : displayRole.toLowerCase().includes('kitchen') ? '#FEF3C7' : '#ECFDF5', 
-                          color: displayRole.toLowerCase().includes('admin') ? '#4F46E5' : displayRole.toLowerCase().includes('kitchen') ? '#D97706' : '#059669'
-                        }}>
-                          <Shield size={12} />
-                          {displayRole}
-                        </span>
-                      </td>
-                      <td style={{ padding: '16px 18px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '300px' }}>
-                          {perms.map(p => {
-                            const mod = ADMIN_MODULES.find(m => m.key === p);
-                            return (
-                              <span key={p} style={{
-                                fontSize: '11px',
-                                padding: '2px 7px',
-                                borderRadius: '6px',
-                                background: '#F1F5F9',
-                                color: '#475569',
-                                fontWeight: 500
-                              }}>
-                                {mod?.name || p}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px 18px' }}>
-                        <span style={{ 
-                          display: 'inline-flex', 
-                          alignItems: 'center', 
-                          gap: '6px',
-                          fontSize: '13px',
-                          fontWeight: 500,
-                          color: staff.is_active ? '#059669' : 'var(--text-secondary)'
-                        }}>
-                          {staff.is_active ? <UserCheck size={16} /> : <UserX size={16} />}
-                          {staff.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '16px 18px', textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                          <button
-                            onClick={() => openStaffModal(staff)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '8px',
-                              background: '#F8FAFC',
-                              border: '1px solid #E2E8F0',
-                              color: 'var(--text-primary)',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              padding: 0,
-                              transition: 'all 0.15s ease'
-                            }}
-                            title="Edit Staff Member"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleStaffDelete(staff.id)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '8px',
-                              background: '#FEF2F2',
-                              border: '1px solid #FEE2E2',
-                              color: '#DC2626',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              padding: 0,
-                              transition: 'all 0.15s ease'
-                            }}
-                            title="Delete Staff Member"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
+        <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
+          {loading ? (
+            <div style={{ padding: '80px', display: 'flex', justifyContent: 'center' }}>
+              <div className="loader" />
+            </div>
+          ) : activeTab === 'staff' ? (
+            /* ============================================
+               STAFF MEMBERS TAB
+               ============================================ */
+            <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflow: 'hidden', borderRadius: 0, margin: 0, padding: 0 }}>
+              <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ paddingLeft: '20px' }}>Member Name</th>
+                      <th>Email</th>
+                      <th>Assigned Role</th>
+                      <th>Allowed Modules</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'center', width: '110px', paddingRight: '20px' }}>Actions</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          /* ============================================
-             ROLES & PERMISSIONS TAB (TABLE FORMAT)
-             ============================================ */
-          <div className="card" style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border)', background: 'white' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)', background: '#F9FAFB' }}>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px', width: '22%' }}>Role</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px', width: '28%' }}>Description</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px', width: '32%' }}>Allowed Modules</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px', width: '10%' }}>Assigned</th>
-                  <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px', textAlign: 'center', width: '110px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roles.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      No roles configured yet. Click "Create New Role" to add one!
-                    </td>
-                  </tr>
-                ) : roles.map(role => {
-                  let perms: string[] = [];
-                  if (Array.isArray(role.permissions)) {
-                    perms = role.permissions;
-                  } else if (typeof role.permissions === 'string') {
-                    try { perms = JSON.parse(role.permissions); } catch (e) { perms = []; }
-                  }
+                  </thead>
+                  <tbody>
+                    {filteredStaffs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          {searchQuery ? 'No staff members match your search criteria.' : 'No staff members found. Add your first team member to grant access!'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredStaffs.map(staff => {
+                        let perms: string[] = [];
+                        if (staff.role_permissions) {
+                          perms = Array.isArray(staff.role_permissions)
+                            ? staff.role_permissions
+                            : typeof staff.role_permissions === 'string'
+                              ? JSON.parse(staff.role_permissions)
+                              : [];
+                        } else if (staff.role === 'KITCHEN') {
+                          perms = ['orders'];
+                        } else {
+                          perms = ['pos', 'orders', 'tables'];
+                        }
 
-                  return (
-                    <tr key={role.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }}>
-                      <td style={{ padding: '16px 18px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '28px', height: '28px',
-                            borderRadius: '6px',
-                            background: '#EEF2FF',
-                            color: '#4F46E5',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <Shield size={15} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px' }}>
-                              {role.name}
-                            </div>
-                            {role.is_default && (
-                              <span style={{ fontSize: '10px', color: '#4F46E5', fontWeight: 600, background: '#EEF2FF', padding: '1px 6px', borderRadius: '4px' }}>
-                                System Default
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
+                        const displayRole = staff.role_name || staff.role || 'Staff';
 
-                      <td style={{ padding: '16px 18px', color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.4 }}>
-                        {role.description || '—'}
-                      </td>
-
-                      <td style={{ padding: '16px 18px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {perms.length === 0 ? (
-                            <span style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic' }}>No modules granted</span>
-                          ) : perms.map(key => {
-                            const mod = ADMIN_MODULES.find(m => m.key === key);
-                            const IconComp = MODULE_ICONS[key] || Shield;
-                            return (
-                              <span key={key} style={{
+                        return (
+                          <tr key={staff.id}>
+                            <td style={{ paddingLeft: '20px' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>{staff.name}</div>
+                              {staff.phone && (
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                  <Smartphone size={11} /> {staff.phone}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-primary)' }}>
+                                <Mail size={13} style={{ color: 'var(--text-secondary)' }} />
+                                <span>{staff.email}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <span style={{ 
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                fontSize: '11px',
+                                padding: '3px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '11px', 
+                                fontWeight: 700,
+                                background: displayRole.toLowerCase().includes('admin') ? '#EEF2FF' : displayRole.toLowerCase().includes('kitchen') ? '#FEF3C7' : '#ECFDF5', 
+                                color: displayRole.toLowerCase().includes('admin') ? '#4F46E5' : displayRole.toLowerCase().includes('kitchen') ? '#D97706' : '#059669'
+                              }}>
+                                <Shield size={11} />
+                                <span>{displayRole}</span>
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '320px' }}>
+                                {perms.map(p => {
+                                  const mod = ADMIN_MODULES.find(m => m.key === p);
+                                  const IconComp = MODULE_ICONS[p] || Shield;
+                                  return (
+                                    <span key={p} style={{
+                                      fontSize: '11px',
+                                      padding: '2px 7px',
+                                      borderRadius: '6px',
+                                      background: '#F1F5F9',
+                                      border: '1px solid #E2E8F0',
+                                      color: '#475569',
+                                      fontWeight: 500,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      <IconComp size={10} style={{ color: 'var(--primary, #971345)' }} />
+                                      <span>{mod?.name || p}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                            <td>
+                              <span style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '4px',
                                 padding: '3px 8px',
                                 borderRadius: '6px',
-                                background: '#F1F5F9',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                background: staff.is_active ? '#ECFDF5' : '#FEF2F2',
+                                color: staff.is_active ? '#059669' : '#DC2626'
+                              }}>
+                                {staff.is_active ? <UserCheck size={12} /> : <UserX size={12} />}
+                                <span>{staff.is_active ? 'Active' : 'Inactive'}</span>
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center', paddingRight: '20px' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => openStaffModal(staff)}
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    background: '#F8FAFC',
+                                    border: '1px solid #E2E8F0',
+                                    color: '#475569',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="Edit Staff Member"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStaffDelete(staff.id)}
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    background: '#FEF2F2',
+                                    border: '1px solid #FEE2E2',
+                                    color: '#DC2626',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="Delete Staff Member"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            /* ============================================
+               ROLES & PERMISSIONS TAB (TABLE FORMAT)
+               ============================================ */
+            <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflow: 'hidden', borderRadius: 0, margin: 0, padding: 0 }}>
+              <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ width: '22%', paddingLeft: '20px' }}>Role</th>
+                      <th style={{ width: '28%' }}>Description</th>
+                      <th style={{ width: '32%' }}>Allowed Modules</th>
+                      <th style={{ width: '10%' }}>Assigned</th>
+                      <th style={{ textAlign: 'center', width: '110px', paddingRight: '20px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRoles.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          {searchQuery ? 'No roles match your search criteria.' : 'No roles configured yet. Click "Create New Role" to add one!'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRoles.map(role => {
+                        let perms: string[] = [];
+                        if (Array.isArray(role.permissions)) {
+                          perms = role.permissions;
+                        } else if (typeof role.permissions === 'string') {
+                          try { perms = JSON.parse(role.permissions); } catch (e) { perms = []; }
+                        }
+
+                        return (
+                          <tr key={role.id}>
+                            <td style={{ paddingLeft: '20px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{
+                                  width: '28px', height: '28px',
+                                  borderRadius: '6px',
+                                  background: '#EEF2FF',
+                                  color: '#4F46E5',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <Shield size={14} />
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
+                                    {role.name}
+                                  </div>
+                                  {role.is_default && (
+                                    <span style={{ fontSize: '10px', color: '#4F46E5', fontWeight: 600, background: '#EEF2FF', padding: '1px 6px', borderRadius: '4px' }}>
+                                      System Default
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            <td style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.4 }}>
+                              {role.description || '—'}
+                            </td>
+
+                            <td>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {perms.length === 0 ? (
+                                  <span style={{ fontSize: '12px', color: '#94A3B8', fontStyle: 'italic' }}>No modules granted</span>
+                                ) : perms.map(key => {
+                                  const mod = ADMIN_MODULES.find(m => m.key === key);
+                                  const IconComp = MODULE_ICONS[key] || Shield;
+                                  return (
+                                    <span key={key} style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontSize: '11px',
+                                      padding: '2px 7px',
+                                      borderRadius: '6px',
+                                      background: '#F1F5F9',
+                                      border: '1px solid #E2E8F0',
+                                      color: '#334155',
+                                      fontWeight: 500,
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      <IconComp size={10} style={{ color: 'var(--primary, #971345)' }} />
+                                      <span>{mod?.name || key}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </td>
+
+                            <td>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                background: '#F8FAFC',
                                 border: '1px solid #E2E8F0',
-                                color: '#334155',
-                                fontWeight: 500,
+                                color: 'var(--text-primary)',
                                 whiteSpace: 'nowrap'
                               }}>
-                                <IconComp size={11} style={{ color: 'var(--primary)' }} />
-                                {mod?.name || key}
+                                <Users size={12} style={{ color: 'var(--text-secondary)' }} />
+                                <span>{role.staff_count || 0} active</span>
                               </span>
-                            );
-                          })}
-                        </div>
-                      </td>
+                            </td>
 
-                      <td style={{ padding: '16px 18px' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          background: '#F8FAFC',
-                          border: '1px solid #E2E8F0',
-                          color: 'var(--text-primary)',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          <Users size={12} style={{ color: 'var(--text-secondary)' }} />
-                          {role.staff_count || 0} active
-                        </span>
-                      </td>
-
-                      <td style={{ padding: '16px 18px', textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                          <button
-                            onClick={() => openRoleModal(role)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '8px',
-                              background: '#F8FAFC',
-                              border: '1px solid #E2E8F0',
-                              color: 'var(--text-primary)',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              padding: 0,
-                              transition: 'all 0.15s ease'
-                            }}
-                            title="Edit Role"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleRoleDelete(role)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '8px',
-                              background: '#FEF2F2',
-                              border: '1px solid #FEE2E2',
-                              color: '#DC2626',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              padding: 0,
-                              transition: 'all 0.15s ease'
-                            }}
-                            title="Delete Role"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                            <td style={{ textAlign: 'center', paddingRight: '20px' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => openRoleModal(role)}
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    background: '#F8FAFC',
+                                    border: '1px solid #E2E8F0',
+                                    color: '#475569',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="Edit Role"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRoleDelete(role)}
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    background: '#FEF2F2',
+                                    border: '1px solid #FEE2E2',
+                                    color: '#DC2626',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="Delete Role"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       </AdminContentWrapper>
 
       {/* ============================================

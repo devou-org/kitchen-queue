@@ -10,11 +10,12 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes, Layers, ArrowUpDown } from 'lucide-react';
+import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes, Layers, ArrowUpDown, Search } from 'lucide-react';
 import AdminProductForm from '@/components/AdminProductForm';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
 import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 
 interface ExtractedProduct {
   id: string;
@@ -288,44 +289,112 @@ export default function AdminProducts() {
   });
 
   return (
-    <AdminContentWrapper>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
       <style>{`
-        /* Product-page-only responsive rules: other admin screens keep their current layout. */
+        @keyframes iconPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.22); opacity: 0.85; }
+        }
+        @keyframes spinLoader {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        /* Page-scoped responsive rules to match orders and tables single-row header toolbar */
+        .products-page-header {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 20px !important;
+          border-bottom: 1px solid var(--border) !important;
+          background: #FFFFFF !important;
+          box-sizing: border-box !important;
+        }
+
+        .products-page-header .admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          gap: 12px !important;
+          width: 100% !important;
+        }
+
+        .products-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          width: 100% !important;
+        }
+
+        .products-search-control {
+          position: relative !important;
+          height: 38px !important;
+        }
+
+        .products-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+        }
+
         .products-table-scroll-hint {
           display: none;
         }
 
-        @media (max-width: 768px) {
-          .products-page-header,
-          .products-page-header .admin-header-left,
-          .products-page-header .admin-header-right {
-            flex: 1 1 100% !important;
+        /* Mobile Screens: Full-width stacked controls below 640px */
+        @media (max-width: 640px) {
+          .products-page-header {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 12px 16px !important;
+          }
+
+          .products-toolbar {
+            display: flex !important;
+            flex-direction: column !important;
+            flex-wrap: wrap !important;
+            align-items: stretch !important;
+            gap: 10px !important;
             width: 100% !important;
+          }
+
+          .products-search-control {
+            flex: none !important;
+            height: 38px !important;
+            width: 100% !important;
+            max-width: 100% !important;
             min-width: 0 !important;
-            margin-left: 0 !important;
+          }
+
+          .products-stats-group {
+            flex-wrap: wrap !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
           }
 
           .products-actions {
-            display: grid !important;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
             width: 100% !important;
-            gap: 8px !important;
+            margin-left: 0 !important;
+            justify-content: flex-start !important;
+            flex-wrap: wrap !important;
           }
 
-          .products-actions > a,
-          .products-actions > button {
-            width: 100% !important;
-            min-width: 0;
-            justify-content: center;
-            padding-left: 10px !important;
-            padding-right: 10px !important;
+          .products-actions > button,
+          .products-actions > a {
+            flex: 1 1 auto;
           }
+        }
 
-          .products-search-input {
-            max-width: 100% !important;
-            width: 100% !important;
-          }
-
+        @media (max-width: 768px) {
           .products-table-viewport {
             overflow-x: auto !important;
             overscroll-behavior-x: contain;
@@ -346,174 +415,219 @@ export default function AdminProducts() {
             font-weight: 600;
           }
         }
-
-        @media (max-width: 360px) {
-          .products-actions {
-            grid-template-columns: minmax(0, 1fr) !important;
-          }
-        }
       `}</style>
       <AdminPageHeader
         className="products-page-header"
-        action={
-          <div className="products-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <style dangerouslySetInnerHTML={{ __html: `
-              @keyframes iconPulse {
-                0%, 100% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.22); opacity: 0.85; }
-              }
-              @keyframes spinLoader {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            `}} />
-            <button
-              onClick={() => {
-                if (!aiEnabled) {
-                  toast.error(aiDisabledReason || 'AI Menu Scanner is currently disabled by administrator.');
-                  return;
-                }
-                setExtractedProducts([]);
-                setAiModalOpen(true);
-              }}
-              title={!aiEnabled ? (aiDisabledReason || 'AI Menu Scanner is currently disabled') : 'Upload Menu Image'}
-              style={{
-                height: '42px',
-                padding: '0 20px',
-                borderRadius: '8px',
-                backgroundColor: aiEnabled ? 'var(--primary, #0f172a)' : '#475569',
-                opacity: aiEnabled ? 1 : 0.6,
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: aiEnabled ? 'pointer' : 'not-allowed',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: aiEnabled ? '0 2px 8px rgba(0, 0, 0, 0.15)' : 'none',
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Sparkles size={16} style={{ color: aiEnabled ? '#ffffff' : '#cbd5e1', animation: aiEnabled ? 'iconPulse 2s infinite ease-in-out' : 'none' }} /> Upload Menu
-            </button>
-            {showInventory && (
-              <Link
-                href={`/${slug}/admin/inventory/recipes`}
-                prefetch={false}
+        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        hideMaximize={true}
+        search={
+          <div className="products-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap', width: '100%', minWidth: 0 }}>
+            {/* Search Input */}
+            <div className="products-search-control" style={{ position: 'relative', width: '240px', flex: '0 0 240px', minWidth: '140px', maxWidth: '300px', flexShrink: 0 }}>
+              <Search
+                size={14}
                 style={{
-                  height: '42px',
-                  padding: '0 16px',
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94A3B8',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  height: '38px',
+                  paddingLeft: '30px',
+                  paddingRight: search ? '26px' : '8px',
+                  fontSize: '12px',
+                  borderRadius: '8px',
+                  background: 'white',
+                  border: '1px solid var(--border)',
+                  width: '100%',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                  outline: 'none',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    color: '#94A3B8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Reorder Categories with left border */}
+            <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => setCategoryModalOpen(true)}
+                title="Reorder Categories"
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  padding: 0,
+                  borderRadius: '8px',
+                  border: '1px solid var(--border, #cbd5e1)',
+                  backgroundColor: '#FFFFFF',
+                  color: 'var(--primary, #0f172a)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+              >
+                <ArrowUpDown size={15} style={{ color: 'var(--primary, #0f172a)' }} />
+              </button>
+            </div>
+
+            {/* Dietary Preference (Veg) Filter with left border */}
+            <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px', flexShrink: 0 }}>
+              <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
+            </div>
+
+            {/* Right Action Buttons */}
+            <div className="products-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
+              {/* Upload Menu */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!aiEnabled) {
+                    toast.error(aiDisabledReason || 'AI Menu Scanner is currently disabled by administrator.');
+                    return;
+                  }
+                  setExtractedProducts([]);
+                  setAiModalOpen(true);
+                }}
+                title={!aiEnabled ? (aiDisabledReason || 'AI Menu Scanner is currently disabled') : 'Upload Menu Image'}
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  backgroundColor: aiEnabled ? 'var(--primary, #0f172a)' : '#475569',
+                  opacity: aiEnabled ? 1 : 0.6,
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: aiEnabled ? 'pointer' : 'not-allowed',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: aiEnabled ? '0 1px 2px rgba(0, 0, 0, 0.08)' : 'none',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <Sparkles size={14} style={{ color: aiEnabled ? '#ffffff' : '#cbd5e1', animation: aiEnabled ? 'iconPulse 2s infinite ease-in-out' : 'none' }} />
+                <span>Upload Menu</span>
+              </button>
+
+              {/* Counters Drawer */}
+              <button
+                type="button"
+                onClick={() => setCounterDrawerOpen(true)}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
                   borderRadius: '8px',
                   backgroundColor: 'var(--primary, #0f172a)',
                   color: '#ffffff',
                   border: 'none',
                   fontWeight: 700,
-                  fontSize: '13px',
-                  textDecoration: 'none',
+                  fontSize: '12px',
+                  cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'all 0.2s ease',
-                  whiteSpace: 'nowrap'
+                  gap: '6px',
+                  boxShadow: aiEnabled ? '0 1px 2px rgba(0, 0, 0, 0.08)' : 'none',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <ChefHat size={16} style={{ color: '#ffffff' }} /> BOM Recipes
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={() => setCounterDrawerOpen(true)}
-              style={{
-                height: '42px',
-                padding: '0 18px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--primary, #0f172a)',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Store size={16} style={{ color: '#ffffff' }} /> Counters
-            </button>
-            <button
-              onClick={() => {
-                setEditingProduct(null);
-                setFormModalOpen(true);
-              }}
-              style={{
-                height: '42px',
-                padding: '0 20px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--primary, #0f172a)',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Plus size={16} /> Add Product
-            </button>
+                <Store size={15} style={{ color: '#ffffff' }} />
+                <span>Counters</span>
+              </button>
+
+              {/* Add Product */}
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingProduct(null);
+                  setFormModalOpen(true);
+                }}
+                className="btn btn-primary"
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
+                  background: primaryColor,
+                  borderColor: primaryColor,
+                }}
+              >
+                <Plus size={15} />
+                <span>Add Product</span>
+              </button>
+
+              {/* Maximize Layout Toggle */}
+              <LayoutMaximizeToggle />
+            </div>
           </div>
         }
       />
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <input
-            type="search"
-            className="input products-search-input"
-            placeholder="Search products by name or category..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ maxWidth: '400px', width: '100%', flex: 1 }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setCategoryModalOpen(true)}
-              title="Reorder Categories"
-              style={{
-                width: '38px',
-                height: '38px',
-                padding: 0,
-                borderRadius: '8px',
-                border: '1px solid var(--border, #cbd5e1)',
-                backgroundColor: '#FFFFFF',
-                color: 'var(--primary, #0f172a)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                transition: 'all 0.15s ease',
-                flexShrink: 0,
-              }}
-            >
-              <ArrowUpDown size={16} style={{ color: 'var(--primary, #0f172a)' }} />
-            </button>
-            <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
-          </div>
-        </div>
-
+      <div
+        className="card products-table-card"
+        style={{
+          width: '100%',
+          maxWidth: '100%',
+          padding: 0,
+          margin: 0,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          borderRadius: 0,
+          border: 'none',
+          boxShadow: 'none',
+          background: '#FFFFFF',
+        }}
+      >
         <div className="products-table-scroll-hint" aria-hidden="true">Swipe left to view all product details</div>
-        <div className="table-wrapper products-table-viewport" style={{ border: 'none', borderRadius: 0 }}>
+        <div className="table-wrapper products-table-viewport" style={{ border: 'none', borderRadius: 0, width: '100%', flex: 1 }}>
           {loading ? (
             <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : (
@@ -631,7 +745,7 @@ export default function AdminProducts() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px' }}>No products found</td></tr>
+                  <tr><td colSpan={showOnlineOrdering ? 7 : 6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No products found</td></tr>
                 )}
               </tbody>
             </table>

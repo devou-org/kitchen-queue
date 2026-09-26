@@ -469,7 +469,7 @@ export default function StaffOrders() {
             </div>
 
             {/* Status Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '110px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -479,12 +479,12 @@ export default function StaffOrders() {
                 options={allStatuses.map((s) => ({ value: s, label: s }))}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
                 className="staff-orders-select"
-                style={{ width: '110px' }}
+                style={{ width: '130px' }}
               />
             </div>
 
             {/* Order Type Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '150px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
@@ -492,13 +492,13 @@ export default function StaffOrders() {
                   setPage(1);
                 }}
                 className="staff-orders-select"
-                style={{ width: '135px' }}
+                style={{ width: '150px' }}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
               />
             </div>
 
             {/* Counter Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '115px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -508,7 +508,7 @@ export default function StaffOrders() {
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
                 className="staff-orders-select"
-                style={{ width: '115px' }}
+                style={{ width: '135px' }}
               />
             </div>
             {/* Far Right Action Buttons */}

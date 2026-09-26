@@ -11,7 +11,11 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-export function InventoryNav() {
+interface InventoryNavProps {
+  inHeader?: boolean;
+}
+
+export function InventoryNav({ inHeader = false }: InventoryNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname() || '';
   const params = useParams();
@@ -74,9 +78,9 @@ export function InventoryNav() {
           overscroll-behavior-x: contain;
           -webkit-overflow-scrolling: touch;
           touch-action: pan-x;
-          padding: 4px 12px 14px 0;
-          border-bottom: 1px solid var(--border, #E2E8F0);
-          margin-bottom: 20px;
+          padding: ${inHeader ? '0' : '4px 12px 14px 0'};
+          border-bottom: ${inHeader ? 'none' : '1px solid var(--border, #E2E8F0)'};
+          margin-bottom: ${inHeader ? '0' : '20px'};
           scrollbar-width: none;
           -ms-overflow-style: none;
         }
@@ -104,9 +108,11 @@ export function InventoryNav() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '9px 15px',
+                height: inHeader ? '38px' : 'auto',
+                boxSizing: 'border-box',
+                padding: inHeader ? '0 12px' : '9px 15px',
                 borderRadius: '8px',
-                fontSize: '13px',
+                fontSize: inHeader ? '12px' : '13px',
                 fontWeight: isActive ? 700 : 500,
                 color: isActive ? '#FFFFFF' : '#64748B',
                 backgroundColor: isActive ? 'var(--primary, #971345)' : '#F8FAFC',

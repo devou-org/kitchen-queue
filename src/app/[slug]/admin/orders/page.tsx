@@ -8,7 +8,7 @@ import { getCurrentBusinessDate } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { ChefHat, Search, X, Printer, Store, Loader2 } from 'lucide-react';
+import { ChefHat, Search, X, Printer, Store, Loader2, ClipboardList, Sparkles, RotateCcw, UtensilsCrossed } from 'lucide-react';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { OrderTableRow, OrderTableHeader } from '@/components/modules/orders/OrderTableRow';
@@ -434,9 +434,32 @@ export default function AdminOrders() {
   };
 
   return (
-    <AdminContentWrapper fullWidth>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
       <style>{`
         /* Page-scoped responsive rules to guarantee single-row header toolbar on desktop, laptops, and tablets */
+        .orders-page-header {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 20px !important;
+          border-bottom: 1px solid var(--border) !important;
+          background: #FFFFFF !important;
+          box-sizing: border-box !important;
+        }
+
+        .orders-page-header .admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          gap: 12px !important;
+          width: 100% !important;
+        }
+
         .orders-toolbar {
           display: flex !important;
           flex-wrap: nowrap !important;
@@ -465,6 +488,12 @@ export default function AdminOrders() {
 
         /* Mobile Screens: Full-width stacked controls below 640px */
         @media (max-width: 640px) {
+          .orders-page-header {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 12px 16px !important;
+          }
+
           .orders-toolbar {
             display: flex !important;
             flex-direction: column !important;
@@ -505,12 +534,12 @@ export default function AdminOrders() {
       `}</style>
       <AdminPageHeader
         className="orders-page-header"
-        style={{ paddingTop: '16px' }}
+        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="orders-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', width: '100%', minWidth: 0 }}>
             {/* Search Input */}
-            <div className="orders-search-control" style={{ position: 'relative', width: '240px', flex: '1 1 240px', minWidth: '140px', maxWidth: '320px', flexShrink: 1 }}>
+            <div className="orders-search-control" style={{ position: 'relative', width: '240px', flex: '0 0 240px', minWidth: '140px', maxWidth: '300px', flexShrink: 0 }}>
               <Search
                 size={14}
                 style={{
@@ -568,7 +597,7 @@ export default function AdminOrders() {
             </div>
 
             {/* Status Dropdown */}
-            <div className="orders-filter-control" style={{ width: '110px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -586,12 +615,12 @@ export default function AdminOrders() {
                 disabled={!statusesLoaded}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
                 className="orders-select"
-                style={{ width: '110px' }}
+                style={{ width: '130px' }}
               />
             </div>
 
             {/* Order Type Dropdown */}
-            <div className="orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '150px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
@@ -599,13 +628,13 @@ export default function AdminOrders() {
                   setPage(1);
                 }}
                 className="orders-select"
-                style={{ width: '135px' }}
+                style={{ width: '150px' }}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
               />
             </div>
 
             {/* Counter Dropdown */}
-            <div className="orders-filter-control" style={{ width: '115px', flexShrink: 0 }}>
+            <div className="orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -615,57 +644,11 @@ export default function AdminOrders() {
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
                 className="orders-select"
-                style={{ width: '115px' }}
+                style={{ width: '135px' }}
               />
             </div>
             {/* Far Right Action Buttons */}
             <div className="orders-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-              {/* Auto-Print Toggle Button */}
-              <button
-                onClick={toggleAutoPrint}
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: autoPrintKot ? '#16A34A' : 'var(--primary, #0f172a)',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                title={autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}
-              >
-                <Printer size={18} style={{ color: '#ffffff' }} />
-              </button>
-
-              {/* Counters & Hardware Drawer Trigger */}
-              <button
-                onClick={() => setCounterDrawerOpen(true)}
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'var(--primary, #0f172a)',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                title="Counters & Hardware"
-              >
-                <Store size={18} style={{ color: '#ffffff' }} />
-              </button>
-
               {/* Kitchen Snapshot Button */}
               <button
                 onClick={() => setShowKitchenSnapshot(true)}
@@ -756,21 +739,24 @@ export default function AdminOrders() {
         </div>
       )}
 
-      {/* Main Orders Table (always 100% full width, never adjusted or squeezed) */}
+      {/* Main Orders Table (starts directly from the 68px bottom line in the logo header) */}
       <div
-        className="card"
+        className="card orders-table-card"
         style={{
           width: '100%',
+          maxWidth: '100%',
           padding: 0,
+          margin: 0,
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          flex: isMaximized ? 1 : undefined,
-          minHeight: isMaximized ? 'calc(100vh - 65px)' : 'calc(100vh - 96px)',
+          flex: 1,
+          minHeight: isMaximized ? 'calc(100vh - 68px)' : 'calc(100vh - 68px)',
           transition: 'all 0.2s ease',
-          borderRadius: '8px',
-          border: '1px solid var(--border)',
+          borderRadius: 0,
+          border: 'none',
           boxShadow: 'none',
+          background: '#FFFFFF',
         }}
       >
 
@@ -790,7 +776,93 @@ export default function AdminOrders() {
                   />
                 ))}
                 {displayedOrders.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '60px', color: '#64748B', fontSize: '14px' }}>No active orders found</td></tr>
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '80px 20px', verticalAlign: 'middle', background: '#FFFFFF' }}>
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto',
+                        maxWidth: '400px',
+                      }}>
+                        {/* Logo / Illustration Container */}
+                        <div style={{
+                          width: '76px',
+                          height: '76px',
+                          borderRadius: '22px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: '18px',
+                          position: 'relative',
+                        }}>
+                          {readySearch || statusFilter || orderTypeFilter || counterFilter ? (
+                            <Search size={34} style={{ color: 'grey' }} strokeWidth={1.8} />
+                          ) : (
+                            <UtensilsCrossed size={34} style={{ color: 'grey' }} strokeWidth={1.8} />
+                          )}
+                        </div>
+
+                        {/* Heading */}
+                        <h3 style={{
+                          fontSize: '17px',
+                          fontWeight: 700,
+                          color: '#0F172A',
+                          margin: '0 0 6px 0',
+                          letterSpacing: '-0.01em',
+                        }}>
+                          {readySearch || statusFilter || orderTypeFilter || counterFilter 
+                            ? 'No matching orders found' 
+                            : 'No active orders'}
+                        </h3>
+
+                        {/* Description */}
+                        <p style={{
+                          fontSize: '13px',
+                          color: '#64748B',
+                          margin: 0,
+                          lineHeight: 1.5,
+                          fontWeight: 500,
+                        }}>
+                          {readySearch || statusFilter || orderTypeFilter || counterFilter
+                            ? 'Try adjusting your search terms or filter criteria to see more orders.'
+                            : 'Incoming orders from POS terminals, QR digital menus, and waitstaff will appear here in real-time.'}
+                        </p>
+
+                        {/* Reset Filters action */}
+                        {(readySearch || statusFilter || orderTypeFilter || counterFilter) && (
+                          <button
+                            onClick={() => {
+                              setReadySearch('');
+                              setStatusFilter('');
+                              setOrderTypeFilter('');
+                              setCounterFilter('');
+                              setPage(1);
+                            }}
+                            style={{
+                              marginTop: '16px',
+                              padding: '7px 14px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: 'var(--primary, #F97316)',
+                              background: 'rgba(249, 115, 22, 0.08)',
+                              border: '1px solid rgba(249, 115, 22, 0.2)',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <RotateCcw size={12} />
+                            <span>Reset all filters</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
