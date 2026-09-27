@@ -399,7 +399,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 <span className="sidebar-link-text">{link.name}</span>
                 {link.name === 'Products' && (
                   <span className="sidebar-link-badge">
-                    <Sparkles size={14} style={{ color: '#ffffff' }} />
+                    <Sparkles size={14} style={{ color: isActive ? 'var(--primary)' : '#F59E0B' }} />
                   </span>
                 )}
               </Link>
