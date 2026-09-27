@@ -41,32 +41,38 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
   const pc = restaurant?.primary_color || '#059669';
   const ticketNum = String(order.ticket_number || '').padStart(3, '0');
   const invoiceDate = formatInvoiceDate(order.created_at);
-  const items = order.items || [];
+  const items = (order.items || []).filter((i) => (i.quantity || 0) > 0);
   const subtotal = items.reduce((s, item) => s + (item.price_at_purchase || 0) * (item.quantity || 1), 0);
+  
   const getOrderTypeLabel = () => {
     if (order.table_number) return 'Dine-in';
-    if ((order as any).order_type) return (order as any).order_type;
+    if ((order as any).order_type) {
+      const t = String((order as any).order_type).toLowerCase().replace('_', '-');
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    }
     return 'Dine-in';
   };
+
   const restName = restaurant?.name || (order as any).restaurant_name || 'Restaurant';
   const firstChar = escapeHtml(restName.charAt(0).toUpperCase());
 
+  // Circular logo matching Starbucks layout
   const logoOrInitial = restaurant?.logo_url
-    ? `<img src="${restaurant.logo_url}" alt="${escapeHtml(restName)}" style="width: 48px; height: 48px; border-radius: 10px; object-fit: cover; margin-bottom: 8px;" />`
-    : `<div style="width: 48px; height: 48px; border-radius: 10px; background: ${pc}; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; margin-bottom: 8px;">${firstChar}</div>`;
+    ? `<img src="${restaurant.logo_url}" alt="${escapeHtml(restName)}" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; display: block;" />`
+    : `<div style="width: 52px; height: 52px; border-radius: 50%; background: ${pc}; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 22px; margin-bottom: 8px;">${firstChar}</div>`;
 
   let addressAndContact = '';
   if (restaurant?.address || restaurant?.phone || restaurant?.gst_number) {
-    addressAndContact = `<p style="font-size: 11px; color: #6b7280; line-height: 1.5; margin: 0;">
-      ${restaurant.address ? `${escapeHtml(restaurant.address)}<br />` : ''}
-      ${restaurant.phone ? `Tel: ${escapeHtml(restaurant.phone)}<br />` : ''}
-      ${restaurant.gst_number ? `GSTIN: <span style="font-weight: 700;">${escapeHtml(restaurant.gst_number)}</span>` : ''}
+    addressAndContact = `<p style="font-size: 11px; color: #6b7280; line-height: 1.5; margin: 0; text-align: center;">
+      ${restaurant.address ? `<span>${escapeHtml(restaurant.address)}</span><br />` : ''}
+      ${restaurant.phone ? `<span style="margin-top: 2px; display: inline-block;">Tel: ${escapeHtml(restaurant.phone)}</span><br />` : ''}
+      ${restaurant.gst_number ? `<span style="margin-top: 2px; display: inline-block;">GSTIN: <strong style="font-weight: 800; color: #1f2937;">${escapeHtml(restaurant.gst_number)}</strong></span>` : ''}
     </p>`;
   }
 
   const itemsHtml = items.map((item) => `
-    <div style="display: grid; grid-template-columns: minmax(0, 1.8fr) 24px 50px 58px; gap: 6px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; box-sizing: border-box; align-items: center;">
-      <span style="font-size: 11px; font-weight: 600; color: #1a1a1a; overflow-wrap: break-word; word-break: break-word; line-height: 1.25;">
+    <div style="display: grid; grid-template-columns: minmax(0, 1.8fr) 26px 56px 64px; gap: 4px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; box-sizing: border-box; align-items: center;">
+      <span style="font-size: 11px; font-weight: 800; color: #111827; text-transform: uppercase; overflow-wrap: break-word; word-break: break-word; line-height: 1.25;">
         ${escapeHtml(item.product_name || (item as any).name || 'Item')}
       </span>
       <span style="font-size: 11px; font-weight: 500; color: #6b7280; text-align: center; white-space: nowrap;">
@@ -75,7 +81,7 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
       <span style="font-size: 11px; font-weight: 500; color: #6b7280; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;">
         ${formatPrice(item.price_at_purchase || 0)}
       </span>
-      <span style="font-size: 11px; font-weight: 700; color: #1a1a1a; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;">
+      <span style="font-size: 11px; font-weight: 800; color: #111827; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;">
         ${formatPrice((item.price_at_purchase || 0) * (item.quantity || 1))}
       </span>
     </div>
@@ -104,75 +110,84 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
     `;
   }
 
+  const customerDisplay = order.customer_name || 'Guest';
+  const tableDisplay = order.table_number || (order.ticket_number ? `#${ticketNum}` : '-');
+
   const content = `
-    <div class="bill-container" style="max-width: 380px; margin: 0 auto; padding: 28px 24px 20px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-      <div style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 20px;">
+    <div class="bill-container" style="max-width: 380px; margin: 0 auto; padding: 24px 20px 20px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+      <!-- Header: Logo, Name, Address, Tel, GSTIN -->
+      <div style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 16px;">
         ${logoOrInitial}
-        <h2 style="font-size: 18px; font-weight: 800; color: #1a1a1a; margin-bottom: 2px;">
+        <h2 style="font-size: 20px; font-weight: 900; color: #111827; margin: 0 0 4px 0; letter-spacing: -0.01em;">
           ${escapeHtml(restName)}
         </h2>
         ${addressAndContact}
       </div>
 
-      <hr style="border: none; border-top: 2px solid #e5e7eb; margin: 14px 0;" />
+      <!-- Solid Top Divider -->
+      <hr style="border: none; border-top: 1.5px solid #e5e7eb; margin: 14px 0;" />
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 4px;">
+      <!-- 2x2 Meta Grid -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 4px;">
         <div>
-          <p style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">Date & Time</p>
-          <p style="font-size: 12px; font-weight: 600; color: #374151; margin: 0;">${invoiceDate}</p>
+          <p style="font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">DATE &amp; TIME</p>
+          <p style="font-size: 12.5px; font-weight: 700; color: #1f2937; margin: 0;">${invoiceDate}</p>
         </div>
         <div>
-          <p style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">Order Type</p>
-          <p style="font-size: 12px; font-weight: 600; color: #374151; margin: 0;">${getOrderTypeLabel()}</p>
+          <p style="font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">ORDER TYPE</p>
+          <p style="font-size: 12.5px; font-weight: 700; color: #1f2937; margin: 0;">${getOrderTypeLabel()}</p>
         </div>
-        ${order.customer_name ? `
-          <div>
-            <p style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">Customer</p>
-            <p style="font-size: 12px; font-weight: 600; color: #374151; margin: 0;">${escapeHtml(order.customer_name)}</p>
-          </div>
-        ` : ''}
-        ${order.table_number ? `
-          <div>
-            <p style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">Table No.</p>
-            <p style="font-size: 12px; font-weight: 600; color: #374151; margin: 0;">${escapeHtml(order.table_number)}</p>
-          </div>
-        ` : (!order.table_number && order.ticket_number ? `
-          <div>
-            <p style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">Token</p>
-            <p style="font-size: 12px; font-weight: 600; color: #374151; margin: 0;">#${ticketNum}</p>
-          </div>
-        ` : '')}
+        <div>
+          <p style="font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">CUSTOMER</p>
+          <p style="font-size: 12.5px; font-weight: 700; color: #1f2937; margin: 0;">${escapeHtml(customerDisplay)}</p>
+        </div>
+        <div>
+          <p style="font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0;">TABLE NO.</p>
+          <p style="font-size: 12.5px; font-weight: 700; color: #1f2937; margin: 0;">${escapeHtml(tableDisplay)}</p>
+        </div>
       </div>
 
-      <hr style="border: none; border-top: 1px dashed #d1d5db; margin: 14px 0;" />
+      <!-- Dashed Mid Divider -->
+      <hr style="border: none; border-top: 1.5px dashed #d1d5db; margin: 14px 0;" />
 
+      <!-- Itemized Table -->
       <div>
-        <div style="display: grid; grid-template-columns: minmax(0, 1.8fr) 24px 50px 58px; gap: 6px; padding: 6px 0; border-bottom: 1px solid #e5e7eb; box-sizing: border-box;">
-          <span style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em;">Item</span>
-          <span style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; text-align: center; white-space: nowrap;">Qty</span>
-          <span style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; text-align: right; white-space: nowrap;">Price</span>
-          <span style="font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; text-align: right; white-space: nowrap;">Total</span>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.8fr) 26px 56px 64px; gap: 4px; padding: 4px 0 6px 0; border-bottom: 1px solid #e5e7eb; box-sizing: border-box;">
+          <span style="font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em;">ITEM</span>
+          <span style="font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; white-space: nowrap;">QTY</span>
+          <span style="font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; white-space: nowrap;">PRICE</span>
+          <span style="font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; white-space: nowrap;">TOTAL</span>
         </div>
         ${itemsHtml}
       </div>
 
-      <hr style="border: none; border-top: 1px dashed #d1d5db; margin: 12px 0;" />
+      <!-- Dashed Divider before Subtotal -->
+      <hr style="border: none; border-top: 1.5px dashed #d1d5db; margin: 12px 0;" />
 
+      <!-- Subtotal -->
       <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0;">
-        <span style="font-size: 13px; font-weight: 600; color: #374151;">Subtotal</span>
-        <span style="font-size: 13px; font-weight: 700; color: #374151; white-space: nowrap; font-variant-numeric: tabular-nums;">${formatPrice(subtotal)}</span>
+        <span style="font-size: 13.5px; font-weight: 700; color: #374151;">Subtotal</span>
+        <span style="font-size: 13.5px; font-weight: 800; color: #111827; white-space: nowrap; font-variant-numeric: tabular-nums;">${formatPrice(subtotal)}</span>
       </div>
 
       ${gstHtml}
 
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; margin-top: 4px; border-top: 2px solid ${pc};">
-        <span style="font-size: 15px; font-weight: 800; color: #1a1a1a;">Grand Total</span>
-        <span style="font-size: 17px; font-weight: 900; color: ${pc}; white-space: nowrap; font-variant-numeric: tabular-nums;">${formatPrice(order.total_price)}</span>
+      <!-- Solid Brand Color Line before Grand Total -->
+      <div style="height: 2px; background: ${pc}; margin: 8px 0 4px 0;"></div>
+
+      <!-- Grand Total -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0 4px 0;">
+        <span style="font-size: 15.5px; font-weight: 900; color: #111827;">Grand Total</span>
+        <span style="font-size: 18px; font-weight: 900; color: ${pc}; white-space: nowrap; font-variant-numeric: tabular-nums;">${formatPrice(order.total_price)}</span>
       </div>
 
-      <div style="text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px dashed #d1d5db;">
-        <p style="font-size: 13px; font-weight: 700; color: #374151; margin: 0 0 4px 0;">Thank you for your visit!</p>
-        <p style="font-size: 11px; color: #9ca3af; line-height: 1.6; margin: 0;">
+      <!-- Dashed Divider before Footer -->
+      <hr style="border: none; border-top: 1.5px dashed #d1d5db; margin: 18px 0 14px 0;" />
+
+      <!-- Footer Message -->
+      <div style="text-align: center; padding-top: 4px;">
+        <p style="font-size: 13.5px; font-weight: 800; color: #374151; margin: 0 0 4px 0;">Thank you for your visit!</p>
+        <p style="font-size: 11px; color: #9ca3af; line-height: 1.5; margin: 0;">
           We hope you enjoyed your meal.<br />
           Please visit us again!
         </p>
@@ -190,12 +205,13 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #1a1a1a; background: #fff; -webkit-font-smoothing: antialiased;
     }
-    .bill-container { max-width: 380px; margin: 0 auto; padding: 28px 24px 20px; }
+    .bill-container { max-width: 380px; margin: 0 auto; padding: 24px 20px 20px; }
     @page {
       margin: 0;
+      size: 80mm auto;
     }
     @media print {
       html, body {
@@ -206,9 +222,9 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
       }
       .bill-container {
         width: 100% !important;
-        max-width: 100% !important;
-        padding: 4mm 12mm 16mm 10mm !important;
-        margin: 0 !important;
+        max-width: 80mm !important;
+        padding: 4mm 6mm 10mm 6mm !important;
+        margin: 0 auto !important;
         box-shadow: none !important;
         border: none !important;
         box-sizing: border-box !important;
@@ -225,16 +241,22 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
 export function printBillTemplateDirectly(order: Order, restaurant?: BillRestaurantInfo): void {
   try {
     const html = generateBillTemplateHTML(order, restaurant);
-    const iframeId = `bill-print-direct-iframe-${Date.now()}`;
+    const iframeId = 'bill-print-direct-iframe';
     let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
-    if (iframe) iframe.remove();
+    if (iframe) {
+      try { iframe.remove(); } catch {}
+    }
+
     iframe = document.createElement('iframe');
     iframe.id = iframeId;
+    // CRITICAL for Chromium: Non-zero size with opacity: 0 ensures layout engine paginates properly
     iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
+    iframe.style.top = '0';
+    iframe.style.left = '0';
+    iframe.style.width = '80mm';
+    iframe.style.height = '100vh';
+    iframe.style.opacity = '0.01';
+    iframe.style.pointerEvents = 'none';
     iframe.style.border = 'none';
     iframe.style.zIndex = '-9999';
     document.body.appendChild(iframe);
@@ -252,16 +274,27 @@ export function printBillTemplateDirectly(order: Order, restaurant?: BillRestaur
       try {
         iframe?.contentWindow?.focus();
         iframe?.contentWindow?.print();
-        setTimeout(() => { try { iframe?.remove(); } catch {} }, 60000);
       } catch (err) {
         console.error('Direct bill print error:', err);
+      } finally {
+        setTimeout(() => {
+          try { iframe?.remove(); } catch {}
+        }, 60000);
       }
     };
 
+    // If an image is in the iframe, wait for it to load before triggering print
+    const img = iframe.contentWindow?.document?.querySelector('img');
+    if (img && !img.complete) {
+      img.onload = () => setTimeout(triggerPrint, 80);
+      img.onerror = () => setTimeout(triggerPrint, 80);
+    }
+
     iframe.onload = () => {
-      setTimeout(triggerPrint, 250);
+      setTimeout(triggerPrint, 150);
     };
-    setTimeout(triggerPrint, 500);
+
+    setTimeout(triggerPrint, 350);
   } catch (err) {
     console.error('printBillTemplateDirectly error:', err);
     throw err;

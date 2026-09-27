@@ -255,113 +255,37 @@ export function OrderDetailsView({
     if (isPrintingBill) return;
     setIsPrintingBill(true);
 
-    const isAutoPrint = typeof window !== 'undefined'
-      ? (localStorage.getItem('qdine_auto_print_bill') !== null
-          ? localStorage.getItem('qdine_auto_print_bill') === 'true'
-          : localStorage.getItem('qdine_auto_print_kot') !== 'false')
-      : true;
-
     const savedPrinter = typeof window !== 'undefined'
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
 
-    const restaurantInfo = restaurant || {
-      name: (order as any).restaurant_name || 'Restaurant',
-      logo_url: undefined,
-      address: undefined,
-      phone: undefined,
-      primary_color: '#059669',
-      gst_number: undefined,
-    };
+    const toastId = toast.loading(`🖨️ Printing Bill #${String(order.ticket_number).padStart(3, '0')} to ${savedPrinter}...`);
 
-    // If Auto-Print is enabled in settings: automatically print silently without showing default print settings dialog
-    if (isAutoPrint) {
-      const toastId = toast.loading(`🖨️ Auto-printing bill to ${savedPrinter}...`);
-      try {
-        const res = await fetch('/api/print/bill', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-restaurant-slug': slug,
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            printerName: savedPrinter,
-            orderData: order,
-            slug,
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Failed to auto-print bill');
-        }
-
-        // 1. Direct Windows server printing (Instant 1-click silent print)
-        if (data.mode === 'server') {
-          toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
-          return;
-        }
-
-        // 2. Cloud print agent active on cashier PC
-        if (data.mode === 'agent') {
-          toast.success(data.message || `Bill sent to Cashier ${savedPrinter}!`, { id: toastId });
-          return;
-        }
-
-        // 3. Check for local print bridge on Windows (Port 9123)
-        const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : null;
-        if (data.base64Bytes) {
-          try {
-            const bridgeUrl = savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : 'http://127.0.0.1:9123/print';
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 1000);
-            const bRes = await fetch(bridgeUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                printerName: savedPrinter,
-                base64Bytes: data.base64Bytes,
-                docName: `Bill #${order.ticket_number}`,
-              }),
-              signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
-            if (bRes.ok) {
-              const bData = await bRes.json();
-              if (bData.success) {
-                toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
-                return;
-              }
-            }
-          } catch {}
-        }
-
-        // 4. Client fallback: silent thermal iframe
-        printBillTemplateDirectly(order, restaurantInfo);
-        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, { id: toastId });
-      } catch (err: any) {
-        console.error('Auto-print bill error:', err);
-        try {
-          printBillTemplateDirectly(order, restaurantInfo);
-          toast.success('Bill print initiated!', { id: toastId });
-        } catch {
-          toast.error(err.message || 'Failed to print bill', { id: toastId });
-        }
-      } finally {
-        setIsPrintingBill(false);
-      }
-      return;
-    }
-
-    // Auto-Print is disabled in settings: open default browser print settings/dialog
-    const toastId = toast.loading('🖨️ Preparing bill...');
     try {
-      printBillTemplateDirectly(order, restaurantInfo);
-      toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, { id: toastId });
+      // Send print job directly to POS-80C thermal printer (1-click instant silent print)
+      const res = await fetch('/api/print/bill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': slug,
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          printerName: savedPrinter,
+          orderData: order,
+          slug,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to print bill');
+      }
+
+      toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
     } catch (err: any) {
       console.error('Bill print error:', err);
-      toast.error('Failed to print bill', { id: toastId });
+      toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
     } finally {
       setIsPrintingBill(false);
     }

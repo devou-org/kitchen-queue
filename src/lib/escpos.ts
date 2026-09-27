@@ -217,6 +217,7 @@ export interface BillPrintData {
 
 /**
  * Format and build raw ESC/POS byte buffer for a Customer Bill / Invoice
+ * Formatted to match the clean, modern BillTemplate on 80mm thermal printers.
  */
 export function buildBillEscposBuffer(data: BillPrintData): Buffer {
   const parts: Buffer[] = [];
@@ -252,28 +253,12 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
     addLine(`GSTIN: ${data.gstNumber.trim()}`);
   }
 
-  addLine('==========================================');
-  addRaw(ESCPOS.BOLD_ON);
-  addLine('TAX INVOICE');
-  addRaw(ESCPOS.BOLD_OFF);
   addLine('------------------------------------------');
 
-  // 3. Order Metadata (Left-aligned)
+  // 3. 2x2 Order Metadata Grid (Matching BillTemplate)
   addRaw(ESCPOS.ALIGN_LEFT);
-  const ticketPadded = `#${String(data.ticketNumber).padStart(3, '0')}`;
-  const orderType = (data.orderType || (data.tableNumber ? 'DINE_IN' : 'TAKEAWAY')).replace('_', '-').toUpperCase();
-
-  addRaw(ESCPOS.BOLD_ON);
-  addLine(padTwoCols(`TOKEN: ${ticketPadded}`, `TYPE: ${orderType}`));
-  addRaw(ESCPOS.BOLD_OFF);
-
-  if (data.tableNumber) {
-    const rawTable = String(data.tableNumber).trim();
-    const tableDisplay = rawTable.toLowerCase().startsWith('table') ? rawTable : `Table ${rawTable}`;
-    addRaw(ESCPOS.BOLD_ON);
-    addLine(`TABLE: ${tableDisplay}`);
-    addRaw(ESCPOS.BOLD_OFF);
-  }
+  const orderType = (data.orderType || (data.tableNumber ? 'Dine-in' : 'Takeaway')).replace('_', '-');
+  const orderTypeDisplay = orderType.charAt(0).toUpperCase() + orderType.slice(1);
 
   const now = data.createdAt ? new Date(data.createdAt) : new Date();
   const dateStr = now.toLocaleDateString('en-IN', {
@@ -286,96 +271,106 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
     minute: '2-digit',
     hour12: true,
   });
-  addLine(padTwoCols(`DATE: ${dateStr}`, timeStr));
+  const dateTimeStr = `${dateStr}, ${timeStr}`;
 
-  if (data.customerName && data.customerName !== 'Guest') {
-    addLine(`CUSTOMER: ${data.customerName}`);
-  }
-  if (data.customerPhone) {
-    addLine(`PHONE: ${data.customerPhone}`);
-  }
+  addRaw(ESCPOS.BOLD_ON);
+  addLine(padTwoCols('DATE & TIME', 'ORDER TYPE'));
+  addRaw(ESCPOS.BOLD_OFF);
+  addLine(padTwoCols(dateTimeStr, orderTypeDisplay));
+  addLine('');
+
+  const custDisplay = data.customerName || 'Guest';
+  const tableDisplay = data.tableNumber
+    ? (String(data.tableNumber).toLowerCase().startsWith('table') ? String(data.tableNumber) : String(data.tableNumber))
+    : (data.ticketNumber ? `#${String(data.ticketNumber).padStart(3, '0')}` : '-');
+
+  addRaw(ESCPOS.BOLD_ON);
+  addLine(padTwoCols('CUSTOMER', 'TABLE NO.'));
+  addRaw(ESCPOS.BOLD_OFF);
+  addLine(padTwoCols(custDisplay, tableDisplay));
+
   if (data.staffName) {
-    addLine(`SERVER: ${data.staffName}`);
+    addLine(padTwoCols('SERVER', data.staffName));
   }
 
-  // 4. Items Table
+  // 4. Itemized Table (Matching ITEM | QTY | PRICE | TOTAL)
   addLine('------------------------------------------');
   addRaw(ESCPOS.BOLD_ON);
-  addLine(padTwoCols('ITEM (QTY x PRICE)', 'AMOUNT'));
+  addLine('ITEM                    QTY   PRICE   TOTAL');
   addRaw(ESCPOS.BOLD_OFF);
   addLine('------------------------------------------');
 
   let calcSubtotal = 0;
   for (const item of data.items) {
-    const name = (item.product_name || item.name || 'Item').trim();
+    const name = (item.product_name || item.name || 'Item').trim().toUpperCase();
     const qty = Number(item.quantity) || 1;
     const price = Number(item.price_at_purchase ?? item.price ?? 0);
     const itemTotal = qty * price;
     calcSubtotal += itemTotal;
 
-    // Line 1: Item Name
+    const maxNameLen = 22;
+    const qtyStr = String(qty).padStart(4, ' ');
+    const priceStr = price.toFixed(2).padStart(7, ' ');
+    const totalStr = itemTotal.toFixed(2).padStart(8, ' ');
+
     addRaw(ESCPOS.BOLD_ON);
-    addLine(name);
+    if (name.length <= maxNameLen) {
+      addLine(name.padEnd(23, ' ') + qtyStr + priceStr + totalStr);
+    } else {
+      addLine(name.slice(0, maxNameLen).padEnd(23, ' ') + qtyStr + priceStr + totalStr);
+      addLine('  ' + name.slice(maxNameLen).trim());
+    }
     addRaw(ESCPOS.BOLD_OFF);
 
-    // Line 2: Qty x Unit Price on left, Item Total on right
-    const qtyPrice = `  ${qty} x ${formatAmt(price)}`;
-    const totStr = formatAmt(itemTotal);
-    addLine(padTwoCols(qtyPrice, totStr));
-
     if (item.notes) {
-      addLine(`    * Note: ${item.notes.trim()}`);
+      addLine(`  * Note: ${item.notes.trim()}`);
     }
   }
 
-  // 5. Totals & Tax
+  // 5. Totals & Tax Breakdown
   addLine('------------------------------------------');
   const subtotal = data.subtotal !== undefined ? Number(data.subtotal) : calcSubtotal;
-  addLine(padTwoCols('Subtotal:', formatAmt(subtotal)));
+  addLine(padTwoCols('Subtotal', `Rs.${subtotal.toFixed(2)}`));
 
   if (data.gstType === 'REGULAR' && (data.gstRate || data.gstAmount)) {
     const rate = Number(data.gstRate) || 0;
     const amount = Number(data.gstAmount) || 0;
     const halfRate = rate / 2;
     const halfAmount = Math.round((amount / 2) * 100) / 100;
-    addLine(padTwoCols(`CGST (${halfRate}%):`, formatAmt(halfAmount)));
-    addLine(padTwoCols(`SGST (${halfRate}%):`, formatAmt(halfAmount)));
-    addLine(padTwoCols(`Total GST (${rate}%):`, formatAmt(amount)));
+    addLine(padTwoCols(`CGST ${halfRate}%`, `Rs.${halfAmount.toFixed(2)}`));
+    addLine(padTwoCols(`SGST ${halfRate}%`, `Rs.${halfAmount.toFixed(2)}`));
+    addLine(padTwoCols(`Total GST ${rate}%`, `Rs.${amount.toFixed(2)}`));
   }
 
   if (data.discountAmount && Number(data.discountAmount) > 0) {
-    addLine(padTwoCols('Discount:', `-${formatAmt(data.discountAmount)}`));
+    addLine(padTwoCols('Discount', `-Rs.${Number(data.discountAmount).toFixed(2)}`));
   }
 
   // 6. Grand Total (Double Height + Bold)
   addLine('==========================================');
   addRaw(ESCPOS.BOLD_ON);
   addRaw(ESCPOS.TEXT_DOUBLE_HEIGHT);
-  addLine(padTwoCols('GRAND TOTAL:', formatAmt(data.totalPrice)));
+  addLine(padTwoCols('Grand Total', `Rs.${Number(data.totalPrice).toFixed(2)}`));
   addRaw(ESCPOS.TEXT_NORMAL);
   addRaw(ESCPOS.BOLD_OFF);
   addLine('==========================================');
 
-  // 7. Payment Info
-  if (data.paymentMethod || data.isPaid !== undefined) {
-    const method = (data.paymentMethod || 'CASH').toUpperCase();
-    const status = data.isPaid ? 'PAID' : 'PENDING';
-    addLine(padTwoCols(`Payment: ${method}`, `Status: ${status}`));
-  }
-
   if (data.notes && data.notes.trim()) {
+    addLine(`Note: "${data.notes.trim()}"`);
     addLine('------------------------------------------');
-    addLine(`Note: ${data.notes.trim()}`);
   }
 
-  // 8. Footer (Centered)
-  addLine('==========================================');
+  // 7. Footer Message (Centered, Matching Template)
   addRaw(ESCPOS.ALIGN_CENTER);
-  addLine('Thank you for dining with us!');
+  addLine('');
+  addRaw(ESCPOS.BOLD_ON);
+  addLine('Thank you for your visit!');
+  addRaw(ESCPOS.BOLD_OFF);
+  addLine('We hope you enjoyed your meal.');
   addLine('Please visit us again!');
   addLine('');
 
-  // 9. Cut and feed
+  // 8. Cut & Feed Lines
   addRaw(ESCPOS.FEED_LINES(4));
   addRaw(ESCPOS.PAPER_CUT_FULL);
 
