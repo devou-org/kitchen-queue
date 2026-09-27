@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql, { getRestaurantBySlug, getOrderById } from '@/lib/db';
+import sql, {
+  getRestaurantBySlug,
+  getOrderById,
+  createPrintJob,
+  getAgentHeartbeat,
+} from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { generateBillReceiptHtml } from '@/lib/thermal-receipt-html';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import { spawn } from 'child_process';
+import {
+  buildBillEscposBuffer,
+  sendRawPrintToWindowsPrinter,
+  BillPrintData,
+} from '@/lib/escpos';
+import { generateBillTemplateHTML } from '@/lib/bill-template-html';
 
 async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
   const admin = await requireAdmin(request);
@@ -21,22 +27,6 @@ async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
 
   if (slug) {
     return await getRestaurantBySlug(slug);
-  }
-  return null;
-}
-
-function findBrowserExecutable(): string | null {
-  const candidates = [
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-    path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-  ];
-
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
   }
   return null;
 }
@@ -66,97 +56,109 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const allItems = (order.items || []).filter((i: any) => (i.quantity || 0) > 0);
+    if (allItems.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No items in this order to print bill' },
+        { status: 400 }
+      );
+    }
+
     const targetPrinter = printerName?.trim() || process.env.KOT_PRINTER_NAME || 'POS-80C';
     const isWindows = process.platform === 'win32';
 
-    const billHtml = generateBillReceiptHtml({
-      restaurantName: restaurant.name || (order as any).restaurant_name || undefined,
-      logoUrl: restaurant.logo_url || undefined,
+    const restaurantInfo = {
+      name: restaurant.name || (order as any).restaurant_name || 'Restaurant',
+      logo_url: restaurant.logo_url || undefined,
       address: restaurant.address || undefined,
       phone: restaurant.phone || undefined,
-      gstNumber: restaurant.gst_number || undefined,
-      primaryColor: restaurant.primary_color || '#16a34a',
+      gst_number: restaurant.gst_number || undefined,
+      primary_color: restaurant.primary_color || '#059669',
+    };
+
+    const billData: BillPrintData = {
+      restaurantName: restaurantInfo.name,
+      address: restaurantInfo.address,
+      phone: restaurantInfo.phone,
+      gstNumber: restaurantInfo.gst_number,
       ticketNumber: order.ticket_number,
-      orderType: order.order_type || 'DINE_IN',
-      tableNumber: order.table_number || undefined,
-      customerName: order.customer_name || undefined,
-      customerPhone: order.phone || undefined,
-      staffName: order.staff_name || undefined,
+      orderType: order.order_type,
+      tableNumber: order.table_number,
+      customerName: order.customer_name,
+      customerPhone: order.phone,
+      staffName: order.staff_name,
       createdAt: order.created_at,
-      items: (order.items || []).map((i: any) => ({
-        name: i.product_name || i.name,
-        product_name: i.product_name,
-        quantity: i.quantity,
-        price_at_purchase: i.price_at_purchase,
-        notes: i.notes,
-      })),
+      items: allItems,
       subtotal: order.subtotal,
-      gstAmount: order.gst_amount,
-      gstRate: order.gst_rate,
-      gstType: order.gst_type,
+      gstType: (order as any).gst_type,
+      gstRate: (order as any).gst_rate,
+      gstAmount: (order as any).gst_amount,
       totalPrice: order.total_price,
-      paymentMethod: order.payment_method || undefined,
-      notes: order.notes || undefined,
-    });
+      paymentMethod: order.payment_method,
+      isPaid: order.is_paid,
+      notes: order.notes,
+    };
 
-    // 1. If Windows host: Print directly to Windows printer via headless Edge/Chrome (zero popups!)
+    // Build raw ESC/POS binary buffer
+    const buffer = buildBillEscposBuffer(billData);
+    const base64Bytes = buffer.toString('base64');
+
+    // Also generate HTML representation for client preview/dialog
+    const billHtml = generateBillTemplateHTML(order, restaurantInfo);
+
+    // 1. Direct hardware print on Windows (Local dev / Cashier PC) — exactly like KOT!
     if (isWindows) {
-      const browserPath = findBrowserExecutable();
-      if (browserPath) {
-        const tempPath = path.join(os.tmpdir(), `bill-${Date.now()}-${order.ticket_number || '0'}.html`);
-        fs.writeFileSync(tempPath, billHtml, 'utf8');
+      const printResult = await sendRawPrintToWindowsPrinter(
+        targetPrinter,
+        buffer,
+        `Bill #${order.ticket_number}`
+      );
 
-        try {
-          await new Promise<void>((resolve, reject) => {
-            const child = spawn(
-              browserPath,
-              [
-                '--headless=old',
-                '--disable-gpu',
-                `--print-to-printer=${targetPrinter}`,
-                tempPath,
-              ],
-              { windowsHide: true }
-            );
-
-            const timer = setTimeout(() => {
-              try { child.kill(); } catch {}
-              resolve(); // Don't block forever if it takes long
-            }, 6000);
-
-            child.on('close', () => {
-              clearTimeout(timer);
-              resolve();
-            });
-
-            child.on('error', (err) => {
-              clearTimeout(timer);
-              reject(err);
-            });
-          });
-
-          // Clean up temp file
-          try { fs.unlinkSync(tempPath); } catch {}
-
-          return NextResponse.json({
-            success: true,
-            mode: 'server',
-            message: `Bill printed directly to ${targetPrinter}!`,
-            printer: targetPrinter,
-          });
-        } catch (printErr: any) {
-          console.warn('Server headless print failed, falling back to browser:', printErr.message);
-          try { fs.unlinkSync(tempPath); } catch {}
-        }
+      if (printResult.success) {
+        return NextResponse.json({
+          success: true,
+          mode: 'server',
+          message: `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${targetPrinter}!`,
+          printer: targetPrinter,
+          base64Bytes,
+          billHtml,
+        });
       }
+      console.warn(`[Windows] Direct raw bill print to "${targetPrinter}" failed:`, printResult.error);
     }
 
-    // 2. Client fallback (e.g. Cloud deployment or fallback)
+    // 2. Queue for Cloud Print Agent on Cashier PC
+    await createPrintJob(restaurant.id, {
+      order_id: order.id,
+      ticket_number: Number(order.ticket_number) || undefined,
+      counter_name: 'BILL',
+      printer_name: targetPrinter,
+      raw_base64: base64Bytes,
+    });
+
+    const agentHeartbeat = await getAgentHeartbeat(restaurant.id);
+    const isAgentOnline = Boolean(agentHeartbeat?.is_online);
+
+    if (isAgentOnline) {
+      return NextResponse.json({
+        success: true,
+        mode: 'agent',
+        message: `Bill #${String(order.ticket_number).padStart(3, '0')} sent to Cashier ${targetPrinter}!`,
+        printer: targetPrinter,
+        base64Bytes,
+        billHtml,
+      });
+    }
+
+    // 3. Fallback to client browser / local bridge
     return NextResponse.json({
       success: true,
       mode: 'client',
-      billHtml,
+      message: `Bill ready for ${targetPrinter}`,
       printer: targetPrinter,
+      base64Bytes,
+      billData,
+      billHtml,
     });
   } catch (error: any) {
     console.error('Bill print API error:', error);
@@ -166,4 +168,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

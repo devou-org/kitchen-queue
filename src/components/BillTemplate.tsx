@@ -12,32 +12,20 @@ import toast from 'react-hot-toast';
 // this component for a consistent layout.
 // ============================================
 
-export interface BillRestaurantInfo {
-  name: string;
-  logo_url?: string;
-  address?: string;
-  phone?: string;
-  gst_number?: string;
-  primary_color?: string;
-}
+import {
+  BillRestaurantInfo,
+  formatInvoiceDate,
+  generateBillTemplateHTML,
+  printBillTemplateDirectly,
+} from '@/lib/bill-template-html';
+
+export type { BillRestaurantInfo };
+export { formatInvoiceDate, generateBillTemplateHTML, printBillTemplateDirectly };
 
 export interface BillProps {
   order: Order;
   restaurant: BillRestaurantInfo;
   onClose?: () => void;
-}
-
-
-function formatInvoiceDate(dateStr: string): string {
-  return new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'Asia/Kolkata',
-  }).format(new Date(dateStr));
 }
 
 export default function BillTemplate({ order, restaurant, onClose }: BillProps) {
