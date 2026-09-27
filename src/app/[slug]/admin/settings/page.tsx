@@ -119,8 +119,9 @@ export default function AdminSettings() {
     setAutoPrintKot(nextVal);
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_auto_print_kot', String(nextVal));
+      localStorage.setItem('qdine_auto_print_bill', String(nextVal));
     }
-    toast.success(nextVal ? '🖨️ Auto-Print KOT: Enabled' : '⏸️ Auto-Print KOT: Paused');
+    toast.success(nextVal ? '🖨️ Auto-Print (KOT & Bill): Enabled' : '⏸️ Auto-Print: Paused');
   };
 
   const toggleSection = (key: string) => {
@@ -876,10 +877,10 @@ export default function AdminSettings() {
                 >
                   <div style={{ minWidth: 0, flex: 1, paddingRight: '12px' }}>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
-                      Kitchen Order Ticket (KOT) Auto-Print
+                      Auto-Print (KOT & Customer Bills)
                     </div>
                     <p style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0', lineHeight: 1.4 }}>
-                      Automatically trigger receipt printing when customers place QR orders or staff submit POS tickets.
+                      Automatically trigger receipt printing for kitchen order tickets and customer bills without showing browser print dialogs.
                     </p>
                   </div>
 

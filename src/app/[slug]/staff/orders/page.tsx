@@ -63,8 +63,9 @@ export default function StaffOrders() {
     setAutoPrintKot(nextVal);
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_auto_print_kot', String(nextVal));
+      localStorage.setItem('qdine_auto_print_bill', String(nextVal));
     }
-    toast.success(nextVal ? '🖨️ Auto-Print KOT: Enabled' : '⏸️ Auto-Print KOT: Paused');
+    toast.success(nextVal ? '🖨️ Auto-Print: Enabled' : '⏸️ Auto-Print: Paused');
   };
 
   const fetchTables = useCallback(() => {

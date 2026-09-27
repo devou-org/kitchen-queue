@@ -177,6 +177,206 @@ export function buildKotEscposBuffer(data: KotPrintData): Buffer {
   return Buffer.concat(parts);
 }
 
+function formatAmt(n: number | string | undefined | null): string {
+  const num = Number(n) || 0;
+  return `Rs.${num.toFixed(2)}`;
+}
+
+export interface BillPrintItem {
+  name?: string;
+  product_name?: string;
+  quantity: number;
+  price?: number;
+  price_at_purchase?: number;
+  notes?: string;
+}
+
+export interface BillPrintData {
+  restaurantName?: string;
+  address?: string;
+  phone?: string;
+  gstNumber?: string;
+  ticketNumber: number | string;
+  orderType?: string;
+  tableNumber?: string;
+  customerName?: string;
+  customerPhone?: string;
+  staffName?: string;
+  createdAt?: string | Date;
+  items: BillPrintItem[];
+  subtotal?: number;
+  gstType?: string;
+  gstRate?: number;
+  gstAmount?: number;
+  discountAmount?: number;
+  totalPrice: number;
+  paymentMethod?: string;
+  isPaid?: boolean;
+  notes?: string;
+}
+
+/**
+ * Format and build raw ESC/POS byte buffer for a Customer Bill / Invoice
+ * Formatted to match the clean, modern BillTemplate on 80mm thermal printers.
+ */
+export function buildBillEscposBuffer(data: BillPrintData): Buffer {
+  const parts: Buffer[] = [];
+
+  const addRaw = (b: Buffer) => parts.push(b);
+  const addText = (text: string) => parts.push(Buffer.from(text, 'utf-8'));
+  const addLine = (text: string) => addText(text + '\n');
+
+  // 1. Initialize printer
+  addRaw(ESCPOS.INIT);
+
+  // 2. Restaurant Header (Centered)
+  addRaw(ESCPOS.ALIGN_CENTER);
+  addRaw(ESCPOS.BOLD_ON);
+  addRaw(ESCPOS.TEXT_DOUBLE_SIZE);
+  addLine(data.restaurantName || 'QDINE');
+  addRaw(ESCPOS.TEXT_NORMAL);
+  addRaw(ESCPOS.BOLD_OFF);
+
+  if (data.address) {
+    const addrParts = data.address.split(/[\r\n]+/);
+    for (const part of addrParts) {
+      const trimmed = part.trim();
+      if (trimmed) addLine(trimmed);
+    }
+  }
+
+  if (data.phone) {
+    addLine(`Tel: ${data.phone.trim()}`);
+  }
+
+  if (data.gstNumber) {
+    addLine(`GSTIN: ${data.gstNumber.trim()}`);
+  }
+
+  addLine('------------------------------------------');
+
+  // 3. 2x2 Order Metadata Grid (Matching BillTemplate)
+  addRaw(ESCPOS.ALIGN_LEFT);
+  const orderType = (data.orderType || (data.tableNumber ? 'Dine-in' : 'Takeaway')).replace('_', '-');
+  const orderTypeDisplay = orderType.charAt(0).toUpperCase() + orderType.slice(1);
+
+  const now = data.createdAt ? new Date(data.createdAt) : new Date();
+  const dateStr = now.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+  const timeStr = now.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const dateTimeStr = `${dateStr}, ${timeStr}`;
+
+  addRaw(ESCPOS.BOLD_ON);
+  addLine(padTwoCols('DATE & TIME', 'ORDER TYPE'));
+  addRaw(ESCPOS.BOLD_OFF);
+  addLine(padTwoCols(dateTimeStr, orderTypeDisplay));
+  addLine('');
+
+  const custDisplay = data.customerName || 'Guest';
+  const tableDisplay = data.tableNumber
+    ? (String(data.tableNumber).toLowerCase().startsWith('table') ? String(data.tableNumber) : String(data.tableNumber))
+    : (data.ticketNumber ? `#${String(data.ticketNumber).padStart(3, '0')}` : '-');
+
+  addRaw(ESCPOS.BOLD_ON);
+  addLine(padTwoCols('CUSTOMER', 'TABLE NO.'));
+  addRaw(ESCPOS.BOLD_OFF);
+  addLine(padTwoCols(custDisplay, tableDisplay));
+
+  if (data.staffName) {
+    addLine(padTwoCols('SERVER', data.staffName));
+  }
+
+  // 4. Itemized Table (Matching ITEM | QTY | PRICE | TOTAL)
+  addLine('------------------------------------------');
+  addRaw(ESCPOS.BOLD_ON);
+  addLine('ITEM                    QTY   PRICE   TOTAL');
+  addRaw(ESCPOS.BOLD_OFF);
+  addLine('------------------------------------------');
+
+  let calcSubtotal = 0;
+  for (const item of data.items) {
+    const name = (item.product_name || item.name || 'Item').trim().toUpperCase();
+    const qty = Number(item.quantity) || 1;
+    const price = Number(item.price_at_purchase ?? item.price ?? 0);
+    const itemTotal = qty * price;
+    calcSubtotal += itemTotal;
+
+    const maxNameLen = 22;
+    const qtyStr = String(qty).padStart(4, ' ');
+    const priceStr = price.toFixed(2).padStart(7, ' ');
+    const totalStr = itemTotal.toFixed(2).padStart(8, ' ');
+
+    addRaw(ESCPOS.BOLD_ON);
+    if (name.length <= maxNameLen) {
+      addLine(name.padEnd(23, ' ') + qtyStr + priceStr + totalStr);
+    } else {
+      addLine(name.slice(0, maxNameLen).padEnd(23, ' ') + qtyStr + priceStr + totalStr);
+      addLine('  ' + name.slice(maxNameLen).trim());
+    }
+    addRaw(ESCPOS.BOLD_OFF);
+
+    if (item.notes) {
+      addLine(`  * Note: ${item.notes.trim()}`);
+    }
+  }
+
+  // 5. Totals & Tax Breakdown
+  addLine('------------------------------------------');
+  const subtotal = data.subtotal !== undefined ? Number(data.subtotal) : calcSubtotal;
+  addLine(padTwoCols('Subtotal', `Rs.${subtotal.toFixed(2)}`));
+
+  if (data.gstType === 'REGULAR' && (data.gstRate || data.gstAmount)) {
+    const rate = Number(data.gstRate) || 0;
+    const amount = Number(data.gstAmount) || 0;
+    const halfRate = rate / 2;
+    const halfAmount = Math.round((amount / 2) * 100) / 100;
+    addLine(padTwoCols(`CGST ${halfRate}%`, `Rs.${halfAmount.toFixed(2)}`));
+    addLine(padTwoCols(`SGST ${halfRate}%`, `Rs.${halfAmount.toFixed(2)}`));
+    addLine(padTwoCols(`Total GST ${rate}%`, `Rs.${amount.toFixed(2)}`));
+  }
+
+  if (data.discountAmount && Number(data.discountAmount) > 0) {
+    addLine(padTwoCols('Discount', `-Rs.${Number(data.discountAmount).toFixed(2)}`));
+  }
+
+  // 6. Grand Total (Double Height + Bold)
+  addLine('==========================================');
+  addRaw(ESCPOS.BOLD_ON);
+  addRaw(ESCPOS.TEXT_DOUBLE_HEIGHT);
+  addLine(padTwoCols('Grand Total', `Rs.${Number(data.totalPrice).toFixed(2)}`));
+  addRaw(ESCPOS.TEXT_NORMAL);
+  addRaw(ESCPOS.BOLD_OFF);
+  addLine('==========================================');
+
+  if (data.notes && data.notes.trim()) {
+    addLine(`Note: "${data.notes.trim()}"`);
+    addLine('------------------------------------------');
+  }
+
+  // 7. Footer Message (Centered, Matching Template)
+  addRaw(ESCPOS.ALIGN_CENTER);
+  addLine('');
+  addRaw(ESCPOS.BOLD_ON);
+  addLine('Thank you for your visit!');
+  addRaw(ESCPOS.BOLD_OFF);
+  addLine('We hope you enjoyed your meal.');
+  addLine('Please visit us again!');
+  addLine('');
+
+  // 8. Cut & Feed Lines
+  addRaw(ESCPOS.FEED_LINES(4));
+  addRaw(ESCPOS.PAPER_CUT_FULL);
+
+  return Buffer.concat(parts);
+}
+
 /**
  * Send raw ESC/POS bytes directly to Windows Thermal Printer via winspool.drv PowerShell script
  */

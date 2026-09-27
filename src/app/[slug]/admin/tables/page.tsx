@@ -9,6 +9,7 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
 import { TableCard } from '@/components/modules/tables/TableCard';
+import { TableOrdersDrawer } from '@/components/modules/tables/TableOrdersDrawer';
 import { CreateTableModal } from '@/components/modules/tables/CreateTableModal';
 import { EditTableModal } from '@/components/modules/tables/EditTableModal';
 import { TableQRModal } from '@/components/modules/tables/TableQRModal';
@@ -26,7 +27,8 @@ export default function AdminTablesPage() {
   const [filter, setFilter] = useState<'ALL' | 'AVAILABLE' | 'OCCUPIED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modals
+  // Modals & Drawers
+  const [selectedDrawerTable, setSelectedDrawerTable] = useState<RestaurantTable | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addingTable, setAddingTable] = useState(false);
   const [selectedEditTable, setSelectedEditTable] = useState<RestaurantTable | null>(null);
@@ -512,6 +514,7 @@ export default function AdminTablesPage() {
             <TableCard
               key={table.id}
               table={table}
+              onSelect={(t) => setSelectedDrawerTable(t)}
               onEdit={(t) => setSelectedEditTable(t)}
               onViewQR={(t) => setSelectedQRTable(t)}
               onDelete={(t) => setTableToDelete(t)}
@@ -521,6 +524,16 @@ export default function AdminTablesPage() {
         </div>
       )}
       </div>
+
+      {/* Slide-over Table Orders Drawer */}
+      <TableOrdersDrawer
+        table={selectedDrawerTable ? (tables.find(t => t.id === selectedDrawerTable.id) || selectedDrawerTable) : null}
+        slug={slugStr || ''}
+        isOpen={!!selectedDrawerTable}
+        onClose={() => setSelectedDrawerTable(null)}
+        onRefresh={fetchTables}
+        primaryColor={primaryColor}
+      />
 
       {/* Modals */}
       <CreateTableModal
