@@ -310,77 +310,117 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: isCollapsed ? 'center' : 'space-between',
-            padding: isCollapsed ? '0 8px' : '0 14px',
+            padding: isCollapsed ? '0 12px' : '0 14px',
             borderBottom: '1px solid var(--border)',
             overflow: 'hidden'
           }}
         >
-          <div 
-            onClick={isCollapsed ? toggleSidebarCollapse : undefined}
-            title={isCollapsed ? "Click to expand sidebar" : undefined}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '10px', 
-              minWidth: 0, 
-              overflow: 'hidden',
-              cursor: isCollapsed ? 'pointer' : 'default',
-              flex: isCollapsed ? 'none' : 1
-            }}
-          >
-            {restaurant?.logo_url ? (
-              <img 
-                src={restaurant.logo_url} 
-                alt={restaurant.name} 
-                style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} 
-              />
-            ) : (
-              <div style={{
-                width: '32px', height: '32px', borderRadius: '8px',
-                backgroundColor: restaurant?.primary_color || 'var(--primary)',
-                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 800, fontSize: '14px', flexShrink: 0
-              }}>
-                {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
+          {isCollapsed ? (
+            <button
+              type="button"
+              onClick={toggleSidebarCollapse}
+              title="Click to expand sidebar"
+              aria-label="Expand sidebar"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                transition: 'transform 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            >
+              {restaurant?.logo_url ? (
+                <img 
+                  src={restaurant.logo_url} 
+                  alt={restaurant.name} 
+                  style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', display: 'block' }} 
+                />
+              ) : (
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '8px',
+                  backgroundColor: restaurant?.primary_color || 'var(--primary)',
+                  color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: '15px'
+                }}>
+                  {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
+                </div>
+              )}
+            </button>
+          ) : (
+            <>
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px', 
+                  minWidth: 0, 
+                  overflow: 'hidden',
+                  flex: 1
+                }}
+              >
+                {restaurant?.logo_url ? (
+                  <img 
+                    src={restaurant.logo_url} 
+                    alt={restaurant.name} 
+                    style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} 
+                  />
+                ) : (
+                  <div style={{
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    backgroundColor: restaurant?.primary_color || 'var(--primary)',
+                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 800, fontSize: '14px', flexShrink: 0
+                  }}>
+                    {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
+                  </div>
+                )}
+                <div className="sidebar-brand-text">
+                  <h2 style={{ fontSize: '15px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0, color: 'var(--text-primary)' }}>
+                    {restaurant?.name || 'Renjz'} Admin
+                  </h2>
+                </div>
               </div>
-            )}
-            <div className="sidebar-brand-text">
-              <h2 style={{ fontSize: '15px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0, color: 'var(--text-primary)' }}>
-                {restaurant?.name || 'Renjz'} Admin
-              </h2>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={toggleSidebarCollapse}
-            title={isCollapsed ? "Expand sidebar" : "Diminish sidebar"}
-            aria-label={isCollapsed ? "Expand sidebar" : "Diminish sidebar"}
-            className="sidebar-diminish-toggle"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: '6px',
-              color: 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease',
-              flexShrink: 0,
-              marginLeft: isCollapsed ? '0' : '4px',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#F3F4F6';
-              e.currentTarget.style.color = 'var(--text-primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'none';
-              e.currentTarget.style.color = 'var(--text-secondary)';
-            }}
-          >
-            {isCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={17} />}
-          </button>
+              <button
+                type="button"
+                onClick={toggleSidebarCollapse}
+                title="Collapse sidebar"
+                aria-label="Collapse sidebar"
+                className="sidebar-diminish-toggle"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                  marginLeft: '4px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#F3F4F6';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'none';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }}
+              >
+                <PanelLeftClose size={17} />
+              </button>
+            </>
+          )}
         </div>
 
         <nav className="sidebar-nav">
@@ -406,126 +446,169 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="sidebar-footer-section">
-          {(showOrdering || showDigitalMenu) && (
-            <div style={{ display: isCollapsed ? 'none' : 'block' }}>
-              <ServiceToggle />
-            </div>
-          )}
-
+        <div className="sidebar-footer-section" style={{ borderTop: '1px solid var(--border)', padding: isCollapsed ? '12px 8px' : '12px 14px' }}>
           {currentUser ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: isCollapsed ? 'center' : 'space-between',
-              gap: isCollapsed ? '8px' : '10px',
-              padding: isCollapsed ? '6px 0' : '10px 12px',
-              borderRadius: '12px',
-              background: isCollapsed ? 'transparent' : '#F9FAFB',
-              border: isCollapsed ? 'none' : '1px solid var(--border)',
-              flexDirection: isCollapsed ? 'column' : 'row',
-              transition: 'all 0.25s ease',
-            }}>
-              {/* Initial Avatar */}
-              <div 
-                title={`${currentUser.name || 'User'} (${isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')})\n${currentUser.email}`}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: isSuperAdminOrOwner ? '#EEF2FF' : '#F3F4F6',
-                  color: isSuperAdminOrOwner ? '#4F46E5' : '#374151',
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  cursor: isCollapsed ? 'pointer' : 'default',
-                }}
-                onClick={isCollapsed ? toggleSidebarCollapse : undefined}
-              >
-                {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
-              </div>
-
-              {/* User Details */}
-              <div className="sidebar-user-details" style={{ display: isCollapsed ? 'none' : 'block' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{
-                    fontWeight: 600,
-                    fontSize: '12px',
-                    color: 'var(--text-primary)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}>
-                    {currentUser.name || 'Team Member'}
-                  </span>
-                  <span style={{
-                    padding: '1px 6px',
-                    borderRadius: '999px',
-                    fontSize: '9px',
-                    fontWeight: 600,
-                    background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
-                    color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
-                    whiteSpace: 'nowrap',
+            isCollapsed ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
+                <div 
+                  title={`${currentUser.name || 'User'} (${isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')})\n${currentUser.email}`}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: isSuperAdminOrOwner ? '#EEF2FF' : '#F1F5F9',
+                    color: isSuperAdminOrOwner ? '#4F46E5' : '#334155',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     flexShrink: 0,
-                    textTransform: 'capitalize',
-                  }}>
-                    {isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')}
-                  </span>
+                    cursor: 'default',
+                  }}
+                >
+                  {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
                 </div>
-                <div style={{
-                  fontSize: '11px',
-                  color: 'var(--text-secondary)',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  marginTop: '1px',
-                }}>
-                  {currentUser.email}
-                </div>
+                <button
+                  onClick={handleLogout}
+                  title="Log Out"
+                  aria-label="Log Out"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                    padding: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#EF4444';
+                    e.currentTarget.style.background = '#FEF2F2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <LogOut size={16} />
+                </button>
               </div>
+            ) : (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                padding: '2px 0',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1 }}>
+                  {/* Initial Avatar */}
+                  <div 
+                    title={`${currentUser.name || 'User'} (${isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')})\n${currentUser.email}`}
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '50%',
+                      background: isSuperAdminOrOwner ? '#EEF2FF' : '#F1F5F9',
+                      color: isSuperAdminOrOwner ? '#4F46E5' : '#334155',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
+                  </div>
 
-              {/* Small Logout Button */}
-              <button
-                onClick={handleLogout}
-                title="Log Out"
-                aria-label="Log Out"
-                style={{
-                  width: '30px',
-                  height: '30px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border)',
-                  background: '#FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  flexShrink: 0,
-                  transition: 'all 0.15s ease',
-                  padding: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#EF4444';
-                  e.currentTarget.style.borderColor = '#FCA5A5';
-                  e.currentTarget.style.background = '#FEF2F2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                  e.currentTarget.style.borderColor = 'var(--border)';
-                  e.currentTarget.style.background = '#FFFFFF';
-                }}
-              >
-                <LogOut size={15} />
-              </button>
-            </div>
+                  {/* User Details */}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{
+                        fontWeight: 700,
+                        fontSize: '12.5px',
+                        color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}>
+                        {currentUser.name || 'Team Member'}
+                      </span>
+                      <span style={{
+                        padding: '1px 5px',
+                        borderRadius: '999px',
+                        fontSize: '9.5px',
+                        fontWeight: 700,
+                        background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
+                        color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        textTransform: 'capitalize',
+                      }}>
+                        {isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontSize: '11px',
+                      color: 'var(--text-secondary)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      marginTop: '1px',
+                    }}>
+                      {currentUser.email}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clean Logout Button without Border */}
+                <button
+                  onClick={handleLogout}
+                  title="Log Out"
+                  aria-label="Log Out"
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease',
+                    padding: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#EF4444';
+                    e.currentTarget.style.background = '#FEF2F2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            )
           ) : (
             <button 
               className="sidebar-logout-btn" 
               onClick={handleLogout}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isCollapsed ? 0 : '8px', marginTop: 0 }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isCollapsed ? 0 : '8px', border: 'none', background: 'transparent' }}
               title="Log Out"
             >
               {!isCollapsed && <span>Log Out</span>}

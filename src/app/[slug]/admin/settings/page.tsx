@@ -5,11 +5,12 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode } from 'lucide-react';
+import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
+import { ServiceToggle } from '@/components/ServiceToggle';
 
 interface CollapsibleCardProps {
   id: string;
@@ -101,9 +102,18 @@ export default function AdminSettings() {
 
   // Auto-Print State (synced with orders and pos)
   const [autoPrintKot, setAutoPrintKot] = useState(true);
+  const [isServiceOnline, setIsServiceOnline] = useState(true);
 
-  // Collapsible Sections State
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const SECTION_KEYS = ['service_status', 'profile', 'menu', 'hours', 'autoprint', 'gst', 'preview', 'qrcode'];
+
+  // Collapsible Sections State (all collapsed by default)
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    SECTION_KEYS.forEach((k) => {
+      initial[k] = true;
+    });
+    return initial;
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -128,7 +138,6 @@ export default function AdminSettings() {
     setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const SECTION_KEYS = ['profile', 'menu', 'hours', 'autoprint', 'gst', 'preview', 'qrcode'];
   const allCollapsed = SECTION_KEYS.every((k) => !!collapsedSections[k]);
 
   const toggleAllSections = () => {
@@ -515,9 +524,49 @@ export default function AdminSettings() {
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: '24px 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px', alignItems: 'start' }}>
           
-          {/* Left Column: Profile, Menu, Hours */}
+          {/* Left Column: Service Status, Profile, Menu, Hours */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
+            {/* 0. Store Service Status Card */}
+            <CollapsibleCard
+              id="service_status"
+              title="Store Service Status"
+              icon={<Power size={18} style={{ color: primaryColor || 'var(--primary, #971345)' }} />}
+              badge={
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    backgroundColor: isServiceOnline ? '#ECFDF5' : '#FEF2F2',
+                    color: isServiceOnline ? '#047857' : '#DC2626',
+                    border: isServiceOnline ? '1px solid #A7F3D0' : '1px solid #FECACA',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: isServiceOnline ? (primaryColor || '#10B981') : '#EF4444',
+                    }}
+                  />
+                  {isServiceOnline ? 'SERVICE ONLINE' : 'SERVICE OFFLINE'}
+                </span>
+              }
+              isCollapsed={!!collapsedSections['service_status']}
+              onToggle={() => toggleSection('service_status')}
+            >
+              <p style={{ ...S.cardDesc, marginBottom: '16px' }}>
+                Manage online ordering availability, switch between Online/Offline modes, and set custom customer offline notices.
+              </p>
+              <ServiceToggle primaryColor={primaryColor} onStatusChange={(online) => setIsServiceOnline(online)} />
+            </CollapsibleCard>
+
             {/* 1. Profile & Contact Card */}
             <CollapsibleCard
               id="profile"
