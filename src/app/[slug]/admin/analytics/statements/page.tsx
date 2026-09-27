@@ -166,36 +166,89 @@ export default function AdminAnalyticsStatementsPage() {
     <>
       <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
         <style>{`
-          .analytics-page-header {
+          .analytics-page-header,
+          .analytics-page-header.admin-page-header-container {
             height: 68px !important;
             min-height: 68px !important;
             display: flex !important;
-            align-items: center !important;
+            align-items: stretch !important;
             margin: 0 !important;
-            padding: 0 20px !important;
+            padding: 0 20px 0 0 !important;
             border-bottom: 1px solid var(--border) !important;
             background: #FFFFFF !important;
             box-sizing: border-box !important;
+            position: relative !important;
           }
 
           .analytics-page-header .admin-page-header-container {
             height: 68px !important;
             min-height: 68px !important;
             display: flex !important;
-            align-items: center !important;
+            align-items: stretch !important;
             margin: 0 !important;
             padding: 0 !important;
             gap: 12px !important;
             width: 100% !important;
           }
 
+          .analytics-page-header .admin-header-left {
+            height: 68px !important;
+            display: flex !important;
+            align-items: stretch !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          .analytics-page-header .admin-header-search {
+            height: 68px !important;
+            display: flex !important;
+            align-items: stretch !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
           .analytics-toolbar {
             display: flex !important;
             flex-wrap: nowrap !important;
-            align-items: center !important;
-            gap: 8px !important;
+            align-items: stretch !important;
+            justify-content: space-between !important;
+            gap: 12px !important;
             width: 100% !important;
+            height: 68px !important;
             min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          .analytics-tabs-wrapper {
+            display: flex !important;
+            align-items: stretch !important;
+            height: 68px !important;
+            min-height: 68px !important;
+            padding-top: 10px !important;
+            padding-right: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 0 !important;
+            box-sizing: border-box !important;
+            flex-shrink: 0 !important;
+            margin: 0 !important;
+          }
+
+          .statements-filter-bar {
+            background: #FFFFFF;
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            width: 100%;
+            box-sizing: border-box;
           }
 
           .analytics-filters {
@@ -213,19 +266,33 @@ export default function AdminAnalyticsStatementsPage() {
             gap: 8px !important;
             margin-left: auto !important;
             flex-shrink: 0 !important;
+            height: 68px !important;
           }
 
-          @media (max-width: 768px) {
+          @media (max-width: 900px) {
             .analytics-page-header {
               height: auto !important;
               min-height: auto !important;
-              padding: 12px 16px !important;
+              padding: 8px 16px !important;
+            }
+
+            .analytics-page-header .admin-page-header-container,
+            .analytics-page-header .admin-header-left,
+            .analytics-page-header .admin-header-search {
+              height: auto !important;
             }
 
             .analytics-toolbar {
               flex-direction: column !important;
               align-items: stretch !important;
               gap: 10px !important;
+              height: auto !important;
+            }
+
+            .analytics-tabs-wrapper {
+              width: 100% !important;
+              border-bottom: 1px solid var(--border) !important;
+              padding-bottom: 2px !important;
             }
 
             .analytics-filters {
@@ -238,195 +305,81 @@ export default function AdminAnalyticsStatementsPage() {
               margin-left: 0 !important;
               justify-content: space-between !important;
               flex-wrap: wrap !important;
+              height: auto !important;
+            }
+
+            .statements-filter-bar {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 12px !important;
+              padding: 12px 16px !important;
+            }
+
+            .statements-filter-bar > div {
+              width: 100% !important;
+              max-width: 100% !important;
             }
           }
         `}</style>
         <AdminPageHeader
           className="analytics-page-header"
-          style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+          style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
           hideMaximize={true}
           search={
             <div className="analytics-toolbar">
-              {/* Search Bar - First on the left */}
-              <div style={{ position: 'relative', width: '220px', flex: '0 0 220px', minWidth: '140px', maxWidth: '260px', flexShrink: 0 }}>
-                <Search
-                  size={14}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#94A3B8',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Search ticket, customer..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    height: '38px',
-                    paddingLeft: '30px',
-                    paddingRight: searchQuery ? '26px' : '8px',
-                    fontSize: '12px',
-                    borderRadius: '8px',
-                    background: 'white',
-                    border: '1px solid var(--border)',
-                    width: '100%',
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                    outline: 'none',
-                    color: 'var(--text-primary)',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    style={{
-                      position: 'absolute',
-                      right: '6px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#94A3B8',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-
-              {/* Left Side: Statements Filters with separator */}
-              <div className="analytics-filters" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>From</span>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    max={dateTo}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    style={{
-                      height: '38px',
-                      width: '135px',
-                      padding: '0 8px',
-                      fontSize: '12px',
-                      borderRadius: '8px',
-                      background: 'white',
-                      border: '1px solid var(--border)',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                      outline: 'none',
-                      color: 'var(--text-primary)',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>To</span>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    min={dateFrom}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    style={{
-                      height: '38px',
-                      width: '135px',
-                      padding: '0 8px',
-                      fontSize: '12px',
-                      borderRadius: '8px',
-                      background: 'white',
-                      border: '1px solid var(--border)',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                      outline: 'none',
-                      color: 'var(--text-primary)',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                <div style={{ width: '135px', flexShrink: 0 }}>
-                  <CustomSelect
-                    value={statusFilter}
-                    onChange={(val) => setStatusFilter(val)}
-                    options={[
-                      { value: '', label: 'All Statuses' },
-                      ...allStatuses.map((s) => ({ value: s, label: s })),
-                    ]}
-                    buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px' }}
-                    style={{ width: '135px' }}
-                  />
-                </div>
-                <div style={{ width: '130px', flexShrink: 0 }}>
-                  <CustomSelect
-                    value={paymentMethodFilter}
-                    onChange={(val) => setPaymentMethodFilter(val)}
-                    options={[
-                      { value: '', label: 'All Methods' },
-                      { value: 'UPI', label: 'UPI' },
-                      { value: 'CASH', label: 'Cash' },
-                      { value: 'CARD', label: 'Card' },
-                    ]}
-                    buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px' }}
-                    style={{ width: '130px' }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={exportCSV}
-                  style={{
-                    height: '38px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#059669',
-                    background: 'rgba(5, 150, 105, 0.08)',
-                    border: '1px solid rgba(5, 150, 105, 0.25)',
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Download size={14} /> <span>Export (CSV)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExpireOldOrders}
-                  disabled={expiring}
-                  style={{
-                    height: '38px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#DC2626',
-                    background: 'rgba(220, 38, 38, 0.08)',
-                    border: '1px solid rgba(220, 38, 38, 0.25)',
-                    whiteSpace: 'nowrap',
-                    cursor: expiring ? 'not-allowed' : 'pointer',
-                    opacity: expiring ? 0.6 : 1,
-                    flexShrink: 0,
-                  }}
-                >
-                  <Clock size={14} /> <span>{expiring ? 'Expiring...' : 'Expire Old'}</span>
-                </button>
-              </div>
-
-              {/* Right Side: Sales & Statements tabs, and Maximize button */}
-              <div className="analytics-actions">
+              {/* 1. Left Side (Starting): Tabs */}
+              <div className="analytics-tabs-wrapper">
                 <AnalyticsNav inHeader={true} />
+              </div>
+
+              {/* 2. Right Side: Date Range Pickers & Maximize */}
+              <div className="analytics-actions">
+                <div className="analytics-filters">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>From</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      max={dateTo}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      style={{
+                        height: '38px',
+                        width: '130px',
+                        padding: '0 8px',
+                        fontSize: '12px',
+                        borderRadius: '8px',
+                        background: 'white',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                        outline: 'none',
+                        color: 'var(--text-primary)',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>To</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      style={{
+                        height: '38px',
+                        width: '130px',
+                        padding: '0 8px',
+                        fontSize: '12px',
+                        borderRadius: '8px',
+                        background: 'white',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                        outline: 'none',
+                        color: 'var(--text-primary)',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
 
                 {/* Left Border Separator */}
                 <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
@@ -436,6 +389,142 @@ export default function AdminAnalyticsStatementsPage() {
             </div>
           }
         />
+
+        {/* Secondary Header: Search Bar & Filters */}
+        <div className="statements-filter-bar">
+          {/* Search Bar */}
+          <div style={{ position: 'relative', width: '100%', maxWidth: '320px', minWidth: '220px' }}>
+            <Search
+              size={15}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#94A3B8',
+                pointerEvents: 'none',
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search ticket, customer, phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                height: '38px',
+                paddingLeft: '34px',
+                paddingRight: searchQuery ? '30px' : '10px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                background: '#FFFFFF',
+                border: '1px solid var(--border)',
+                width: '100%',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                outline: 'none',
+                color: 'var(--text-primary)',
+                boxSizing: 'border-box',
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#94A3B8',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Filters & Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ width: '140px' }}>
+              <CustomSelect
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val)}
+                options={[
+                  { value: '', label: 'All Statuses' },
+                  ...allStatuses.map((s) => ({ value: s, label: s })),
+                ]}
+                buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px' }}
+                style={{ width: '140px' }}
+              />
+            </div>
+            <div style={{ width: '135px' }}>
+              <CustomSelect
+                value={paymentMethodFilter}
+                onChange={(val) => setPaymentMethodFilter(val)}
+                options={[
+                  { value: '', label: 'All Methods' },
+                  { value: 'UPI', label: 'UPI' },
+                  { value: 'CASH', label: 'Cash' },
+                  { value: 'CARD', label: 'Card' },
+                ]}
+                buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px' }}
+                style={{ width: '135px' }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={exportCSV}
+              style={{
+                height: '38px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#059669',
+                background: 'rgba(5, 150, 105, 0.08)',
+                border: '1px solid rgba(5, 150, 105, 0.25)',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <Download size={14} /> <span>Export (CSV)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExpireOldOrders}
+              disabled={expiring}
+              style={{
+                height: '38px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#DC2626',
+                background: 'rgba(220, 38, 38, 0.08)',
+                border: '1px solid rgba(220, 38, 38, 0.25)',
+                whiteSpace: 'nowrap',
+                cursor: expiring ? 'not-allowed' : 'pointer',
+                opacity: expiring ? 0.6 : 1,
+                flexShrink: 0,
+              }}
+            >
+              <Clock size={14} /> <span>{expiring ? 'Expiring...' : 'Expire Old'}</span>
+            </button>
+          </div>
+        </div>
 
         <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
 

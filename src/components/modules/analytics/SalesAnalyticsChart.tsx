@@ -69,16 +69,15 @@ export function SalesAnalyticsChart({
   if (!mounted) {
     return (
       <div
-        className="card"
         style={{
           height: '320px',
-          marginBottom: '20px',
+          margin: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           background: '#FFFFFF',
-          borderRadius: '12px',
-          border: '1px solid var(--border)',
+          borderRadius: 0,
+          border: 'none',
         }}
       >
         <div className="loader" style={{ width: 32, height: 32 }} />
@@ -154,14 +153,13 @@ export function SalesAnalyticsChart({
 
   return (
     <div
-      className="card"
       style={{
-        padding: '20px',
-        borderRadius: '12px',
-        border: '1px solid var(--border)',
+        padding: 0,
+        borderRadius: 0,
+        border: 'none',
         background: '#FFFFFF',
-        marginBottom: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+        margin: 0,
+        boxShadow: 'none',
         overflow: 'hidden',
       }}
     >

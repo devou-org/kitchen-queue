@@ -722,18 +722,19 @@ tr:hover td {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 44px;
+  height: 46px;
   padding: 0 16px;
-  margin: 4px 10px;
+  margin: 0;
   font-size: 13.5px;
   font-weight: 500;
   color: var(--text-secondary);
   text-decoration: none;
-  border-radius: 10px;
+  border-radius: 0;
+  border-right: 3.5px solid transparent;
   box-sizing: border-box;
   overflow: hidden;
   white-space: nowrap;
-  transition: background-color 0.15s ease, color 0.15s ease, width 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-link-icon {
@@ -761,26 +762,33 @@ tr:hover td {
   transition: opacity 0.2s ease;
 }
 
-.sidebar-link:hover {
-  color: var(--primary);
-  background: #F9FAFB;
+.sidebar-link:hover:not(.active) {
+  color: var(--text-primary);
+  background-color: rgba(0, 0, 0, 0.035);
 }
 
 .sidebar-link.active {
-  color: white !important;
-  background: var(--primary);
+  color: var(--primary) !important;
+  background-color: rgba(225, 29, 72, 0.08);
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-right: 3.5px solid var(--primary);
+  box-shadow: none;
 }
 
 .sidebar.collapsed .sidebar-link {
-  width: 44px !important;
-  height: 44px !important;
+  width: 100% !important;
+  height: 48px !important;
   padding: 0 !important;
-  margin: 4px auto !important;
+  margin: 0 !important;
   justify-content: center !important;
   gap: 0 !important;
-  border-radius: 10px !important;
+  border-radius: 0 !important;
+  border-right: 3.5px solid transparent;
+}
+
+.sidebar.collapsed .sidebar-link.active {
+  border-right: 3.5px solid var(--primary) !important;
 }
 
 .sidebar.collapsed .sidebar-link-text {

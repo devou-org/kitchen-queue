@@ -318,58 +318,178 @@ export default function StaffAdminPage() {
     <>
       <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
         <style>{`
-          .staff-page-header {
+          .staff-page-header,
+          .staff-page-header.admin-page-header-container {
             height: 68px !important;
             min-height: 68px !important;
             display: flex !important;
-            align-items: center !important;
+            align-items: stretch !important;
             margin: 0 !important;
-            padding: 0 20px !important;
+            padding: 0 20px 0 0 !important;
             border-bottom: 1px solid var(--border) !important;
             background: #FFFFFF !important;
             box-sizing: border-box !important;
+            position: relative !important;
           }
 
           .staff-page-header .admin-page-header-container {
             height: 68px !important;
             min-height: 68px !important;
             display: flex !important;
-            align-items: center !important;
+            align-items: stretch !important;
             margin: 0 !important;
             padding: 0 !important;
             gap: 12px !important;
             width: 100% !important;
           }
 
+          .staff-page-header .admin-header-left,
+          .staff-page-header .admin-header-search {
+            height: 68px !important;
+            display: flex !important;
+            align-items: stretch !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
           .staff-toolbar {
             display: flex !important;
             flex-wrap: nowrap !important;
-            align-items: center !important;
-            gap: 8px !important;
+            align-items: stretch !important;
+            justify-content: space-between !important;
+            gap: 12px !important;
             width: 100% !important;
+            height: 68px !important;
             min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          .staff-tabs-wrapper {
+            display: flex !important;
+            align-items: stretch !important;
+            height: 68px !important;
+            min-height: 68px !important;
+            padding-top: 10px !important;
+            padding-right: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 0 !important;
+            box-sizing: border-box !important;
+            flex-shrink: 0 !important;
+            margin: 0 !important;
+          }
+
+          .staff-nav-scroll {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            overflow-x: auto;
+            overscroll-behavior-x: contain;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-x;
+            border-top: none;
+            height: 100%;
+            min-height: auto;
+            padding: 0;
+            margin: 0;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            box-sizing: border-box;
+            position: relative;
+          }
+          .staff-nav-scroll::-webkit-scrollbar {
+            display: none;
+          }
+
+          .staff-nav-item {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            height: 100%;
+            min-height: auto;
+            box-sizing: border-box;
+            padding: 0 24px;
+            border-radius: 0;
+            font-size: 14.5px;
+            font-weight: 500;
+            color: #475569;
+            text-decoration: none;
+            white-space: nowrap;
+            flex-shrink: 0;
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            border: none;
+            border-top: 3.5px solid transparent;
+            margin-top: 0;
+            background-color: transparent;
+            transition: all 0.15s ease-in-out;
+          }
+          .staff-nav-item:hover:not(.staff-nav-item--active) {
+            color: #0F172A;
+            background-color: rgba(0, 0, 0, 0.035);
+          }
+          .staff-nav-item--active {
+            font-weight: 600;
+            color: var(--primary, #971345);
+            background-color: rgba(151, 19, 69, 0.08);
+            background-color: color-mix(in srgb, var(--primary, #971345) 9%, transparent);
+            border-top: 3.5px solid var(--primary, #971345);
+          }
+
+          .staff-nav-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 999px;
+            background: #F1F5F9;
+            color: #64748B;
+            transition: all 0.15s ease;
+          }
+          .staff-nav-item--active .staff-nav-badge {
+            background: color-mix(in srgb, var(--primary, #971345) 16%, transparent);
+            color: var(--primary, #971345);
           }
 
           .staff-actions {
             display: flex !important;
             flex-wrap: nowrap !important;
             align-items: center !important;
-            gap: 8px !important;
+            gap: 10px !important;
             margin-left: auto !important;
             flex-shrink: 0 !important;
+            height: 68px !important;
           }
 
           @media (max-width: 768px) {
             .staff-page-header {
               height: auto !important;
               min-height: auto !important;
-              padding: 12px 16px !important;
+              padding: 8px 16px !important;
+            }
+
+            .staff-page-header .admin-page-header-container,
+            .staff-page-header .admin-header-left,
+            .staff-page-header .admin-header-search {
+              height: auto !important;
             }
 
             .staff-toolbar {
               flex-direction: column !important;
               align-items: stretch !important;
               gap: 10px !important;
+              height: auto !important;
+            }
+
+            .staff-tabs-wrapper {
+              width: 100% !important;
+              height: auto !important;
+              border-bottom: 1px solid var(--border) !important;
+              padding-bottom: 2px !important;
             }
 
             .staff-actions {
@@ -377,151 +497,97 @@ export default function StaffAdminPage() {
               margin-left: 0 !important;
               justify-content: space-between !important;
               flex-wrap: wrap !important;
+              height: auto !important;
             }
           }
         `}</style>
         <AdminPageHeader
           className="staff-page-header"
-          style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+          style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
           hideMaximize={true}
           search={
             <div className="staff-toolbar">
-              {/* Search Bar - First on the left */}
-              <div style={{ position: 'relative', width: '240px', flex: '0 0 240px', minWidth: '140px', maxWidth: '300px', flexShrink: 0 }}>
-                <Search
-                  size={14}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#94A3B8',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder={activeTab === 'staff' ? 'Search staff name, email...' : 'Search roles...'}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    height: '38px',
-                    paddingLeft: '30px',
-                    paddingRight: searchQuery ? '26px' : '8px',
-                    fontSize: '12px',
-                    borderRadius: '8px',
-                    background: 'white',
-                    border: '1px solid var(--border)',
-                    width: '100%',
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                    outline: 'none',
-                    color: 'var(--text-primary)',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                {searchQuery && (
+              {/* Left Side (Starting): Tabs starting flush from left */}
+              <div className="staff-tabs-wrapper">
+                <div className="staff-nav-scroll">
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => setActiveTab('staff')}
+                    className={`staff-nav-item ${activeTab === 'staff' ? 'staff-nav-item--active' : ''}`}
+                  >
+                    <span>Staff Members</span>
+                    <span className="staff-nav-badge">{staffs.length}/6</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('roles')}
+                    className={`staff-nav-item ${activeTab === 'roles' ? 'staff-nav-item--active' : ''}`}
+                  >
+                    <span>Roles & Permissions</span>
+                    <span className="staff-nav-badge">{roles.length}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Side: Search + Add Action + Maximize Toggle */}
+              <div className="staff-actions">
+                <div style={{ position: 'relative', width: '220px', minWidth: '140px', maxWidth: '280px', flexShrink: 0 }}>
+                  <Search
+                    size={14}
                     style={{
                       position: 'absolute',
-                      right: '6px',
+                      left: '10px',
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
                       color: '#94A3B8',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      pointerEvents: 'none',
                     }}
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-
-              {/* Sub Tabs Switcher - Next with a left separator */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, borderLeft: '1px solid #E2E8F0', paddingLeft: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('staff')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    height: '38px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'staff' ? 700 : 500,
-                    color: activeTab === 'staff' ? '#FFFFFF' : '#64748B',
-                    backgroundColor: activeTab === 'staff' ? 'var(--primary, #971345)' : '#F8FAFC',
-                    border: activeTab === 'staff' ? '1px solid transparent' : '1px solid #E2E8F0',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Users size={14} />
-                  <span>Staff Members</span>
-                  <span
+                  />
+                  <input
+                    type="text"
+                    placeholder={activeTab === 'staff' ? 'Search staff name, email...' : 'Search roles...'}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     style={{
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      padding: '1px 6px',
-                      borderRadius: '999px',
-                      background: activeTab === 'staff' ? 'rgba(255, 255, 255, 0.25)' : '#E2E8F0',
-                      color: activeTab === 'staff' ? '#FFFFFF' : '#475569',
-                      marginLeft: '2px',
+                      height: '38px',
+                      paddingLeft: '30px',
+                      paddingRight: searchQuery ? '26px' : '8px',
+                      fontSize: '12px',
+                      borderRadius: '8px',
+                      background: 'white',
+                      border: '1px solid var(--border)',
+                      width: '100%',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                      outline: 'none',
+                      color: 'var(--text-primary)',
+                      boxSizing: 'border-box',
                     }}
-                  >
-                    {staffs.length}/6
-                  </span>
-                </button>
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      style={{
+                        position: 'absolute',
+                        right: '6px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#94A3B8',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('roles')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    height: '38px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'roles' ? 700 : 500,
-                    color: activeTab === 'roles' ? '#FFFFFF' : '#64748B',
-                    backgroundColor: activeTab === 'roles' ? 'var(--primary, #971345)' : '#F8FAFC',
-                    border: activeTab === 'roles' ? '1px solid transparent' : '1px solid #E2E8F0',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Shield size={14} />
-                  <span>Roles & Permissions</span>
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      padding: '1px 6px',
-                      borderRadius: '999px',
-                      background: activeTab === 'roles' ? 'rgba(255, 255, 255, 0.25)' : '#E2E8F0',
-                      color: activeTab === 'roles' ? '#FFFFFF' : '#475569',
-                      marginLeft: '2px',
-                    }}
-                  >
-                    {roles.length}
-                  </span>
-                </button>
-              </div>
-
-              {/* Right Side Actions */}
-              <div className="staff-actions">
                 {activeTab === 'staff' ? (
                   <button
                     type="button"
@@ -577,7 +643,6 @@ export default function StaffAdminPage() {
                   </button>
                 )}
 
-                {/* Left Border Separator */}
                 <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                   <LayoutMaximizeToggle />
                 </div>

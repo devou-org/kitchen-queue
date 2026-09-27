@@ -55,36 +55,69 @@ export default function InventoryDashboardPage() {
     <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
       <style>{`
         /* Page-scoped responsive rules to match orders, tables, and products 68px header toolbar */
-        .inventory-page-header {
+        .inventory-page-header,
+        .inventory-page-header.admin-page-header-container {
           height: 68px !important;
           min-height: 68px !important;
           display: flex !important;
-          align-items: center !important;
+          align-items: stretch !important;
           margin: 0 !important;
-          padding: 0 20px !important;
+          padding: 0 20px 0 0 !important;
           border-bottom: 1px solid var(--border) !important;
           background: #FFFFFF !important;
           box-sizing: border-box !important;
+          position: relative !important;
         }
 
         .inventory-page-header .admin-page-header-container {
           height: 68px !important;
           min-height: 68px !important;
           display: flex !important;
-          align-items: center !important;
+          align-items: stretch !important;
           margin: 0 !important;
           padding: 0 !important;
           gap: 12px !important;
           width: 100% !important;
         }
 
+        .inventory-page-header .admin-header-left,
+        .inventory-page-header .admin-header-search {
+          height: 68px !important;
+          display: flex !important;
+          align-items: stretch !important;
+          flex-wrap: nowrap !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
         .inventory-toolbar {
           display: flex !important;
           flex-wrap: nowrap !important;
-          align-items: center !important;
-          gap: 8px !important;
+          align-items: stretch !important;
+          justify-content: space-between !important;
+          gap: 12px !important;
           width: 100% !important;
+          height: 68px !important;
           min-width: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .inventory-tabs-wrapper {
+          display: flex !important;
+          align-items: stretch !important;
+          height: 68px !important;
+          min-height: 68px !important;
+          padding-top: 10px !important;
+          padding-right: 0 !important;
+          padding-bottom: 0 !important;
+          padding-left: 0 !important;
+          box-sizing: border-box !important;
+          flex: 1 1 auto !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+          overflow-x: auto !important;
         }
 
         .inventory-actions {
@@ -94,19 +127,28 @@ export default function InventoryDashboardPage() {
           gap: 8px !important;
           margin-left: auto !important;
           flex-shrink: 0 !important;
+          height: 68px !important;
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
           .inventory-page-header {
             height: auto !important;
             min-height: auto !important;
-            padding: 12px 16px !important;
+            padding: 8px 16px !important;
           }
 
           .inventory-toolbar {
             flex-direction: column !important;
             align-items: stretch !important;
             gap: 10px !important;
+            height: auto !important;
+          }
+
+          .inventory-tabs-wrapper {
+            width: 100% !important;
+            height: auto !important;
+            border-bottom: 1px solid var(--border) !important;
+            padding-bottom: 2px !important;
           }
 
           .inventory-actions {
@@ -114,6 +156,7 @@ export default function InventoryDashboardPage() {
             margin-left: 0 !important;
             justify-content: flex-start !important;
             flex-wrap: wrap !important;
+            height: auto !important;
           }
 
           .inventory-actions > a,
@@ -125,17 +168,17 @@ export default function InventoryDashboardPage() {
       `}</style>
       <AdminPageHeader
         className="inventory-page-header"
-        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
         hideMaximize={true}
         search={
-          <div className="inventory-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap', width: '100%', minWidth: 0 }}>
+          <div className="inventory-toolbar">
             {/* Left Side: Inventory Navigation Tabs embedded in 68px toolbar */}
-            <div style={{ minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
+            <div className="inventory-tabs-wrapper">
               <InventoryNav inHeader={true} />
             </div>
 
             {/* Right Side Actions */}
-            <div className="inventory-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
+            <div className="inventory-actions">
               {/* Receive Stock Button */}
               <Link
                 href={`/${slugStr}/admin/inventory/purchases`}
