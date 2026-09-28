@@ -566,8 +566,6 @@ export default function AdminPosPage() {
                 <LayoutMaximizeToggle />
               </div>
             </div>
-              </div>
-            </div>
           </div>
         }
       />
