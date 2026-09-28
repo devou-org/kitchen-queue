@@ -346,6 +346,7 @@ export default function AdminLoyaltyPage() {
           border-bottom: 1px solid var(--border, #e2e8f0);
           margin-bottom: 20px;
           gap: 4px;
+          padding-bottom: 2px;
         }
         .loyalty-nav-bar::-webkit-scrollbar {
           display: none;
@@ -365,6 +366,7 @@ export default function AdminLoyaltyPage() {
           white-space: nowrap;
           transition: all 0.15s ease-in-out;
           border-radius: 4px 4px 0 0;
+          flex-shrink: 0;
         }
         .loyalty-nav-item:hover:not(.active) {
           color: #0f172a;
@@ -386,10 +388,42 @@ export default function AdminLoyaltyPage() {
           font-weight: 700;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 640px) {
           .loyalty-metrics-grid {
-            grid-template-columns: 1fr 1fr !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
           }
+          .loyalty-metric-card {
+            padding: 10px 12px !important;
+          }
+          .loyalty-metric-title {
+            font-size: 11px !important;
+          }
+          .loyalty-metric-value {
+            font-size: 16px !important;
+          }
+          .loyalty-metric-subtext {
+            font-size: 10px !important;
+          }
+          .loyalty-nav-item {
+            padding: 8px 10px !important;
+            font-size: 12px !important;
+            gap: 4px !important;
+          }
+          .loyalty-grid-2col {
+            grid-template-columns: 1fr !important;
+          }
+          .rewards-tab-header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+          }
+          .rewards-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 768px) {
           .loyalty-table-desktop {
             display: none !important;
           }
@@ -477,48 +511,48 @@ export default function AdminLoyaltyPage() {
 
       {/* Metrics Row */}
       <div className="loyalty-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Total CRM Members</span>
+            <span className="loyalty-metric-title" style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Total CRM Members</span>
             <div style={{ background: '#ecfdf5', color: '#059669', width: '34px', height: '34px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Users size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalMembers}</div>
-          <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px', fontWeight: 600 }}>Active Member Profiles</div>
+          <div className="loyalty-metric-value" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalMembers}</div>
+          <div className="loyalty-metric-subtext" style={{ fontSize: '12px', color: '#10b981', marginTop: '4px', fontWeight: 600 }}>Active Member Profiles</div>
         </div>
 
-        <div style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Active Points Balance</span>
+            <span className="loyalty-metric-title" style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Active Points Balance</span>
             <div style={{ background: '#fef3c7', color: '#d97706', width: '34px', height: '34px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Gift size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalActivePoints.toLocaleString()} pts</div>
-          <div style={{ fontSize: '12px', color: '#d97706', marginTop: '4px', fontWeight: 600 }}>Available for Redemption</div>
+          <div className="loyalty-metric-value" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalActivePoints.toLocaleString()} pts</div>
+          <div className="loyalty-metric-subtext" style={{ fontSize: '12px', color: '#d97706', marginTop: '4px', fontWeight: 600 }}>Available for Redemption</div>
         </div>
 
-        <div style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Punch Card Visits</span>
+            <span className="loyalty-metric-title" style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Punch Card Visits</span>
             <div style={{ background: '#eff6ff', color: '#2563eb', width: '34px', height: '34px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Award size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalVisitsCount}</div>
-          <div style={{ fontSize: '12px', color: '#2563eb', marginTop: '4px', fontWeight: 600 }}>Recorded Visits</div>
+          <div className="loyalty-metric-value" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalVisitsCount}</div>
+          <div className="loyalty-metric-subtext" style={{ fontSize: '12px', color: '#2563eb', marginTop: '4px', fontWeight: 600 }}>Recorded Visits</div>
         </div>
 
-        <div style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Cumulative Spend</span>
+            <span className="loyalty-metric-title" style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Cumulative Spend</span>
             <div style={{ background: '#f3e8ff', color: '#9333ea', width: '34px', height: '34px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <TrendingUp size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>₹{totalSpentSum.toLocaleString()}</div>
-          <div style={{ fontSize: '12px', color: '#9333ea', marginTop: '4px', fontWeight: 600 }}>Total Loyalty Revenue</div>
+          <div className="loyalty-metric-value" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>₹{totalSpentSum.toLocaleString()}</div>
+          <div className="loyalty-metric-subtext" style={{ fontSize: '12px', color: '#9333ea', marginTop: '4px', fontWeight: 600 }}>Total Loyalty Revenue</div>
         </div>
       </div>
 
@@ -760,7 +794,7 @@ export default function AdminLoyaltyPage() {
           </div>
 
           {/* Earning Rules */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+          <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                 Points Earning Rate (Points per ₹1 Spent)
@@ -794,7 +828,7 @@ export default function AdminLoyaltyPage() {
           </div>
 
           {/* Points Expiry Rule */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+          <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                 Points Expiry Policy
@@ -831,7 +865,7 @@ export default function AdminLoyaltyPage() {
             <div style={{ fontWeight: 700, color: '#b45309', fontSize: '14px', marginBottom: '10px' }}>
               Standard Points-to-Rupee Conversion Rate
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#78350f', marginBottom: '4px' }}>
                   Points Required
@@ -866,7 +900,7 @@ export default function AdminLoyaltyPage() {
             <div style={{ fontWeight: 700, color: '#0369a1', fontSize: '14px', marginBottom: '10px' }}>
               Visit Punch Card Milestone Configuration
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#0c4a6e', marginBottom: '4px' }}>
                   Milestone Visit Count (e.g. Every Nth Visit)
