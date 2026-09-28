@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { ClipboardList, ShoppingCart, Ticket, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare, Receipt, Boxes } from 'lucide-react';
+import { ClipboardList, ShoppingCart, Ticket, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare, Receipt, Boxes, Gift } from 'lucide-react';
 import 'react-phone-number-input/style.css';
 import PhoneInput from 'react-phone-number-input';
 
@@ -11,6 +11,7 @@ const ALL_MODULES = [
   { key: 'ONLINE_ORDERING', label: 'Online Ordering', icon: <ShoppingCart size={16} />, desc: 'Cart, checkout, OTP verification' },
   { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', icon: <Ticket size={16} />, desc: 'Token generation, live queue display' },
   { key: 'INVENTORY', label: 'Inventory Management', icon: <Boxes size={16} />, desc: 'Raw ingredients, recipes/BOM, purchases, wastage' },
+  { key: 'LOYALTY_PROGRAM', label: 'Loyalty & Rewards', icon: <Gift size={16} />, desc: 'CRM points, punch cards, rewards' },
 ];
 
 type Restaurant = {

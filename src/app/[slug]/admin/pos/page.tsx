@@ -136,6 +136,29 @@ export default function AdminPosPage() {
     order_type: 'DINE_IN'
   });
   const [submitting, setSubmitting] = useState(false);
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState<any>(null);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState<number>(0);
+
+  useEffect(() => {
+    if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
+      const slugStr = Array.isArray(slug) ? slug[0] : slug;
+      fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(orderForm.phone.trim())}`)
+        .then(res => res.json())
+        .then(json => {
+          if (json.success && json.data && json.data.length > 0) {
+            setLoyaltyCustomer(json.data[0]);
+            if (json.data[0].name && !orderForm.customer_name) {
+              setOrderForm(prev => ({ ...prev, customer_name: json.data[0].name }));
+            }
+          } else {
+            setLoyaltyCustomer(null);
+          }
+        })
+        .catch(() => setLoyaltyCustomer(null));
+    } else {
+      setLoyaltyCustomer(null);
+    }
+  }, [orderForm.phone, slug, restaurant]);
 
   const fetchTables = useCallback(async () => {
     try {
@@ -617,6 +640,46 @@ export default function AdminPosPage() {
                   <div>
                     <label className="label">Customer Phone (Optional)</label>
                     <input type="text" className="input" placeholder="99xxxxxxxx" value={orderForm.phone} onChange={e => setOrderForm({ ...orderForm, phone: e.target.value })} />
+                    {loyaltyCustomer && (
+                      <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', padding: '12px', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#047857' }}>Loyalty Member Profile</span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '12px' }}>
+                            {loyaltyCustomer.points_balance} pts
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#065f46', marginBottom: '8px' }}>
+                          Visits: <strong>{loyaltyCustomer.visit_progress || 0}/5</strong> · Total Spend: ₹{Number(loyaltyCustomer.total_spent || 0).toLocaleString()}
+                        </div>
+                        {Number(loyaltyCustomer.points_balance) >= 100 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (loyaltyDiscount > 0) {
+                                setLoyaltyDiscount(0);
+                                toast.success('Loyalty discount removed');
+                              } else {
+                                setLoyaltyDiscount(50);
+                                toast.success('Applied ₹50 loyalty discount!');
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '6px',
+                              borderRadius: '6px',
+                              border: '1px solid #059669',
+                              background: loyaltyDiscount > 0 ? '#059669' : 'white',
+                              color: loyaltyDiscount > 0 ? 'white' : '#059669',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {loyaltyDiscount > 0 ? 'Remove ₹50 Loyalty Discount' : 'Redeem 100 pts for ₹50 Discount'}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div>

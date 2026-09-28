@@ -314,8 +314,70 @@ async function runAutoMigration(sqlConnection: any) {
           created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_recipe_items_recipe ON recipe_items(recipe_id);
+
+      CREATE TABLE IF NOT EXISTS loyalty_settings (
+        restaurant_id UUID PRIMARY KEY REFERENCES restaurants(id) ON DELETE CASCADE,
+        is_enabled BOOLEAN DEFAULT true,
+        points_earning_rate DECIMAL(10, 4) DEFAULT 0.1000,
+        points_redemption_rate_points INT DEFAULT 100,
+        points_redemption_rate_amount DECIMAL(10, 2) DEFAULT 50.00,
+        points_expiry_type VARCHAR(50) DEFAULT 'NEVER',
+        points_expiry_days INT DEFAULT 365,
+        min_order_amount DECIMAL(10, 2) DEFAULT 0.00,
+        visit_milestone_count INT DEFAULT 5,
+        visit_reward_type VARCHAR(50) DEFAULT 'DISCOUNT_AMOUNT',
+        visit_reward_value VARCHAR(255) DEFAULT '100',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS loyalty_rewards (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        points_required INT NOT NULL,
+        reward_type VARCHAR(50) NOT NULL,
+        discount_value DECIMAL(10, 2) DEFAULT 0.00,
+        selected_product_ids JSONB DEFAULT '[]'::jsonb,
+        min_purchase_amount DECIMAL(10, 2) DEFAULT 0.00,
+        valid_until TIMESTAMP WITH TIME ZONE,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS customer_loyalty (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        points_balance DECIMAL(10, 2) DEFAULT 0.00,
+        total_points_earned DECIMAL(10, 2) DEFAULT 0.00,
+        total_points_redeemed DECIMAL(10, 2) DEFAULT 0.00,
+        total_visits INT DEFAULT 0,
+        visit_progress INT DEFAULT 0,
+        rewards_unlocked INT DEFAULT 0,
+        total_spent DECIMAL(10, 2) DEFAULT 0.00,
+        last_visit_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        CONSTRAINT unique_customer_restaurant_loyalty UNIQUE (restaurant_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS loyalty_transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        customer_loyalty_id UUID NOT NULL REFERENCES customer_loyalty(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+        reward_id UUID REFERENCES loyalty_rewards(id) ON DELETE SET NULL,
+        transaction_type VARCHAR(50) NOT NULL,
+        points_delta DECIMAL(10, 2) DEFAULT 0.00,
+        visit_delta INT DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
     `;
-    console.log("Auto-migrated menu, GST, tables, counters, and inventory schema successfully!");
+    console.log("Auto-migrated menu, GST, tables, counters, inventory, and loyalty schema successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
@@ -512,8 +574,8 @@ export async function createRestaurant(data: {
   }
 
   // Seed default modules for the new restaurant
-  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY'];
-  const defaultEnabledModules = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT'];
+  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS', 'LOYALTY_PROGRAM'];
+  const defaultEnabledModules = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'LOYALTY_PROGRAM'];
   const enabledModules = data.modules || defaultEnabledModules;
 
   for (const mod of ALL_MODULES) {
@@ -1561,6 +1623,13 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
     }
   }
 
+  // Trigger Loyalty Points processing
+  if (status === 'PAID' || status === 'COMPLETED' || updatedOrder?.is_paid) {
+    processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
+  } else if (status === 'CANCELLED' || status === 'REFUNDED') {
+    processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
+  }
+
   return updatedOrder;
 }
 
@@ -1612,6 +1681,13 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       } catch (tblErr) {
         console.error('Error re-evaluating table occupancy & session:', tblErr);
       }
+    }
+
+    // Trigger Loyalty Points processing
+    if (nextIsPaid || nextStatus === 'PAID' || nextStatus === 'COMPLETED') {
+      processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
+    } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
+      processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
     }
 
     return updatedOrder;
@@ -2778,6 +2854,483 @@ export async function getAgentHeartbeat(restaurantId: string) {
       return null;
     }
     return null;
+  }
+}
+
+// ============================================================================
+// LOYALTY SYSTEM HELPERS
+// ============================================================================
+
+export async function getLoyaltySettings(restaurantId: string) {
+  try {
+    let rows = await sql`
+      SELECT * FROM loyalty_settings WHERE restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (rows.length === 0) {
+      rows = await sql`
+        INSERT INTO loyalty_settings (
+          restaurant_id, is_enabled, points_earning_rate, points_redemption_rate_points,
+          points_redemption_rate_amount, points_expiry_type, points_expiry_days,
+          min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value
+        ) VALUES (${restaurantId}, true, 0.1000, 100, 50.00, 'NEVER', 365, 0.00, 5, 'DISCOUNT_AMOUNT', '100')
+        ON CONFLICT (restaurant_id) DO NOTHING
+        RETURNING *
+      `;
+      if (rows.length === 0) {
+        rows = await sql`SELECT * FROM loyalty_settings WHERE restaurant_id = ${restaurantId} LIMIT 1`;
+      }
+    }
+    return rows[0] || null;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function updateLoyaltySettings(restaurantId: string, data: {
+  is_enabled?: boolean;
+  points_earning_rate?: number;
+  points_redemption_rate_points?: number;
+  points_redemption_rate_amount?: number;
+  points_expiry_type?: string;
+  points_expiry_days?: number;
+  min_order_amount?: number;
+  visit_milestone_count?: number;
+  visit_reward_type?: string;
+  visit_reward_value?: string;
+}) {
+  try {
+    const rows = await sql`
+      INSERT INTO loyalty_settings (
+        restaurant_id, is_enabled, points_earning_rate, points_redemption_rate_points,
+        points_redemption_rate_amount, points_expiry_type, points_expiry_days,
+        min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value, updated_at
+      ) VALUES (
+        ${restaurantId},
+        COALESCE(${data.is_enabled ?? true}, true),
+        COALESCE(${data.points_earning_rate ?? 0.1}, 0.1),
+        COALESCE(${data.points_redemption_rate_points ?? 100}, 100),
+        COALESCE(${data.points_redemption_rate_amount ?? 50}, 50),
+        COALESCE(${data.points_expiry_type ?? 'NEVER'}, 'NEVER'),
+        COALESCE(${data.points_expiry_days ?? 365}, 365),
+        COALESCE(${data.min_order_amount ?? 0}, 0),
+        COALESCE(${data.visit_milestone_count ?? 5}, 5),
+        COALESCE(${data.visit_reward_type ?? 'DISCOUNT_AMOUNT'}, 'DISCOUNT_AMOUNT'),
+        COALESCE(${data.visit_reward_value ?? '100'}, '100'),
+        NOW()
+      )
+      ON CONFLICT (restaurant_id) DO UPDATE SET
+        is_enabled = EXCLUDED.is_enabled,
+        points_earning_rate = EXCLUDED.points_earning_rate,
+        points_redemption_rate_points = EXCLUDED.points_redemption_rate_points,
+        points_redemption_rate_amount = EXCLUDED.points_redemption_rate_amount,
+        points_expiry_type = EXCLUDED.points_expiry_type,
+        points_expiry_days = EXCLUDED.points_expiry_days,
+        min_order_amount = EXCLUDED.min_order_amount,
+        visit_milestone_count = EXCLUDED.visit_milestone_count,
+        visit_reward_type = EXCLUDED.visit_reward_type,
+        visit_reward_value = EXCLUDED.visit_reward_value,
+        updated_at = NOW()
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
+  try {
+    let query;
+    if (search && search.trim() !== '') {
+      const searchPattern = `%${search.trim().toLowerCase()}%`;
+      query = sql`
+        SELECT 
+          cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
+          cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
+          cl.total_spent, cl.last_visit_at, cl.created_at,
+          u.name, u.phone, u.email
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+          AND (LOWER(u.name) LIKE ${searchPattern} OR LOWER(u.phone) LIKE ${searchPattern})
+        ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+      `;
+    } else {
+      query = sql`
+        SELECT 
+          cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
+          cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
+          cl.total_spent, cl.last_visit_at, cl.created_at,
+          u.name, u.phone, u.email
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+        ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+      `;
+    }
+
+    const rows = await query;
+    return rows;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function getOrCreateCustomerLoyaltyByPhone(restaurantId: string, phone: string, name?: string) {
+  try {
+    let user = await getUserByPhone(phone);
+    if (!user) {
+      user = await createUser(phone, name);
+    }
+
+    let rows = await sql`
+      SELECT cl.*, u.name, u.phone, u.email
+      FROM customer_loyalty cl
+      JOIN users u ON u.id = cl.user_id
+      WHERE cl.restaurant_id = ${restaurantId} AND cl.user_id = ${user.id}
+      LIMIT 1
+    `;
+
+    if (rows.length === 0) {
+      rows = await sql`
+        INSERT INTO customer_loyalty (user_id, restaurant_id, points_balance, total_visits, visit_progress, rewards_unlocked)
+        VALUES (${user.id}, ${restaurantId}, 0, 0, 0, 0)
+        ON CONFLICT (restaurant_id, user_id) DO UPDATE SET updated_at = NOW()
+        RETURNING *
+      `;
+      rows[0].name = user.name;
+      rows[0].phone = user.phone;
+      rows[0].email = user.email;
+    }
+
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function adjustCustomerPoints(restaurantId: string, customerLoyaltyId: string, pointsDelta: number, reason?: string) {
+  try {
+    const loyaltyRecord = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (loyaltyRecord.length === 0) throw new Error('Customer loyalty record not found');
+
+    const rec = loyaltyRecord[0];
+    const newBalance = Math.max(0, Number(rec.points_balance) + pointsDelta);
+
+    const updated = await sql`
+      UPDATE customer_loyalty
+      SET points_balance = ${newBalance},
+          updated_at = NOW()
+      WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId}
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${customerLoyaltyId}, ${rec.user_id}, 'MANUAL_ADJUSTMENT', ${pointsDelta}, 0, ${reason || 'Manual admin adjustment'})
+    `;
+
+    return updated[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function getLoyaltyRewards(restaurantId: string) {
+  try {
+    const rows = await sql`
+      SELECT * FROM loyalty_rewards 
+      WHERE restaurant_id = ${restaurantId}
+      ORDER BY is_active DESC, points_required ASC
+    `;
+    return rows;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function createLoyaltyReward(restaurantId: string, rewardData: {
+  name: string;
+  points_required: number;
+  reward_type: string;
+  discount_value?: number;
+  selected_product_ids?: string[];
+  min_purchase_amount?: number;
+  valid_until?: string | null;
+}) {
+  try {
+    const selectedIdsJson = JSON.stringify(rewardData.selected_product_ids || []);
+    const validUntilVal = rewardData.valid_until ? new Date(rewardData.valid_until).toISOString() : null;
+
+    const rows = await sql`
+      INSERT INTO loyalty_rewards (
+        restaurant_id, name, points_required, reward_type, discount_value,
+        selected_product_ids, min_purchase_amount, valid_until, is_active
+      ) VALUES (
+        ${restaurantId},
+        ${rewardData.name},
+        ${rewardData.points_required},
+        ${rewardData.reward_type},
+        ${rewardData.discount_value ?? 0},
+        ${selectedIdsJson}::jsonb,
+        ${rewardData.min_purchase_amount ?? 0},
+        ${validUntilVal},
+        true
+      )
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function updateLoyaltyReward(restaurantId: string, rewardId: string, rewardData: {
+  name?: string;
+  points_required?: number;
+  reward_type?: string;
+  discount_value?: number;
+  selected_product_ids?: string[];
+  min_purchase_amount?: number;
+  valid_until?: string | null;
+  is_active?: boolean;
+}) {
+  try {
+    const existing = await sql`
+      SELECT * FROM loyalty_rewards WHERE id = ${rewardId} AND restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (existing.length === 0) throw new Error('Reward not found');
+
+    const ex = existing[0];
+    const selectedIdsJson = JSON.stringify(rewardData.selected_product_ids ?? ex.selected_product_ids ?? []);
+    const validUntilVal = rewardData.valid_until !== undefined 
+      ? (rewardData.valid_until ? new Date(rewardData.valid_until).toISOString() : null)
+      : ex.valid_until;
+
+    const rows = await sql`
+      UPDATE loyalty_rewards
+      SET name = ${rewardData.name ?? ex.name},
+          points_required = ${rewardData.points_required ?? ex.points_required},
+          reward_type = ${rewardData.reward_type ?? ex.reward_type},
+          discount_value = ${rewardData.discount_value ?? ex.discount_value},
+          selected_product_ids = ${selectedIdsJson}::jsonb,
+          min_purchase_amount = ${rewardData.min_purchase_amount ?? ex.min_purchase_amount},
+          valid_until = ${validUntilVal},
+          is_active = ${rewardData.is_active ?? ex.is_active},
+          updated_at = NOW()
+      WHERE id = ${rewardId} AND restaurant_id = ${restaurantId}
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function deleteLoyaltyReward(restaurantId: string, rewardId: string) {
+  try {
+    await sql`
+      DELETE FROM loyalty_rewards WHERE id = ${rewardId} AND restaurant_id = ${restaurantId}
+    `;
+    return true;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return false;
+    }
+    throw err;
+  }
+}
+
+export async function getLoyaltyTransactionsList(restaurantId: string) {
+  try {
+    const rows = await sql`
+      SELECT 
+        lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
+        u.name as customer_name, u.phone,
+        o.ticket_number
+      FROM loyalty_transactions lt
+      JOIN users u ON u.id = lt.user_id
+      LEFT JOIN orders o ON o.id = lt.order_id
+      WHERE lt.restaurant_id = ${restaurantId}
+      ORDER BY lt.created_at DESC
+      LIMIT 100
+    `;
+    return rows;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function processLoyaltyForCompletedOrder(restaurantId: string, orderId: string, customerPhone?: string, totalAmount?: number) {
+  try {
+    const settings = await getLoyaltySettings(restaurantId);
+    if (!settings || !settings.is_enabled) return;
+
+    // Check if points already earned for this order (idempotency check)
+    const existingTx = await sql`
+      SELECT id FROM loyalty_transactions
+      WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} AND transaction_type = 'EARN_POINTS'
+      LIMIT 1
+    `;
+    if (existingTx.length > 0) return;
+
+    let phone = customerPhone;
+    let amount = totalAmount;
+    let userId: string | null = null;
+
+    if (!phone || amount === undefined) {
+      const orderRes = await sql`SELECT customer_phone, phone, user_id, total_price FROM orders WHERE id = ${orderId} AND restaurant_id = ${restaurantId} LIMIT 1`;
+      if (orderRes.length === 0) return;
+      phone = phone || orderRes[0].customer_phone || orderRes[0].phone;
+      amount = amount ?? Number(orderRes[0].total_price || 0);
+      userId = orderRes[0].user_id || null;
+    }
+
+    if (!phone && !userId) return;
+
+    let customerLoyalty;
+    if (phone) {
+      customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone);
+    } else if (userId) {
+      const rows = await sql`
+        SELECT cl.*, u.name, u.phone, u.email FROM customer_loyalty cl JOIN users u ON u.id = cl.user_id WHERE cl.restaurant_id = ${restaurantId} AND cl.user_id = ${userId} LIMIT 1
+      `;
+      customerLoyalty = rows[0];
+    }
+
+    if (!customerLoyalty) return;
+
+    if (settings.min_order_amount && amount < Number(settings.min_order_amount)) {
+      return;
+    }
+
+    const rate = Number(settings.points_earning_rate || 0.1);
+    const pointsEarned = Math.floor(amount * rate);
+
+    const milestoneTarget = Number(settings.visit_milestone_count || 5);
+    let newVisitProgress = Number(customerLoyalty.visit_progress || 0) + 1;
+    let newTotalVisits = Number(customerLoyalty.total_visits || 0) + 1;
+    let newRewardsUnlocked = Number(customerLoyalty.rewards_unlocked || 0);
+    let visitRewardEarned = false;
+
+    if (newVisitProgress >= milestoneTarget) {
+      newVisitProgress = newVisitProgress % milestoneTarget;
+      newRewardsUnlocked += 1;
+      visitRewardEarned = true;
+    }
+
+    const newPointsBalance = Number(customerLoyalty.points_balance || 0) + pointsEarned;
+    const newTotalEarned = Number(customerLoyalty.total_points_earned || 0) + pointsEarned;
+    const newTotalSpent = Number(customerLoyalty.total_spent || 0) + amount;
+
+    await sql`
+      UPDATE customer_loyalty
+      SET points_balance = ${newPointsBalance},
+          total_points_earned = ${newTotalEarned},
+          total_visits = ${newTotalVisits},
+          visit_progress = ${newVisitProgress},
+          rewards_unlocked = ${newRewardsUnlocked},
+          total_spent = ${newTotalSpent},
+          last_visit_at = NOW(),
+          updated_at = NOW()
+      WHERE id = ${customerLoyalty.id} AND restaurant_id = ${restaurantId}
+    `;
+
+    if (pointsEarned > 0) {
+      await sql`
+        INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, order_id, transaction_type, points_delta, visit_delta, notes)
+        VALUES (${restaurantId}, ${customerLoyalty.id}, ${customerLoyalty.user_id}, ${orderId}, 'EARN_POINTS', ${pointsEarned}, 0, ${`Earned ${pointsEarned} points for order`})
+      `;
+    }
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, order_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${customerLoyalty.id}, ${customerLoyalty.user_id}, ${orderId}, 'EARN_VISIT', 0, 1, ${visitRewardEarned ? `Visit ${newTotalVisits} recorded! Reward unlocked!` : `Visit ${newTotalVisits} recorded`})
+    `;
+  } catch (err) {
+    console.error('Error processing loyalty for completed order:', err);
+  }
+}
+
+export async function processLoyaltyForCancelledOrder(restaurantId: string, orderId: string) {
+  try {
+    const existingEarnTx = await sql`
+      SELECT * FROM loyalty_transactions
+      WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} AND transaction_type = 'EARN_POINTS'
+      LIMIT 1
+    `;
+    if (existingEarnTx.length === 0) return;
+
+    const existingReversalTx = await sql`
+      SELECT id FROM loyalty_transactions
+      WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} AND transaction_type = 'REVERSAL_REFUND'
+      LIMIT 1
+    `;
+    if (existingReversalTx.length > 0) return;
+
+    const earnTx = existingEarnTx[0];
+    const pointsDeduction = Number(earnTx.points_delta || 0);
+
+    const loyaltyRes = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${earnTx.customer_loyalty_id} LIMIT 1
+    `;
+    if (loyaltyRes.length === 0) return;
+    const cl = loyaltyRes[0];
+
+    const newBalance = Math.max(0, Number(cl.points_balance || 0) - pointsDeduction);
+
+    await sql`
+      UPDATE customer_loyalty
+      SET points_balance = ${newBalance},
+          updated_at = NOW()
+      WHERE id = ${cl.id}
+    `;
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, order_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${cl.id}, ${cl.user_id}, ${orderId}, 'REVERSAL_REFUND', ${-pointsDeduction}, 0, ${'Order cancelled/refunded - points reversed'})
+    `;
+  } catch (err) {
+    console.error('Error reversing loyalty points for cancelled order:', err);
   }
 }
 

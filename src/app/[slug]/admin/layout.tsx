@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, Gift } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
@@ -24,6 +24,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
   // Controlled via Super Admin Subscription Modules
   const showInventory = restaurant?.modules?.INVENTORY === true;
+  const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM !== false;
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
@@ -60,6 +61,17 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         // Double-check with a fresh fetch in case the module was just enabled in another tab/window
         refresh().then((latest) => {
           if (latest && latest.modules?.INVENTORY !== true) {
+            const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
+            router.replace(`/${slug}/admin/${target}`);
+          }
+        });
+      }
+    }
+
+    if (!resLoading && restaurant && restaurant.modules?.LOYALTY_PROGRAM === false) {
+      if (pathname.startsWith(`/${slug}/admin/loyalty`)) {
+        refresh().then((latest) => {
+          if (latest && latest.modules?.LOYALTY_PROGRAM === false) {
             const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
             router.replace(`/${slug}/admin/${target}`);
           }
@@ -129,6 +141,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     { name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
     { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showInventory ? [{ name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
+    ...(showLoyalty ? [{ name: 'Loyalty', href: `/${slug}/admin/loyalty`, icon: <Gift size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/sales`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
