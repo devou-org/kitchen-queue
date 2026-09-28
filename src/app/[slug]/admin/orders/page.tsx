@@ -8,11 +8,12 @@ import { getCurrentBusinessDate } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { ChefHat, Search, X, Printer, Store, Loader2, ClipboardList, Sparkles, RotateCcw, UtensilsCrossed } from 'lucide-react';
+import { ChefHat, Search, X, Printer, Store, Loader2, ClipboardList, Sparkles, RotateCcw, UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { OrderTableRow, OrderTableHeader } from '@/components/modules/orders/OrderTableRow';
 import OrderDetailsView from '@/components/modules/orders/OrderDetailsView';
+import OrderStatusBadge from '@/components/modules/orders/OrderStatusBadge';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
@@ -38,7 +39,7 @@ export default function AdminOrders() {
   const { isMaximized } = useAdminLayout();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('PREPARING');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
   const [counterFilter, setCounterFilter] = useState('');
   const [readySearch, setReadySearch] = useState('');
@@ -160,7 +161,8 @@ export default function AdminOrders() {
     fetchStatuses();
   }, [slug]);
 
-  const dismissUpdate = (id: string) => {
+  const dismissUpdate = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setRecentUpdates(prev => {
       const updated = prev.filter(u => u.id !== id);
       localStorage.setItem(`kitchenQueue_liveAdditions_${Array.isArray(slug) ? slug[0] : slug}`, JSON.stringify(updated));
@@ -168,11 +170,34 @@ export default function AdminOrders() {
     });
   };
 
+  const clearAllUpdates = () => {
+    setRecentUpdates([]);
+    localStorage.removeItem(`kitchenQueue_liveAdditions_${Array.isArray(slug) ? slug[0] : slug}`);
+  };
+
+  const handleUpdateClick = async (update: OrderUpdateLog) => {
+    const existing = orders.find(o => o.id === update.order_id);
+    if (existing) {
+      setSelectedOrder(existing);
+    } else {
+      try {
+        setModalLoading(true);
+        const res = await orderService.getOrderById(update.order_id);
+        if (res.success && res.data) {
+          setSelectedOrder(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load order from live addition:', err);
+      } finally {
+        setModalLoading(false);
+      }
+    }
+  };
+
   const fetchOrders = useCallback(async (silent = false) => {
     if (!restaurant) return;
-    if (!silent) setLoading(true);
+    if (!silent && ordersRef.current.length === 0) setLoading(true);
     try {
-      const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
       const data = await orderService.getOrders({
@@ -181,7 +206,7 @@ export default function AdminOrders() {
         sort: 'ASC',
         date_from: bDate,
         date_to: bDate,
-        status: statusFilter || currentDefault,
+        status: statusFilter || 'PREPARING',
         order_type: orderTypeFilter || undefined,
       });
 
@@ -200,7 +225,7 @@ export default function AdminOrders() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, orderTypeFilter, queueStatuses, restaurant]);
+  }, [page, statusFilter, orderTypeFilter, restaurant?.timezone, restaurant?.rollover_time]);
 
   const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -255,9 +280,7 @@ export default function AdminOrders() {
           }
           return o;
         }).filter(o => {
-          // If statusFilter is empty, we are in the default view
-          const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
-          const currentFilter = statusFilter || currentDefault;
+          const currentFilter = statusFilter || 'PREPARING';
           if (currentFilter !== 'ALL') {
             return o.status === currentFilter;
           }
@@ -377,11 +400,11 @@ export default function AdminOrders() {
         // Success feedback handled by Pusher event to avoid duplicates
         // Update local state instantly for UI responsiveness
         setOrders(prev => {
-          const currentDefault = queueStatuses.length > 0 ? queueStatuses[0] : 'PENDING';
+          const currentFilter = statusFilter || 'PREPARING';
           return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number, payment_method: pMethod ?? o.payment_method } : o)
             .filter(o => {
-              if (statusFilter) return o.status === statusFilter;
-              return o.status === currentDefault;
+              if (currentFilter !== 'ALL') return o.status === currentFilter;
+              return true;
             });
         });
         setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number, payment_method: pMethod ?? prev.payment_method } : null);
@@ -607,11 +630,8 @@ export default function AdminOrders() {
                 }}
                 options={
                   !statusesLoaded
-                    ? [{ value: '', label: 'Loading...' }]
-                    : [
-                      { value: '', label: defaultStatus },
-                      ...activeStatuses.map((s) => ({ value: s, label: s })),
-                    ]
+                    ? [{ value: 'PREPARING', label: 'PREPARING' }]
+                    : allStatuses.map((s) => ({ value: s, label: s }))
                 }
                 disabled={!statusesLoaded}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
@@ -681,58 +701,240 @@ export default function AdminOrders() {
       />
 
       {recentUpdates.length > 0 && (
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }}></span>
-            <h2 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Additions</h2>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: '#F8FAFC' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '16px',
+                height: '16px',
+              }}>
+                <span style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  backgroundColor: '#10B981',
+                  opacity: 0.35,
+                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                }} />
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: '#10B981',
+                }} />
+              </span>
+              <h2 style={{
+                fontSize: '12px',
+                fontWeight: 800,
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                Live Additions
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '1px 8px',
+                  borderRadius: '12px',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  color: '#047857',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  textTransform: 'none',
+                  letterSpacing: 'normal'
+                }}>
+                  {recentUpdates.length} {recentUpdates.length === 1 ? 'addition' : 'additions'}
+                </span>
+              </h2>
+            </div>
+            {recentUpdates.length > 1 && (
+              <button
+                type="button"
+                onClick={clearAllUpdates}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#64748B',
+                  cursor: 'pointer',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  transition: 'color 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#0F172A')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#64748B')}
+              >
+                Clear all
+              </button>
+            )}
           </div>
-          <div className="live-updates-container">
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '12px',
+          }}>
             {recentUpdates.map(update => (
               <div
                 key={update.id}
-                className="card live-update-card animate-fade-in"
+                onClick={() => handleUpdateClick(update)}
+                className="animate-fade-in"
                 style={{
-                  padding: '16px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                  cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  borderLeft: '4px solid var(--success)',
-                  position: 'relative'
+                  gap: '10px',
+                  transition: 'all 0.15s ease',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--primary)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.06)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)' }}>#{String(update.ticket_number).padStart(3, '0')}</div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <span className={`badge badge-${update.status.toLowerCase()}`}>{update.status}</span>
-                        {update.table_number && (
-                          <span style={{ fontSize: '10px', fontWeight: 800, color: 'white', background: 'var(--primary)', padding: '2px 6px', borderRadius: '4px' }}>🪑 T-{update.table_number}</span>
-                        )}
-                      </div>
-                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>{update.message}</p>
-                    </div>
+                {/* Accent Top Bar */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  backgroundColor: 'var(--primary, #971345)',
+                }} />
+
+                {/* Top Row: Ticket Number + Status Badge + Table + Timestamp + Dismiss */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{
+                      fontFamily: 'monospace, var(--font-mono)',
+                      fontSize: '15px',
+                      fontWeight: 800,
+                      color: '#0F172A',
+                      letterSpacing: '-0.02em',
+                    }}>
+                      #{String(update.ticket_number).padStart(3, '0')}
+                    </span>
+                    <OrderStatusBadge status={update.status} />
+                    {update.table_number && (
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#334155',
+                        background: '#F1F5F9',
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        border: '1px solid #E2E8F0',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        🪑 {update.table_number.toLowerCase().startsWith('t') ? update.table_number : `T-${update.table_number}`}
+                      </span>
+                    )}
                   </div>
-                  <button
-                    onClick={() => dismissUpdate(update.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '18px', padding: '0 4px', lineHeight: 1 }}
-                  >
-                    ✕
-                  </button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600 }}>
+                      {update.timestamp}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => dismissUpdate(update.id, e)}
+                      title="Dismiss notification"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        borderRadius: '4px',
+                        color: '#94A3B8',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#F1F5F9';
+                        e.currentTarget.style.color = '#0F172A';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#94A3B8';
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 </div>
 
+                {/* Items Added Pills */}
                 {update.items && update.items.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {update.items.map((item, idx) => (
-                      <div key={idx} style={{ background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        <span style={{ color: 'var(--primary)' }}>{item.quantity}x</span> {item.product_name}
+                      <div
+                        key={idx}
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#0F172A',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}
+                      >
+                        <span style={{ color: 'var(--primary)', fontWeight: 800 }}>
+                          {item.quantity}x
+                        </span>
+                        <span>{item.product_name}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(0,0,0,0.03)', paddingTop: '8px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 700 }}>{update.timestamp}</div>
+                {/* Bottom Row */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingTop: '6px',
+                  borderTop: '1px solid #F1F5F9',
+                  fontSize: '11px',
+                  color: '#64748B',
+                  fontWeight: 600
+                }}>
+                  <span>{update.message}</span>
+                  <span style={{
+                    color: 'var(--primary)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    fontWeight: 700
+                  }}>
+                    View order <ArrowRight size={12} />
+                  </span>
                 </div>
               </div>
             ))}

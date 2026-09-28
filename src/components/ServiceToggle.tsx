@@ -4,15 +4,55 @@ import { useParams } from 'next/navigation';
 
 import { Power, CheckCircle2, AlertCircle } from 'lucide-react';
 
+export function checkOperatingHours(
+  openTime?: string, 
+  closeTime?: string, 
+  tz = 'Asia/Kolkata'
+): boolean {
+  if (!openTime || !closeTime) return true;
+  try {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz || 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    const currentTime = formatter.format(new Date()).slice(0, 5);
+    const open = openTime.slice(0, 5);
+    const close = closeTime.slice(0, 5);
+
+    if (open === close) return true; // 24 hours
+    if (open < close) {
+      return currentTime >= open && currentTime < close;
+    } else {
+      // Midnight crossing: e.g. 18:00 to 02:00
+      return currentTime >= open || currentTime < close;
+    }
+  } catch {
+    return true;
+  }
+}
+
+export interface ServiceToggleProps {
+  variant?: 'default' | 'light';
+  primaryColor?: string;
+  onStatusChange?: (isActive: boolean) => void;
+  openingTime?: string;
+  closingTime?: string;
+  timezone?: string;
+  controlledActive?: boolean;
+}
+
 export const ServiceToggle = ({ 
   variant = 'default',
   primaryColor,
   onStatusChange,
-}: { 
-  variant?: 'default' | 'light';
-  primaryColor?: string;
-  onStatusChange?: (isActive: boolean) => void;
-}) => {
+  openingTime,
+  closingTime,
+  timezone,
+  controlledActive,
+}: ServiceToggleProps) => {
   const [isActive, setIsActive] = useState(true);
   const [message, setMessage] = useState('');
   const [toggling, setToggling] = useState(false);
@@ -58,6 +98,31 @@ export const ServiceToggle = ({
       })
       .catch(() => {});
   }, [slug]);
+
+  // Synchronize automatically whenever openingTime, closingTime, or timezone changes
+  useEffect(() => {
+    if (openingTime !== undefined && closingTime !== undefined) {
+      const withinHours = checkOperatingHours(openingTime, closingTime, timezone);
+      setIsOperatingHours(withinHours);
+      if (!withinHours) {
+        setIsActive(false);
+        onStatusChange?.(false);
+      } else {
+        if (controlledActive !== undefined) {
+          setIsActive(controlledActive);
+        } else {
+          setIsActive(true);
+          onStatusChange?.(true);
+        }
+      }
+    }
+  }, [openingTime, closingTime, timezone, controlledActive]);
+
+  useEffect(() => {
+    if (controlledActive !== undefined) {
+      setIsActive(controlledActive);
+    }
+  }, [controlledActive]);
 
   const updateService = async (newActive: boolean, newMessage?: string) => {
     if (!slug) return;

@@ -20,6 +20,12 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
     const order = await getOrderById(restaurantId, orderId);
     if (!order) return;
 
+    // Only auto-print orders when in PREPARING state (never in PENDING state)
+    if (order.status !== 'PREPARING') {
+      console.log(`ℹ️ Order #${order.ticket_number} is in "${order.status}" status (not PREPARING). Skipping automatic print.`);
+      return;
+    }
+
     const allItems = (order.items || []).filter((i: any) => (i.quantity || 0) > 0);
     if (allItems.length === 0) return;
 
