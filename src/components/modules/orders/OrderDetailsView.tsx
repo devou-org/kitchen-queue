@@ -26,6 +26,8 @@ import OrderStatusBadge from './OrderStatusBadge';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printKotFromBrowser } from '@/lib/client-print';
+import { printBillTemplateDirectly } from '@/components/BillTemplate';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 interface OrderDetailsViewProps {
   order: Order;
@@ -50,6 +52,7 @@ export function OrderDetailsView({
   onStatusChange,
   loading = false,
 }: OrderDetailsViewProps) {
+  const { restaurant } = useRestaurant();
   const [mounted, setMounted] = useState(false);
   const [tempStatus, setTempStatus] = useState(order.status);
   const [tempTableNumber, setTempTableNumber] = useState(order.table_number || '');
@@ -246,6 +249,48 @@ export function OrderDetailsView({
     }
   };
 
+  const [isPrintingBill, setIsPrintingBill] = useState(false);
+
+  const handlePrintBill = async () => {
+    if (isPrintingBill) return;
+    setIsPrintingBill(true);
+
+    const savedPrinter = typeof window !== 'undefined'
+      ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
+      : 'POS-80C';
+
+    const toastId = toast.loading(`🖨️ Printing Bill #${String(order.ticket_number).padStart(3, '0')} to ${savedPrinter}...`);
+
+    try {
+      // Send print job directly to POS-80C thermal printer (1-click instant silent print)
+      const res = await fetch('/api/print/bill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': slug,
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          printerName: savedPrinter,
+          orderData: order,
+          slug,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to print bill');
+      }
+
+      toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+    } catch (err: any) {
+      console.error('Bill print error:', err);
+      toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+    } finally {
+      setIsPrintingBill(false);
+    }
+  };
+
   if (!mounted) return null;
 
   return createPortal(
@@ -354,7 +399,7 @@ export function OrderDetailsView({
           top: 0,
           right: 0,
           bottom: 0,
-          width: '440px',
+          width: '460px',
           maxWidth: '100vw',
           height: '100vh',
           maxHeight: '100vh',
@@ -377,258 +422,335 @@ export function OrderDetailsView({
           style={{
             flexShrink: 0,
             background: 'white',
-            padding: '20px',
+            padding: '16px 20px',
             borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '16px',
             zIndex: 10,
           }}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          {/* Top Row: Ticket Number + Badges + Close Button */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              width: '100%',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0 }}>
               <span
                 style={{
-                  fontSize: '18px',
+                  fontSize: '20px',
                   fontWeight: 800,
                   color: '#0F172A',
                   fontFamily: 'monospace, var(--font-mono)',
+                  letterSpacing: '-0.02em',
                 }}
               >
                 #{String(order.ticket_number).padStart(3, '0')}
               </span>
               <OrderTypeBadge type={order.order_type} variant="minimal" />
               <OrderStatusBadge status={order.status} />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748B', flexWrap: 'wrap' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                <Calendar size={13} style={{ color: '#94A3B8' }} />
-                {formatDateTime(order.created_at)}
-              </span>
               {order.table_number && (
                 <span
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '5px',
+                    gap: '4px',
                     fontWeight: 700,
-                    fontSize: '12px',
+                    fontSize: '11px',
                     color: '#92400E',
                     backgroundColor: '#FEF3C7',
                     border: '1px solid #FDE68A',
-                    padding: '3px 9px',
+                    padding: '2px 8px',
                     borderRadius: '6px',
                     lineHeight: 1.3,
                   }}
                 >
-                  <MapPin size={12} style={{ color: '#D97706', flexShrink: 0 }} />
+                  <MapPin size={11} style={{ color: '#D97706', flexShrink: 0 }} />
                   {order.table_number.toLowerCase().startsWith('table') ? order.table_number : `Table ${order.table_number}`}
                 </span>
               )}
             </div>
+
+            {/* Close Button */}
+            <button
+              onClick={handleDismiss}
+              style={{
+                background: '#F1F5F9',
+                border: 'none',
+                borderRadius: '8px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748B',
+                flexShrink: 0,
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E2E8F0')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#F1F5F9')}
+              title="Close Details (Esc)"
+            >
+              <X size={16} />
+            </button>
           </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {/* Print KOT Button */}
-          <div ref={printMenuRef} style={{ position: 'relative' }}>
+          {/* Date & Time Row */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              color: '#64748B',
+              marginTop: '6px',
+            }}
+          >
+            <Calendar size={13} style={{ color: '#94A3B8', flexShrink: 0 }} />
+            <span>{formatDateTime(order.created_at)}</span>
+          </div>
+
+          {/* Actions Toolbar Row */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '8px',
+              marginTop: '14px',
+            }}
+          >
+            {/* Print KOT Button */}
+            <div ref={printMenuRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (uniqueCounters.length <= 1) {
+                    handlePrintKot(uniqueCounters[0] || 'ALL');
+                  } else {
+                    setPrintMenuOpen(!printMenuOpen);
+                  }
+                }}
+                disabled={isPrinting || itemsWithCounter.length === 0}
+                style={{
+                  width: '100%',
+                  padding: '0 8px',
+                  height: '34px',
+                  fontSize: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  background: isPrinting ? '#F8FAFC' : '#FFFFFF',
+                  border: '1px solid #CBD5E1',
+                  color: '#0F172A',
+                  cursor: isPrinting ? 'wait' : 'pointer',
+                  boxSizing: 'border-box',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => { if (!isPrinting) e.currentTarget.style.background = '#F8FAFC'; }}
+                onMouseLeave={(e) => { if (!isPrinting) e.currentTarget.style.background = '#FFFFFF'; }}
+                title={
+                  uniqueCounters.length <= 1
+                    ? `Print KOT (${uniqueCounters[0] || 'All Items'}) to POS-80C`
+                    : 'Print KOT by Counter'
+                }
+              >
+                {isPrinting ? (
+                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <Printer size={13} style={{ color: 'var(--primary, #2563eb)' }} />
+                )}
+                <span>Print KOT</span>
+                {uniqueCounters.length > 1 && (
+                  <ChevronDown size={12} style={{ color: '#64748B', marginLeft: '1px' }} />
+                )}
+              </button>
+
+              {/* Dropdown Menu when multiple counters exist */}
+              {printMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    left: 0,
+                    zIndex: 100,
+                    background: '#FFFFFF',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    border: '1px solid #E2E8F0',
+                    padding: '6px',
+                    minWidth: '220px',
+                  }}
+                >
+                  <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8' }}>
+                    Print KOT by Counter
+                  </div>
+
+                  {/* Print individual counters */}
+                  {uniqueCounters.map((cName) => {
+                    const count = counterGroups[cName]?.length || 0;
+                    return (
+                      <button
+                        key={cName}
+                        type="button"
+                        onClick={() => handlePrintKot(cName)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#0F172A',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <span>{cName}</span>
+                        <span style={{ fontSize: '11px', color: '#64748B', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                          {count} {count === 1 ? 'item' : 'items'}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  <div style={{ height: '1px', background: '#F1F5F9', margin: '4px 0' }} />
+
+                  {/* Option: Separate slips for all counters */}
+                  <button
+                    type="button"
+                    onClick={() => handlePrintKot('ALL', true)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: 'var(--primary, #2563eb)',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#EFF6FF')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <span>All Counters (Separate Slips)</span>
+                    <span style={{ fontSize: '10px', opacity: 0.8 }}>{uniqueCounters.length} slips</span>
+                  </button>
+
+                  {/* Option: Combined master KOT */}
+                  <button
+                    type="button"
+                    onClick={() => handlePrintKot('ALL', false)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#64748B',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <span>Combined Master KOT</span>
+                    <span style={{ fontSize: '10px' }}>{itemsWithCounter.length} items</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Print Bill Button */}
             <button
               type="button"
-              onClick={() => {
-                if (uniqueCounters.length <= 1) {
-                  handlePrintKot(uniqueCounters[0] || 'ALL');
-                } else {
-                  setPrintMenuOpen(!printMenuOpen);
-                }
-              }}
-              disabled={isPrinting || itemsWithCounter.length === 0}
-              className="btn btn-secondary btn-sm"
+              onClick={handlePrintBill}
+              disabled={isPrintingBill || (order.items || []).length === 0}
               style={{
-                padding: '0 10px',
-                height: '30px',
+                width: '100%',
+                padding: '0 8px',
+                height: '34px',
                 fontSize: '12px',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '5px',
                 fontWeight: 600,
                 borderRadius: '8px',
-                background: '#F8FAFC',
-                border: '1px solid #E2E8F0',
-                color: '#0F172A',
-                cursor: isPrinting ? 'wait' : 'pointer',
+                background: isPrintingBill ? '#F8FAFC' : '#ECFDF5',
+                border: '1px solid #6EE7B7',
+                color: '#065F46',
+                cursor: isPrintingBill ? 'wait' : 'pointer',
+                boxSizing: 'border-box',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
               }}
-              title={
-                uniqueCounters.length <= 1
-                  ? `Print KOT (${uniqueCounters[0] || 'All Items'}) to POS-80C`
-                  : 'Print KOT by Counter'
-              }
+              onMouseEnter={(e) => { if (!isPrintingBill) e.currentTarget.style.background = '#D1FAE5'; }}
+              onMouseLeave={(e) => { if (!isPrintingBill) e.currentTarget.style.background = '#ECFDF5'; }}
+              title="Print customer bill / receipt"
             >
-              {isPrinting ? (
-                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              {isPrintingBill ? (
+                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite', color: '#065F46' }} />
               ) : (
-                <Printer size={13} style={{ color: 'var(--primary, #2563eb)' }} />
+                <CreditCard size={13} style={{ color: '#059669' }} />
               )}
-              <span>Print KOT</span>
-              {uniqueCounters.length > 1 && (
-                <ChevronDown size={12} style={{ color: '#64748B', marginLeft: '-2px' }} />
-              )}
+              <span>Print Bill</span>
             </button>
 
-            {/* Dropdown Menu when multiple counters exist */}
-            {printMenuOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 6px)',
-                  right: 0,
-                  zIndex: 100,
-                  background: '#FFFFFF',
-                  borderRadius: '8px',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                  border: '1px solid #E2E8F0',
-                  padding: '6px',
-                  minWidth: '220px',
-                }}
-              >
-                <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8' }}>
-                  Print KOT by Counter
-                </div>
-
-                {/* Print individual counters */}
-                {uniqueCounters.map((cName) => {
-                  const count = counterGroups[cName]?.length || 0;
-                  return (
-                    <button
-                      key={cName}
-                      type="button"
-                      onClick={() => handlePrintKot(cName)}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: '7px 10px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: 'transparent',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: '#0F172A',
-                        cursor: 'pointer',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <span>{cName}</span>
-                      <span style={{ fontSize: '11px', color: '#64748B', background: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
-                        {count} {count === 1 ? 'item' : 'items'}
-                      </span>
-                    </button>
-                  );
-                })}
-
-                <div style={{ height: '1px', background: '#F1F5F9', margin: '4px 0' }} />
-
-                {/* Option: Separate slips for all counters */}
-                <button
-                  type="button"
-                  onClick={() => handlePrintKot('ALL', true)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '7px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: 'var(--primary, #2563eb)',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#EFF6FF')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <span>All Counters (Separate Slips)</span>
-                  <span style={{ fontSize: '10px', opacity: 0.8 }}>{uniqueCounters.length} slips</span>
-                </button>
-
-                {/* Option: Combined master KOT */}
-                <button
-                  type="button"
-                  onClick={() => handlePrintKot('ALL', false)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '7px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#64748B',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <span>Combined Master KOT</span>
-                  <span style={{ fontSize: '10px' }}>{itemsWithCounter.length} items</span>
-                </button>
-              </div>
-            )}
+            {/* Edit Button */}
+            <Link
+              prefetch={false}
+              href={editUrl}
+              style={{
+                width: '100%',
+                padding: '0 8px',
+                height: '34px',
+                fontSize: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                fontWeight: 600,
+                borderRadius: '8px',
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                color: '#0F172A',
+                textDecoration: 'none',
+                boxSizing: 'border-box',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#FFFFFF')}
+              title="Edit Order"
+            >
+              <Pencil size={13} style={{ color: '#64748B' }} />
+              <span>Edit</span>
+            </Link>
           </div>
-
-          <Link
-            prefetch={false}
-            href={editUrl}
-            className="btn btn-secondary btn-sm"
-            style={{
-              padding: '0 10px',
-              height: '30px',
-              fontSize: '12px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontWeight: 600,
-              borderRadius: '8px',
-            }}
-            title="Edit Order"
-          >
-            <Pencil size={13} />
-            <span>Edit</span>
-          </Link>
-
-          <button
-            onClick={handleDismiss}
-            style={{
-              background: '#F1F5F9',
-              border: 'none',
-              borderRadius: '8px',
-              width: '30px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: '#64748B',
-              transition: 'background 0.15s ease',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E2E8F0')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#F1F5F9')}
-            title="Close Details"
-          >
-            <X size={16} />
-          </button>
         </div>
-      </div>
 
       {/* 2. SCROLLABLE CONTENT BODY */}
       <div
@@ -644,44 +766,129 @@ export function OrderDetailsView({
         }}
       >
 
-        {/* SECTION: CUSTOMER DETAILS */}
-        <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '12px' }}>
-            Customer Details
+        {/* SECTION: STATUS & TABLE CONTROLS */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '10px' }}>
+            Status & Table
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <User size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
-                {order.customer_name || 'Guest'}
-              </span>
-              {order.staff_name && (
-                <span style={{ fontSize: '11px', color: '#64748B', marginLeft: 'auto' }}>
-                  by {order.staff_name.split(' ')[0]}
-                </span>
-              )}
-            </div>
 
-            {order.phone && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
-                <a
-                  href={`tel:${order.phone}`}
-                  style={{ fontSize: '12px', color: '#334155', textDecoration: 'none' }}
-                >
-                  {order.phone}
-                </a>
+          {/* Status Select */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+              Status
+            </label>
+            <CustomSelect
+              value={tempStatus}
+              disabled={actionLoading || loading}
+              onChange={(val) => {
+                setTempStatus(val);
+                if (val !== 'PAID') {
+                  handleUpdateStatus(val);
+                }
+              }}
+              direction="auto"
+              options={allStatuses.map((s) => ({ value: s, label: s }))}
+              buttonStyle={{ height: '36px', fontSize: '13px' }}
+            />
+
+            {tempStatus === 'PAID' && (
+              <div style={{ marginTop: '10px', padding: '10px', background: '#F8FAFC', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  Payment Method
+                </label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <CustomSelect
+                    style={{ flex: 1 }}
+                    value={paymentMethod}
+                    onChange={(val) => setPaymentMethod(val)}
+                    direction="auto"
+                    options={[
+                      { value: '', label: 'Select' },
+                      { value: 'UPI', label: 'UPI' },
+                      { value: 'CASH', label: 'Cash' },
+                      { value: 'CARD', label: 'Card' },
+                    ]}
+                    buttonStyle={{ height: '34px', fontSize: '12px' }}
+                  />
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => handleUpdateStatus('PAID')}
+                    disabled={actionLoading || !paymentMethod}
+                    style={{ height: '34px', padding: '0 12px', fontSize: '12px', borderRadius: '8px' }}
+                  >
+                    Confirm
+                  </button>
+                </div>
               </div>
             )}
+          </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Users size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
-              <span style={{ fontSize: '12px', color: '#475569' }}>
-                {order.party_size || 1} {Number(order.party_size) === 1 ? 'Guest' : 'Guests'}
-              </span>
+          {/* Table Select */}
+          <div>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+              Assigned Table
+            </label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <CustomSelect
+                style={{ flex: 1 }}
+                value={tempTableNumber}
+                disabled={actionLoading || loading}
+                onChange={(val) => setTempTableNumber(val)}
+                direction="auto"
+                options={[
+                  { value: '', label: '-- No Table --' },
+                  ...tables
+                    .filter((t: any) => {
+                      const partySize = Number(order.party_size) || 1;
+                      const check = checkTableAssignment(t, partySize, {
+                        orderId: order.id,
+                        phone: order.phone,
+                        customerName: order.customer_name,
+                      });
+                      const isCurrent = t.table_number === tempTableNumber;
+                      return check.allowed || isCurrent;
+                    })
+                    .map((t: any) => {
+                      const partySize = Number(order.party_size) || 1;
+                      const check = checkTableAssignment(t, partySize, {
+                        orderId: order.id,
+                        phone: order.phone,
+                        customerName: order.customer_name,
+                      });
+                      const cap = Number(t.capacity) || 0;
+                      const seated = check.occupiedSeats;
+                      const rawNum = String(t.table_number || '').trim();
+                      let tableLabel = rawNum;
+                      if (/^\d+$/.test(rawNum)) {
+                        tableLabel = `T${rawNum}`;
+                      } else if (rawNum.toLowerCase().startsWith('t-')) {
+                        tableLabel = `T-${rawNum.slice(2)}`;
+                      }
+                      const freeSeats = Math.max(0, cap - seated);
+
+                      return {
+                        value: String(t.table_number),
+                        label: `${tableLabel} · ${seated}/${cap} (${freeSeats} free)`,
+                      };
+                    }),
+                  ...(tempTableNumber && !tables.some((t: any) => String(t.table_number) === String(tempTableNumber))
+                    ? [{ value: tempTableNumber, label: `Table ${tempTableNumber}` }]
+                    : []),
+                ]}
+                buttonStyle={{ height: '36px', fontSize: '13px' }}
+              />
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleUpdateTable}
+                disabled={actionLoading || loading || tempTableNumber === (order.table_number || '')}
+                style={{ height: '36px', padding: '0 12px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '8px' }}
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>
+
 
         {/* SECTION: ORDER ITEMS */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
@@ -848,125 +1055,41 @@ export function OrderDetailsView({
           </div>
         </div>
 
-        {/* SECTION: STATUS & TABLE CONTROLS */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '10px' }}>
-            Status & Table
+        {/* SECTION: CUSTOMER DETAILS */}
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '12px' }}>
+            Customer Details
           </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <User size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                {order.customer_name || 'Guest'}
+              </span>
+              {order.staff_name && (
+                <span style={{ fontSize: '11px', color: '#64748B', marginLeft: 'auto' }}>
+                  by {order.staff_name.split(' ')[0]}
+                </span>
+              )}
+            </div>
 
-          {/* Status Select */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              Status
-            </label>
-            <CustomSelect
-              value={tempStatus}
-              disabled={actionLoading || loading}
-              onChange={(val) => {
-                setTempStatus(val);
-                if (val !== 'PAID') {
-                  handleUpdateStatus(val);
-                }
-              }}
-              direction="up"
-              options={allStatuses.map((s) => ({ value: s, label: s }))}
-              buttonStyle={{ height: '36px', fontSize: '13px' }}
-            />
-
-            {tempStatus === 'PAID' && (
-              <div style={{ marginTop: '10px', padding: '10px', background: '#F8FAFC', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', marginBottom: '4px', textTransform: 'uppercase' }}>
-                  Payment Method
-                </label>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <CustomSelect
-                    style={{ flex: 1 }}
-                    value={paymentMethod}
-                    onChange={(val) => setPaymentMethod(val)}
-                    direction="up"
-                    options={[
-                      { value: '', label: 'Select' },
-                      { value: 'UPI', label: 'UPI' },
-                      { value: 'CASH', label: 'Cash' },
-                      { value: 'CARD', label: 'Card' },
-                    ]}
-                    buttonStyle={{ height: '34px', fontSize: '12px' }}
-                  />
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleUpdateStatus('PAID')}
-                    disabled={actionLoading || !paymentMethod}
-                    style={{ height: '34px', padding: '0 12px', fontSize: '12px', borderRadius: '8px' }}
-                  >
-                    Confirm
-                  </button>
-                </div>
+            {order.phone && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                <a
+                  href={`tel:${order.phone}`}
+                  style={{ fontSize: '12px', color: '#334155', textDecoration: 'none' }}
+                >
+                  {order.phone}
+                </a>
               </div>
             )}
-          </div>
 
-          {/* Table Select */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              Assigned Table
-            </label>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <CustomSelect
-                style={{ flex: 1 }}
-                value={tempTableNumber}
-                disabled={actionLoading || loading}
-                onChange={(val) => setTempTableNumber(val)}
-                direction="up"
-                options={[
-                  { value: '', label: '-- No Table --' },
-                  ...tables
-                    .filter((t: any) => {
-                      const partySize = Number(order.party_size) || 1;
-                      const check = checkTableAssignment(t, partySize, {
-                        orderId: order.id,
-                        phone: order.phone,
-                        customerName: order.customer_name,
-                      });
-                      const isCurrent = t.table_number === tempTableNumber;
-                      return check.allowed || isCurrent;
-                    })
-                    .map((t: any) => {
-                      const partySize = Number(order.party_size) || 1;
-                      const check = checkTableAssignment(t, partySize, {
-                        orderId: order.id,
-                        phone: order.phone,
-                        customerName: order.customer_name,
-                      });
-                      const cap = Number(t.capacity) || 0;
-                      const seated = check.occupiedSeats;
-                      const rawNum = String(t.table_number || '').trim();
-                      let tableLabel = rawNum;
-                      if (/^\d+$/.test(rawNum)) {
-                        tableLabel = `T${rawNum}`;
-                      } else if (rawNum.toLowerCase().startsWith('t-')) {
-                        tableLabel = `T-${rawNum.slice(2)}`;
-                      }
-                      const freeSeats = Math.max(0, cap - seated);
-
-                      return {
-                        value: String(t.table_number),
-                        label: `${tableLabel} · ${seated}/${cap} (${freeSeats} free)`,
-                      };
-                    }),
-                  ...(tempTableNumber && !tables.some((t: any) => String(t.table_number) === String(tempTableNumber))
-                    ? [{ value: tempTableNumber, label: `Table ${tempTableNumber}` }]
-                    : []),
-                ]}
-                buttonStyle={{ height: '36px', fontSize: '13px' }}
-              />
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={handleUpdateTable}
-                disabled={actionLoading || loading || tempTableNumber === (order.table_number || '')}
-                style={{ height: '36px', padding: '0 12px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '8px' }}
-              >
-                Save
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Users size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
+              <span style={{ fontSize: '12px', color: '#475569' }}>
+                {order.party_size || 1} {Number(order.party_size) === 1 ? 'Guest' : 'Guests'}
+              </span>
             </div>
           </div>
         </div>

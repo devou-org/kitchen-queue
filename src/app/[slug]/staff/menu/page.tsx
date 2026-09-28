@@ -234,7 +234,7 @@ export default function StaffMenuPage() {
       });
 
       try {
-        await printUnifiedThermalTicket({
+        const result = await printUnifiedThermalTicket({
           base64Bytes: data.base64Bytes,
           kotData: data.kotData,
           printerName: data.printer_name,
@@ -242,6 +242,11 @@ export default function StaffMenuPage() {
           counterName: data.counter_name,
           isAutoPrint: true,
         });
+        if (result.success) {
+          toast.success(`🖨️ Auto-printed: ${data.counter_name || 'KOT'} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            id: `kot-auto-${data.ticket_number}-${data.counter_name}`,
+          });
+        }
       } catch (err: any) {
         console.error('Auto-print execution error on staff menu:', err);
       }
@@ -364,61 +369,12 @@ export default function StaffMenuPage() {
       });
 
       if (res.success && res.data) {
-        toast.success(`Order placed successfully! Ticket #${res.data.ticket_number}`);
         const createdOrder = res.data;
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
         setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN' });
         await fetchTables();
-
-        // 🖨️ Immediately print KOT tickets for this staff POS order
-        const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
-        if (autoPrint && createdOrder.id) {
-          const toastId = toast.loading('🖨️ Generating KOT tickets...');
-          try {
-            const printRes = await fetch('/api/print/kot', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-restaurant-slug': slug,
-              },
-              body: JSON.stringify({
-                orderId: createdOrder.id,
-                separateSlips: true,
-                orderData: createdOrder,
-                slug,
-              }),
-            });
-            const printData = await printRes.json();
-            if (printData.success) {
-              if (printData.slips && Array.isArray(printData.slips)) {
-                for (const slip of printData.slips) {
-                  await printKotFromBrowser({
-                    kotData: slip.kotData,
-                    base64Bytes: slip.base64Bytes,
-                    printerName: slip.printerName || printData.printer,
-                    counterId: slip.counterId,
-                    counterName: slip.kotData?.counterName,
-                  });
-                }
-                toast.success(`KOT printed for ${printData.slips.length} counter(s)!`, { id: toastId });
-              } else if (printData.kotData) {
-                await printKotFromBrowser({
-                  kotData: printData.kotData,
-                  base64Bytes: printData.base64Bytes,
-                  printerName: printData.printer,
-                });
-                toast.success('KOT printed successfully!', { id: toastId });
-              }
-            } else {
-              toast.dismiss(toastId);
-            }
-          } catch (printErr: any) {
-            console.error('POS order print error:', printErr);
-            toast.dismiss(toastId);
-          }
-        }
       } else {
         toast.error(res.error || 'Failed to place order');
       }

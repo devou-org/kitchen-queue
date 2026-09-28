@@ -38,6 +38,29 @@ let activeSerialPort: any = null;
 let activeUsbDevice: any = null;
 let activeUsbEndpoint: number = 1;
 
+// Deduplication map to prevent double-printing within 5 seconds
+const recentPrintJobs = new Map<string, number>();
+
+function checkAndMarkDuplicatePrint(ticketNumber?: string | number, counterId?: string, counterName?: string): boolean {
+  if (!ticketNumber) return false;
+  const key = `${ticketNumber}_${counterId || counterName || 'all'}`;
+  const now = Date.now();
+  const lastTime = recentPrintJobs.get(key);
+  if (lastTime && now - lastTime < 5000) {
+    return true;
+  }
+  recentPrintJobs.set(key, now);
+  // Housekeep old entries
+  if (recentPrintJobs.size > 100) {
+    for (const [k, time] of recentPrintJobs.entries()) {
+      if (now - time > 30000) {
+        recentPrintJobs.delete(k);
+      }
+    }
+  }
+  return false;
+}
+
 // Common BLE Service UUIDs used by ESC/POS thermal printers
 const BLE_THERMAL_SERVICES = [
   '000018f0-0000-1000-8000-00805f9b34fb', // Standard POS
@@ -676,6 +699,15 @@ export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise
   method: 'bluetooth' | 'serial' | 'rawbt' | 'browser';
   message?: string;
 }> {
+  const ticketNo = options.kotData?.ticketNumber;
+  if (ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName)) {
+    console.warn(`[HardwarePrinter] Duplicate print suppressed for Ticket #${ticketNo} (${options.counterName || options.counterId || 'ALL'})`);
+    return Promise.resolve({
+      success: true,
+      method: 'serial',
+      message: `Ticket #${ticketNo} already processed. Duplicate suppressed.`,
+    });
+  }
   return enqueuePrintJob(() => executePrintUnifiedThermalTicket(options));
 }
 
@@ -794,8 +826,18 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     } catch {}
   }
 
-  // 5. Fallback: Browser 80mm Thermal Receipt
-  // When no direct Bluetooth/Serial/RawBT hardware is connected, this prints via the OS thermal receipt driver.
+  // 5. Fallback: Browser 80mm Thermal Receipt (Manual print only; never on auto-print)
+  // When isAutoPrint is true and forceBrowser is false, NEVER open the browser print dialog!
+  if (isAutoPrint && !forceBrowser) {
+    console.warn(`[HardwarePrinter] Silent printer not reachable for "${printerName}". Browser print dialog suppressed for auto-print.`);
+    return {
+      success: false,
+      method: 'browser',
+      message: `Silent printer not connected for "${printerName}". Start print-agent or connect via USB/Bluetooth.`,
+    };
+  }
+
+  // When no direct Bluetooth/Serial/RawBT/Bridge hardware is connected, this prints via the OS thermal receipt driver.
   // In Chrome Kiosk Mode (--kiosk-printing), this prints 100% silently and automatically.
   return new Promise((resolve) => {
     try {

@@ -4,8 +4,12 @@ import { hashPassword } from '@/lib/auth';
 import { requireAdmin } from '@/lib/auth';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdmin(request);
-  if (!admin || !admin.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await requireAdmin(request);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (!user.isAdmin && (!user.permissions || !user.permissions.includes('staff'))) {
+    return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
+  }
 
   try {
     const slug = request.headers.get('x-restaurant-slug') || 'demo';
@@ -32,8 +36,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdmin(request);
-  if (!admin || !admin.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await requireAdmin(request);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (!user.isAdmin && (!user.permissions || !user.permissions.includes('staff'))) {
+    return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 });
+  }
 
   try {
     const slug = request.headers.get('x-restaurant-slug') || 'demo';

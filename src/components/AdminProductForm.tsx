@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
-import { inventoryService } from '@/app/services/inventory.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Eye, Layers, ArrowLeft, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
@@ -421,6 +420,14 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   Category <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setReorderModalOpen(true)}
+                    title="Reorder Categories"
+                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <ArrowUpDown size={14} /> Reorder
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowAddCategory(!showAddCategory)}

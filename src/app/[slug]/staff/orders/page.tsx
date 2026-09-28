@@ -27,7 +27,7 @@ export default function StaffOrders() {
   const { isMaximized } = useAdminLayout();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('PENDING');
+  const [statusFilter, setStatusFilter] = useState('PREPARING');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
   const [counterFilter, setCounterFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -63,8 +63,9 @@ export default function StaffOrders() {
     setAutoPrintKot(nextVal);
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_auto_print_kot', String(nextVal));
+      localStorage.setItem('qdine_auto_print_bill', String(nextVal));
     }
-    toast.success(nextVal ? '🖨️ Auto-Print KOT: Enabled' : '⏸️ Auto-Print KOT: Paused');
+    toast.success(nextVal ? '🖨️ Auto-Print: Enabled' : '⏸️ Auto-Print: Paused');
   };
 
   const fetchTables = useCallback(() => {
@@ -116,7 +117,7 @@ export default function StaffOrders() {
         sort: 'ASC',
         date_from: bDate,
         date_to: bDate,
-        status: statusFilter
+        status: statusFilter || 'PREPARING'
       });
 
       if (data.success && data.data) {
@@ -128,7 +129,7 @@ export default function StaffOrders() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, restaurant]);
+  }, [page, statusFilter, restaurant?.timezone, restaurant?.rollover_time]);
 
   const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -469,7 +470,7 @@ export default function StaffOrders() {
             </div>
 
             {/* Status Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '110px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -479,12 +480,12 @@ export default function StaffOrders() {
                 options={allStatuses.map((s) => ({ value: s, label: s }))}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
                 className="staff-orders-select"
-                style={{ width: '110px' }}
+                style={{ width: '130px' }}
               />
             </div>
 
             {/* Order Type Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '150px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
@@ -492,13 +493,13 @@ export default function StaffOrders() {
                   setPage(1);
                 }}
                 className="staff-orders-select"
-                style={{ width: '135px' }}
+                style={{ width: '150px' }}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
               />
             </div>
 
             {/* Counter Dropdown */}
-            <div className="staff-orders-filter-control" style={{ width: '115px', flexShrink: 0 }}>
+            <div className="staff-orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -508,7 +509,7 @@ export default function StaffOrders() {
                 ]}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
                 className="staff-orders-select"
-                style={{ width: '115px' }}
+                style={{ width: '135px' }}
               />
             </div>
             {/* Far Right Action Buttons */}

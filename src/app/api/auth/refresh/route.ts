@@ -75,6 +75,89 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
+    // Handle Staff Member Refresh
+    const staffRows = await sql`
+      SELECT s.*, r.name as role_name, r.permissions as role_permissions, res.slug as restaurant_slug, res.name as restaurant_name
+      FROM staffs s
+      LEFT JOIN roles r ON r.id = s.role_id
+      LEFT JOIN restaurants res ON res.id = s.restaurant_id
+      WHERE s.id = ${payload.userId} AND s.is_active = true
+      LIMIT 1
+    `;
+    const staff = staffRows[0];
+    if (staff) {
+      let permissions: string[] = [];
+      if (staff.role_permissions) {
+        permissions = Array.isArray(staff.role_permissions)
+          ? staff.role_permissions
+          : typeof staff.role_permissions === 'string'
+            ? JSON.parse(staff.role_permissions)
+            : [];
+      } else if (staff.role === 'KITCHEN') {
+        permissions = ['orders'];
+      } else {
+        permissions = ['pos', 'orders', 'tables'];
+      }
+
+      const roleName = staff.role_name || staff.role || 'Staff';
+
+      const token = await generateAccessToken({
+        userId: staff.id,
+        email: staff.email,
+        name: staff.name,
+        isAdmin: false,
+        isStaff: true,
+        role: roleName,
+        roleId: staff.role_id,
+        permissions: permissions,
+        restaurantId: staff.restaurant_id,
+        restaurantSlug: staff.restaurant_slug,
+        restaurantName: staff.restaurant_name,
+      }, '1d');
+
+      const newRefreshToken = await generateRefreshToken({
+        userId: staff.id,
+        tokenVersion: 1,
+      }, '90d');
+
+      const response = NextResponse.json({
+        success: true,
+        token,
+        user: {
+          id: staff.id,
+          email: staff.email,
+          name: staff.name,
+          role: roleName,
+          role_id: staff.role_id,
+          permissions: permissions,
+          is_admin: false,
+          is_staff: true,
+          restaurant_id: staff.restaurant_id,
+          restaurant_slug: staff.restaurant_slug,
+          restaurant_name: staff.restaurant_name,
+        },
+      });
+
+      response.cookies.set('admin_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60,
+        path: '/',
+      });
+      response.cookies.set('admin_logged_in', '1', { httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 90 * 24 * 60 * 60, path: '/' });
+      response.cookies.set('staff_token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 24 * 60 * 60, path: '/' });
+      response.cookies.set('admin_refresh_token', newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 90 * 24 * 60 * 60,
+        path: '/',
+      });
+
+      return response;
+    }
+
     // Handle Standard User Refresh
     const userRows = await sql`SELECT * FROM users WHERE id = ${payload.userId} LIMIT 1`;
     const user = userRows[0];

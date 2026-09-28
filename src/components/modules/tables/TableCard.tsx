@@ -5,6 +5,7 @@ import { formatPrice } from '@/lib/format';
 
 interface TableCardProps {
   table: RestaurantTable;
+  onSelect?: (table: RestaurantTable) => void;
   onViewQR: (table: RestaurantTable) => void;
   onEdit: (table: RestaurantTable) => void;
   onDelete: (table: RestaurantTable) => void;
@@ -106,34 +107,7 @@ function TableVisualDiagram({
               : '0 2px 6px rgba(0, 0, 0, 0.03)',
             transition: 'all 0.2s ease'
           }}
-        >
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ fontSize: '16px', fontWeight: 900, color: isOccupied ? '#854D0E' : '#0F172A', letterSpacing: '-0.01em' }}>
-              {tableNumber}
-            </span>
-          </div>
-
-          <div
-            style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              background: isOccupied ? '#EAB308' : primaryColor,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '9px',
-              fontWeight: 900,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}
-          >
-            ✓
-          </div>
-        </div>
+        />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '8px', alignItems: 'center' }}>
           {rightChairs.map((occ, idx) => (
@@ -151,7 +125,7 @@ function TableVisualDiagram({
   );
 }
 
-export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#059669' }: TableCardProps) {
+export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primaryColor = '#059669' }: TableCardProps) {
   const isOccupied = table.status === 'OCCUPIED';
   const activeOrders = table.active_orders || [];
 
@@ -163,6 +137,15 @@ export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#
 
   return (
     <div
+      onClick={() => onSelect?.(table)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect?.(table);
+        }
+      }}
       style={{
         background: '#FFFFFF',
         borderRadius: '8px',
@@ -172,9 +155,24 @@ export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        transition: 'all 0.2s ease-in-out',
+        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        cursor: onSelect ? 'pointer' : 'default',
+      }}
+      onMouseEnter={(e) => {
+        if (onSelect) {
+          e.currentTarget.style.borderColor = `${primaryColor}60`;
+          e.currentTarget.style.boxShadow = `0 6px 20px rgba(0, 0, 0, 0.08)`;
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (onSelect) {
+          e.currentTarget.style.borderColor = '#F1F5F9';
+          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -186,7 +184,11 @@ export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#
 
         <div style={{ display: 'flex', gap: '4px' }}>
           <button
-            onClick={() => onEdit(table)}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(table);
+            }}
             title="Edit Table Name & Capacity"
             style={{
               padding: '6px',
@@ -203,7 +205,11 @@ export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#
             <Edit2 size={16} color={primaryColor} />
           </button>
           <button
-            onClick={() => onViewQR(table)}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewQR(table);
+            }}
             title="View & Print Table QR Code"
             style={{
               padding: '6px',
@@ -220,7 +226,11 @@ export function TableCard({ table, onViewQR, onEdit, onDelete, primaryColor = '#
             <QrCode size={16} color={primaryColor} />
           </button>
           <button
-            onClick={() => onDelete(table)}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(table);
+            }}
             title="Delete Table"
             style={{
               padding: '6px',

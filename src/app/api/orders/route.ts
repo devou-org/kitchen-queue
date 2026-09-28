@@ -138,6 +138,9 @@ export async function POST(request: NextRequest) {
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
+    const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+    const staffId = (isPos && admin?.isStaff && isUuid(admin?.userId)) ? admin.userId : undefined;
+
     const order = await createOrder({
       restaurant_id: restaurant.id,
       customer_name: customer_name.trim(),
@@ -152,7 +155,7 @@ export async function POST(request: NextRequest) {
       table_number: order_type === 'TAKEAWAY' ? null : table_number,
       order_type: order_type || 'DINE_IN',
       is_pos: isPos,
-      staff_id: isPos ? admin?.userId : undefined,
+      staff_id: staffId,
       business_date,
       items,
     });
@@ -179,8 +182,8 @@ export async function POST(request: NextRequest) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
     }
 
-    // 🖨️ AUTO-PRINT KOT PER COUNTER when order is placed
-    if (order) {
+    // 🖨️ AUTO-PRINT KOT PER COUNTER: Only print when order is in PREPARING state (never in PENDING state)
+    if (order && order.status === 'PREPARING') {
       try {
         await autoQueueAndBroadcastKot(restaurant.id, order.id);
       } catch (kotErr) {
