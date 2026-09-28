@@ -12,6 +12,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { CustomMultiSelect } from '@/components/ui/CustomSelect';
 
 type CustomerLoyalty = {
   id: string;
@@ -1316,23 +1317,18 @@ export default function AdminLoyaltyPage() {
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                 Applicable / Free Products (Product Picker)
               </label>
-              <select
-                multiple
+              <CustomMultiSelect
+                options={productsList.map((p) => ({
+                  value: p.id,
+                  label: p.name,
+                  price: p.price,
+                }))}
                 value={rewardForm.selected_product_ids}
-                onChange={(e) => {
-                  const opts = Array.from(e.target.selectedOptions, (opt) => opt.value);
-                  setRewardForm({ ...rewardForm, selected_product_ids: opts });
-                }}
-                style={{ width: '100%', height: '120px', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
-              >
-                {productsList.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} (₹{p.price})
-                  </option>
-                ))}
-              </select>
-              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                Hold Ctrl (or Cmd) to select multiple products. Leave empty for all products.
+                onChange={(selectedIds) => setRewardForm({ ...rewardForm, selected_product_ids: selectedIds })}
+                placeholder="Select applicable products (Leave empty for all)..."
+              />
+              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block' }}>
+                Selected products will be eligible for this reward. Leave empty to apply to all products.
               </span>
             </div>
 

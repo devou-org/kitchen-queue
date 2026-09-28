@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Search, X } from 'lucide-react';
 
 export interface SelectOption<T = string> {
   value: T;
@@ -208,6 +208,279 @@ export function CustomSelect<T extends string = string>({
               </button>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export interface MultiSelectOption<T = string> {
+  value: T;
+  label: string;
+  sublabel?: string;
+  price?: number;
+}
+
+export interface CustomMultiSelectProps<T = string> {
+  options: MultiSelectOption<T>[];
+  value: T[];
+  onChange: (val: T[]) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  style?: React.CSSProperties;
+  className?: string;
+}
+
+export function CustomMultiSelect<T extends string = string>({
+  options,
+  value,
+  onChange,
+  placeholder = 'Select products...',
+  disabled = false,
+  style = {},
+  className = '',
+}: CustomMultiSelectProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, []);
+
+  const filteredOptions = options.filter((opt) =>
+    opt.label.toLowerCase().includes(search.toLowerCase()) ||
+    (opt.sublabel && opt.sublabel.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const toggleOption = (val: T) => {
+    if (value.includes(val)) {
+      onChange(value.filter((v) => v !== val));
+    } else {
+      onChange([...value, val]);
+    }
+  };
+
+  const removeValue = (val: T, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(value.filter((v) => v !== val));
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ position: 'relative', width: '100%', ...style }}
+      className={className}
+    >
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        style={{
+          minHeight: '44px',
+          padding: '6px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'white',
+          border: '1px solid var(--border, #cbd5e1)',
+          borderRadius: '8px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+          gap: '8px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', flex: 1, alignItems: 'center' }}>
+          {value.length === 0 ? (
+            <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>
+              {placeholder}
+            </span>
+          ) : (
+            value.map((val) => {
+              const opt = options.find((o) => o.value === val);
+              if (!opt) return null;
+              return (
+                <span
+                  key={String(val)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                  }}
+                >
+                  {opt.label} {opt.price !== undefined ? `(₹${opt.price})` : ''}
+                  <X
+                    size={12}
+                    onClick={(e) => removeValue(val, e)}
+                    style={{ cursor: 'pointer', color: '#64748b' }}
+                  />
+                </span>
+              );
+            })
+          )}
+        </div>
+        <ChevronDown
+          size={16}
+          style={{
+            color: '#64748b',
+            transition: 'transform 0.2s ease',
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            flexShrink: 0,
+          }}
+        />
+      </div>
+
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            background: 'white',
+            border: '1px solid var(--border, #cbd5e1)',
+            borderRadius: '8px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+            padding: '8px',
+            maxHeight: '280px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+          }}
+        >
+          {/* Search bar & quick select controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '6px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px 6px 28px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '12px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+            {value.length > 0 ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange([]);
+                }}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#dc2626',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px 6px',
+                }}
+              >
+                Clear All
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(options.map((o) => o.value));
+                }}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: 'var(--primary, #059669)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px 6px',
+                }}
+              >
+                Select All
+              </button>
+            )}
+          </div>
+
+          {/* Product list */}
+          <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {filteredOptions.length === 0 ? (
+              <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>
+                No matching products found.
+              </div>
+            ) : (
+              filteredOptions.map((option) => {
+                const isSelected = value.includes(option.value);
+                return (
+                  <div
+                    key={String(option.value)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleOption(option.value);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      background: isSelected ? '#f0fdf4' : 'transparent',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = '#f8fafc';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        style={{ width: '16px', height: '16px', accentColor: 'var(--primary, #059669)', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontWeight: isSelected ? 700 : 500, color: '#0f172a' }}>
+                        {option.label}
+                      </span>
+                    </div>
+                    {option.price !== undefined && (
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>
+                        ₹{option.price}
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </div>
