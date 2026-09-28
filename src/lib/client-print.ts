@@ -1,5 +1,9 @@
-import { KotPrintData } from './escpos';
-import { printUnifiedThermalTicket } from './hardware-printer';
+import { KotPrintData, BillPrintData } from './escpos';
+import {
+  printUnifiedThermalTicket,
+  printUnifiedBill,
+  UnifiedBillPrintOptions,
+} from './hardware-printer';
 
 export interface ClientPrintOptions {
   kotData: KotPrintData;
@@ -9,6 +13,17 @@ export interface ClientPrintOptions {
   counterName?: string;
   localBridgeUrl?: string; // fallback if local bridge is running
   isAutoPrint?: boolean;
+  forceBrowser?: boolean;
+}
+
+export interface ClientBillPrintOptions {
+  base64Bytes?: string;
+  billHtml?: string;
+  orderData?: any;
+  billData?: BillPrintData | any;
+  printerName?: string;
+  ticketNumber?: string | number;
+  localBridgeUrl?: string;
   forceBrowser?: boolean;
 }
 
@@ -84,3 +99,29 @@ export async function printKotFromBrowser(options: ClientPrintOptions): Promise<
     message: hardwareResult.message,
   };
 }
+
+/**
+ * Print Bill receipt from the client browser.
+ * 1. Direct Web Bluetooth (if paired)
+ * 2. Direct Web Serial / USB (if connected)
+ * 3. Android RawBT
+ * 4. Local bridge endpoint (if active)
+ * 5. 80mm hidden iframe thermal print (Compatible with Chrome Kiosk mode / system thermal printer)
+ */
+export async function printBillFromBrowser(options: ClientBillPrintOptions): Promise<{
+  success: boolean;
+  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser';
+  message?: string;
+}> {
+  return await printUnifiedBill({
+    base64Bytes: options.base64Bytes,
+    billHtml: options.billHtml,
+    orderData: options.orderData,
+    billData: options.billData,
+    printerName: options.printerName,
+    ticketNumber: options.ticketNumber,
+    localBridgeUrl: options.localBridgeUrl,
+    forceBrowser: options.forceBrowser,
+  });
+}
+

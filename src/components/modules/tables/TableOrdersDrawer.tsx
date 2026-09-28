@@ -23,6 +23,7 @@ import { RestaurantTable } from '@/modules/tables/tables.repository';
 import { formatPrice, formatDateTime } from '@/lib/format';
 import OrderStatusBadge from '@/components/modules/orders/OrderStatusBadge';
 import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
+import { printBillFromBrowser, printKotFromBrowser } from '@/lib/client-print';
 
 interface TableOrdersDrawerProps {
   table: RestaurantTable | null;
@@ -110,7 +111,29 @@ export function TableOrdersDrawer({
         throw new Error(data.error || 'Failed to print bill');
       }
 
-      toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+      // If handled on server (local Windows dev) or cloud print agent
+      if (data.mode === 'server' || data.mode === 'agent') {
+        toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+        return;
+      }
+
+      // Client mode (VPS cloud-hosted / client browser):
+      const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : undefined;
+      const clientRes = await printBillFromBrowser({
+        base64Bytes: data.base64Bytes,
+        billHtml: data.billHtml,
+        orderData: order,
+        billData: data.billData,
+        printerName: data.printer || savedPrinter,
+        ticketNumber: order.ticket_number,
+        localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
+      });
+
+      if (clientRes.success) {
+        toast.success(clientRes.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed!`, { id: toastId });
+      } else {
+        toast.error(clientRes.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
     } catch (err: any) {
       console.error('Bill print error:', err);
       toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
@@ -151,7 +174,36 @@ export function TableOrdersDrawer({
         throw new Error(data.error || 'Failed to print KOT');
       }
 
-      toast.success(data.message || `KOT #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+      if (data.mode === 'server' || data.mode === 'agent') {
+        toast.success(data.message || `KOT #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+        return;
+      }
+
+      // Client mode (VPS fallback)
+      const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : undefined;
+      if (data.slips && Array.isArray(data.slips)) {
+        for (const slip of data.slips) {
+          await printKotFromBrowser({
+            kotData: slip.kotData,
+            base64Bytes: slip.base64Bytes,
+            printerName: slip.printerName || data.printer || savedPrinter,
+            counterId: slip.counterId,
+            counterName: slip.kotData?.counterName,
+            localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
+          });
+        }
+        toast.success(`KOT printed for ${data.slips.length} counter(s)!`, { id: toastId });
+      } else if (data.kotData) {
+        const clientRes = await printKotFromBrowser({
+          kotData: data.kotData,
+          base64Bytes: data.base64Bytes,
+          printerName: data.printer || savedPrinter,
+          localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
+        });
+        toast.success(clientRes.message || `KOT #${String(order.ticket_number).padStart(3, '0')} printed!`, { id: toastId });
+      } else {
+        toast.success(data.message || 'KOT printed!', { id: toastId });
+      }
     } catch (err: any) {
       console.error('KOT print error:', err);
       toast.error(err.message || 'Failed to print KOT.', { id: toastId });
