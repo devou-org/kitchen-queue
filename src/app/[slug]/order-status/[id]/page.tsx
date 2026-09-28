@@ -13,7 +13,8 @@ import {
   CircleDollarSign,
   Info,
   ClipboardEdit,
-  Receipt
+  Receipt,
+  Gift
 } from 'lucide-react';
 import { formatPrice, formatOrdinal } from '@/lib/format';
 import { Order } from '@/types';
@@ -423,6 +424,38 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             </div>
           )}
         </div>
+
+        {/* Loyalty Points Earned Card */}
+        {order && order.total_price > 0 && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+            borderRadius: '20px',
+            padding: '16px 20px',
+            marginBottom: '20px',
+            border: '1px solid #6EE7B7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 4px 12px rgba(5, 150, 105, 0.08)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: '#059669', color: 'white', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Gift size={22} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '14px', color: '#065F46' }}>
+                  {order.is_paid || (order.status || '').toUpperCase() === 'PAID' ? 'Loyalty Points Earned!' : 'Loyalty Points For This Order'}
+                </div>
+                <div style={{ fontSize: '12px', color: '#047857', marginTop: '2px', fontWeight: 600 }}>
+                  {order.is_paid || (order.status || '').toUpperCase() === 'PAID' ? 'Credited to your CRM balance' : 'Will be credited upon payment completion'}
+                </div>
+              </div>
+            </div>
+            <div style={{ background: '#059669', color: 'white', padding: '6px 14px', borderRadius: '20px', fontWeight: 800, fontSize: '15px' }}>
+              +{Math.floor(order.total_price * 0.1)} pts
+            </div>
+          </div>
+        )}
 
         {/* Notification Banner - For PENDING & WAITING statuses */}
         {['PENDING', 'WAITING'].includes((order.status || '').trim().toUpperCase()) && (

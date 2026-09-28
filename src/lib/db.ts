@@ -3173,6 +3173,9 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
 
 export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
   try {
+    // Auto-sync any completed/paid orders to loyalty customers & points
+    await syncAllCompletedOrdersToLoyalty(restaurantId);
+
     let query;
     if (search && search.trim() !== '') {
       const searchPattern = `%${search.trim().toLowerCase()}%`;
@@ -3181,7 +3184,7 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
           cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
           cl.total_spent, cl.last_visit_at, cl.created_at,
-          u.name, u.phone, u.email
+          u.name, u.phone
         FROM customer_loyalty cl
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
@@ -3194,7 +3197,7 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
           cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
           cl.total_spent, cl.last_visit_at, cl.created_at,
-          u.name, u.phone, u.email
+          u.name, u.phone
         FROM customer_loyalty cl
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
@@ -3221,7 +3224,7 @@ export async function getOrCreateCustomerLoyaltyByPhone(restaurantId: string, ph
     }
 
     let rows = await sql`
-      SELECT cl.*, u.name, u.phone, u.email
+      SELECT cl.*, u.name, u.phone
       FROM customer_loyalty cl
       JOIN users u ON u.id = cl.user_id
       WHERE cl.restaurant_id = ${restaurantId} AND cl.user_id = ${user.id}
@@ -3237,7 +3240,6 @@ export async function getOrCreateCustomerLoyaltyByPhone(restaurantId: string, ph
       `;
       rows[0].name = user.name;
       rows[0].phone = user.phone;
-      rows[0].email = user.email;
     }
 
     return rows[0];
@@ -3425,6 +3427,25 @@ export async function getLoyaltyTransactionsList(restaurantId: string) {
   }
 }
 
+export async function syncAllCompletedOrdersToLoyalty(restaurantId: string) {
+  try {
+    const orders = await sql`
+      SELECT id, customer_name, phone, user_id, total_price, status, is_paid
+      FROM orders
+      WHERE restaurant_id = ${restaurantId}
+        AND (is_paid = true OR status IN ('PAID', 'COMPLETED'))
+    `;
+
+    for (const ord of orders) {
+      const phone = ord.phone;
+      const amount = Number(ord.total_price || 0);
+      await processLoyaltyForCompletedOrder(restaurantId, ord.id, phone, amount);
+    }
+  } catch (err) {
+    console.error('Error syncing completed orders to loyalty:', err);
+  }
+}
+
 export async function processLoyaltyForCompletedOrder(restaurantId: string, orderId: string, customerPhone?: string, totalAmount?: number) {
   try {
     const settings = await getLoyaltySettings(restaurantId);
@@ -3441,35 +3462,49 @@ export async function processLoyaltyForCompletedOrder(restaurantId: string, orde
     let phone = customerPhone;
     let amount = totalAmount;
     let userId: string | null = null;
+    let customerName: string | null = null;
 
-    if (!phone || amount === undefined) {
-      const orderRes = await sql`SELECT customer_phone, phone, user_id, total_price FROM orders WHERE id = ${orderId} AND restaurant_id = ${restaurantId} LIMIT 1`;
-      if (orderRes.length === 0) return;
-      phone = phone || orderRes[0].customer_phone || orderRes[0].phone;
+    const orderRes = await sql`
+      SELECT customer_name, phone, user_id, total_price 
+      FROM orders 
+      WHERE id = ${orderId} AND restaurant_id = ${restaurantId} 
+      LIMIT 1
+    `;
+    if (orderRes.length > 0) {
+      phone = phone || orderRes[0].phone;
       amount = amount ?? Number(orderRes[0].total_price || 0);
       userId = orderRes[0].user_id || null;
+      customerName = orderRes[0].customer_name || null;
+    }
+
+    if (!phone && !userId && customerName) {
+      // Deterministically generate phone key for guest customers registered by name
+      const nameHash = Math.abs(customerName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 12345).toString().slice(0, 8);
+      phone = `99${nameHash.padStart(8, '0')}`;
     }
 
     if (!phone && !userId) return;
 
     let customerLoyalty;
     if (phone) {
-      customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone);
+      customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone, customerName || undefined);
     } else if (userId) {
       const rows = await sql`
-        SELECT cl.*, u.name, u.phone, u.email FROM customer_loyalty cl JOIN users u ON u.id = cl.user_id WHERE cl.restaurant_id = ${restaurantId} AND cl.user_id = ${userId} LIMIT 1
+        SELECT cl.*, u.name, u.phone FROM customer_loyalty cl JOIN users u ON u.id = cl.user_id WHERE cl.restaurant_id = ${restaurantId} AND cl.user_id = ${userId} LIMIT 1
       `;
       customerLoyalty = rows[0];
     }
 
     if (!customerLoyalty) return;
 
-    if (settings.min_order_amount && amount < Number(settings.min_order_amount)) {
+    const validAmount = Number(amount || 0);
+
+    if (settings.min_order_amount && validAmount < Number(settings.min_order_amount)) {
       return;
     }
 
     const rate = Number(settings.points_earning_rate || 0.1);
-    const pointsEarned = Math.floor(amount * rate);
+    const pointsEarned = Math.floor(validAmount * rate);
 
     const milestoneTarget = Number(settings.visit_milestone_count || 5);
     let newVisitProgress = Number(customerLoyalty.visit_progress || 0) + 1;
@@ -3485,7 +3520,7 @@ export async function processLoyaltyForCompletedOrder(restaurantId: string, orde
 
     const newPointsBalance = Number(customerLoyalty.points_balance || 0) + pointsEarned;
     const newTotalEarned = Number(customerLoyalty.total_points_earned || 0) + pointsEarned;
-    const newTotalSpent = Number(customerLoyalty.total_spent || 0) + amount;
+    const newTotalSpent = Number(customerLoyalty.total_spent || 0) + validAmount;
 
     await sql`
       UPDATE customer_loyalty
@@ -3556,6 +3591,60 @@ export async function processLoyaltyForCancelledOrder(restaurantId: string, orde
     `;
   } catch (err) {
     console.error('Error reversing loyalty points for cancelled order:', err);
+  }
+}
+
+export async function redeemLoyaltyReward(restaurantId: string, phone: string, rewardId: string) {
+  try {
+    const customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone);
+    if (!customerLoyalty) {
+      throw new Error('Customer profile not found');
+    }
+
+    const rewardRes = await sql`
+      SELECT * FROM loyalty_rewards WHERE id = ${rewardId} AND restaurant_id = ${restaurantId} AND is_active = true LIMIT 1
+    `;
+    if (rewardRes.length === 0) {
+      throw new Error('Reward not found or inactive');
+    }
+    const reward = rewardRes[0];
+
+    const currentPoints = Number(customerLoyalty.points_balance || 0);
+    const requiredPoints = Number(reward.points_required || 0);
+
+    if (currentPoints < requiredPoints) {
+      throw new Error(`Insufficient points balance (${currentPoints} pts available, ${requiredPoints} pts required)`);
+    }
+
+    const newPointsBalance = currentPoints - requiredPoints;
+    const newTotalRedeemed = Number(customerLoyalty.total_points_redeemed || 0) + requiredPoints;
+
+    await sql`
+      UPDATE customer_loyalty
+      SET points_balance = ${newPointsBalance},
+          total_points_redeemed = ${newTotalRedeemed},
+          updated_at = NOW()
+      WHERE id = ${customerLoyalty.id} AND restaurant_id = ${restaurantId}
+    `;
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${customerLoyalty.id}, ${customerLoyalty.user_id}, 'REDEEM_POINTS', ${-requiredPoints}, 0, ${`Redeemed reward: ${reward.name}`})
+    `;
+
+    return {
+      success: true,
+      reward,
+      new_points_balance: newPointsBalance,
+      customer: {
+        id: customerLoyalty.id,
+        name: customerLoyalty.name,
+        phone: customerLoyalty.phone,
+        points_balance: newPointsBalance,
+      }
+    };
+  } catch (err: any) {
+    throw err;
   }
 }
 
