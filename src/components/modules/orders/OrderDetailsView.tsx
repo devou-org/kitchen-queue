@@ -25,7 +25,7 @@ import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { checkTableAssignment } from '@/lib/table-capacity';
-import { printKotFromBrowser } from '@/lib/client-print';
+import { printKotFromBrowser, printBillFromBrowser } from '@/lib/client-print';
 import { printBillTemplateDirectly } from '@/components/BillTemplate';
 import { useRestaurant } from '@/hooks/useRestaurant';
 
@@ -282,7 +282,28 @@ export function OrderDetailsView({
         throw new Error(data.error || 'Failed to print bill');
       }
 
-      toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+      if (data.mode === 'server' || data.mode === 'agent') {
+        toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+        return;
+      }
+
+      // Cloud hosted (VPS): Print via hardware (Bluetooth/USB/RawBT/local bridge) or 80mm browser thermal driver
+      const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : undefined;
+      const clientRes = await printBillFromBrowser({
+        base64Bytes: data.base64Bytes,
+        billHtml: data.billHtml,
+        orderData: order,
+        billData: data.billData,
+        printerName: data.printer || savedPrinter,
+        ticketNumber: order.ticket_number,
+        localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
+      });
+
+      if (clientRes.success) {
+        toast.success(clientRes.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed!`, { id: toastId });
+      } else {
+        toast.error(clientRes.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
     } catch (err: any) {
       console.error('Bill print error:', err);
       toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
