@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
 import { 
   Gift, Users, Award, TrendingUp, Search, RefreshCw, Plus, 
@@ -78,6 +79,11 @@ export default function AdminLoyaltyPage() {
 
   const [activeTab, setActiveTab] = useState<'customers' | 'settings' | 'rewards' | 'transactions'>('customers');
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Customer Directory State
   const [customers, setCustomers] = useState<CustomerLoyalty[]>([]);
@@ -314,7 +320,20 @@ export default function AdminLoyaltyPage() {
 
   return (
     <AdminContentWrapper>
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-right" 
+        containerStyle={{
+          position: 'fixed',
+          top: 20,
+          right: 20,
+          zIndex: 999999,
+        }}
+        toastOptions={{
+          style: {
+            zIndex: 999999,
+          },
+        }}
+      />
       
       <style>{`
         .loyalty-nav-bar {
@@ -1124,8 +1143,8 @@ export default function AdminLoyaltyPage() {
       )}
 
       {/* MODAL: MANUAL POINTS ADJUSTMENT */}
-      {selectedCustomer && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+      {mounted && selectedCustomer && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: '20px' }}>
           <div className="animate-fade-in" style={{ background: 'white', borderRadius: '14px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -1187,12 +1206,13 @@ export default function AdminLoyaltyPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MODAL: ADD / EDIT REWARD */}
-      {showRewardModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+      {mounted && showRewardModal && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: '20px' }}>
           <form noValidate onSubmit={handleSaveReward} className="animate-fade-in" style={{ background: 'white', borderRadius: '14px', padding: '24px', maxWidth: '500px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -1332,7 +1352,8 @@ export default function AdminLoyaltyPage() {
               </button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
     </AdminContentWrapper>
   );
