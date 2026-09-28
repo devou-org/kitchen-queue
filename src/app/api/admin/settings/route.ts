@@ -163,6 +163,7 @@ export async function PUT(request: NextRequest) {
       opening_time,
       closing_time,
       rollover_time,
+      is_service_active,
       country,
       country_code,
       state,
@@ -175,6 +176,34 @@ export async function PUT(request: NextRequest) {
 
     if (!name) {
       return NextResponse.json({ success: false, error: 'Name is required' }, { status: 400 });
+    }
+
+    await ensureColumnExists();
+    const effTz = timezone || restaurant.timezone || 'Asia/Kolkata';
+    const effOpen = opening_time !== undefined ? opening_time : restaurant.opening_time;
+    const effClose = closing_time !== undefined ? closing_time : restaurant.closing_time;
+
+    const timeCheck = await sql`
+      SELECT (CURRENT_TIMESTAMP AT TIME ZONE COALESCE(${effTz}, 'Asia/Kolkata'))::time as current_time_in_tz
+    `;
+    const curTime = timeCheck[0]?.current_time_in_tz;
+
+    let computedOperatingHours = true;
+    if (effOpen && effClose && curTime) {
+      if (effOpen < effClose) {
+        computedOperatingHours = curTime >= effOpen && curTime < effClose;
+      } else if (effOpen > effClose) {
+        computedOperatingHours = curTime >= effOpen || curTime < effClose;
+      }
+    }
+
+    let finalServiceActive = true;
+    if (!computedOperatingHours) {
+      finalServiceActive = false;
+    } else if (typeof is_service_active === 'boolean') {
+      finalServiceActive = is_service_active;
+    } else {
+      finalServiceActive = true;
     }
 
     await sql`
@@ -193,6 +222,7 @@ export async function PUT(request: NextRequest) {
         opening_time = ${opening_time || null},
         closing_time = ${closing_time || null},
         rollover_time = ${rollover_time || null},
+        is_service_active = ${finalServiceActive},
         country = COALESCE(${country || null}, country),
         country_code = COALESCE(${country_code || null}, country_code),
         state = COALESCE(${state || null}, state),
@@ -205,7 +235,12 @@ export async function PUT(request: NextRequest) {
       WHERE id = ${restaurant.id}
     `;
 
-    return NextResponse.json({ success: true, message: 'Settings updated successfully' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Settings updated successfully',
+      isServiceActive: finalServiceActive,
+      isOperatingHours: computedOperatingHours
+    });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

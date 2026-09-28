@@ -27,7 +27,7 @@ export default function StaffOrders() {
   const { isMaximized } = useAdminLayout();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('PENDING');
+  const [statusFilter, setStatusFilter] = useState('PREPARING');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
   const [counterFilter, setCounterFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -117,7 +117,7 @@ export default function StaffOrders() {
         sort: 'ASC',
         date_from: bDate,
         date_to: bDate,
-        status: statusFilter
+        status: statusFilter || 'PREPARING'
       });
 
       if (data.success && data.data) {
@@ -129,7 +129,7 @@ export default function StaffOrders() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, restaurant]);
+  }, [page, statusFilter, restaurant?.timezone, restaurant?.rollover_time]);
 
   const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 

@@ -10,7 +10,7 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
-import { ServiceToggle } from '@/components/ServiceToggle';
+import { ServiceToggle, checkOperatingHours } from '@/components/ServiceToggle';
 
 interface CollapsibleCardProps {
   id: string;
@@ -182,11 +182,28 @@ export default function AdminSettings() {
   const [detectingLoc, setDetectingLoc] = useState(false);
   const [hasPromptedGeo, setHasPromptedGeo] = useState(false);
 
-  // Business Hours State
   const [timezone, setTimezone] = useState('Asia/Kolkata');
   const [openingTime, setOpeningTime] = useState('09:00:00');
   const [closingTime, setClosingTime] = useState('22:00:00');
   const [rolloverTime, setRolloverTime] = useState('00:00:00');
+
+  const handleOpeningTimeChange = (newOpen: string) => {
+    setOpeningTime(newOpen);
+    const within = checkOperatingHours(newOpen, closingTime, timezone);
+    setIsServiceOnline(within);
+  };
+
+  const handleClosingTimeChange = (newClose: string) => {
+    setClosingTime(newClose);
+    const within = checkOperatingHours(openingTime, newClose, timezone);
+    setIsServiceOnline(within);
+  };
+
+  const handleTimezoneChange = (newTz: string) => {
+    setTimezone(newTz);
+    const within = checkOperatingHours(openingTime, closingTime, newTz);
+    setIsServiceOnline(within);
+  };
 
   const handleDetectLocation = (isAutoPrompt = false) => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
@@ -253,10 +270,14 @@ export default function AdminSettings() {
       setMenuLayout((restaurant as any).menu_layout || 'LIST');
       setMenuTitle(restaurant.menu_title || "Today's Specials");
       setMenuDescription(restaurant.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes.");
-      setTimezone(restaurant.timezone || 'Asia/Kolkata');
-      setOpeningTime(restaurant.opening_time || '09:00:00');
-      setClosingTime(restaurant.closing_time || '22:00:00');
+      const tzVal = restaurant.timezone || 'Asia/Kolkata';
+      const openVal = restaurant.opening_time || '09:00:00';
+      const closeVal = restaurant.closing_time || '22:00:00';
+      setTimezone(tzVal);
+      setOpeningTime(openVal);
+      setClosingTime(closeVal);
       setRolloverTime(restaurant.rollover_time || '00:00:00');
+      setIsServiceOnline(checkOperatingHours(openVal, closeVal, tzVal));
 
       // Location fields
       setCity((restaurant as any).city || '');
@@ -365,6 +386,7 @@ export default function AdminSettings() {
           opening_time: openingTime,
           closing_time: closingTime,
           rollover_time: rolloverTime,
+          is_service_active: isServiceOnline,
           city: city || null,
           state: state || null,
           country: country || null,
@@ -564,7 +586,14 @@ export default function AdminSettings() {
               <p style={{ ...S.cardDesc, marginBottom: '16px' }}>
                 Manage online ordering availability, switch between Online/Offline modes, and set custom customer offline notices.
               </p>
-              <ServiceToggle primaryColor={primaryColor} onStatusChange={(online) => setIsServiceOnline(online)} />
+              <ServiceToggle 
+                primaryColor={primaryColor} 
+                onStatusChange={(online) => setIsServiceOnline(online)}
+                openingTime={openingTime}
+                closingTime={closingTime}
+                timezone={timezone}
+                controlledActive={isServiceOnline}
+              />
             </CollapsibleCard>
 
             {/* 1. Profile & Contact Card */}
@@ -705,20 +734,12 @@ export default function AdminSettings() {
                 </div>
 
                 {/* Theme Colors Configuration */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div>
                     <label style={S.label}>Primary Brand Color</label>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', maxWidth: '320px' }}>
                       <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} style={S.colorSwatch} />
                       <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} maxLength={7} style={S.colorInput} placeholder="#971345" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={S.label}>Secondary / Background Color</label>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
-                      <input type="color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} style={S.colorSwatch} />
-                      <input type="text" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} maxLength={7} style={S.colorInput} placeholder="#EC7951" />
                     </div>
                   </div>
                 </div>
@@ -827,7 +848,7 @@ export default function AdminSettings() {
                     <label style={S.label}>Timezone</label>
                     <select
                       value={timezone}
-                      onChange={e => setTimezone(e.target.value)}
+                      onChange={e => handleTimezoneChange(e.target.value)}
                       style={{ ...S.input, appearance: 'auto', backgroundColor: '#ffffff' }}
                     >
                       <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
@@ -847,11 +868,11 @@ export default function AdminSettings() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
                     <div>
                       <label style={S.label}>Opening Time</label>
-                      <input type="time" value={openingTime} onChange={e => setOpeningTime(e.target.value)} style={S.input} />
+                      <input type="time" value={openingTime} onChange={e => handleOpeningTimeChange(e.target.value)} style={S.input} />
                     </div>
                     <div>
                       <label style={S.label}>Closing Time</label>
-                      <input type="time" value={closingTime} onChange={e => setClosingTime(e.target.value)} style={S.input} />
+                      <input type="time" value={closingTime} onChange={e => handleClosingTimeChange(e.target.value)} style={S.input} />
                     </div>
                   </div>
 
@@ -1011,7 +1032,7 @@ export default function AdminSettings() {
             >
               <p style={{ ...S.cardDesc, marginBottom: '16px' }}>Read-only tax configuration managed by the Super Admin platform.</p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <label style={S.label}>GST Type</label>
                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'default' }}>

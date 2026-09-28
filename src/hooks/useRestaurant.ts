@@ -65,9 +65,13 @@ export async function fetchRestaurant(force = false): Promise<RestaurantContext 
     .then(res => res.json())
     .then(data => {
       if (data.success && data.data) {
-        cached = data.data;
+        const prev = JSON.stringify(cached);
+        const next = JSON.stringify(data.data);
         lastFetchTime = Date.now();
-        listeners.forEach(fn => fn(cached));
+        if (prev !== next) {
+          cached = data.data;
+          listeners.forEach(fn => fn(cached));
+        }
         return cached;
       }
       return null;
@@ -116,7 +120,7 @@ export function useRestaurant() {
     // Auto-revalidate whenever user switches back to this browser tab or window gains focus
     const revalidate = () => {
       const now = Date.now();
-      if (now - lastFetchTime > 1500) {
+      if (now - lastFetchTime > 30000) {
         fetchRestaurant(true);
       }
     };
