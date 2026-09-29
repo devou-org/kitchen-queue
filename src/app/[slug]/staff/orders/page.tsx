@@ -261,19 +261,32 @@ export default function StaffOrders() {
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
+        is_paid: newStatus === 'PAID' ? true : undefined,
         table_number: tableNumber,
         payment_method: pMethod || undefined
       });
       if (data.success) {
         fetchTables();
         setOrders(prev => {
-          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number, payment_method: pMethod ?? o.payment_method } : o)
+          return prev.map(o => o.id === id ? {
+            ...o,
+            status: newStatus as Order['status'],
+            table_number: tableNumber ?? o.table_number,
+            payment_method: pMethod ?? o.payment_method,
+            is_paid: newStatus === 'PAID' ? true : o.is_paid
+          } : o)
             .filter(o => {
               if (statusFilter) return o.status === statusFilter;
               return o.status === 'PENDING';
             });
         });
-        setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number, payment_method: pMethod ?? prev.payment_method } : null);
+        setSelectedOrder((prev): Order | null => prev ? {
+          ...prev,
+          status: newStatus as Order['status'],
+          table_number: tableNumber ?? prev.table_number,
+          payment_method: pMethod ?? prev.payment_method,
+          is_paid: newStatus === 'PAID' ? true : prev.is_paid
+        } : null);
         toast.success(`Order updated to ${newStatus}`);
       } else {
         toast.error(data.error || 'Failed to update');
@@ -655,6 +668,10 @@ export default function StaffOrders() {
           onClose={closeModal}
           onStatusChange={handleStatusChange}
           loading={modalLoading}
+          onOrderUpdated={(updated) => {
+            setSelectedOrder(updated);
+            setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)));
+          }}
         />
       )}
 

@@ -1130,7 +1130,7 @@ export default function AdminSettings() {
               >
                 <QRCodeGenerator
                   hideCardWrapper={true}
-                  url={`${process.env.NEXT_PUBLIC_URL || window.location.origin}/${slug}/menu`}
+                  url={`${(process.env.NEXT_PUBLIC_URL || window.location.origin).trim().replace(/\/+$/, '')}/${slug}/menu`}
                   title="Menu QR Code"
                   description="Download and print this QR code to allow customers to easily access your digital menu."
                   primaryColor={primaryColor}

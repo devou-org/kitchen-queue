@@ -10,13 +10,12 @@ import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { useParams } from 'next/navigation';
 import { Search, X } from 'lucide-react';
-import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
-import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
+import { POSCheckoutDrawer, POSOrderFormData } from '@/components/modules/pos/POSCheckoutDrawer';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -119,20 +118,15 @@ export default function AdminPosPage() {
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [tables, setTables] = useState<any[]>([]);
-  const [orderForm, setOrderForm] = useState<{
-    customer_name: string;
-    phone: string;
-    table_number: string;
-    party_size: number;
-    notes: string;
-    order_type: OrderType | string;
-  }>({
+  const [orderForm, setOrderForm] = useState<POSOrderFormData>({
     customer_name: '',
     phone: '',
     table_number: '',
     party_size: 1,
     notes: '',
-    order_type: 'DINE_IN'
+    order_type: 'DINE_IN',
+    is_paid: false,
+    payment_method: 'CASH',
   });
   const [submitting, setSubmitting] = useState(false);
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<any>(null);
@@ -354,10 +348,14 @@ export default function AdminPosPage() {
 
   const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.size === 0) return toast.error('Cart is empty');
+    if (cart.size === 0) {
+      toast.error('Cart is empty');
+      return;
+    }
     const isTakeaway = orderForm.order_type === 'TAKEAWAY';
     if (!isTakeaway && !orderForm.customer_name && !orderForm.table_number) {
-      return toast.error('Please provide a Customer Name or Table Number');
+      toast.error('Please provide a Customer Name or Table Number');
+      return;
     }
 
     setSubmitting(true);
@@ -380,7 +378,9 @@ export default function AdminPosPage() {
         party_size: isTakeaway ? 0 : orderForm.party_size,
         notes: orderForm.notes,
         order_type: orderForm.order_type,
-        is_pos: true
+        is_pos: true,
+        is_paid: Boolean(orderForm.is_paid),
+        payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
       });
 
       if (res.success && res.data) {
@@ -388,7 +388,7 @@ export default function AdminPosPage() {
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN' });
+        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH' });
         await fetchTables();
       } else {
         toast.error(res.error || 'Failed to place order');
@@ -615,203 +615,18 @@ export default function AdminPosPage() {
         </div>
       )}
 
-      {checkoutOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <div style={{ background: 'var(--bg)', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 800 }}>Complete Order</h2>
-              <button onClick={() => setCheckoutOpen(false)} style={{ background: 'none', border: 'none', fontSize: '24px', color: 'var(--text-secondary)' }}>&times;</button>
-            </div>
-
-            <div style={{ marginBottom: '24px' }}>
-              {Array.from(cart.values()).map(item => (
-                <div key={item.product_id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                  <span>{item.quantity}x {item.name}</span>
-                  <span style={{ fontWeight: 600 }}>{formatPrice(item.price * item.quantity)}</span>
-                </div>
-              ))}
-              <div style={{ borderTop: '1px dashed var(--border)', margin: '12px 0', paddingTop: '12px' }}>
-                {gstAmount > 0 ? (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                      <span>Subtotal</span>
-                      <span>{formatPrice(subtotal)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                      <span>GST ({restaurant?.gst_rate || 0}%)</span>
-                      <span>{formatPrice(gstAmount)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px', paddingTop: '4px' }}>
-                      <span>Total</span>
-                      <span style={{ color: 'var(--primary)' }}>{formatPrice(totalPrice)}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px' }}>
-                    <span>Total</span>
-                    <span style={{ color: 'var(--primary)' }}>{formatPrice(totalPrice)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <form onSubmit={submitOrder} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <OrderTypeSelector
-                value={(orderForm.order_type as OrderType) || 'DINE_IN'}
-                onChange={(val) => setOrderForm({ ...orderForm, order_type: val })}
-              />
-
-              {orderForm.order_type !== 'TAKEAWAY' && (
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <div style={{ flex: 1 }}>
-                    <label className="label">Table Number *</label>
-                    {tables.length > 0 ? (
-                      <select
-                        className="input"
-                        value={orderForm.table_number}
-                        onChange={e => {
-                          const selectedNum = e.target.value;
-                          const matchedTable = tables.find((t: any) => t.table_number === selectedNum);
-                          setOrderForm({
-                            ...orderForm,
-                            table_number: selectedNum,
-                            party_size: matchedTable?.capacity ? Number(matchedTable.capacity) : orderForm.party_size
-                          });
-                        }}
-                      >
-                        <option value="">-- Select Table --</option>
-                        {tables
-                          .filter((t: any) => {
-                            const partySize = Number(orderForm.party_size) || 1;
-                            const check = checkTableAssignment(t, partySize, {
-                              phone: orderForm.phone,
-                              customerName: orderForm.customer_name,
-                            });
-                            const isCurrent = t.table_number === orderForm.table_number;
-                            return check.allowed || isCurrent;
-                          })
-                          .map((t: any) => {
-                            const partySize = Number(orderForm.party_size) || 1;
-                            const check = checkTableAssignment(t, partySize, {
-                              phone: orderForm.phone,
-                              customerName: orderForm.customer_name,
-                            });
-                            const cap = Number(t.capacity) || 0;
-                            const seated = check.occupiedSeats;
-
-                            const rawNum = String(t.table_number || '').trim();
-                            let tableLabel = rawNum;
-                            if (/^\d+$/.test(rawNum)) {
-                              tableLabel = `T${rawNum}`;
-                            } else if (rawNum.toLowerCase().startsWith('t-')) {
-                              tableLabel = `T-${rawNum.slice(2)}`;
-                            } else if (rawNum.toLowerCase().startsWith('t') && !rawNum.toLowerCase().startsWith('table')) {
-                              tableLabel = `T${rawNum.slice(1)}`;
-                            } else if (rawNum.toLowerCase().startsWith('table #')) {
-                              const c = rawNum.slice(7).trim();
-                              tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
-                            } else if (rawNum.toLowerCase().startsWith('table ')) {
-                              const c = rawNum.slice(6).trim();
-                              tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
-                            }
-
-                            const freeSeats = Math.max(0, cap - seated);
-
-                            return (
-                              <option key={t.id} value={t.table_number}>
-                                {tableLabel} · {seated}/{cap} · {freeSeats} Free
-                              </option>
-                            );
-                          })}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        className="input"
-                        placeholder="e.g. 12"
-                        value={orderForm.table_number}
-                        onChange={e => setOrderForm({ ...orderForm, table_number: e.target.value })}
-                      />
-                    )}
-                  </div>
-                  <div style={{ width: '100px' }}>
-                    <label className="label">Persons</label>
-                    <select
-                      className="input"
-                      value={orderForm.party_size}
-                      onChange={e => setOrderForm({ ...orderForm, party_size: parseInt(e.target.value) || 1 })}
-                      style={{ paddingRight: '30px' }}
-                    >
-                      {[...Array(10)].map((_, i) => (
-                        <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="label">Customer Name (Optional)</label>
-                <input type="text" className="input" placeholder="Name" value={orderForm.customer_name} onChange={e => setOrderForm({ ...orderForm, customer_name: e.target.value })} />
-              </div>
-
-              <div>
-                <label className="label">Customer Phone (Optional)</label>
-                <input type="text" className="input" placeholder="99xxxxxxxx" value={orderForm.phone} onChange={e => setOrderForm({ ...orderForm, phone: e.target.value })} />
-                {loyaltyCustomer && (
-                  <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', padding: '12px', marginTop: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#047857' }}>Loyalty Member Profile</span>
-                      <span style={{ fontSize: '11px', fontWeight: 700, background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '12px' }}>
-                        {loyaltyCustomer.points_balance} pts
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#065f46', marginBottom: '8px' }}>
-                      Visits: <strong>{loyaltyCustomer.visit_progress || 0}/5</strong> · Total Spend: ₹{Number(loyaltyCustomer.total_spent || 0).toLocaleString()}
-                    </div>
-                    {Number(loyaltyCustomer.points_balance) >= 100 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (loyaltyDiscount > 0) {
-                            setLoyaltyDiscount(0);
-                            toast.success('Loyalty discount removed');
-                          } else {
-                            setLoyaltyDiscount(50);
-                            toast.success('Applied ₹50 loyalty discount!');
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '6px',
-                          borderRadius: '6px',
-                          border: '1px solid #059669',
-                          background: loyaltyDiscount > 0 ? '#059669' : 'white',
-                          color: loyaltyDiscount > 0 ? 'white' : '#059669',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {loyaltyDiscount > 0 ? 'Remove ₹50 Loyalty Discount' : 'Redeem 100 pts for ₹50 Discount'}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="label">Notes</label>
-                <input type="text" className="input" placeholder="Less spicy, extra napkins..." value={orderForm.notes} onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} />
-              </div>
-
-              <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '8px' }} disabled={submitting}>
-                {submitting ? 'Placing Order...' : 'Place Order Now'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <POSCheckoutDrawer
+        isOpen={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        cart={cart}
+        onUpdateCart={handleUpdate}
+        tables={tables}
+        restaurant={restaurant}
+        orderForm={orderForm}
+        setOrderForm={setOrderForm}
+        onSubmitOrder={submitOrder}
+        submitting={submitting}
+      />
       </div>
     </AdminContentWrapper>
   );

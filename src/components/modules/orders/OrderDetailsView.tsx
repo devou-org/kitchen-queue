@@ -25,9 +25,11 @@ import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { checkTableAssignment } from '@/lib/table-capacity';
-import { printKotFromBrowser } from '@/lib/client-print';
+import { printKotFromBrowser, printBillFromBrowser } from '@/lib/client-print';
 import { printBillTemplateDirectly } from '@/components/BillTemplate';
 import { useRestaurant } from '@/hooks/useRestaurant';
+import { orderService } from '@/app/services/orders.api';
+import { EditOrderModal } from './EditOrderModal';
 
 interface OrderDetailsViewProps {
   order: Order;
@@ -39,10 +41,11 @@ interface OrderDetailsViewProps {
   onBack?: () => void;
   onStatusChange: (orderId: string, newStatus: string, tableNumber?: string, paymentMethod?: string) => Promise<void> | void;
   loading?: boolean;
+  onOrderUpdated?: (updatedOrder: Order) => void;
 }
 
 export function OrderDetailsView({
-  order,
+  order: initialOrder,
   slug,
   isStaff = false,
   tables = [],
@@ -51,14 +54,21 @@ export function OrderDetailsView({
   onBack,
   onStatusChange,
   loading = false,
+  onOrderUpdated,
 }: OrderDetailsViewProps) {
   const { restaurant } = useRestaurant();
+  const [order, setOrder] = useState<Order>(initialOrder);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [tempStatus, setTempStatus] = useState(order.status);
-  const [tempTableNumber, setTempTableNumber] = useState(order.table_number || '');
-  const [paymentMethod, setPaymentMethod] = useState(order.payment_method || '');
+  const [tempStatus, setTempStatus] = useState(initialOrder.status);
+  const [tempTableNumber, setTempTableNumber] = useState(initialOrder.table_number || '');
+  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || '');
   const [actionLoading, setActionLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+
+  React.useEffect(() => {
+    setOrder(initialOrder);
+  }, [initialOrder]);
 
   React.useEffect(() => {
     setMounted(true);
@@ -104,8 +114,17 @@ export function OrderDetailsView({
   const handleUpdateStatus = async (statusToApply: string) => {
     setActionLoading(true);
     try {
-      await onStatusChange(order.id, statusToApply, tempTableNumber, paymentMethod);
+      const pMethod = statusToApply === 'PAID' ? (order.payment_method || paymentMethod || 'CASH') : paymentMethod;
+      await onStatusChange(order.id, statusToApply, tempTableNumber, pMethod);
       setTempStatus(statusToApply as any);
+      if (statusToApply === 'PAID') {
+        setOrder((prev) => ({
+          ...prev,
+          status: 'PAID',
+          is_paid: true,
+          payment_method: prev.payment_method || pMethod,
+        }));
+      }
     } finally {
       setActionLoading(false);
     }
@@ -116,6 +135,32 @@ export function OrderDetailsView({
     setActionLoading(true);
     try {
       await onStatusChange(order.id, tempStatus, tempTableNumber, paymentMethod);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMarkAsPaid = async () => {
+    setActionLoading(true);
+    try {
+      const pMethod = order.payment_method || paymentMethod || 'CASH';
+      const res = await orderService.updateOrder(order.id, {
+        status: 'PAID',
+        is_paid: true,
+        payment_method: pMethod,
+        table_number: tempTableNumber || order.table_number,
+      });
+      if (res.success && res.data) {
+        setOrder(res.data);
+        setTempStatus('PAID');
+        setPaymentMethod(res.data.payment_method || pMethod);
+        if (onOrderUpdated) onOrderUpdated(res.data);
+        toast.success('Order marked as PAID');
+      } else {
+        toast.error(res.error || 'Failed to update order');
+      }
+    } catch {
+      toast.error('Network error updating order');
     } finally {
       setActionLoading(false);
     }
@@ -282,7 +327,28 @@ export function OrderDetailsView({
         throw new Error(data.error || 'Failed to print bill');
       }
 
-      toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+      if (data.mode === 'server' || data.mode === 'agent') {
+        toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+        return;
+      }
+
+      // Cloud hosted (VPS): Print via hardware (Bluetooth/USB/RawBT/local bridge) or 80mm browser thermal driver
+      const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : undefined;
+      const clientRes = await printBillFromBrowser({
+        base64Bytes: data.base64Bytes,
+        billHtml: data.billHtml,
+        orderData: order,
+        billData: data.billData,
+        printerName: data.printer || savedPrinter,
+        ticketNumber: order.ticket_number,
+        localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
+      });
+
+      if (clientRes.success) {
+        toast.success(clientRes.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed!`, { id: toastId });
+      } else {
+        toast.error(clientRes.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
     } catch (err: any) {
       console.error('Bill print error:', err);
       toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
@@ -719,10 +785,10 @@ export function OrderDetailsView({
               <span>Print Bill</span>
             </button>
 
-            {/* Edit Button */}
-            <Link
-              prefetch={false}
-              href={editUrl}
+            {/* Edit Button - Opens minimal popup modal with 8px radius */}
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
               style={{
                 width: '100%',
                 padding: '0 8px',
@@ -737,9 +803,9 @@ export function OrderDetailsView({
                 background: '#FFFFFF',
                 border: '1px solid #CBD5E1',
                 color: '#0F172A',
-                textDecoration: 'none',
                 boxSizing: 'border-box',
                 whiteSpace: 'nowrap',
+                cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
@@ -748,7 +814,7 @@ export function OrderDetailsView({
             >
               <Pencil size={13} style={{ color: '#64748B' }} />
               <span>Edit</span>
-            </Link>
+            </button>
           </div>
         </div>
 
@@ -782,45 +848,12 @@ export function OrderDetailsView({
               disabled={actionLoading || loading}
               onChange={(val) => {
                 setTempStatus(val);
-                if (val !== 'PAID') {
-                  handleUpdateStatus(val);
-                }
+                handleUpdateStatus(val);
               }}
               direction="auto"
               options={allStatuses.map((s) => ({ value: s, label: s }))}
               buttonStyle={{ height: '36px', fontSize: '13px' }}
             />
-
-            {tempStatus === 'PAID' && (
-              <div style={{ marginTop: '10px', padding: '10px', background: '#F8FAFC', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', marginBottom: '4px', textTransform: 'uppercase' }}>
-                  Payment Method
-                </label>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <CustomSelect
-                    style={{ flex: 1 }}
-                    value={paymentMethod}
-                    onChange={(val) => setPaymentMethod(val)}
-                    direction="auto"
-                    options={[
-                      { value: '', label: 'Select' },
-                      { value: 'UPI', label: 'UPI' },
-                      { value: 'CASH', label: 'Cash' },
-                      { value: 'CARD', label: 'Card' },
-                    ]}
-                    buttonStyle={{ height: '34px', fontSize: '12px' }}
-                  />
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleUpdateStatus('PAID')}
-                    disabled={actionLoading || !paymentMethod}
-                    style={{ height: '34px', padding: '0 12px', fontSize: '12px', borderRadius: '8px' }}
-                  >
-                    Confirm
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Table Select */}
@@ -1042,14 +1075,44 @@ export function OrderDetailsView({
               </div>
             </div>
 
-            <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
-              <span style={{ color: '#64748B' }}>Payment</span>
-              {order.is_paid ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803D', fontWeight: 600 }}>
-                  <CheckCircle2 size={12} /> Paid ({order.payment_method || 'Settled'})
-                </span>
-              ) : (
-                <span style={{ color: '#B45309', fontWeight: 600 }}>Unpaid</span>
+            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748B' }}>Payment</span>
+                {order.is_paid ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803D', fontWeight: 600 }}>
+                    <CheckCircle2 size={12} /> Paid ({order.payment_method || 'Settled'})
+                  </span>
+                ) : (
+                  <span style={{ color: '#B45309', fontWeight: 600 }}>Unpaid</span>
+                )}
+              </div>
+              {order.status !== 'PAID' && (
+                <button
+                  type="button"
+                  disabled={actionLoading || loading}
+                  onClick={handleMarkAsPaid}
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    borderRadius: '6px',
+                    border: '1px solid #16A34A',
+                    background: '#F0FDF4',
+                    color: '#15803D',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#DCFCE7')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = '#F0FDF4')}
+                >
+                  <CheckCircle2 size={14} />
+                  <span>Mark as Paid</span>
+                </button>
               )}
             </div>
           </div>
@@ -1110,6 +1173,23 @@ export function OrderDetailsView({
         )}
       </div>
     </aside>
+
+    <EditOrderModal
+      isOpen={isEditModalOpen}
+      onClose={() => setIsEditModalOpen(false)}
+      order={order}
+      slug={slug}
+      tables={tables}
+      onOrderUpdated={(updated) => {
+        setOrder(updated);
+        setTempStatus(updated.status);
+        setTempTableNumber(updated.table_number || '');
+        setPaymentMethod(updated.payment_method || '');
+        if (onOrderUpdated) {
+          onOrderUpdated(updated);
+        }
+      }}
+    />
   </>,
   document.body
   );
