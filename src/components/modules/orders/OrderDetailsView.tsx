@@ -1051,6 +1051,15 @@ export function OrderDetailsView({
               </div>
             ) : null}
 
+            {order.discount_amount && Number(order.discount_amount) > 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#16a34a', fontWeight: 700 }}>
+                <span>Loyalty Discount</span>
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  -{formatPrice(order.discount_amount)}
+                </span>
+              </div>
+            ) : null}
+
             <div
               style={{
                 display: 'flex',

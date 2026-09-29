@@ -44,7 +44,8 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2),
       ADD COLUMN IF NOT EXISTS gst_type VARCHAR(20) DEFAULT 'NONE',
       ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS order_type VARCHAR(50) DEFAULT 'DINE_IN';
+      ADD COLUMN IF NOT EXISTS order_type VARCHAR(50) DEFAULT 'DINE_IN',
+      ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0;
     `;
     await sqlConnection`
       INSERT INTO gemini_request_config (request_type, max_output_tokens)
@@ -413,6 +414,9 @@ async function runAutoMigration(sqlConnection: any) {
 
       ALTER TABLE admins
       ADD COLUMN IF NOT EXISTS name VARCHAR(100);
+
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
     `;
     console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, admins, and loyalty schema successfully!");
   } catch (err) {
@@ -1309,6 +1313,7 @@ export async function createOrder(data: {
   phone: string;
   total_price: number;
   subtotal?: number;
+  discount_amount?: number;
   gst_amount?: number;
   gst_rate?: number;
   gst_type?: string;
@@ -1364,6 +1369,7 @@ export async function createOrder(data: {
   
   // Use passed subtotal or computed total
   const finalSubtotal = data.subtotal ?? computedTotal;
+  const discountVal = Number(data.discount_amount) || 0;
 
   const client = await pool.connect();
   try {
@@ -1475,16 +1481,16 @@ export async function createOrder(data: {
         INSERT INTO orders (
           restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, 
           notes, party_size, ticket_number, table_number, table_id, table_session_id, staff_id, business_date, subtotal, 
-          gst_amount, gst_rate, gst_type, pending_at, preparing_at, order_type, paid_at, payment_method
+          gst_amount, gst_rate, gst_type, pending_at, preparing_at, order_type, paid_at, payment_method, discount_amount
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, CURRENT_DATE), $17, $18, $19, $20, $21, $22, $23, $24, $25)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, CURRENT_DATE), $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
         RETURNING id
       `,
       [
         data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
         isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
-        pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod
+        pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, discountVal
       ]
     );
 
