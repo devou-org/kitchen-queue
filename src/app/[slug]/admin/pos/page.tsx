@@ -251,9 +251,10 @@ export default function AdminPosPage() {
           counterName: data.counter_name,
           isAutoPrint: true,
         });
+        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${data.counter_name || 'KOT'} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
-            id: `kot-auto-${data.ticket_number}-${data.counter_name}`,
+          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
           });
         }
       } catch (err: any) {
