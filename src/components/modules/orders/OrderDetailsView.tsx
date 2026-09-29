@@ -22,6 +22,7 @@ import {
   Banknote,
   QrCode,
   Check,
+  ChefHat,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import OrderTypeBadge from './OrderTypeBadge';
@@ -181,7 +182,7 @@ export function OrderDetailsView({
   const counterGroups = React.useMemo(() => {
     const map: Record<string, typeof itemsWithCounter> = {};
     for (const item of itemsWithCounter) {
-      const c = (item.counter || '').trim() || 'Unassigned';
+      const c = (item.counter || '').trim() || 'Kitchen';
       if (!map[c]) map[c] = [];
       map[c].push(item);
     }
@@ -189,6 +190,71 @@ export function OrderDetailsView({
   }, [itemsWithCounter]);
 
   const uniqueCounters = React.useMemo(() => Object.keys(counterGroups), [counterGroups]);
+
+  const [updatingItemIds, setUpdatingItemIds] = useState<Record<string, boolean>>({});
+  const [updatingCounters, setUpdatingCounters] = useState<Record<string, boolean>>({});
+
+  const getItemStatusBadgeConfig = (status?: string) => {
+    const s = (status || 'PENDING').toUpperCase();
+    switch (s) {
+      case 'PREPARING':
+        return { label: 'Preparing', bg: '#FEF3C7', text: '#B45309', border: '#FDE68A', next: 'READY' };
+      case 'READY':
+        return { label: 'Ready', bg: '#ECFDF5', text: '#047857', border: '#A7F3D0', next: 'SERVED' };
+      case 'SERVED':
+        return { label: 'Served', bg: '#F1F5F9', text: '#475569', border: '#E2E8F0', next: 'PREPARING' };
+      case 'CANCELLED':
+        return { label: 'Cancelled', bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA', next: 'PENDING' };
+      case 'PENDING':
+      default:
+        return { label: 'Pending', bg: '#FFF7ED', text: '#C2410C', border: '#FFEDD5', next: 'PREPARING' };
+    }
+  };
+
+  const handleItemStatusChange = async (item: any, nextStatus: string) => {
+    if (!item.id) return;
+    setUpdatingItemIds(prev => ({ ...prev, [item.id]: true }));
+    try {
+      const res = await orderService.updateOrderItemStatus(order.id, {
+        item_ids: [item.id],
+        status: nextStatus,
+      });
+      if (res.success && res.data) {
+        setOrder(res.data);
+        setTempStatus(res.data.status);
+        if (onOrderUpdated) onOrderUpdated(res.data);
+        toast.success(`${item.product_name || 'Item'} marked as ${nextStatus}`);
+      } else {
+        toast.error(res.error || 'Failed to update item status');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setUpdatingItemIds(prev => ({ ...prev, [item.id]: false }));
+    }
+  };
+
+  const handleCounterStatusChange = async (counterName: string, nextStatus: string) => {
+    setUpdatingCounters(prev => ({ ...prev, [counterName]: true }));
+    try {
+      const res = await orderService.updateOrderItemStatus(order.id, {
+        counter: counterName,
+        status: nextStatus,
+      });
+      if (res.success && res.data) {
+        setOrder(res.data);
+        setTempStatus(res.data.status);
+        if (onOrderUpdated) onOrderUpdated(res.data);
+        toast.success(`All ${counterName} items marked as ${nextStatus}`);
+      } else {
+        toast.error(res.error || 'Failed to update counter items');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setUpdatingCounters(prev => ({ ...prev, [counterName]: false }));
+    }
+  };
 
   const [isPrinting, setIsPrinting] = useState(false);
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
@@ -924,102 +990,237 @@ export function OrderDetailsView({
         </div>
 
 
-        {/* SECTION: ORDER ITEMS */}
+        {/* SECTION: ORDER ITEMS (COUNTER ROUTED & PER-ITEM STATUS) */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Utensils size={12} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Utensils size={13} />
               Order Items ({totalItemsCount})
             </span>
+            {uniqueCounters.length > 1 && (
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#4F46E5', background: '#EEF2FF', padding: '2px 8px', borderRadius: '12px', border: '1px solid #E0E7FF' }}>
+                {uniqueCounters.length} Counters
+              </span>
+            )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {(order.items && order.items.length > 0) ? (
-              order.items.map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    background: '#F8FAFC',
-                    border: '1px solid #F1F5F9',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '4px',
-                        background: '#E2E8F0',
-                        color: '#0F172A',
-                        fontWeight: 700,
-                        fontSize: '11px',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {item.quantity}×
-                    </span>
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          color: '#0F172A',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
-                      >
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.product_name}
-                        </span>
-                        {item.counter && (
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              backgroundColor: '#EEF2FF',
-                              color: '#4F46E5',
-                              border: '1px solid #E0E7FF',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {item.counter}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#64748B' }}>
-                        {formatPrice(item.price_at_purchase)} each
-                      </div>
-                    </div>
-                  </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {uniqueCounters.length > 0 ? (
+              uniqueCounters.map((cName) => {
+                const itemsInCounter = counterGroups[cName] || [];
+                const readyOrServedCount = itemsInCounter.filter((i: any) => ['READY', 'SERVED'].includes((i.status || 'PENDING').toUpperCase())).length;
+                const isAllReady = itemsInCounter.length > 0 && readyOrServedCount === itemsInCounter.length;
+                const isCounterUpdating = Boolean(updatingCounters[cName]);
 
+                return (
                   <div
+                    key={cName}
                     style={{
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: '#0F172A',
-                      fontVariantNumeric: 'tabular-nums',
-                      flexShrink: 0,
-                      marginLeft: '8px',
+                      borderRadius: '8px',
+                      border: '1px solid #E2E8F0',
+                      background: '#FFFFFF',
+                      overflow: 'hidden',
                     }}
                   >
-                    {formatPrice(item.price_at_purchase * item.quantity)}
+                    {/* Counter Station Header */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        background: '#F8FAFC',
+                        borderBottom: '1px solid #E2E8F0',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '5px',
+                            background: '#EEF2FF',
+                            color: '#4F46E5',
+                          }}
+                        >
+                          <ChefHat size={13} />
+                        </span>
+                        <div>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                            {cName}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>
+                            ({readyOrServedCount}/{itemsInCounter.length} Ready)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Station Bulk Action */}
+                      <div>
+                        {isAllReady ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#047857',
+                              background: '#ECFDF5',
+                              border: '1px solid #A7F3D0',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                            }}
+                          >
+                            <Check size={12} /> All Ready
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isCounterUpdating}
+                            onClick={() => handleCounterStatusChange(cName, 'READY')}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#047857',
+                              background: '#ECFDF5',
+                              border: '1px solid #A7F3D0',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              cursor: isCounterUpdating ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                            title={`Mark all items for ${cName} as Ready`}
+                          >
+                            {isCounterUpdating ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <CheckCircle2 size={12} />
+                            )}
+                            Mark {cName} Ready
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Counter Items List */}
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {itemsInCounter.map((item: any, idx: number) => {
+                        const isItemUpdating = Boolean(updatingItemIds[item.id]);
+                        const statusConfig = getItemStatusBadgeConfig(item.status);
+
+                        return (
+                          <div
+                            key={item.id || idx}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '9px 12px',
+                              borderBottom: idx < itemsInCounter.length - 1 ? '1px solid #F1F5F9' : 'none',
+                              background: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '22px',
+                                  height: '22px',
+                                  borderRadius: '4px',
+                                  background: '#E2E8F0',
+                                  color: '#0F172A',
+                                  fontWeight: 700,
+                                  fontSize: '11px',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {item.quantity}×
+                              </span>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div
+                                  style={{
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    color: '#0F172A',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {item.product_name}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#64748B' }}>
+                                  {formatPrice(item.price_at_purchase)} each
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Item Status Toggle & Price */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                disabled={isItemUpdating}
+                                onClick={() => handleItemStatusChange(item, statusConfig.next)}
+                                title={`Current: ${statusConfig.label}. Click to mark ${statusConfig.next}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  color: statusConfig.text,
+                                  background: statusConfig.bg,
+                                  border: `1px solid ${statusConfig.border}`,
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  cursor: isItemUpdating ? 'not-allowed' : 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                {isItemUpdating ? (
+                                  <Loader2 size={11} className="animate-spin" />
+                                ) : (
+                                  <span
+                                    style={{
+                                      width: '6px',
+                                      height: '6px',
+                                      borderRadius: '50%',
+                                      backgroundColor: statusConfig.text,
+                                    }}
+                                  />
+                                )}
+                                {statusConfig.label}
+                              </button>
+
+                              <div
+                                style={{
+                                  fontSize: '13px',
+                                  fontWeight: 700,
+                                  color: '#0F172A',
+                                  fontVariantNumeric: 'tabular-nums',
+                                  minWidth: '60px',
+                                  textAlign: 'right',
+                                }}
+                              >
+                                {formatPrice(item.price_at_purchase * item.quantity)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div style={{ padding: '16px 0', textAlign: 'center', color: '#94A3B8', fontSize: '12px' }}>
                 No items recorded.

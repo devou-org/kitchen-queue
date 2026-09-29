@@ -276,6 +276,7 @@ export default function AdminOrders() {
               status: data.new_status || o.status,
               table_number: data.table_number || o.table_number,
               is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : o.is_paid,
+              items: data.items || o.items,
             };
           }
           return o;
@@ -286,6 +287,19 @@ export default function AdminOrders() {
           }
           return true;
         });
+      });
+
+      setSelectedOrder(prev => {
+        if (prev && prev.id === data.order_id) {
+          return {
+            ...prev,
+            status: data.new_status || prev.status,
+            table_number: data.table_number || prev.table_number,
+            is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : prev.is_paid,
+            items: data.items || prev.items,
+          };
+        }
+        return prev;
       });
 
       // 2. HIGHLIGHT & LOG ADDITIONS
@@ -440,7 +454,7 @@ export default function AdminOrders() {
   let filteredOrders = orders;
   if (counterFilter) {
     filteredOrders = filteredOrders.map(order => {
-      const filteredItems = (order.items || []).filter(item => item.counter === counterFilter);
+      const filteredItems = (order.items || []).filter(item => (item.counter || 'Kitchen').toLowerCase() === counterFilter.toLowerCase());
       return { ...order, items: filteredItems };
     }).filter(order => order.items && order.items.length > 0);
   }

@@ -306,7 +306,7 @@ export default function StaffOrders() {
   let filteredOrders = orders;
   if (counterFilter) {
     filteredOrders = filteredOrders.map(order => {
-      const filteredItems = (order.items || []).filter(item => item.counter === counterFilter);
+      const filteredItems = (order.items || []).filter(item => (item.counter || 'Kitchen').toLowerCase() === counterFilter.toLowerCase());
       return { ...order, items: filteredItems };
     }).filter(order => order.items && order.items.length > 0);
   }
