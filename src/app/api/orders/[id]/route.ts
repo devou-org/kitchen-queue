@@ -241,7 +241,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // ✅ UPDATE STATUS, TABLE NUMBER & PAYMENT STATUS ATOMICALLY
-    const shouldUpdateStatusOrPayment = status || table_number || typeof is_paid === 'boolean';
+    const shouldUpdateStatusOrPayment = Boolean(status || table_number || typeof is_paid === 'boolean' || payment_method);
     if (shouldUpdateStatusOrPayment) {
       if (status && status !== existing.status) {
         // Fetch queue statuses for the restaurant to validate the new status

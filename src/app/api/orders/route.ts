@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customer_name, phone, items, notes, party_size, table_number, order_type } = body;
+    const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method } = body;
 
     if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
@@ -134,6 +134,8 @@ export async function POST(request: NextRequest) {
     const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
     // Only trust is_pos if the user is verified staff/admin. Prevents token leakage into customer UI.
     const isPos = hasAdminRights && body.is_pos === true;
+    const isPaid = hasAdminRights && Boolean(is_paid);
+    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : (hasAdminRights && payment_method ? String(payment_method) : undefined);
 
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
@@ -155,6 +157,8 @@ export async function POST(request: NextRequest) {
       table_number: order_type === 'TAKEAWAY' ? null : table_number,
       order_type: order_type || 'DINE_IN',
       is_pos: isPos,
+      is_paid: isPaid,
+      payment_method: paymentMethod,
       staff_id: staffId,
       business_date,
       items,

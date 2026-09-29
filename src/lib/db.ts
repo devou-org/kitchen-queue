@@ -997,9 +997,9 @@ export async function getOrderStats(restaurantId: string, filters: {
       return await sql`
         SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1014,9 +1014,9 @@ export async function getOrderStats(restaurantId: string, filters: {
       return await sql`
         SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1030,9 +1030,9 @@ export async function getOrderStats(restaurantId: string, filters: {
       return await sql`
         SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1048,9 +1048,9 @@ export async function getOrderStats(restaurantId: string, filters: {
     return await sql`
       SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1065,9 +1065,9 @@ export async function getOrderStats(restaurantId: string, filters: {
     return await sql`
       SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1080,9 +1080,9 @@ export async function getOrderStats(restaurantId: string, filters: {
   return await sql`
     SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1255,6 +1255,8 @@ export async function createOrder(data: {
   table_number?: string;
   order_type?: string;
   is_pos?: boolean;
+  is_paid?: boolean;
+  payment_method?: string;
   staff_id?: string;
   business_date?: string;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
@@ -1402,21 +1404,25 @@ export async function createOrder(data: {
     const isUuid = (str?: string | null) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
     const validStaffId = isUuid(data.staff_id) ? data.staff_id : null;
 
+    const isPaid = Boolean(data.is_paid);
+    const paidAt = isPaid ? new Date().toISOString() : null;
+    const paymentMethod = isPaid ? (data.payment_method || 'CASH') : (data.payment_method || null);
+
     const orderResult = await client.query(
       `
         INSERT INTO orders (
           restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, 
           notes, party_size, ticket_number, table_number, table_id, table_session_id, staff_id, business_date, subtotal, 
-          gst_amount, gst_rate, gst_type, pending_at, preparing_at, order_type
+          gst_amount, gst_rate, gst_type, pending_at, preparing_at, order_type, paid_at, payment_method
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, CURRENT_DATE), $16, $17, $18, $19, $20, $21, $22)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, CURRENT_DATE), $17, $18, $19, $20, $21, $22, $23, $24, $25)
         RETURNING id
       `,
       [
         data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
-        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
+        isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
-        pendingAt, preparingAt, data.order_type || 'DINE_IN'
+        pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod
       ]
     );
 
@@ -1440,6 +1446,16 @@ export async function createOrder(data: {
       await deductInventoryForOrder(client, data.restaurant_id, orderId, normalizedItems);
     } catch (invErr) {
       console.error('Non-blocking inventory auto-deduction error:', invErr);
+    }
+
+    // Process billing if order was placed as already paid
+    if (isPaid) {
+      try {
+        const { BillingService } = await import('@/modules/billing/billing.service');
+        await BillingService.processOrderBilling(client, data.restaurant_id, orderId, Number(data.total_price));
+      } catch (billErr) {
+        console.error('Non-blocking billing processing error on createOrder:', billErr);
+      }
     }
 
     await client.query('COMMIT');
@@ -1629,9 +1645,10 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
           is_paid = $2,
           table_number = COALESCE($3, table_number),
           payment_method = COALESCE($6, payment_method),
+          paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() ELSE paid_at END,
           updated_at = NOW()
       WHERE restaurant_id = $4 AND id = $5
-      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method
+      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, paid_at
     `, [nextStatus, nextIsPaid, tableNumber || null, restaurantId, id, paymentMethod || null]);
     
     const updatedOrder = updateRes.rows[0];
@@ -2018,7 +2035,7 @@ export async function getDailyAnalytics(restaurantId: string, dateFrom: string, 
       MODE() WITHIN GROUP (ORDER BY EXTRACT(HOUR FROM created_at)) as peak_hour
     FROM orders WHERE restaurant_id = ${restaurantId}
       AND business_date BETWEEN ${dateFrom} AND ${dateTo}
-      AND is_paid = true AND status = 'PAID'
+      AND is_paid = true AND status != 'CANCELLED'
     GROUP BY business_date
     ORDER BY business_date ASC
   `;
@@ -2033,7 +2050,7 @@ export async function getPeakHours(restaurantId: string, dateFrom: string, dateT
       SUM(total_price) as revenue
     FROM orders WHERE restaurant_id = ${restaurantId}
       AND business_date BETWEEN ${dateFrom} AND ${dateTo}
-      AND is_paid = true AND status = 'PAID'
+      AND is_paid = true AND status != 'CANCELLED'
     GROUP BY EXTRACT(HOUR FROM created_at)
     ORDER BY hour ASC
   `;
@@ -2055,7 +2072,7 @@ export async function getTopProducts(restaurantId: string, dateFrom: string, dat
     JOIN orders o ON o.id = oi.order_id
     WHERE o.restaurant_id = ${restaurantId}
       AND o.business_date BETWEEN ${dateFrom} AND ${dateTo}
-      AND o.is_paid = true AND o.status = 'PAID'
+      AND o.is_paid = true AND o.status != 'CANCELLED'
     GROUP BY p.id, p.name, p.category, p.price, p.image_url
     ORDER BY total_quantity DESC
     LIMIT ${limit}
@@ -2071,7 +2088,7 @@ export async function getPaymentMethodAnalytics(restaurantId: string, dateFrom: 
       COALESCE(SUM(total_price), 0)::float as total_revenue
     FROM orders WHERE restaurant_id = ${restaurantId}
       AND business_date BETWEEN ${dateFrom} AND ${dateTo}
-      AND is_paid = true AND status = 'PAID'
+      AND is_paid = true AND status != 'CANCELLED'
     GROUP BY payment_method
     ORDER BY total_revenue DESC
   `;
@@ -2081,9 +2098,9 @@ export async function getPaymentMethodAnalytics(restaurantId: string, dateFrom: 
 export async function getDashboardStats(restaurantId: string) {
   const statsRows = await sql`
     SELECT 
-      COALESCE(SUM(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID'), 0) as revenue_today,
-      COUNT(*) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID') as orders_today,
-      COALESCE(AVG(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID'), 0) as avg_order_value,
+      COALESCE(SUM(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED'), 0) as revenue_today,
+      COUNT(*) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED') as orders_today,
+      COALESCE(AVG(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED'), 0) as avg_order_value,
       COUNT(*) FILTER (WHERE status = 'PENDING') as pending_orders
     FROM orders WHERE restaurant_id = ${restaurantId}
   `;

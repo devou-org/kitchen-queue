@@ -34,14 +34,14 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
   const res = await pool.query(
     `SELECT 
        COUNT(*)::int as total_orders,
-       COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+       COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
        COUNT(*) FILTER (WHERE status = 'CANCELLED')::int as cancelled_orders,
        COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0)::numeric as gross_revenue,
-       COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as total_paid_revenue,
-       COALESCE(SUM(subtotal) FILTER (WHERE status = 'PAID' AND gst_type = 'REGULAR'), 0)::numeric as net_subtotal,
-       COALESCE(SUM(gst_amount) FILTER (WHERE status = 'PAID' AND gst_type = 'REGULAR'), 0)::numeric as regular_gst,
-       COALESCE(SUM(total_price * gst_rate / 100) FILTER (WHERE status = 'PAID' AND gst_type = 'COMPOSITION'), 0)::numeric as composition_gst,
-       COALESCE(AVG(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as average_order_value
+       COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0)::numeric as total_paid_revenue,
+       COALESCE(SUM(subtotal) FILTER (WHERE is_paid = true AND status != 'CANCELLED' AND gst_type = 'REGULAR'), 0)::numeric as net_subtotal,
+       COALESCE(SUM(gst_amount) FILTER (WHERE is_paid = true AND status != 'CANCELLED' AND gst_type = 'REGULAR'), 0)::numeric as regular_gst,
+       COALESCE(SUM(total_price * gst_rate / 100) FILTER (WHERE is_paid = true AND status != 'CANCELLED' AND gst_type = 'COMPOSITION'), 0)::numeric as composition_gst,
+       COALESCE(AVG(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0)::numeric as average_order_value
      FROM orders
      WHERE restaurant_id = $1
        AND business_date >= $2::date
@@ -72,7 +72,7 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
      WHERE restaurant_id = $1
        AND business_date >= $2::date
        AND business_date <= $3::date
-       AND status = 'PAID'
+       AND is_paid = true AND status != 'CANCELLED'
      GROUP BY COALESCE(payment_method, 'UNKNOWN')
      ORDER BY total_amount DESC`,
     [restaurantId, dateFrom, dateTo]
@@ -120,10 +120,10 @@ export async function getSalesTrend(restaurantId: string, params: { period?: 'da
     `SELECT 
        business_date::text,
        COUNT(*)::int as total_orders,
-       COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+       COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
        COUNT(*) FILTER (WHERE status = 'CANCELLED')::int as cancelled_orders,
-       COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as total_revenue,
-       COALESCE(AVG(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as aov
+       COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0)::numeric as total_revenue,
+       COALESCE(AVG(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0)::numeric as aov
      FROM orders
      WHERE restaurant_id = $1
        AND business_date >= $2::date
@@ -160,7 +160,7 @@ export async function getHourlySales(restaurantId: string, params: DateFilter = 
     `SELECT 
        EXTRACT(HOUR FROM created_at)::int as hour,
        COUNT(*)::int as order_count,
-       COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as revenue
+       COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0)::numeric as revenue
      FROM orders
      WHERE restaurant_id = $1
        AND business_date >= $2::date
@@ -205,7 +205,7 @@ export async function getTopProducts(restaurantId: string, params: DateFilter & 
      WHERE o.restaurant_id = $1
        AND o.business_date >= $2::date
        AND o.business_date <= $3::date
-       AND o.status = 'PAID'
+       AND o.is_paid = true AND o.status != 'CANCELLED'
      GROUP BY p.id, p.name, p.category, p.price
      ORDER BY total_quantity_sold DESC, total_revenue DESC
      LIMIT $4`,
@@ -250,7 +250,7 @@ export async function getBottomProducts(restaurantId: string, params: DateFilter
        AND o.restaurant_id = $1 
        AND o.business_date >= $2::date 
        AND o.business_date <= $3::date
-       AND o.status = 'PAID'
+       AND o.is_paid = true AND o.status != 'CANCELLED'
      WHERE p.restaurant_id = $1
        AND p.is_active = true
      GROUP BY p.id, p.name, p.category, p.price
@@ -293,7 +293,7 @@ export async function getCategoryPerformance(restaurantId: string, params: DateF
      WHERE o.restaurant_id = $1
        AND o.business_date >= $2::date
        AND o.business_date <= $3::date
-       AND o.status = 'PAID'
+       AND o.is_paid = true AND o.status != 'CANCELLED'
      GROUP BY p.category
      ORDER BY category_revenue DESC`,
     [restaurantId, dateFrom, dateTo]
@@ -797,7 +797,7 @@ export async function getTablePerformance(restaurantId: string, params: DateFilt
        t.table_number,
        t.capacity,
        COUNT(DISTINCT ts.id)::int as sessions,
-       COALESCE(SUM(o.total_price) FILTER (WHERE o.status = 'PAID'), 0)::numeric as revenue,
+       COALESCE(SUM(o.total_price) FILTER (WHERE o.is_paid = true AND o.status != 'CANCELLED'), 0)::numeric as revenue,
        COALESCE(AVG(ts.party_size), 0)::numeric as average_party_size,
        COALESCE(AVG(EXTRACT(EPOCH FROM (ts.ended_at - ts.started_at))/60) FILTER (WHERE ts.status = 'CLOSED' AND ts.ended_at IS NOT NULL), 0)::numeric as avg_turn_time
      FROM restaurant_tables t
@@ -836,7 +836,7 @@ export async function getTopTablesByRevenue(restaurantId: string, params: DateFi
   const res = await pool.query(
     `SELECT 
        t.table_number,
-       COALESCE(SUM(o.total_price) FILTER (WHERE o.status = 'PAID'), 0)::numeric as revenue
+       COALESCE(SUM(o.total_price) FILTER (WHERE o.is_paid = true AND o.status != 'CANCELLED'), 0)::numeric as revenue
      FROM restaurant_tables t
      LEFT JOIN table_sessions ts ON ts.table_id = t.id
        AND ts.started_at >= $2::date AND ts.started_at < ($3::date + INTERVAL '1 day')
@@ -864,7 +864,7 @@ export async function getBottomTablesByRevenue(restaurantId: string, params: Dat
   const res = await pool.query(
     `SELECT 
        t.table_number,
-       COALESCE(SUM(o.total_price) FILTER (WHERE o.status = 'PAID'), 0)::numeric as revenue
+       COALESCE(SUM(o.total_price) FILTER (WHERE o.is_paid = true AND o.status != 'CANCELLED'), 0)::numeric as revenue
      FROM restaurant_tables t
      LEFT JOIN table_sessions ts ON ts.table_id = t.id
        AND ts.started_at >= $2::date AND ts.started_at < ($3::date + INTERVAL '1 day')
@@ -926,7 +926,7 @@ export async function getRevenuePerTableHour(restaurantId: string, params: DateF
   const dateTo = params.date_to || currentBusinessDate;
 
   const revRes = await pool.query(
-    `SELECT COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0)::numeric as total_revenue
+    `SELECT COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0)::numeric as total_revenue
      FROM orders
      WHERE restaurant_id = $1
        AND table_id IS NOT NULL

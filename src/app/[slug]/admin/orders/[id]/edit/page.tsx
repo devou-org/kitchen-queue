@@ -231,7 +231,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
         }
       />
 
-      <div className="card" style={{ maxWidth: '760px' }}>
+      <div className="card" style={{ maxWidth: '760px', borderRadius: '8px', border: '1px solid var(--border)' }}>
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <div style={{ flex: 2, minWidth: '220px' }}>
@@ -239,6 +239,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
               <input
                 type="text"
                 className="input"
+                style={{ borderRadius: '8px' }}
                 value={form.customer_name}
                 onChange={(e) => setForm((prev) => ({ ...prev, customer_name: e.target.value }))}
                 required
@@ -249,6 +250,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
               <input
                 type="text"
                 className="input"
+                style={{ borderRadius: '8px' }}
                 value={form.phone}
                 onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
                 required
@@ -261,6 +263,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                 min={1}
                 step={1}
                 className="input"
+                style={{ borderRadius: '8px' }}
                 value={form.party_size}
                 onChange={(e) => setForm((prev) => ({ ...prev, party_size: e.target.value }))}
                 required
@@ -276,7 +279,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
               value={form.notes}
               onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
               placeholder="Kitchen notes, preferences, etc"
-              style={{ resize: 'vertical', minHeight: '80px' }}
+              style={{ resize: 'vertical', minHeight: '80px', borderRadius: '8px' }}
             />
           </div>
 
@@ -299,20 +302,20 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                      }}
                      onFocus={() => setShowDropdown(true)}
                      onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                     style={{ width: '100%', paddingLeft: '40px' }}
+                     style={{ width: '100%', paddingLeft: '40px', borderRadius: '8px' }}
                   />
                 </div>
                 {showDropdown && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', maxHeight: '200px', overflowY: 'auto', zIndex: 50, marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid var(--border)', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 50, marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                     {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
                       <div style={{ padding: '12px', color: 'var(--text-secondary)', fontSize: '14px' }}>No products found.</div>
                     ) : (
                       products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map(product => (
                          <div 
                            key={product.id} 
-                           style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: '14px', background: newProductId === product.id ? '#f0fdf4' : 'transparent' }}
+                           style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: '14px', background: newProductId === product.id ? '#f0fdf4' : 'transparent', borderRadius: '8px' }}
                            onMouseDown={(e) => {
-                              e.preventDefault(); // Prevent blur from firing before mouse down
+                              e.preventDefault();
                               setNewProductId(product.id);
                               setSearchQuery(`${product.name}`);
                               setShowDropdown(false);
@@ -326,7 +329,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                   </div>
                 )}
               </div>
-              <button type="button" className="btn btn-secondary" onClick={addItem} style={{ height: '42px' }}>Add Item</button>
+              <button type="button" className="btn btn-secondary" onClick={addItem} style={{ height: '42px', borderRadius: '8px' }}>Add Item</button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -337,7 +340,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                     key={item.product_id}
                     style={{
                       border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-sm)',
+                      borderRadius: '8px',
                       padding: '12px 14px',
                       background: 'white',
                     }}
@@ -357,6 +360,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                           background: 'none', border: 'none',
                           fontSize: '18px', cursor: 'pointer',
                           color: '#EF4444', lineHeight: 1, padding: '2px 4px',
+                          borderRadius: '8px',
                           flexShrink: 0,
                         }}
                         title="Remove item"
@@ -367,19 +371,18 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
 
                     {/* Stepper + subtotal */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <button
                           type="button"
                           onClick={() => updateItemQuantity(item.product_id, -1)}
                           disabled={item.quantity <= 1}
                           style={{
-                            width: '40px', height: '40px',
-                            borderRadius: '8px 0 0 8px',
-                            border: '1.5px solid var(--border)',
-                            borderRight: 'none',
+                            width: '36px', height: '36px',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border)',
                             background: item.quantity <= 1 ? '#f9fafb' : 'white',
                             color: item.quantity <= 1 ? '#9CA3AF' : 'var(--primary)',
-                            fontSize: '20px', fontWeight: 700,
+                            fontSize: '18px', fontWeight: 700,
                             cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
@@ -387,10 +390,11 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                           −
                         </button>
                         <span style={{
-                          width: '48px', height: '40px',
+                          minWidth: '36px', height: '36px',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          border: '1.5px solid var(--border)',
-                          fontWeight: 800, fontSize: '16px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border)',
+                          fontWeight: 700, fontSize: '15px',
                           color: 'var(--text-primary)',
                           background: '#fafafa',
                           userSelect: 'none',
@@ -402,13 +406,12 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                           onClick={() => updateItemQuantity(item.product_id, 1)}
                           disabled={item.quantity >= 99}
                           style={{
-                            width: '40px', height: '40px',
-                            borderRadius: '0 8px 8px 0',
-                            border: '1.5px solid var(--border)',
-                            borderLeft: 'none',
+                            width: '36px', height: '36px',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border)',
                             background: 'white',
                             color: 'var(--primary)',
-                            fontSize: '20px', fontWeight: 700,
+                            fontSize: '18px', fontWeight: 700,
                             cursor: item.quantity >= 99 ? 'not-allowed' : 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
@@ -434,10 +437,10 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
           </div>
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+            <button type="submit" className="btn btn-primary" style={{ borderRadius: '8px' }} disabled={saving}>
               {saving ? 'Saving...' : 'Save Order Changes'}
             </button>
-            <Link prefetch={false} href={`/${slug}/admin/orders`} className="btn btn-ghost">Cancel</Link>
+            <Link prefetch={false} href={`/${slug}/admin/orders`} className="btn btn-ghost" style={{ borderRadius: '8px' }}>Cancel</Link>
           </div>
         </form>
       </div>
