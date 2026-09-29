@@ -120,6 +120,8 @@ export async function POST(request: NextRequest) {
     }
     subtotal = Math.round(subtotal * 100) / 100;
 
+    const discount_amount = Math.max(0, Number(body.discount_amount) || 0);
+
     const gst_type = restaurant.gst_type || 'NONE';
     const gst_rate = Number(restaurant.gst_rate) || 0;
     let gst_amount = 0;
@@ -129,6 +131,8 @@ export async function POST(request: NextRequest) {
       gst_amount = Math.round((subtotal * gst_rate / 100) * 100) / 100;
       total_price = subtotal + gst_amount;
     }
+
+    total_price = Math.max(0, total_price - discount_amount);
 
     const admin = await requireAdmin(request);
     const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
@@ -149,6 +153,7 @@ export async function POST(request: NextRequest) {
       phone,
       total_price,
       subtotal,
+      discount_amount,
       gst_amount,
       gst_rate,
       gst_type,

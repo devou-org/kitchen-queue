@@ -8,15 +8,30 @@ interface OrderSummaryProps {
   gstAmount?: number;
   gstRate?: number | string;
   gstType?: string;
+  discountAmount?: number;
+  appliedRewardName?: string;
   total: number;
   addToMode: boolean;
   activeOrder: Order | null;
 }
 
-export default function OrderSummary({ items, subtotal, gstAmount, gstRate, gstType, total, addToMode, activeOrder }: OrderSummaryProps) {
+export default function OrderSummary({ 
+  items, 
+  subtotal, 
+  gstAmount, 
+  gstRate, 
+  gstType, 
+  discountAmount = 0,
+  appliedRewardName,
+  total, 
+  addToMode, 
+  activeOrder 
+}: OrderSummaryProps) {
   const halfGst = (gstAmount || 0) / 2;
   const splitGst = Math.round(halfGst * 100) / 100;
   const halfRate = gstRate ? Number(gstRate) / 2 : undefined;
+
+  const finalTotal = Math.max(0, total - discountAmount);
 
   return (
     <div className="card" style={{ marginBottom: '16px' }}>
@@ -64,9 +79,15 @@ export default function OrderSummary({ items, subtotal, gstAmount, gstRate, gstT
                 </div>
               </>
             )}
+            {discountAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#16a34a', fontWeight: 700 }}>
+                <span>Loyalty Reward ({appliedRewardName || 'Discount'})</span>
+                <span>-{formatPrice(discountAmount)}</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '18px', paddingTop: '8px', borderTop: '2px solid var(--border)' }}>
               <span>Total</span>
-              <span style={{ color: 'var(--primary)' }}>{formatPrice(total)}</span>
+              <span style={{ color: 'var(--primary)' }}>{formatPrice(finalTotal)}</span>
             </div>
           </div>
         </>

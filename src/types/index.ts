@@ -53,6 +53,7 @@ export interface Order {
   phone: string;
   total_price: number;
   subtotal?: number;
+  discount_amount?: number;
   gst_amount?: number;
   gst_rate?: number;
   gst_type?: 'NONE' | 'REGULAR' | 'COMPOSITION' | string;
