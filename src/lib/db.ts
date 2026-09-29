@@ -1838,22 +1838,61 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
     const nextItems = Array.from(normalizedMap.entries()).map(([product_id, quantity]) => ({ product_id, quantity }));
 
     const existingItemRows = await sql`
-      SELECT product_id, quantity
+      SELECT id, product_id, quantity, price_at_purchase, status, counter, prepared_at, ready_at
       FROM order_items
       WHERE order_id = ${id}
-    `;
+    ` as {
+      id: string;
+      product_id: string;
+      quantity: number;
+      price_at_purchase: number;
+      status?: string;
+      counter?: string;
+      prepared_at?: string | Date | null;
+      ready_at?: string | Date | null;
+    }[];
 
     const currentQtyByProduct = new Map<string, number>();
+    const existingItemMap = new Map<string, {
+      id: string;
+      product_id: string;
+      quantity: number;
+      price_at_purchase: number;
+      status: string;
+      counter: string;
+      prepared_at: string | null;
+      ready_at: string | null;
+    }>();
+
     for (const row of existingItemRows) {
-      currentQtyByProduct.set(row.product_id, (currentQtyByProduct.get(row.product_id) || 0) + Number(row.quantity));
+      const q = Number(row.quantity);
+      currentQtyByProduct.set(row.product_id, (currentQtyByProduct.get(row.product_id) || 0) + q);
+      existingItemMap.set(row.product_id, {
+        id: row.id,
+        product_id: row.product_id,
+        quantity: q,
+        price_at_purchase: Number(row.price_at_purchase),
+        status: (row.status || 'PENDING').toUpperCase(),
+        counter: (row.counter && row.counter.trim()) ? row.counter.trim() : 'Kitchen',
+        prepared_at: row.prepared_at ? new Date(row.prepared_at).toISOString() : null,
+        ready_at: row.ready_at ? new Date(row.ready_at).toISOString() : null,
+      });
     }
 
     const targetProductIds = nextItems.map((item) => item.product_id);
     const productRows = await sql`
-      SELECT id, name, price, stock_quantity, buffer_quantity, is_active
+      SELECT id, name, price, stock_quantity, buffer_quantity, is_active, counter
       FROM products
       WHERE id = ANY(${targetProductIds})
-    `;
+    ` as {
+      id: string;
+      name: string;
+      price: number;
+      stock_quantity: number;
+      buffer_quantity: number;
+      is_active: boolean;
+      counter?: string;
+    }[];
 
     if (productRows.length !== targetProductIds.length) {
       throw new Error('One or more selected products do not exist');
@@ -1866,6 +1905,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
       stock_quantity: number;
       buffer_quantity: number;
       is_active: boolean;
+      counter?: string;
     }>();
 
     for (const row of productRows) {
@@ -1876,6 +1916,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
         stock_quantity: Number(row.stock_quantity),
         buffer_quantity: Number(row.buffer_quantity),
         is_active: Boolean(row.is_active),
+        counter: (row.counter && row.counter.trim()) ? row.counter.trim() : 'Kitchen',
       });
     }
 
@@ -1925,42 +1966,79 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
       `;
     }
 
-    await sql`DELETE FROM order_items WHERE order_id = ${id}`;
+    // 1. Delete items that were completely removed from order
+    const nextProductIdsSet = new Set(nextItems.map((i) => i.product_id));
+    const itemsToDelete = existingItemRows.filter((r) => !nextProductIdsSet.has(r.product_id));
+    if (itemsToDelete.length > 0) {
+      const idsToDelete = itemsToDelete.map((r) => r.id);
+      await sql`DELETE FROM order_items WHERE id = ANY(${idsToDelete})`;
+    }
 
-    const insertItems = nextItems.map((item) => {
+    // 2. Insert new items or update existing items preserving status, counter, and timestamps
+    for (const item of nextItems) {
       const product = productById.get(item.product_id);
       if (!product) {
         throw new Error('A selected product is invalid');
       }
-      return {
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price_at_purchase: product.price,
-      };
-    });
 
-    const productIds = insertItems.map((i) => i.product_id);
-    const quantities = insertItems.map((i) => i.quantity);
-    const prices = insertItems.map((i) => i.price_at_purchase);
+      const existing = existingItemMap.get(item.product_id);
+      const counter = existing?.counter || product.counter || 'Kitchen';
+      const priceAtPurchase = existing?.price_at_purchase ?? product.price;
 
-    await sql`
-      INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase, status, counter)
-      SELECT 
-        ${id}, 
-        t.pid, 
-        t.qty, 
-        t.price, 
-        'PENDING', 
-        COALESCE(NULLIF(p.counter, ''), 'Kitchen')
-      FROM unnest(
-        ${productIds}::uuid[],
-        ${quantities}::int[],
-        ${prices}::numeric[]
-      ) AS t(pid, qty, price)
-      LEFT JOIN products p ON p.id = t.pid
-    `;
+      if (existing) {
+        const isIncreased = item.quantity > existing.quantity;
+        let newStatus = existing.status;
+        let preparedAt = existing.prepared_at;
+        let readyAt = existing.ready_at;
 
-    const newSubtotal = Math.round(insertItems.reduce((acc, item) => acc + (item.price_at_purchase * item.quantity), 0) * 100) / 100;
+        if (isIncreased) {
+          // If items were added to this product, more prep is required
+          if (['READY', 'SERVED'].includes(existing.status)) {
+            newStatus = 'PREPARING';
+            readyAt = null; // Additional quantity not yet ready
+          }
+          if (!preparedAt) {
+            preparedAt = new Date().toISOString();
+          }
+        }
+
+        await sql`
+          UPDATE order_items
+          SET quantity = ${item.quantity},
+              price_at_purchase = ${priceAtPurchase},
+              status = ${newStatus},
+              counter = ${counter},
+              prepared_at = ${preparedAt},
+              ready_at = ${readyAt}
+          WHERE id = ${existing.id}
+        `;
+      } else {
+        // Brand new item added to the order
+        const initialStatus = existingOrder.status === 'PENDING' ? 'PENDING' : 'PREPARING';
+        const preparedAt = initialStatus === 'PREPARING' ? new Date().toISOString() : null;
+
+        await sql`
+          INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase, status, counter, prepared_at)
+          VALUES (
+            ${id}, 
+            ${item.product_id}, 
+            ${item.quantity}, 
+            ${priceAtPurchase}, 
+            ${initialStatus}, 
+            ${counter}, 
+            ${preparedAt}
+          )
+        `;
+      }
+    }
+
+    const newSubtotal = Math.round(nextItems.reduce((acc, item) => {
+      const product = productById.get(item.product_id);
+      const existing = existingItemMap.get(item.product_id);
+      const price = existing?.price_at_purchase ?? product?.price ?? 0;
+      return acc + (price * item.quantity);
+    }, 0) * 100) / 100;
+
     const gstType = existingOrder.gst_type || 'NONE';
     const gstRate = Number(existingOrder.gst_rate) || 0;
     let newGstAmount = 0;

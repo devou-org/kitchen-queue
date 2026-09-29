@@ -190,7 +190,7 @@ export function generateThermalReceiptHtml(data: KotPrintData): string {
   <div class="receipt-container">
     <div class="center">
       <div class="title">${escapeHtml(restaurantName)}</div>
-      <div class="subtitle">*** KITCHEN ORDER TICKET ***</div>
+      <div class="subtitle">${data.isAddOn ? '*** RUNNING KOT (ADD-ON) ***' : '*** KITCHEN ORDER TICKET ***'}</div>
     </div>
 
     <div class="counter-banner">
