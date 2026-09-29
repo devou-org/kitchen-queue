@@ -21,8 +21,10 @@ export class TablesService {
     }
 
     // Generate table-specific order link for QR Code
-    const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://qdinetest.devou.in';
-    const qrUrl = `${baseUrl}/${restaurantSlug}/menu?table=${encodeURIComponent(cleanTableNum)}`;
+    const baseUrl = (process.env.NEXT_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+    const qrUrl = baseUrl
+      ? `${baseUrl}/${restaurantSlug}/menu?table=${encodeURIComponent(cleanTableNum)}`
+      : `/${restaurantSlug}/menu?table=${encodeURIComponent(cleanTableNum)}`;
 
     return await TablesRepository.createTable({
       restaurant_id: restaurantId,
@@ -59,8 +61,10 @@ export class TablesService {
           throw new Error(`Table "${cleanTableNum}" already exists.`);
         }
 
-        const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://qdinetest.devou.in';
-        newQrUrl = `${baseUrl}/${restaurantSlug}/menu?table=${encodeURIComponent(cleanTableNum)}`;
+        const baseUrl = (process.env.NEXT_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+        newQrUrl = baseUrl
+          ? `${baseUrl}/${restaurantSlug}/menu?table=${encodeURIComponent(cleanTableNum)}`
+          : `/${restaurantSlug}/menu?table=${encodeURIComponent(cleanTableNum)}`;
       }
     }
 

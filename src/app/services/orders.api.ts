@@ -13,6 +13,8 @@ export interface CreateOrderData {
   table_number?: string;
   order_type?: string;
   is_pos?: boolean;
+  is_paid?: boolean;
+  payment_method?: string;
 }
 
 export interface UpdateOrderData {

@@ -8,11 +8,19 @@ interface TableQRModalProps {
   table: RestaurantTable | null;
   restaurantName?: string;
   restaurantLogo?: string;
+  restaurantSlug?: string;
   onClose: () => void;
   primaryColor?: string;
 }
 
-export function TableQRModal({ table, restaurantName = 'Qdine', restaurantLogo, onClose, primaryColor = '#059669' }: TableQRModalProps) {
+export function TableQRModal({
+  table,
+  restaurantName = 'Qdine',
+  restaurantLogo,
+  restaurantSlug,
+  onClose,
+  primaryColor = '#059669',
+}: TableQRModalProps) {
   const qrRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -22,7 +30,33 @@ export function TableQRModal({ table, restaurantName = 'Qdine', restaurantLogo, 
 
   if (!table || !mounted) return null;
 
-  const qrUrl = table.qr_code_url || `https://qdinetest.devou.in/demo/menu?table=${encodeURIComponent(table.table_number)}`;
+  const configuredBaseUrl = (
+    process.env.NEXT_PUBLIC_URL ||
+    (typeof window !== 'undefined' ? window.location.origin : '')
+  )
+    .trim()
+    .replace(/\/+$/, '');
+
+  const currentSlug =
+    restaurantSlug ||
+    (typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : '') ||
+    'demo';
+
+  let qrUrl = table.qr_code_url || '';
+  if (configuredBaseUrl) {
+    if (!qrUrl) {
+      qrUrl = `${configuredBaseUrl}/${currentSlug}/menu?table=${encodeURIComponent(table.table_number)}`;
+    } else {
+      try {
+        const parsed = new URL(qrUrl, configuredBaseUrl);
+        qrUrl = `${configuredBaseUrl}${parsed.pathname}${parsed.search}`;
+      } catch {
+        qrUrl = `${configuredBaseUrl}/${currentSlug}/menu?table=${encodeURIComponent(table.table_number)}`;
+      }
+    }
+  } else if (!qrUrl) {
+    qrUrl = `/${currentSlug}/menu?table=${encodeURIComponent(table.table_number)}`;
+  }
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');

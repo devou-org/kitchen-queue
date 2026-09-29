@@ -556,6 +556,7 @@ export default function AdminTablesPage() {
         table={selectedQRTable}
         restaurantName={restaurant?.name}
         restaurantLogo={restaurant?.logo_url}
+        restaurantSlug={slugStr || restaurant?.slug}
         onClose={() => setSelectedQRTable(null)}
         primaryColor={primaryColor}
       />

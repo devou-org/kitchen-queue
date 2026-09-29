@@ -127,13 +127,17 @@ export default function StaffMenuPage() {
     party_size: number;
     notes: string;
     order_type: OrderType | string;
+    is_paid?: boolean;
+    payment_method?: string;
   }>({
     customer_name: '',
     phone: '',
     table_number: '',
     party_size: 1,
     notes: '',
-    order_type: 'DINE_IN'
+    order_type: 'DINE_IN',
+    is_paid: false,
+    payment_method: 'CASH',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -365,7 +369,9 @@ export default function StaffMenuPage() {
         party_size: isTakeaway ? 0 : orderForm.party_size,
         notes: orderForm.notes,
         order_type: orderForm.order_type,
-        is_pos: true
+        is_pos: true,
+        is_paid: Boolean(orderForm.is_paid),
+        payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
       });
 
       if (res.success && res.data) {
@@ -373,7 +379,7 @@ export default function StaffMenuPage() {
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN' });
+        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH' });
         await fetchTables();
       } else {
         toast.error(res.error || 'Failed to place order');
@@ -618,6 +624,45 @@ export default function StaffMenuPage() {
               <div>
                 <label className="label">Notes</label>
                 <input type="text" className="input" placeholder="Less spicy, extra napkins..." value={orderForm.notes} onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} />
+              </div>
+
+              <div style={{ background: orderForm.is_paid ? '#F0FDF4' : '#F8FAFC', border: orderForm.is_paid ? '1px solid #BBF7D0' : '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', marginTop: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: orderForm.is_paid ? '#15803D' : '#334155' }}>Mark as Paid (Optional)</div>
+                    <div style={{ fontSize: '11px', color: '#64748B' }}>Order stays in kitchen queue</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(orderForm.is_paid)}
+                    onChange={e => setOrderForm({ ...orderForm, is_paid: e.target.checked, payment_method: e.target.checked ? (orderForm.payment_method || 'CASH') : orderForm.payment_method })}
+                    style={{ width: '18px', height: '18px', accentColor: '#16A34A', cursor: 'pointer' }}
+                  />
+                </label>
+                {orderForm.is_paid && (
+                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #DCFCE7', display: 'flex', gap: '6px' }}>
+                    {['CASH', 'UPI', 'CARD'].map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setOrderForm({ ...orderForm, payment_method: m })}
+                        style={{
+                          flex: 1,
+                          height: '32px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: (orderForm.payment_method || 'CASH') === m ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
+                          background: (orderForm.payment_method || 'CASH') === m ? '#FFFFFF' : '#F8FAFC',
+                          color: (orderForm.payment_method || 'CASH') === m ? '#15803D' : '#475569',
+                        }}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '8px' }} disabled={submitting}>
