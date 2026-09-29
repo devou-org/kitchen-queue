@@ -163,6 +163,25 @@ class OrderService {
     }
   }
 
+  async updateOrderItemStatus(
+    orderId: string,
+    data: { item_ids?: string[]; counter?: string; status: string }
+  ): Promise<ApiResponse<Order>> {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/items/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (error) {
+      return { success: false, error: 'Network error while updating item status.' };
+    }
+  }
+
 }
 
 export const orderService = new OrderService();
