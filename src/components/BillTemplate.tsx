@@ -450,6 +450,15 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
                 </>
               )}
 
+              {order.discount_amount && Number(order.discount_amount) > 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#16a34a' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600 }}>Discount</span>
+                  <span style={{ fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                    -{formatPrice(order.discount_amount)}
+                  </span>
+                </div>
+              ) : null}
+
               {/* Grand Total */}
               <div style={{
                 display: 'flex',

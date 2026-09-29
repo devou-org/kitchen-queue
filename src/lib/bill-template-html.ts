@@ -171,6 +171,12 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
       </div>
 
       ${gstHtml}
+      ${(order as any).discount_amount && Number((order as any).discount_amount) > 0 ? `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; color: #16a34a;">
+        <span style="font-size: 13.5px; font-weight: 700;">Discount</span>
+        <span style="font-size: 13.5px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums;">-${formatPrice((order as any).discount_amount)}</span>
+      </div>
+      ` : ''}
 
       <!-- Solid Brand Color Line before Grand Total -->
       <div style="height: 2px; background: ${pc}; margin: 8px 0 4px 0;"></div>

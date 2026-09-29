@@ -642,6 +642,15 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               </>
             )}
 
+            {order.discount_amount && Number(order.discount_amount) > 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#16a34a', fontWeight: 600 }}>Discount</span>
+                <span style={{ fontWeight: 700, fontSize: '14px', color: '#16a34a' }}>
+                  -{formatPrice(order.discount_amount)}
+                </span>
+              </div>
+            ) : null}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Status</span>
               <span style={{ fontWeight: 800, fontSize: '14px', color: '#EC7951', textTransform: 'uppercase' }}>
