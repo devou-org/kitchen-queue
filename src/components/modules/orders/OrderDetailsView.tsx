@@ -19,6 +19,9 @@ import {
   Printer,
   ChevronDown,
   Loader2,
+  Banknote,
+  QrCode,
+  Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import OrderTypeBadge from './OrderTypeBadge';
@@ -62,7 +65,7 @@ export function OrderDetailsView({
   const [mounted, setMounted] = useState(false);
   const [tempStatus, setTempStatus] = useState(initialOrder.status);
   const [tempTableNumber, setTempTableNumber] = useState(initialOrder.table_number || '');
-  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || '');
+  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'CASH');
   const [actionLoading, setActionLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
@@ -107,7 +110,7 @@ export function OrderDetailsView({
   React.useEffect(() => {
     setTempStatus(order.status);
     setTempTableNumber(order.table_number || '');
-    setPaymentMethod(order.payment_method || '');
+    setPaymentMethod(order.payment_method || 'CASH');
     setIsClosing(false);
   }, [order.id, order.status, order.table_number, order.payment_method]);
 
@@ -140,27 +143,25 @@ export function OrderDetailsView({
     }
   };
 
-  const handleMarkAsPaid = async () => {
+  const handleMarkAsPaid = async (methodToUse?: string) => {
     setActionLoading(true);
     try {
-      const pMethod = order.payment_method || paymentMethod || 'CASH';
+      const pMethod = methodToUse || paymentMethod || order.payment_method || 'CASH';
       const res = await orderService.updateOrder(order.id, {
-        status: 'PAID',
         is_paid: true,
         payment_method: pMethod,
         table_number: tempTableNumber || order.table_number,
       });
       if (res.success && res.data) {
         setOrder(res.data);
-        setTempStatus('PAID');
         setPaymentMethod(res.data.payment_method || pMethod);
         if (onOrderUpdated) onOrderUpdated(res.data);
-        toast.success('Order marked as PAID');
+        toast.success(`Payment recorded as Paid (${pMethod})`);
       } else {
-        toast.error(res.error || 'Failed to update order');
+        toast.error(res.error || 'Failed to update payment');
       }
     } catch {
-      toast.error('Network error updating order');
+      toast.error('Network error updating payment');
     } finally {
       setActionLoading(false);
     }
@@ -1086,33 +1087,129 @@ export function OrderDetailsView({
                   <span style={{ color: '#B45309', fontWeight: 600 }}>Unpaid</span>
                 )}
               </div>
-              {order.status !== 'PAID' && (
-                <button
-                  type="button"
-                  disabled={actionLoading || loading}
-                  onClick={handleMarkAsPaid}
+
+              {!order.is_paid && (
+                <div
                   style={{
-                    width: '100%',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    borderRadius: '6px',
-                    border: '1px solid #16A34A',
                     background: '#F0FDF4',
-                    color: '#15803D',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                    border: '1px solid #BBF7D0',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    marginTop: '4px',
                     transition: 'all 0.15s ease',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#DCFCE7')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = '#F0FDF4')}
                 >
-                  <CheckCircle2 size={14} />
-                  <span>Mark as Paid</span>
-                </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CreditCard size={15} style={{ color: '#16A34A' }} />
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#15803D' }}>
+                        Mark as Paid
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: '#64748B' }}>
+                        Record payment without changing kitchen status
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      paddingTop: '8px',
+                      borderTop: '1px solid #DCFCE7',
+                    }}
+                  >
+                    <label
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        color: '#166534',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      Payment Method
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                      {[
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
+                        { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CARD', label: 'Card', icon: CreditCard },
+                      ].map((m) => {
+                        const Icon = m.icon;
+                        const selected = (paymentMethod || 'CASH') === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setPaymentMethod(m.id)}
+                            style={{
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: selected ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
+                              background: selected ? '#FFFFFF' : '#F8FAFC',
+                              color: selected ? '#15803D' : '#475569',
+                              boxShadow: selected ? '0 1px 3px rgba(22, 163, 74, 0.15)' : 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <Icon size={12} />
+                            <span>{m.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={actionLoading || loading}
+                      onClick={() => handleMarkAsPaid()}
+                      style={{
+                        marginTop: '4px',
+                        width: '100%',
+                        height: '34px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: '#16A34A',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#15803D')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = '#16A34A')}
+                    >
+                      {actionLoading ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          <span>Recording Payment...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={14} />
+                          <span>Confirm as Paid · {paymentMethod || 'CASH'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
