@@ -15,6 +15,7 @@ export interface CreateOrderData {
   is_pos?: boolean;
   is_paid?: boolean;
   payment_method?: string;
+  discount_amount?: number;
 }
 
 export interface UpdateOrderData {

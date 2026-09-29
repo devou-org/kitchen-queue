@@ -9,7 +9,7 @@ import { orderService } from '@/app/services/orders.api';
 
 // Modular Components
 import OrderSummary from './components/OrderSummary';
-import CustomerDetails from './components/CustomerDetails';
+import CustomerDetails, { LoyaltyRewardOption } from './components/CustomerDetails';
 import CheckoutActions from './components/CheckoutActions';
 
 // Statuses where adding to an existing order is allowed
@@ -35,6 +35,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [addToMode, setAddToMode] = useState(false); // true = adding to existing order
   const [inOtpStep, setInOtpStep] = useState(false);
+  const [selectedReward, setSelectedReward] = useState<LoyaltyRewardOption | null>(null);
   const [form, setForm] = useState<{
     customer_name: string;
     phone: string;
@@ -122,6 +123,20 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     total = subtotal + gstAmount;
   }
 
+  // Calculate Loyalty Reward Discount
+  let discountAmount = 0;
+  if (selectedReward) {
+    if (selectedReward.reward_type === 'DISCOUNT_AMOUNT') {
+      discountAmount = Math.min(total, Number(selectedReward.discount_value || 0));
+    } else if (selectedReward.reward_type === 'DISCOUNT_PERCENTAGE') {
+      discountAmount = Math.min(total, Math.round((subtotal * Number(selectedReward.discount_value || 0)) / 100));
+    } else if (selectedReward.reward_type === 'FREE_ITEM') {
+      discountAmount = Math.min(total, Number(selectedReward.discount_value || 0));
+    }
+  }
+
+  const finalTotal = Math.max(0, total - discountAmount);
+
   const isVerified = currentUser && currentUser.phone === form.phone;
 
 
@@ -175,18 +190,38 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       }));
 
       const storedTable = typeof window !== 'undefined' ? localStorage.getItem(`table_number_${slug}`) || undefined : undefined;
+      const rewardNote = selectedReward ? `[Loyalty Reward: ${selectedReward.name}]` : '';
+      const combinedNotes = [form.notes.trim(), rewardNote].filter(Boolean).join(' ');
 
       const data = await orderService.createOrder({
         customer_name: form.customer_name.trim(),
         phone: form.phone,
         items: orderItems,
-        notes: form.notes.trim() || undefined,
+        notes: combinedNotes || undefined,
         party_size: isTakeaway ? 0 : (parseInt(form.party_size) || 1),
         table_number: isTakeaway ? undefined : storedTable,
         order_type: (form.order_type as OrderType) || 'DINE_IN',
+        discount_amount: discountAmount,
       });
 
       if (data.success && data.data) {
+        // Redeem loyalty reward if selected
+        if (selectedReward) {
+          try {
+            await fetch('/api/admin/loyalty/redeem', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                slug,
+                phone: form.phone,
+                reward_id: selectedReward.id,
+              }),
+            });
+          } catch (err) {
+            console.error('Failed to process loyalty reward redemption:', err);
+          }
+        }
+
         // Update user name in local storage if changed
         const existing = localStorage.getItem('user');
         if (existing) {
@@ -198,7 +233,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         localStorage.removeItem(`cart_${slug}`);
         localStorage.removeItem(`add_to_order_${slug}`);
         localStorage.removeItem(`table_number_${slug}`);
-        toast.success('Order placed successfully! 🎉');
+        toast.success('Order placed successfully!');
         router.push(`/${slug}/order-status/${data.data.id}`);
       } else {
         toast.error(data.error || 'Failed to place order');
@@ -250,7 +285,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       if (data.success) {
         localStorage.removeItem(`cart_${slug}`);
         localStorage.removeItem(`add_to_order_${slug}`);
-        toast.success('Items added to your order! 🎉');
+        toast.success('Items added to your order!');
         router.push(`/${slug}/order-status/${activeOrder.id}`);
       } else {
         toast.error(data.error || 'Failed to update order');
@@ -289,7 +324,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             background: '#fffbeb',
             border: '1px solid #fde68a',
           }}>
-            <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '2px' }}>⚠️</span>
             <p style={{ fontSize: '13px', color: '#92400e', fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
               You already have an active order (<span style={{ fontWeight: 800 }}>#{String(activeOrder.ticket_number).padStart(3, '0')}</span>). 
               To add more items to your table, please contact the staff.
@@ -305,6 +339,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
           gstAmount={gstAmount}
           gstRate={restaurant?.gst_rate}
           gstType={restaurant?.gst_type}
+          discountAmount={discountAmount}
+          appliedRewardName={selectedReward?.name}
           total={total}
           addToMode={addToMode}
           activeOrder={activeOrder}
@@ -312,6 +348,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
         {!addToMode && (
           <CustomerDetails 
+            slug={slug}
+            subtotal={subtotal}
             form={form}
             setForm={setForm}
             isVerified={isVerified}
@@ -319,6 +357,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             onSubmit={handleNewOrder}
             totalQty={items.reduce((s, i) => s + i.quantity, 0)}
             onOtpStepChange={setInOtpStep}
+            selectedReward={selectedReward}
+            onSelectReward={setSelectedReward}
           />
         )}
       </div>
@@ -329,15 +369,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         isVerified={isVerified}
         inOtpStep={inOtpStep}
         itemsCount={items.length}
-        total={total}
+        total={finalTotal}
         ticketNumber={activeOrder?.ticket_number}
         onAddToOrder={handleAddToOrder}
         onSubmitNewOrder={handleNewOrder}
         hasActiveOrder={!!activeOrder}
       />
-
-
-
     </div>
   );
 }
+

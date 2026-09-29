@@ -82,7 +82,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Update modules if provided
     if (Array.isArray(modules)) {
       let modulesToSet = [];
-      const ALL_MODULE_KEYS = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS'];
+      const ALL_MODULE_KEYS = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS', 'LOYALTY_PROGRAM'];
 
       if (modules.length === 0 || typeof modules[0] === 'string') {
         // Form submitted as string keys (enabled ones only)

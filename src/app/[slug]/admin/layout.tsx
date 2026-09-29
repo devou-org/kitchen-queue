@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3, LogOut, PanelLeftClose, PanelLeftOpen, Gift } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
@@ -45,6 +45,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
   // Controlled via Super Admin Subscription Modules
   const showInventory = restaurant?.modules?.INVENTORY === true;
+  const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM !== false;
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
@@ -91,6 +92,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     { key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
     { key: 'products', name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
+    ...(showLoyalty ? [{ key: 'loyalty', name: 'Loyalty', href: `/${slug}/admin/loyalty`, icon: <Gift size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'staff', name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
     { key: 'billing', name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
@@ -162,6 +164,17 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         });
       }
     }
+
+    if (!resLoading && restaurant && restaurant.modules?.LOYALTY_PROGRAM === false) {
+      if (pathname.startsWith(`/${slug}/admin/loyalty`)) {
+        refresh().then((latest) => {
+          if (latest && latest.modules?.LOYALTY_PROGRAM === false) {
+            const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
+            router.replace(`/${slug}/admin/${target}`);
+          }
+        });
+      }
+    }
   }, [restaurant, resLoading, pathname, router, slug, showOrdering, showQueue, refresh]);
 
   // If on login page, render children without sidebar
@@ -217,6 +230,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     }
     router.push(`/${slug}/admin/login`);
   };
+
 
   if (restaurant?.billing_status === 'SUSPENDED') {
     return (
