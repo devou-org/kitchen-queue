@@ -249,7 +249,7 @@ export async function GET() {
     `;
 
     // Default Modules
-    const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS'];
+    const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS', 'LOYALTY_PROGRAM'];
     for (const mod of ALL_MODULES) {
       await sql`
         INSERT INTO restaurant_modules (restaurant_id, module_name, is_enabled)

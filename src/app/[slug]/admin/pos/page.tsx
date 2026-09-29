@@ -129,6 +129,29 @@ export default function AdminPosPage() {
     payment_method: 'CASH',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState<any>(null);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState<number>(0);
+
+  useEffect(() => {
+    if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
+      const slugStr = Array.isArray(slug) ? slug[0] : slug;
+      fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(orderForm.phone.trim())}`)
+        .then(res => res.json())
+        .then(json => {
+          if (json.success && json.data && json.data.length > 0) {
+            setLoyaltyCustomer(json.data[0]);
+            if (json.data[0].name && !orderForm.customer_name) {
+              setOrderForm(prev => ({ ...prev, customer_name: json.data[0].name }));
+            }
+          } else {
+            setLoyaltyCustomer(null);
+          }
+        })
+        .catch(() => setLoyaltyCustomer(null));
+    } else {
+      setLoyaltyCustomer(null);
+    }
+  }, [orderForm.phone, slug, restaurant]);
 
   const fetchTables = useCallback(async () => {
     try {

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
-import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart, Receipt, MapPin, Navigation, Boxes } from 'lucide-react';
+import { Loader2, Globe, Key, Ticket, Settings, AlertTriangle, Pencil, X, ClipboardList, ShoppingCart, Receipt, MapPin, Navigation, Boxes, Gift } from 'lucide-react';
 type Module = {
   module_name: string;
   is_enabled: boolean;
@@ -30,6 +30,7 @@ const ALL_MODULES = [
   { key: 'ONLINE_ORDERING', label: 'Online Ordering', desc: 'Enables online checkout, payments, and shopping carts.', icon: <ShoppingCart size={16} /> },
   { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', desc: 'Tracks active order tokens and served tokens for kitchen screen.', icon: <Ticket size={16} /> },
   { key: 'INVENTORY', label: 'Inventory Management', desc: 'Tracks raw food ingredients, recipes (BOM), stock deliveries, and wastage.', icon: <Boxes size={16} /> },
+  { key: 'LOYALTY_PROGRAM', label: 'Loyalty & Rewards', desc: 'CRM points balance, punch cards, and milestone reward discounts.', icon: <Gift size={16} /> },
 ];
 
 const S: Record<string, React.CSSProperties> = {
