@@ -13,6 +13,7 @@
 
 import { KotPrintData } from './escpos';
 import { generateThermalReceiptHtml } from './thermal-receipt-html';
+import { generateBillTemplateHTML } from './bill-template-html';
 
 export type HardwarePrinterType = 'bluetooth' | 'serial' | 'usb' | 'browser';
 
@@ -37,6 +38,29 @@ let activeBluetoothChar: any = null;
 let activeSerialPort: any = null;
 let activeUsbDevice: any = null;
 let activeUsbEndpoint: number = 1;
+
+// Deduplication map to prevent double-printing within 5 seconds
+const recentPrintJobs = new Map<string, number>();
+
+function checkAndMarkDuplicatePrint(ticketNumber?: string | number, counterId?: string, counterName?: string): boolean {
+  if (!ticketNumber) return false;
+  const key = `${ticketNumber}_${counterId || counterName || 'all'}`;
+  const now = Date.now();
+  const lastTime = recentPrintJobs.get(key);
+  if (lastTime && now - lastTime < 5000) {
+    return true;
+  }
+  recentPrintJobs.set(key, now);
+  // Housekeep old entries
+  if (recentPrintJobs.size > 100) {
+    for (const [k, time] of recentPrintJobs.entries()) {
+      if (now - time > 30000) {
+        recentPrintJobs.delete(k);
+      }
+    }
+  }
+  return false;
+}
 
 // Common BLE Service UUIDs used by ESC/POS thermal printers
 const BLE_THERMAL_SERVICES = [
@@ -473,7 +497,7 @@ export function isSerialConnectedForCounter(
     }
   }
   if (activeSerialPort && activeSerialPort.readable) {
-    return { connected: true, deviceName: activeBluetoothDevice?.name || 'USB Serial Printer' };
+    return { connected: true, deviceName: 'USB Serial Printer' };
   }
   return { connected: false, deviceName: null };
 }
@@ -676,6 +700,15 @@ export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise
   method: 'bluetooth' | 'serial' | 'rawbt' | 'browser';
   message?: string;
 }> {
+  const ticketNo = options.kotData?.ticketNumber;
+  if (ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName)) {
+    console.warn(`[HardwarePrinter] Duplicate print suppressed for Ticket #${ticketNo} (${options.counterName || options.counterId || 'ALL'})`);
+    return Promise.resolve({
+      success: true,
+      method: 'serial',
+      message: `Ticket #${ticketNo} already processed. Duplicate suppressed.`,
+    });
+  }
   return enqueuePrintJob(() => executePrintUnifiedThermalTicket(options));
 }
 
@@ -794,61 +827,282 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     } catch {}
   }
 
-  // 5. Fallback: Browser 80mm Thermal Receipt
-  // When no direct Bluetooth/Serial/RawBT hardware is connected, this prints via the OS thermal receipt driver.
-  // In Chrome Kiosk Mode (--kiosk-printing), this prints 100% silently and automatically.
-  return new Promise((resolve) => {
-    try {
-      const html = generateThermalReceiptHtml(kotData);
+  // 5. Fallback: Browser 80mm Thermal Receipt (Manual print only; never on auto-print)
+  // When isAutoPrint is true and forceBrowser is false, NEVER open the browser print dialog!
+  if (isAutoPrint && !forceBrowser) {
+    console.warn(`[HardwarePrinter] Silent printer not reachable for "${printerName}". Browser print dialog suppressed for auto-print.`);
+    return {
+      success: false,
+      method: 'browser',
+      message: `Silent printer not connected for "${printerName}". Start print-agent or connect via USB/Bluetooth.`,
+    };
+  }
 
-      const iframeId = `kot-print-iframe-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const iframe = document.createElement('iframe');
+  // When no direct Bluetooth/Serial/RawBT/Bridge hardware is connected, this prints via the OS thermal receipt driver.
+  // In Chrome Kiosk Mode (--kiosk-printing), this prints 100% silently and automatically.
+  const html = generateThermalReceiptHtml(kotData);
+  const printed = await printHtmlViaIframe(html);
+  return {
+    success: printed,
+    method: 'browser',
+    message: `KOT printed for ${counterName || kotData.counterName || printerName}`,
+  };
+}
+
+/**
+ * Universal iframe print helper for 80mm thermal receipts.
+ * Uses a non-zero invisible frame (opacity: 0.01) so Chromium layout engines
+ * reliably paginate and calculate styles before triggering print.
+ */
+export function printHtmlViaIframe(html: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve(false);
+      return;
+    }
+    try {
+      const iframeId = `thermal-print-iframe-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
+      if (iframe) {
+        try { iframe.remove(); } catch {}
+      }
+
+      iframe = document.createElement('iframe');
       iframe.id = iframeId;
       iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
+      iframe.style.top = '0';
+      iframe.style.left = '0';
+      iframe.style.width = '80mm';
+      iframe.style.height = '100vh';
+      iframe.style.opacity = '0.01';
+      iframe.style.pointerEvents = 'none';
       iframe.style.border = 'none';
       iframe.style.zIndex = '-9999';
       document.body.appendChild(iframe);
 
       const doc = iframe.contentWindow?.document;
-      if (!doc) throw new Error('Cannot access print frame');
+      if (!doc) {
+        resolve(false);
+        return;
+      }
 
       doc.open();
       doc.write(html);
       doc.close();
 
+      let printed = false;
       const triggerPrint = () => {
+        if (printed) return;
+        printed = true;
         try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
+          iframe?.contentWindow?.focus();
+          iframe?.contentWindow?.print();
+          resolve(true);
+        } catch (err) {
+          console.error('Print iframe error:', err);
+          resolve(false);
+        } finally {
           setTimeout(() => {
-            try { iframe.remove(); } catch {}
+            try { iframe?.remove(); } catch {}
           }, 60000);
-          resolve({
-            success: true,
-            method: 'browser',
-            message: `KOT printed for ${counterName || kotData.counterName || printerName}`,
-          });
-        } catch {
-          resolve({
-            success: true,
-            method: 'browser',
-          });
         }
       };
 
-      iframe.onload = triggerPrint;
-      setTimeout(triggerPrint, 500);
-    } catch (err: any) {
-      resolve({
-        success: false,
-        method: 'browser',
-        message: err.message || 'Failed to print ticket',
-      });
+      const img = iframe.contentWindow?.document?.querySelector('img');
+      if (img && !img.complete) {
+        img.onload = () => setTimeout(triggerPrint, 80);
+        img.onerror = () => setTimeout(triggerPrint, 80);
+      }
+
+      iframe.onload = () => setTimeout(triggerPrint, 150);
+      setTimeout(triggerPrint, 400);
+    } catch (err) {
+      console.error('printHtmlViaIframe fatal error:', err);
+      resolve(false);
     }
   });
+}
+
+// ============================================================
+// 5. UNIFIED BILL PRINT DISPATCHER
+// ============================================================
+
+export interface UnifiedBillPrintOptions {
+  base64Bytes?: string;
+  billHtml?: string;
+  orderData?: any;
+  billData?: any;
+  printerName?: string;
+  ticketNumber?: string | number;
+  localBridgeUrl?: string;
+  forceBrowser?: boolean;
+}
+
+/**
+ * Dispatch bill print job to the most direct, highest-priority hardware connection:
+ * 1. Web Bluetooth (if paired & active)
+ * 2. Web Serial / USB (if connected & active)
+ * 3. Android RawBT WebSocket (Port 40213 - 100% silent, background)
+ * 4. Android RawBT URL Intent
+ * 5. Local HTTP Bridge on Windows (Port 9123 - 100% silent, background)
+ * 6. Hidden iframe 80mm thermal receipt (Browser thermal driver / Chrome kiosk printing)
+ */
+export function printUnifiedBill(options: UnifiedBillPrintOptions): Promise<{
+  success: boolean;
+  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser';
+  message?: string;
+}> {
+  return enqueuePrintJob(() => executePrintUnifiedBill(options));
+}
+
+async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promise<{
+  success: boolean;
+  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser';
+  message?: string;
+}> {
+  const {
+    base64Bytes,
+    billHtml,
+    orderData,
+    billData,
+    printerName = (typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C') : 'POS-80C'),
+    forceBrowser = false,
+  } = options;
+
+  const ticketNumber = options.ticketNumber || billData?.ticketNumber || orderData?.ticket_number || '';
+
+  // Convert base64 to Uint8Array if provided
+  let rawBytes: Uint8Array | null = null;
+  if (base64Bytes) {
+    try {
+      const binaryString = atob(base64Bytes);
+      const len = binaryString.length;
+      rawBytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        rawBytes[i] = binaryString.charCodeAt(i);
+      }
+    } catch {}
+  }
+
+  if (!forceBrowser && rawBytes) {
+    const preferredType = typeof window !== 'undefined' ? localStorage.getItem('qdine_preferred_printer_type') : null;
+
+    // Check if RawBT is explicitly preferred on Android
+    if (preferredType === 'rawbt' && base64Bytes) {
+      const sent = printViaRawBt(base64Bytes);
+      if (sent) {
+        return {
+          success: true,
+          method: 'rawbt',
+          message: 'Sent directly to RawBT Android Print Service!',
+        };
+      }
+    }
+
+    // 1. Try Bluetooth if active or attempt auto-reconnect
+    const btCheck = isBluetoothConnectedForCounter(undefined, printerName);
+    if (!btCheck.connected && (!activeBluetoothChar || !activeBluetoothDevice?.gatt?.connected)) {
+      await tryAutoConnectBluetooth();
+    }
+
+    const btNow = isBluetoothConnectedForCounter(undefined, printerName);
+    const isBtActive = btNow.connected || (activeBluetoothChar && activeBluetoothDevice?.gatt?.connected);
+    if (isBtActive) {
+      try {
+        await writeBytesToBluetooth(rawBytes, printerName);
+        return {
+          success: true,
+          method: 'bluetooth',
+          message: `Bill #${ticketNumber} printed instantly to ${btNow.deviceName || activeBluetoothDevice?.name || 'Bluetooth Printer'}!`,
+        };
+      } catch (err: any) {
+        console.warn('Bluetooth bill print failed, trying alternatives:', err.message);
+      }
+    }
+
+    // 2. Try Serial / USB if active
+    const serialCheck = isSerialConnectedForCounter(undefined, printerName);
+    const isSerialActive = serialCheck.connected || (activeSerialPort && activeSerialPort.writable);
+    if (isSerialActive) {
+      try {
+        await writeBytesToSerial(rawBytes);
+        return {
+          success: true,
+          method: 'serial',
+          message: `Bill #${ticketNumber} printed instantly to USB Printer (${printerName})!`,
+        };
+      } catch (err: any) {
+        console.warn('USB bill print failed, trying alternatives:', err.message);
+      }
+    }
+
+    // 3. Try RawBT WebSocket on Android
+    try {
+      const rawBtWsOk = await printViaRawBtWebSocket(rawBytes);
+      if (rawBtWsOk) {
+        return {
+          success: true,
+          method: 'rawbt',
+          message: 'Bill printed silently via RawBT Android Print Service!',
+        };
+      }
+    } catch {}
+
+    // 4. Try Local HTTP Bridge on Windows (Port 9123 or user-configured bridge URL)
+    try {
+      const bridgeUrl = options.localBridgeUrl || (typeof window !== 'undefined' && localStorage.getItem('qdine_printer_bridge_url')) || 'http://127.0.0.1:9123/print';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+      const bridgeRes = await fetch(bridgeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          printerName,
+          base64Bytes,
+          docName: `Bill #${ticketNumber || ''}`,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (bridgeRes.ok) {
+        const bridgeData = await bridgeRes.json();
+        if (bridgeData.success) {
+          return {
+            success: true,
+            method: 'bridge',
+            message: `Bill #${ticketNumber} sent silently to ${printerName} via local bridge!`,
+          };
+        }
+      }
+    } catch {}
+  }
+
+  // 5. Fallback: Browser 80mm Thermal Receipt (via hidden iframe)
+  let htmlToPrint = billHtml;
+  if (!htmlToPrint && orderData) {
+    htmlToPrint = generateBillTemplateHTML(orderData, {
+      name: orderData.restaurant_name || 'Restaurant',
+      address: orderData.restaurant_address,
+      phone: orderData.restaurant_phone,
+      gst_number: orderData.restaurant_gst,
+    });
+  }
+
+  if (htmlToPrint) {
+    const printed = await printHtmlViaIframe(htmlToPrint);
+    return {
+      success: printed,
+      method: 'browser',
+      message: `Bill #${String(ticketNumber).padStart(3, '0')} printed!`,
+    };
+  }
+
+  return {
+    success: false,
+    method: 'browser',
+    message: 'No print data or HTML available to print bill.',
+  };
 }
 

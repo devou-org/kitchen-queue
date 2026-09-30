@@ -12,9 +12,11 @@ import { useParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
+import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { printKotFromBrowser } from '@/lib/client-print';
+import { sortCategoriesByConfig } from '@/lib/category-order';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -110,6 +112,7 @@ export default function StaffMenuPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
+  const [dietaryFilter, setDietaryFilter] = useState<DietaryPreferenceFilter>('ALL');
 
   useEffect(() => {
     tryAutoConnectBluetooth();
@@ -124,13 +127,17 @@ export default function StaffMenuPage() {
     party_size: number;
     notes: string;
     order_type: OrderType | string;
+    is_paid?: boolean;
+    payment_method?: string;
   }>({
     customer_name: '',
     phone: '',
     table_number: '',
     party_size: 1,
     notes: '',
-    order_type: 'DINE_IN'
+    order_type: 'DINE_IN',
+    is_paid: false,
+    payment_method: 'CASH',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -148,7 +155,14 @@ export default function StaffMenuPage() {
   useEffect(() => {
     const initPage = async () => {
       try {
-        const res = await productService.getProducts();
+        const [res, catRes] = await Promise.all([
+          productService.getProducts(),
+          fetch('/api/categories', {
+            headers: { 'x-restaurant-slug': slug as string },
+            cache: 'no-store'
+          }).then(r => r.json()).catch(() => ({ success: false, data: [] }))
+        ]);
+
         if (res.success && res.data) {
           const parsedData = res.data.map(p => ({
             ...p,
@@ -157,12 +171,12 @@ export default function StaffMenuPage() {
             buffer_quantity: Number(p.buffer_quantity)
           }));
           setProducts(parsedData);
-          const uniqueCats = Array.from(new Set(
-            parsedData
-              .map((p: Product) => p.category?.trim())
-              .filter((cat: string) => cat && cat !== 'All')
-          ));
-          setCategories(['All', ...uniqueCats]);
+
+          const configured = (catRes.success && Array.isArray(catRes.data)) ? catRes.data : [];
+          const productCats = parsedData.map((p: Product) => p.category?.trim()).filter(Boolean);
+          const sortedCats = sortCategoriesByConfig(productCats, configured);
+
+          setCategories(['All', ...sortedCats]);
         }
 
         await fetchTables();
@@ -173,7 +187,7 @@ export default function StaffMenuPage() {
       }
     };
     initPage();
-  }, [fetchTables]);
+  }, [fetchTables, slug]);
 
   // Pusher for real-time updates
   useEffect(() => {
@@ -224,7 +238,7 @@ export default function StaffMenuPage() {
       });
 
       try {
-        await printUnifiedThermalTicket({
+        const result = await printUnifiedThermalTicket({
           base64Bytes: data.base64Bytes,
           kotData: data.kotData,
           printerName: data.printer_name,
@@ -232,6 +246,11 @@ export default function StaffMenuPage() {
           counterName: data.counter_name,
           isAutoPrint: true,
         });
+        if (result.success) {
+          toast.success(`🖨️ Auto-printed: ${data.counter_name || 'KOT'} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            id: `kot-auto-${data.ticket_number}-${data.counter_name}`,
+          });
+        }
       } catch (err: any) {
         console.error('Auto-print execution error on staff menu:', err);
       }
@@ -350,65 +369,18 @@ export default function StaffMenuPage() {
         party_size: isTakeaway ? 0 : orderForm.party_size,
         notes: orderForm.notes,
         order_type: orderForm.order_type,
-        is_pos: true
+        is_pos: true,
+        is_paid: Boolean(orderForm.is_paid),
+        payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
       });
 
       if (res.success && res.data) {
-        toast.success(`Order placed successfully! Ticket #${res.data.ticket_number}`);
         const createdOrder = res.data;
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN' });
+        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH' });
         await fetchTables();
-
-        // 🖨️ Immediately print KOT tickets for this staff POS order
-        const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
-        if (autoPrint && createdOrder.id) {
-          const toastId = toast.loading('🖨️ Generating KOT tickets...');
-          try {
-            const printRes = await fetch('/api/print/kot', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-restaurant-slug': slug,
-              },
-              body: JSON.stringify({
-                orderId: createdOrder.id,
-                separateSlips: true,
-                orderData: createdOrder,
-                slug,
-              }),
-            });
-            const printData = await printRes.json();
-            if (printData.success) {
-              if (printData.slips && Array.isArray(printData.slips)) {
-                for (const slip of printData.slips) {
-                  await printKotFromBrowser({
-                    kotData: slip.kotData,
-                    base64Bytes: slip.base64Bytes,
-                    printerName: slip.printerName || printData.printer,
-                    counterId: slip.counterId,
-                    counterName: slip.kotData?.counterName,
-                  });
-                }
-                toast.success(`KOT printed for ${printData.slips.length} counter(s)!`, { id: toastId });
-              } else if (printData.kotData) {
-                await printKotFromBrowser({
-                  kotData: printData.kotData,
-                  base64Bytes: printData.base64Bytes,
-                  printerName: printData.printer,
-                });
-                toast.success('KOT printed successfully!', { id: toastId });
-              }
-            } else {
-              toast.dismiss(toastId);
-            }
-          } catch (printErr: any) {
-            console.error('POS order print error:', printErr);
-            toast.dismiss(toastId);
-          }
-        }
       } else {
         toast.error(res.error || 'Failed to place order');
       }
@@ -434,7 +406,9 @@ export default function StaffMenuPage() {
     .filter(p => {
       const matchCat = category === 'All' || p.category === category;
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+      const pref = p.dietary_preference || 'NON_VEG';
+      const matchDietary = dietaryFilter === 'ALL' || (dietaryFilter === 'VEG' ? pref === 'VEG' : pref === 'NON_VEG');
+      return matchCat && matchSearch && matchDietary;
     })
     .sort((a, b) => {
       const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
@@ -444,8 +418,8 @@ export default function StaffMenuPage() {
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '16px' }}>
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-        <div style={{ position: 'relative', width: '100%', flex: 1 }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
           <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
             type="search"
@@ -456,6 +430,7 @@ export default function StaffMenuPage() {
             style={{ width: '100%', paddingLeft: '40px' }}
           />
         </div>
+        <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
       </div>
 
       {/* Categories */}
@@ -649,6 +624,45 @@ export default function StaffMenuPage() {
               <div>
                 <label className="label">Notes</label>
                 <input type="text" className="input" placeholder="Less spicy, extra napkins..." value={orderForm.notes} onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} />
+              </div>
+
+              <div style={{ background: orderForm.is_paid ? '#F0FDF4' : '#F8FAFC', border: orderForm.is_paid ? '1px solid #BBF7D0' : '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', marginTop: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: orderForm.is_paid ? '#15803D' : '#334155' }}>Mark as Paid (Optional)</div>
+                    <div style={{ fontSize: '11px', color: '#64748B' }}>Order stays in kitchen queue</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(orderForm.is_paid)}
+                    onChange={e => setOrderForm({ ...orderForm, is_paid: e.target.checked, payment_method: e.target.checked ? (orderForm.payment_method || 'CASH') : orderForm.payment_method })}
+                    style={{ width: '18px', height: '18px', accentColor: '#16A34A', cursor: 'pointer' }}
+                  />
+                </label>
+                {orderForm.is_paid && (
+                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #DCFCE7', display: 'flex', gap: '6px' }}>
+                    {['CASH', 'UPI', 'CARD'].map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setOrderForm({ ...orderForm, payment_method: m })}
+                        style={{
+                          flex: 1,
+                          height: '32px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: (orderForm.payment_method || 'CASH') === m ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
+                          background: (orderForm.payment_method || 'CASH') === m ? '#FFFFFF' : '#F8FAFC',
+                          color: (orderForm.payment_method || 'CASH') === m ? '#15803D' : '#475569',
+                        }}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '8px' }} disabled={submitting}>

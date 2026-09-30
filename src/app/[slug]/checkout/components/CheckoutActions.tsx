@@ -76,7 +76,7 @@ export default function CheckoutActions({
           loading={loading}
           text={
             !isVerified ? (
-              <span>⚠️ Verify Phone to Order</span>
+              <span>Verify Phone to Order</span>
             ) : (
               <>
                 <span>Slide to Place Order</span>

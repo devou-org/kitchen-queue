@@ -6,7 +6,7 @@ class ProductService {
     let token: string | null = null;
     const path = window.location.pathname;
 
-    if (path.startsWith('/admin')) {
+    if (path.startsWith('/admin') || path.includes('/admin')) {
       token = localStorage.getItem('admin_token');
     } else if (path.includes('/staff')) {
       token = localStorage.getItem('staff_token') || localStorage.getItem('admin_token');
@@ -46,7 +46,18 @@ class ProductService {
     return headers;
   }
 
-  // --- PUBLIC METHODS ---
+  async getCategories(): Promise<ApiResponse<{ id: string; name: string; sort_order?: number }[]>> {
+    try {
+      const res = await fetch('/api/categories', { 
+        headers: this.getAuthHeaders(),
+        cache: 'no-store' 
+      });
+      return await res.json();
+    } catch {
+      return { success: false, error: 'Network error fetching food categories' };
+    }
+  }
+
   async getProducts(): Promise<ApiResponse<Product[]>> {
     try {
       const res = await fetch('/api/products', { 

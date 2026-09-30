@@ -17,6 +17,7 @@ import {
 import toast from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { InventoryNav } from '@/components/modules/inventory/InventoryNav';
 import { inventoryService } from '@/app/services/inventory.api';
 import { formatPrice } from '@/lib/format';
@@ -59,33 +60,150 @@ export default function InventoryReportsPage() {
   }, [dateFrom, dateTo]);
 
   return (
-    <AdminContentWrapper>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
+      <style>{`
+        .inventory-page-header,
+        .inventory-page-header.admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: stretch !important;
+          margin: 0 !important;
+          padding: 0 20px 0 0 !important;
+          border-bottom: 1px solid var(--border) !important;
+          background: #FFFFFF !important;
+          box-sizing: border-box !important;
+          position: relative !important;
+        }
+
+        .inventory-page-header .admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: stretch !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          gap: 12px !important;
+          width: 100% !important;
+        }
+
+        .inventory-page-header .admin-header-left,
+        .inventory-page-header .admin-header-search {
+          height: 68px !important;
+          display: flex !important;
+          align-items: stretch !important;
+          flex-wrap: nowrap !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .inventory-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: stretch !important;
+          justify-content: space-between !important;
+          gap: 12px !important;
+          width: 100% !important;
+          height: 68px !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .inventory-tabs-wrapper {
+          display: flex !important;
+          align-items: stretch !important;
+          height: 68px !important;
+          min-height: 68px !important;
+          padding-top: 10px !important;
+          padding-right: 0 !important;
+          padding-bottom: 0 !important;
+          padding-left: 0 !important;
+          box-sizing: border-box !important;
+          flex: 1 1 auto !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+          overflow-x: auto !important;
+        }
+
+        .inventory-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+          height: 68px !important;
+        }
+
+        @media (max-width: 768px) {
+          .inventory-page-header {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 8px 16px !important;
+          }
+
+          .inventory-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            height: auto !important;
+          }
+
+          .inventory-tabs-wrapper {
+            width: 100% !important;
+            height: auto !important;
+            border-bottom: 1px solid var(--border) !important;
+            padding-bottom: 2px !important;
+          }
+
+          .inventory-actions {
+            width: 100% !important;
+            margin-left: 0 !important;
+            justify-content: flex-start !important;
+            flex-wrap: wrap !important;
+            height: auto !important;
+          }
+        }
+      `}</style>
       <AdminPageHeader
-        title="Inventory Reports & Analytics"
-        subtitle="Auditable stock valuation, raw material consumption ledgers, wastage by cause, and category asset distribution."
-        action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FFFFFF', padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-              <Calendar size={14} style={{ color: '#64748B' }} />
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                style={{ border: 'none', fontSize: '12px', outline: 'none', color: '#0F172A' }}
-              />
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                style={{ border: 'none', fontSize: '12px', outline: 'none', color: '#0F172A' }}
-              />
+        className="inventory-page-header"
+        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
+        hideMaximize={true}
+        search={
+          <div className="inventory-toolbar">
+            <div className="inventory-tabs-wrapper">
+              <InventoryNav inHeader={true} />
+            </div>
+
+            <div className="inventory-actions">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FFFFFF', padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <Calendar size={14} style={{ color: '#64748B' }} />
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  style={{ border: 'none', fontSize: '12px', outline: 'none', color: '#0F172A' }}
+                />
+                <span style={{ fontSize: '12px', color: '#94A3B8' }}>to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  style={{ border: 'none', fontSize: '12px', outline: 'none', color: '#0F172A' }}
+                />
+              </div>
+
+              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <LayoutMaximizeToggle />
+              </div>
             </div>
           </div>
         }
       />
 
-      <InventoryNav />
+      <div style={{ padding: '20px 24px' }}>
 
       {/* Report Sub Tabs */}
       <div
@@ -402,6 +520,7 @@ export default function InventoryReportsPage() {
           )}
         </>
       )}
+      </div>
     </AdminContentWrapper>
   );
 }

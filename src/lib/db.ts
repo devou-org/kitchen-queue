@@ -44,7 +44,8 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2),
       ADD COLUMN IF NOT EXISTS gst_type VARCHAR(20) DEFAULT 'NONE',
       ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS order_type VARCHAR(50) DEFAULT 'DINE_IN';
+      ADD COLUMN IF NOT EXISTS order_type VARCHAR(50) DEFAULT 'DINE_IN',
+      ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0;
     `;
     await sqlConnection`
       INSERT INTO gemini_request_config (request_type, max_output_tokens)
@@ -145,10 +146,29 @@ async function runAutoMigration(sqlConnection: any) {
       );
     `;
     await sqlConnection`
+      CREATE TABLE IF NOT EXISTS counters (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(100) NOT NULL,
+          code VARCHAR(50) NULL,
+          display_order INT DEFAULT 0,
+          is_active BOOLEAN DEFAULT true,
+          printer_name VARCHAR(100) DEFAULT 'POS-80C',
+          printer_type VARCHAR(50) DEFAULT 'DEFAULT',
+          printer_address VARCHAR(200) NULL,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
       ALTER TABLE counters
+      ADD COLUMN IF NOT EXISTS code VARCHAR(50) NULL,
+      ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
       ADD COLUMN IF NOT EXISTS printer_name VARCHAR(100) DEFAULT 'POS-80C',
       ADD COLUMN IF NOT EXISTS printer_type VARCHAR(50) DEFAULT 'DEFAULT',
       ADD COLUMN IF NOT EXISTS printer_address VARCHAR(200) NULL;
+
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS counter VARCHAR(255);
     `;
     // Inventory tables
     await sqlConnection`
@@ -314,8 +334,91 @@ async function runAutoMigration(sqlConnection: any) {
           created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_recipe_items_recipe ON recipe_items(recipe_id);
+
+      CREATE TABLE IF NOT EXISTS loyalty_settings (
+        restaurant_id UUID PRIMARY KEY REFERENCES restaurants(id) ON DELETE CASCADE,
+        is_enabled BOOLEAN DEFAULT true,
+        points_earning_rate DECIMAL(10, 4) DEFAULT 0.1000,
+        points_redemption_rate_points INT DEFAULT 100,
+        points_redemption_rate_amount DECIMAL(10, 2) DEFAULT 50.00,
+        points_expiry_type VARCHAR(50) DEFAULT 'NEVER',
+        points_expiry_days INT DEFAULT 365,
+        min_order_amount DECIMAL(10, 2) DEFAULT 0.00,
+        visit_milestone_count INT DEFAULT 5,
+        visit_reward_type VARCHAR(50) DEFAULT 'DISCOUNT_AMOUNT',
+        visit_reward_value VARCHAR(255) DEFAULT '100',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS loyalty_rewards (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        points_required INT NOT NULL,
+        reward_type VARCHAR(50) NOT NULL,
+        discount_value DECIMAL(10, 2) DEFAULT 0.00,
+        selected_product_ids JSONB DEFAULT '[]'::jsonb,
+        min_purchase_amount DECIMAL(10, 2) DEFAULT 0.00,
+        valid_until TIMESTAMP WITH TIME ZONE,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS customer_loyalty (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        points_balance DECIMAL(10, 2) DEFAULT 0.00,
+        total_points_earned DECIMAL(10, 2) DEFAULT 0.00,
+        total_points_redeemed DECIMAL(10, 2) DEFAULT 0.00,
+        total_visits INT DEFAULT 0,
+        visit_progress INT DEFAULT 0,
+        rewards_unlocked INT DEFAULT 0,
+        total_spent DECIMAL(10, 2) DEFAULT 0.00,
+        last_visit_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        CONSTRAINT unique_customer_restaurant_loyalty UNIQUE (restaurant_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS loyalty_transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        customer_loyalty_id UUID NOT NULL REFERENCES customer_loyalty(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+        reward_id UUID REFERENCES loyalty_rewards(id) ON DELETE SET NULL,
+        transaction_type VARCHAR(50) NOT NULL,
+        points_delta DECIMAL(10, 2) DEFAULT 0.00,
+        visit_delta INT DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS roles (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+          name VARCHAR(100) NOT NULL,
+          description TEXT,
+          permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
+          is_default BOOLEAN DEFAULT false,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(restaurant_id, name)
+      );
+
+      ALTER TABLE staffs
+      ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES roles(id) ON DELETE SET NULL;
+
+      ALTER TABLE admins
+      ADD COLUMN IF NOT EXISTS name VARCHAR(100);
+
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
     `;
-    console.log("Auto-migrated menu, GST, tables, counters, and inventory schema successfully!");
+    console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, admins, and loyalty schema successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
   }
@@ -512,8 +615,8 @@ export async function createRestaurant(data: {
   }
 
   // Seed default modules for the new restaurant
-  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY'];
-  const defaultEnabledModules = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT'];
+  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS', 'LOYALTY_PROGRAM'];
+  const defaultEnabledModules = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'LOYALTY_PROGRAM'];
   const enabledModules = data.modules || defaultEnabledModules;
 
   for (const mod of ALL_MODULES) {
@@ -960,9 +1063,9 @@ export async function getOrderStats(restaurantId: string, filters: {
       return await sql`
         SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -977,9 +1080,9 @@ export async function getOrderStats(restaurantId: string, filters: {
       return await sql`
         SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -993,9 +1096,9 @@ export async function getOrderStats(restaurantId: string, filters: {
       return await sql`
         SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1011,9 +1114,9 @@ export async function getOrderStats(restaurantId: string, filters: {
     return await sql`
       SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1028,9 +1131,9 @@ export async function getOrderStats(restaurantId: string, filters: {
     return await sql`
       SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1043,9 +1146,9 @@ export async function getOrderStats(restaurantId: string, filters: {
   return await sql`
     SELECT 
           COUNT(*)::int as total_orders,
-          COUNT(*) FILTER (WHERE status = 'PAID')::int as paid_orders,
+          COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE status = 'PAID'), 0) as total_paid_revenue,
+          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
           COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
@@ -1210,6 +1313,7 @@ export async function createOrder(data: {
   phone: string;
   total_price: number;
   subtotal?: number;
+  discount_amount?: number;
   gst_amount?: number;
   gst_rate?: number;
   gst_type?: string;
@@ -1218,6 +1322,8 @@ export async function createOrder(data: {
   table_number?: string;
   order_type?: string;
   is_pos?: boolean;
+  is_paid?: boolean;
+  payment_method?: string;
   staff_id?: string;
   business_date?: string;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
@@ -1263,6 +1369,7 @@ export async function createOrder(data: {
   
   // Use passed subtotal or computed total
   const finalSubtotal = data.subtotal ?? computedTotal;
+  const discountVal = Number(data.discount_amount) || 0;
 
   const client = await pool.connect();
   try {
@@ -1362,21 +1469,28 @@ export async function createOrder(data: {
       tableSessionId = sessionInfo.tableSessionId;
     }
 
+    const isUuid = (str?: string | null) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+    const validStaffId = isUuid(data.staff_id) ? data.staff_id : null;
+
+    const isPaid = Boolean(data.is_paid);
+    const paidAt = isPaid ? new Date().toISOString() : null;
+    const paymentMethod = isPaid ? (data.payment_method || 'CASH') : (data.payment_method || null);
+
     const orderResult = await client.query(
       `
         INSERT INTO orders (
           restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, 
           notes, party_size, ticket_number, table_number, table_id, table_session_id, staff_id, business_date, subtotal, 
-          gst_amount, gst_rate, gst_type, pending_at, preparing_at, order_type
+          gst_amount, gst_rate, gst_type, pending_at, preparing_at, order_type, paid_at, payment_method, discount_amount
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, CURRENT_DATE), $16, $17, $18, $19, $20, $21, $22)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, CURRENT_DATE), $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
         RETURNING id
       `,
       [
         data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
-        data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, data.staff_id || null, 
+        isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
-        pendingAt, preparingAt, data.order_type || 'DINE_IN'
+        pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, discountVal
       ]
     );
 
@@ -1400,6 +1514,16 @@ export async function createOrder(data: {
       await deductInventoryForOrder(client, data.restaurant_id, orderId, normalizedItems);
     } catch (invErr) {
       console.error('Non-blocking inventory auto-deduction error:', invErr);
+    }
+
+    // Process billing if order was placed as already paid
+    if (isPaid) {
+      try {
+        const { BillingService } = await import('@/modules/billing/billing.service');
+        await BillingService.processOrderBilling(client, data.restaurant_id, orderId, Number(data.total_price));
+      } catch (billErr) {
+        console.error('Non-blocking billing processing error on createOrder:', billErr);
+      }
     }
 
     await client.query('COMMIT');
@@ -1561,6 +1685,13 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
     }
   }
 
+  // Trigger Loyalty Points processing
+  if (status === 'PAID' || status === 'COMPLETED' || updatedOrder?.is_paid) {
+    processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
+  } else if (status === 'CANCELLED' || status === 'REFUNDED') {
+    processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
+  }
+
   return updatedOrder;
 }
 
@@ -1589,9 +1720,10 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
           is_paid = $2,
           table_number = COALESCE($3, table_number),
           payment_method = COALESCE($6, payment_method),
+          paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() ELSE paid_at END,
           updated_at = NOW()
       WHERE restaurant_id = $4 AND id = $5
-      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method
+      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, paid_at
     `, [nextStatus, nextIsPaid, tableNumber || null, restaurantId, id, paymentMethod || null]);
     
     const updatedOrder = updateRes.rows[0];
@@ -1612,6 +1744,13 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       } catch (tblErr) {
         console.error('Error re-evaluating table occupancy & session:', tblErr);
       }
+    }
+
+    // Trigger Loyalty Points processing
+    if (nextIsPaid || nextStatus === 'PAID' || nextStatus === 'COMPLETED') {
+      processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
+    } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
+      processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
     }
 
     return updatedOrder;
@@ -1978,7 +2117,7 @@ export async function getDailyAnalytics(restaurantId: string, dateFrom: string, 
       MODE() WITHIN GROUP (ORDER BY EXTRACT(HOUR FROM created_at)) as peak_hour
     FROM orders WHERE restaurant_id = ${restaurantId}
       AND business_date BETWEEN ${dateFrom} AND ${dateTo}
-      AND is_paid = true AND status = 'PAID'
+      AND is_paid = true AND status != 'CANCELLED'
     GROUP BY business_date
     ORDER BY business_date ASC
   `;
@@ -1993,7 +2132,7 @@ export async function getPeakHours(restaurantId: string, dateFrom: string, dateT
       SUM(total_price) as revenue
     FROM orders WHERE restaurant_id = ${restaurantId}
       AND business_date BETWEEN ${dateFrom} AND ${dateTo}
-      AND is_paid = true AND status = 'PAID'
+      AND is_paid = true AND status != 'CANCELLED'
     GROUP BY EXTRACT(HOUR FROM created_at)
     ORDER BY hour ASC
   `;
@@ -2015,7 +2154,7 @@ export async function getTopProducts(restaurantId: string, dateFrom: string, dat
     JOIN orders o ON o.id = oi.order_id
     WHERE o.restaurant_id = ${restaurantId}
       AND o.business_date BETWEEN ${dateFrom} AND ${dateTo}
-      AND o.is_paid = true AND o.status = 'PAID'
+      AND o.is_paid = true AND o.status != 'CANCELLED'
     GROUP BY p.id, p.name, p.category, p.price, p.image_url
     ORDER BY total_quantity DESC
     LIMIT ${limit}
@@ -2023,12 +2162,27 @@ export async function getTopProducts(restaurantId: string, dateFrom: string, dat
   return rows;
 }
 
+export async function getPaymentMethodAnalytics(restaurantId: string, dateFrom: string, dateTo: string) {
+  const rows = await sql`
+    SELECT 
+      COALESCE(NULLIF(UPPER(TRIM(payment_method)), ''), 'PENDING / OTHER') as payment_method,
+      COUNT(*)::int as order_count,
+      COALESCE(SUM(total_price), 0)::float as total_revenue
+    FROM orders WHERE restaurant_id = ${restaurantId}
+      AND business_date BETWEEN ${dateFrom} AND ${dateTo}
+      AND is_paid = true AND status != 'CANCELLED'
+    GROUP BY payment_method
+    ORDER BY total_revenue DESC
+  `;
+  return rows;
+}
+
 export async function getDashboardStats(restaurantId: string) {
   const statsRows = await sql`
     SELECT 
-      COALESCE(SUM(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID'), 0) as revenue_today,
-      COUNT(*) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID') as orders_today,
-      COALESCE(AVG(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status = 'PAID'), 0) as avg_order_value,
+      COALESCE(SUM(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED'), 0) as revenue_today,
+      COUNT(*) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED') as orders_today,
+      COALESCE(AVG(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED'), 0) as avg_order_value,
       COUNT(*) FILTER (WHERE status = 'PENDING') as pending_orders
     FROM orders WHERE restaurant_id = ${restaurantId}
   `;
@@ -2259,32 +2413,165 @@ export async function deleteCounter(restaurantId: string, id: string) {
 // CATEGORY QUERIES
 // ============================================
 
-export async function getCategories() {
+export async function getCategories(restaurantId?: string) {
   try {
-    const rows = await sql`SELECT * FROM categories ORDER BY name ASC`;
-    return rows;
+    if (restaurantId) {
+      // 1. Auto-sync any product categories that haven't been added to categories table yet
+      await sql`
+        INSERT INTO categories (restaurant_id, name, sort_order)
+        SELECT 
+          p.restaurant_id,
+          TRIM(p.category) as name,
+          COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = p.restaurant_id), 0) + 10 as sort_order
+        FROM products p
+        WHERE p.restaurant_id = ${restaurantId}
+          AND p.category IS NOT NULL 
+          AND TRIM(p.category) != ''
+          AND NOT EXISTS (
+            SELECT 1 FROM categories c 
+            WHERE c.restaurant_id = p.restaurant_id 
+              AND LOWER(c.name) = LOWER(TRIM(p.category))
+          )
+        GROUP BY p.restaurant_id, TRIM(p.category)
+        ON CONFLICT DO NOTHING
+      `;
+
+      // 2. Fetch all categories for this restaurant ordered by sort_order
+      const rows = await sql`
+        SELECT * FROM categories 
+        WHERE restaurant_id = ${restaurantId} 
+        ORDER BY sort_order ASC, name ASC
+      `;
+      return rows;
+    } else {
+      const rows = await sql`SELECT * FROM categories ORDER BY sort_order ASC, name ASC`;
+      return rows;
+    }
   } catch (err) {
     console.warn('⚠️ categories table fetch failed, falling back to products table categories:', err);
-    // Fallback: Get unique categories from products table to satisfy the UI
-    const fallbackRows = await sql`
-      SELECT DISTINCT TRIM(category) as name, MIN(id::text) as id 
-      FROM products 
-      WHERE category IS NOT NULL AND category != ''
-      GROUP BY TRIM(category)
-      ORDER BY name ASC
-    `;
-    return fallbackRows;
+    return [];
   }
 }
 
-export async function createCategory(name: string) {
-  const rows = await sql`
-    INSERT INTO categories (name) VALUES (${name})
-    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-    RETURNING *
-  `;
-  return rows[0];
+export async function createCategory(name: string, restaurantId?: string) {
+  let nextOrder = 10;
+  if (restaurantId) {
+    const maxRes = await sql`SELECT COALESCE(MAX(sort_order), 0) as max_order FROM categories WHERE restaurant_id = ${restaurantId}`;
+    nextOrder = (Number(maxRes[0]?.max_order) || 0) + 10;
+  }
+
+  if (restaurantId) {
+    const rows = await sql`
+      INSERT INTO categories (restaurant_id, name, sort_order) 
+      VALUES (${restaurantId}, ${name}, ${nextOrder})
+      ON CONFLICT (restaurant_id, name) DO UPDATE SET name = EXCLUDED.name
+      RETURNING *
+    `;
+    return rows[0];
+  } else {
+    const rows = await sql`
+      INSERT INTO categories (name, sort_order) 
+      VALUES (${name}, ${nextOrder})
+      RETURNING *
+    `;
+    return rows[0];
+  }
 }
+
+export async function reorderCategories(restaurantId: string, categoryId: string, direction: 'up' | 'down') {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get current list of categories sorted by sort_order
+    const res = await client.query(
+      `SELECT id, name, sort_order FROM categories WHERE restaurant_id = $1 ORDER BY sort_order ASC, name ASC`,
+      [restaurantId]
+    );
+    const categories = res.rows;
+
+    const targetIdx = categories.findIndex(c => c.id === categoryId);
+    if (targetIdx === -1) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Category not found' };
+    }
+
+    const swapIdx = direction === 'up' ? targetIdx - 1 : targetIdx + 1;
+    if (swapIdx < 0 || swapIdx >= categories.length) {
+      await client.query('ROLLBACK');
+      return { success: true, categories }; // Already at top/bottom limit
+    }
+
+    const targetCat = categories[targetIdx];
+    const swapCat = categories[swapIdx];
+
+    // Swap sort_orders in a single transaction
+    await client.query(
+      `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+      [swapCat.sort_order, targetCat.id, restaurantId]
+    );
+    await client.query(
+      `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+      [targetCat.sort_order, swapCat.id, restaurantId]
+    );
+
+    // If both had identical sort_orders, reassign clean sequential sort_orders (10, 20, 30...)
+    if (targetCat.sort_order === swapCat.sort_order) {
+      // Re-sort with swapped elements
+      const reordered = [...categories];
+      reordered[targetIdx] = swapCat;
+      reordered[swapIdx] = targetCat;
+
+      for (let i = 0; i < reordered.length; i++) {
+        await client.query(
+          `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+          [(i + 1) * 10, reordered[i].id, restaurantId]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    const updatedRes = await client.query(
+      `SELECT * FROM categories WHERE restaurant_id = $1 ORDER BY sort_order ASC, name ASC`,
+      [restaurantId]
+    );
+    return { success: true, categories: updatedRes.rows };
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error reordering categories:', err);
+    return { success: false, error: err.message || 'Failed to reorder categories' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateCategorySequence(restaurantId: string, orderedCategoryIds: string[]) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (let i = 0; i < orderedCategoryIds.length; i++) {
+      await client.query(
+        `UPDATE categories SET sort_order = $1 WHERE id = $2 AND restaurant_id = $3`,
+        [(i + 1) * 10, orderedCategoryIds[i], restaurantId]
+      );
+    }
+    await client.query('COMMIT');
+
+    const updatedRes = await client.query(
+      `SELECT * FROM categories WHERE restaurant_id = $1 ORDER BY sort_order ASC, name ASC`,
+      [restaurantId]
+    );
+    return { success: true, categories: updatedRes.rows };
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error updating category sequence:', err);
+    return { success: false, error: err.message || 'Failed to update category sequence' };
+  } finally {
+    client.release();
+  }
+}
+
 
 // ============================================
 // USER QUERIES
@@ -2319,24 +2606,184 @@ export async function getAdminByEmail(email: string) {
 }
 
 // ============================================
+// ROLES & PERMISSIONS QUERIES
+// ============================================
+
+export async function seedDefaultRoles(restaurantId: string) {
+  try {
+    const existing = await sql`SELECT id, name FROM roles WHERE restaurant_id = ${restaurantId}`;
+    if (existing.length === 0) {
+      const defaultRoles = [
+        { name: 'Waiter', description: 'Floor staff handling dine-in tables, table orders, and checking active orders', permissions: JSON.stringify(['pos', 'orders', 'tables']) },
+        { name: 'Kitchen Staff', description: 'Kitchen and chef display for viewing and preparing live orders', permissions: JSON.stringify(['orders']) },
+        { name: 'Cashier', description: 'Counter staff managing billing, POS orders, tables, and daily sales reports', permissions: JSON.stringify(['pos', 'orders', 'tables', 'analytics']) },
+        { name: 'Manager', description: 'General manager overseeing operations, menu items, inventory, analytics, and staff', permissions: JSON.stringify(['pos', 'orders', 'tables', 'products', 'inventory', 'analytics', 'staff']) },
+      ];
+
+      for (const r of defaultRoles) {
+        await sql`
+          INSERT INTO roles (restaurant_id, name, description, permissions, is_default)
+          VALUES (${restaurantId}, ${r.name}, ${r.description}, ${r.permissions}::jsonb, true)
+          ON CONFLICT (restaurant_id, name) DO NOTHING
+        `;
+      }
+    }
+
+    // Auto-link any existing staff without role_id to a matching role or Waiter by default
+    const unlinkedStaff = await sql`SELECT id, role FROM staffs WHERE restaurant_id = ${restaurantId} AND role_id IS NULL`;
+    if (unlinkedStaff.length > 0) {
+      const allRoles = await sql`SELECT id, LOWER(name) as name_lower FROM roles WHERE restaurant_id = ${restaurantId}`;
+      for (const st of unlinkedStaff) {
+        const staffRoleLower = (st.role || '').toLowerCase();
+        let matchedRole = allRoles.find((r: any) => r.name_lower === staffRoleLower || r.name_lower.includes(staffRoleLower));
+        if (!matchedRole) {
+          matchedRole = allRoles.find((r: any) => r.name_lower.includes('waiter')) || allRoles[0];
+        }
+        if (matchedRole) {
+          await sql`UPDATE staffs SET role_id = ${matchedRole.id} WHERE id = ${st.id}`;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error seeding default roles:', err);
+  }
+}
+
+export async function getRoles(restaurantId: string) {
+  try {
+    await seedDefaultRoles(restaurantId);
+    return await sql`
+      SELECT r.id, r.restaurant_id, r.name, r.description, r.permissions, r.is_default, r.created_at, r.updated_at,
+             COUNT(s.id)::integer as staff_count
+      FROM roles r
+      LEFT JOIN staffs s ON s.role_id = r.id
+      WHERE r.restaurant_id = ${restaurantId}
+      GROUP BY r.id
+      ORDER BY r.is_default DESC, r.name ASC
+    `;
+  } catch (err: any) {
+    if (err.message?.includes('roles') || err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      await seedDefaultRoles(restaurantId);
+      return await sql`
+        SELECT r.id, r.restaurant_id, r.name, r.description, r.permissions, r.is_default, r.created_at, r.updated_at,
+               COUNT(s.id)::integer as staff_count
+        FROM roles r
+        LEFT JOIN staffs s ON s.role_id = r.id
+        WHERE r.restaurant_id = ${restaurantId}
+        GROUP BY r.id
+        ORDER BY r.is_default DESC, r.name ASC
+      `;
+    }
+    throw err;
+  }
+}
+
+export async function getRoleById(restaurantId: string, id: string) {
+  const rows = await sql`SELECT * FROM roles WHERE restaurant_id = ${restaurantId} AND id = ${id} LIMIT 1`;
+  return rows[0] || null;
+}
+
+export async function createRole(restaurantId: string, data: { name: string; description?: string; permissions: string[] }) {
+  const permissionsJson = JSON.stringify(data.permissions || []);
+  const rows = await sql`
+    INSERT INTO roles (restaurant_id, name, description, permissions, is_default)
+    VALUES (${restaurantId}, ${data.name.trim()}, ${data.description?.trim() || null}, ${permissionsJson}::jsonb, false)
+    RETURNING id, name, description, permissions, is_default, created_at, updated_at
+  `;
+  return rows[0];
+}
+
+export async function updateRole(restaurantId: string, id: string, data: { name?: string; description?: string; permissions?: string[] }) {
+  const existing = await getRoleById(restaurantId, id);
+  if (!existing) throw new Error('Role not found');
+
+  const permissionsJson = data.permissions ? JSON.stringify(data.permissions) : null;
+
+  const rows = await sql`
+    UPDATE roles SET
+      name = COALESCE(${data.name ? data.name.trim() : null}, name),
+      description = COALESCE(${data.description !== undefined ? data.description.trim() : null}, description),
+      permissions = COALESCE(${permissionsJson}::jsonb, permissions),
+      updated_at = NOW()
+    WHERE restaurant_id = ${restaurantId} AND id = ${id}
+    RETURNING id, name, description, permissions, is_default, created_at, updated_at
+  `;
+
+  if (data.name) {
+    await sql`UPDATE staffs SET role = ${data.name.trim()} WHERE role_id = ${id}`;
+  }
+
+  return rows[0];
+}
+
+export async function deleteRole(restaurantId: string, id: string) {
+  const staffCountRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId} AND role_id = ${id}`;
+  if (staffCountRows[0].count > 0) {
+    throw new Error(`Cannot delete role because ${staffCountRows[0].count} staff member(s) are currently assigned to it. Please reassign them first.`);
+  }
+  await sql`DELETE FROM roles WHERE restaurant_id = ${restaurantId} AND id = ${id}`;
+}
+
+// ============================================
 // STAFF QUERIES
 // ============================================
 
 export async function getStaffs(restaurantId: string) {
-  return await sql`SELECT id, name, email, phone, role, is_active, created_at, updated_at FROM staffs WHERE restaurant_id = ${restaurantId} ORDER BY created_at DESC`;
+  try {
+    await seedDefaultRoles(restaurantId);
+    return await sql`
+      SELECT s.id, s.name, s.email, s.phone, s.role, s.role_id, s.is_active, s.created_at, s.updated_at,
+             r.name as role_name, r.permissions as role_permissions
+      FROM staffs s
+      LEFT JOIN roles r ON r.id = s.role_id
+      WHERE s.restaurant_id = ${restaurantId}
+      ORDER BY s.created_at DESC
+    `;
+  } catch (err: any) {
+    if (err.message?.includes('roles') || err.message?.includes('role_id')) {
+      await runAutoMigration(sql);
+      return await sql`
+        SELECT s.id, s.name, s.email, s.phone, s.role, s.role_id, s.is_active, s.created_at, s.updated_at,
+               r.name as role_name, r.permissions as role_permissions
+        FROM staffs s
+        LEFT JOIN roles r ON r.id = s.role_id
+        WHERE s.restaurant_id = ${restaurantId}
+        ORDER BY s.created_at DESC
+      `;
+    }
+    throw err;
+  }
 }
 
 export async function getStaffByEmail(email: string) {
-  const rows = await sql`SELECT * FROM staffs WHERE email = ${email} LIMIT 1`;
-  return rows[0] || null;
+  try {
+    const rows = await sql`
+      SELECT s.*, r.name as role_name, r.permissions as role_permissions
+      FROM staffs s
+      LEFT JOIN roles r ON r.id = s.role_id
+      WHERE s.email = ${email}
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  } catch (err: any) {
+    const rows = await sql`SELECT * FROM staffs WHERE email = ${email} LIMIT 1`;
+    return rows[0] || null;
+  }
 }
 
 export async function getStaffById(restaurantId: string, id: string) {
-  const rows = await sql`SELECT * FROM staffs WHERE restaurant_id = ${restaurantId} AND id = ${id} LIMIT 1`;
+  const rows = await sql`
+    SELECT s.*, r.name as role_name, r.permissions as role_permissions
+    FROM staffs s
+    LEFT JOIN roles r ON r.id = s.role_id
+    WHERE s.restaurant_id = ${restaurantId} AND s.id = ${id}
+    LIMIT 1
+  `;
   return rows[0] || null;
 }
 
-export async function createStaff(restaurantId: string, data: { name: string; email: string; phone?: string; password?: string; role?: string; is_active?: boolean }) {
+export async function createStaff(restaurantId: string, data: { name: string; email: string; phone?: string; password?: string; role?: string; role_id?: string; is_active?: boolean }) {
   // Limit staff creation per restaurant to 6
   const limit = 6;
   const countRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId}`;
@@ -2344,19 +2791,37 @@ export async function createStaff(restaurantId: string, data: { name: string; em
     throw new Error(`Staff limit reached (max ${limit} staff members per restaurant)`);
   }
 
+  let roleName = data.role || 'STAFF';
+  let roleId = data.role_id || null;
+
+  if (roleId) {
+    const roleRows = await sql`SELECT id, name FROM roles WHERE restaurant_id = ${restaurantId} AND id = ${roleId} LIMIT 1`;
+    if (roleRows[0]) {
+      roleName = roleRows[0].name;
+    }
+  }
+
   const rows = await sql`
-    INSERT INTO staffs (restaurant_id, name, email, phone, password, role, is_active) 
-    VALUES (${restaurantId}, ${data.name}, ${data.email}, ${data.phone || null}, ${data.password || null}, ${data.role || 'STAFF'}, ${data.is_active !== false}) 
-    RETURNING id, name, email, phone, role, is_active
+    INSERT INTO staffs (restaurant_id, name, email, phone, password, role, role_id, is_active) 
+    VALUES (${restaurantId}, ${data.name}, ${data.email}, ${data.phone || null}, ${data.password || null}, ${roleName}, ${roleId}, ${data.is_active !== false}) 
+    RETURNING id, name, email, phone, role, role_id, is_active
   `;
   return rows[0];
 }
 
-export async function updateStaff(restaurantId: string, id: string, data: Partial<{ name: string; email: string; phone: string; password?: string; role: string; is_active: boolean }>) {
+export async function updateStaff(restaurantId: string, id: string, data: Partial<{ name: string; email: string; phone: string; password?: string; role: string; role_id: string; is_active: boolean }>) {
   if (data.is_active === true) {
     const activeCountRows = await sql`SELECT COUNT(*)::integer as count FROM staffs WHERE restaurant_id = ${restaurantId} AND is_active = true AND id != ${id}`;
     if (activeCountRows[0].count >= 6) {
       throw new Error(`Active staff limit reached (max 6 active/online staff members allowed)`);
+    }
+  }
+
+  let roleName = data.role;
+  if (data.role_id) {
+    const roleRows = await sql`SELECT id, name FROM roles WHERE restaurant_id = ${restaurantId} AND id = ${data.role_id} LIMIT 1`;
+    if (roleRows[0]) {
+      roleName = roleRows[0].name;
     }
   }
 
@@ -2366,11 +2831,12 @@ export async function updateStaff(restaurantId: string, id: string, data: Partia
       email = COALESCE(${data.email ?? null}, email),
       phone = COALESCE(${data.phone ?? null}, phone),
       password = COALESCE(${data.password ?? null}, password),
-      role = COALESCE(${data.role ?? null}, role),
+      role = COALESCE(${roleName ?? null}, role),
+      role_id = COALESCE(${data.role_id ?? null}, role_id),
       is_active = COALESCE(${data.is_active ?? null}, is_active),
       updated_at = NOW()
     WHERE restaurant_id = ${restaurantId} AND id = ${id}
-    RETURNING id, name, email, phone, role, is_active
+    RETURNING id, name, email, phone, role, role_id, is_active
   `;
   return rows[0];
 }
@@ -2636,6 +3102,572 @@ export async function getAgentHeartbeat(restaurantId: string) {
       return null;
     }
     return null;
+  }
+}
+
+// ============================================================================
+// LOYALTY SYSTEM HELPERS
+// ============================================================================
+
+export async function getLoyaltySettings(restaurantId: string) {
+  try {
+    let rows = await sql`
+      SELECT * FROM loyalty_settings WHERE restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (rows.length === 0) {
+      rows = await sql`
+        INSERT INTO loyalty_settings (
+          restaurant_id, is_enabled, points_earning_rate, points_redemption_rate_points,
+          points_redemption_rate_amount, points_expiry_type, points_expiry_days,
+          min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value
+        ) VALUES (${restaurantId}, true, 0.1000, 100, 50.00, 'NEVER', 365, 0.00, 5, 'DISCOUNT_AMOUNT', '100')
+        ON CONFLICT (restaurant_id) DO NOTHING
+        RETURNING *
+      `;
+      if (rows.length === 0) {
+        rows = await sql`SELECT * FROM loyalty_settings WHERE restaurant_id = ${restaurantId} LIMIT 1`;
+      }
+    }
+    return rows[0] || null;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function updateLoyaltySettings(restaurantId: string, data: {
+  is_enabled?: boolean;
+  points_earning_rate?: number;
+  points_redemption_rate_points?: number;
+  points_redemption_rate_amount?: number;
+  points_expiry_type?: string;
+  points_expiry_days?: number;
+  min_order_amount?: number;
+  visit_milestone_count?: number;
+  visit_reward_type?: string;
+  visit_reward_value?: string;
+}) {
+  try {
+    const rows = await sql`
+      INSERT INTO loyalty_settings (
+        restaurant_id, is_enabled, points_earning_rate, points_redemption_rate_points,
+        points_redemption_rate_amount, points_expiry_type, points_expiry_days,
+        min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value, updated_at
+      ) VALUES (
+        ${restaurantId},
+        COALESCE(${data.is_enabled ?? true}, true),
+        COALESCE(${data.points_earning_rate ?? 0.1}, 0.1),
+        COALESCE(${data.points_redemption_rate_points ?? 100}, 100),
+        COALESCE(${data.points_redemption_rate_amount ?? 50}, 50),
+        COALESCE(${data.points_expiry_type ?? 'NEVER'}, 'NEVER'),
+        COALESCE(${data.points_expiry_days ?? 365}, 365),
+        COALESCE(${data.min_order_amount ?? 0}, 0),
+        COALESCE(${data.visit_milestone_count ?? 5}, 5),
+        COALESCE(${data.visit_reward_type ?? 'DISCOUNT_AMOUNT'}, 'DISCOUNT_AMOUNT'),
+        COALESCE(${data.visit_reward_value ?? '100'}, '100'),
+        NOW()
+      )
+      ON CONFLICT (restaurant_id) DO UPDATE SET
+        is_enabled = EXCLUDED.is_enabled,
+        points_earning_rate = EXCLUDED.points_earning_rate,
+        points_redemption_rate_points = EXCLUDED.points_redemption_rate_points,
+        points_redemption_rate_amount = EXCLUDED.points_redemption_rate_amount,
+        points_expiry_type = EXCLUDED.points_expiry_type,
+        points_expiry_days = EXCLUDED.points_expiry_days,
+        min_order_amount = EXCLUDED.min_order_amount,
+        visit_milestone_count = EXCLUDED.visit_milestone_count,
+        visit_reward_type = EXCLUDED.visit_reward_type,
+        visit_reward_value = EXCLUDED.visit_reward_value,
+        updated_at = NOW()
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
+  try {
+    // Auto-sync any completed/paid orders to loyalty customers & points
+    await syncAllCompletedOrdersToLoyalty(restaurantId);
+
+    let query;
+    if (search && search.trim() !== '') {
+      const searchPattern = `%${search.trim().toLowerCase()}%`;
+      query = sql`
+        SELECT 
+          cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
+          cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
+          cl.total_spent, cl.last_visit_at, cl.created_at,
+          u.name, u.phone
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+          AND (LOWER(u.name) LIKE ${searchPattern} OR LOWER(u.phone) LIKE ${searchPattern})
+        ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+      `;
+    } else {
+      query = sql`
+        SELECT 
+          cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
+          cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
+          cl.total_spent, cl.last_visit_at, cl.created_at,
+          u.name, u.phone
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+        ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+      `;
+    }
+
+    const rows = await query;
+    return rows;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function getOrCreateCustomerLoyaltyByPhone(restaurantId: string, phone: string, name?: string) {
+  try {
+    let user = await getUserByPhone(phone);
+    if (!user) {
+      user = await createUser(phone, name);
+    }
+
+    let rows = await sql`
+      SELECT cl.*, u.name, u.phone
+      FROM customer_loyalty cl
+      JOIN users u ON u.id = cl.user_id
+      WHERE cl.restaurant_id = ${restaurantId} AND cl.user_id = ${user.id}
+      LIMIT 1
+    `;
+
+    if (rows.length === 0) {
+      rows = await sql`
+        INSERT INTO customer_loyalty (user_id, restaurant_id, points_balance, total_visits, visit_progress, rewards_unlocked)
+        VALUES (${user.id}, ${restaurantId}, 0, 0, 0, 0)
+        ON CONFLICT (restaurant_id, user_id) DO UPDATE SET updated_at = NOW()
+        RETURNING *
+      `;
+      rows[0].name = user.name;
+      rows[0].phone = user.phone;
+    }
+
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function adjustCustomerPoints(restaurantId: string, customerLoyaltyId: string, pointsDelta: number, reason?: string) {
+  try {
+    const loyaltyRecord = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (loyaltyRecord.length === 0) throw new Error('Customer loyalty record not found');
+
+    const rec = loyaltyRecord[0];
+    const newBalance = Math.max(0, Number(rec.points_balance) + pointsDelta);
+
+    const updated = await sql`
+      UPDATE customer_loyalty
+      SET points_balance = ${newBalance},
+          updated_at = NOW()
+      WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId}
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${customerLoyaltyId}, ${rec.user_id}, 'MANUAL_ADJUSTMENT', ${pointsDelta}, 0, ${reason || 'Manual admin adjustment'})
+    `;
+
+    return updated[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function getLoyaltyRewards(restaurantId: string) {
+  try {
+    const rows = await sql`
+      SELECT * FROM loyalty_rewards 
+      WHERE restaurant_id = ${restaurantId}
+      ORDER BY is_active DESC, points_required ASC
+    `;
+    return rows;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function createLoyaltyReward(restaurantId: string, rewardData: {
+  name: string;
+  points_required: number;
+  reward_type: string;
+  discount_value?: number;
+  selected_product_ids?: string[];
+  min_purchase_amount?: number;
+  valid_until?: string | null;
+}) {
+  try {
+    const selectedIdsJson = JSON.stringify(rewardData.selected_product_ids || []);
+    const validUntilVal = rewardData.valid_until ? new Date(rewardData.valid_until).toISOString() : null;
+
+    const rows = await sql`
+      INSERT INTO loyalty_rewards (
+        restaurant_id, name, points_required, reward_type, discount_value,
+        selected_product_ids, min_purchase_amount, valid_until, is_active
+      ) VALUES (
+        ${restaurantId},
+        ${rewardData.name},
+        ${rewardData.points_required},
+        ${rewardData.reward_type},
+        ${rewardData.discount_value ?? 0},
+        ${selectedIdsJson}::jsonb,
+        ${rewardData.min_purchase_amount ?? 0},
+        ${validUntilVal},
+        true
+      )
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function updateLoyaltyReward(restaurantId: string, rewardId: string, rewardData: {
+  name?: string;
+  points_required?: number;
+  reward_type?: string;
+  discount_value?: number;
+  selected_product_ids?: string[];
+  min_purchase_amount?: number;
+  valid_until?: string | null;
+  is_active?: boolean;
+}) {
+  try {
+    const existing = await sql`
+      SELECT * FROM loyalty_rewards WHERE id = ${rewardId} AND restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (existing.length === 0) throw new Error('Reward not found');
+
+    const ex = existing[0];
+    const selectedIdsJson = JSON.stringify(rewardData.selected_product_ids ?? ex.selected_product_ids ?? []);
+    const validUntilVal = rewardData.valid_until !== undefined 
+      ? (rewardData.valid_until ? new Date(rewardData.valid_until).toISOString() : null)
+      : ex.valid_until;
+
+    const rows = await sql`
+      UPDATE loyalty_rewards
+      SET name = ${rewardData.name ?? ex.name},
+          points_required = ${rewardData.points_required ?? ex.points_required},
+          reward_type = ${rewardData.reward_type ?? ex.reward_type},
+          discount_value = ${rewardData.discount_value ?? ex.discount_value},
+          selected_product_ids = ${selectedIdsJson}::jsonb,
+          min_purchase_amount = ${rewardData.min_purchase_amount ?? ex.min_purchase_amount},
+          valid_until = ${validUntilVal},
+          is_active = ${rewardData.is_active ?? ex.is_active},
+          updated_at = NOW()
+      WHERE id = ${rewardId} AND restaurant_id = ${restaurantId}
+      RETURNING *
+    `;
+    return rows[0];
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return null;
+    }
+    throw err;
+  }
+}
+
+export async function deleteLoyaltyReward(restaurantId: string, rewardId: string) {
+  try {
+    await sql`
+      DELETE FROM loyalty_rewards WHERE id = ${rewardId} AND restaurant_id = ${restaurantId}
+    `;
+    return true;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return false;
+    }
+    throw err;
+  }
+}
+
+export async function getLoyaltyTransactionsList(restaurantId: string) {
+  try {
+    const rows = await sql`
+      SELECT 
+        lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
+        u.name as customer_name, u.phone,
+        o.ticket_number
+      FROM loyalty_transactions lt
+      JOIN users u ON u.id = lt.user_id
+      LEFT JOIN orders o ON o.id = lt.order_id
+      WHERE lt.restaurant_id = ${restaurantId}
+      ORDER BY lt.created_at DESC
+      LIMIT 100
+    `;
+    return rows;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function syncAllCompletedOrdersToLoyalty(restaurantId: string) {
+  try {
+    const orders = await sql`
+      SELECT id, customer_name, phone, user_id, total_price, status, is_paid
+      FROM orders
+      WHERE restaurant_id = ${restaurantId}
+        AND (is_paid = true OR status IN ('PAID', 'COMPLETED'))
+    `;
+
+    for (const ord of orders) {
+      const phone = ord.phone;
+      const amount = Number(ord.total_price || 0);
+      await processLoyaltyForCompletedOrder(restaurantId, ord.id, phone, amount);
+    }
+  } catch (err) {
+    console.error('Error syncing completed orders to loyalty:', err);
+  }
+}
+
+export async function processLoyaltyForCompletedOrder(restaurantId: string, orderId: string, customerPhone?: string, totalAmount?: number) {
+  try {
+    const settings = await getLoyaltySettings(restaurantId);
+    if (!settings || !settings.is_enabled) return;
+
+    // Check if points already earned for this order (idempotency check)
+    const existingTx = await sql`
+      SELECT id FROM loyalty_transactions
+      WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} AND transaction_type = 'EARN_POINTS'
+      LIMIT 1
+    `;
+    if (existingTx.length > 0) return;
+
+    let phone = customerPhone;
+    let amount = totalAmount;
+    let userId: string | null = null;
+    let customerName: string | null = null;
+
+    const orderRes = await sql`
+      SELECT customer_name, phone, user_id, total_price 
+      FROM orders 
+      WHERE id = ${orderId} AND restaurant_id = ${restaurantId} 
+      LIMIT 1
+    `;
+    if (orderRes.length > 0) {
+      phone = phone || orderRes[0].phone;
+      amount = amount ?? Number(orderRes[0].total_price || 0);
+      userId = orderRes[0].user_id || null;
+      customerName = orderRes[0].customer_name || null;
+    }
+
+    if (!phone && !userId && customerName) {
+      // Deterministically generate phone key for guest customers registered by name
+      const nameHash = Math.abs(customerName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 12345).toString().slice(0, 8);
+      phone = `99${nameHash.padStart(8, '0')}`;
+    }
+
+    if (!phone && !userId) return;
+
+    let customerLoyalty;
+    if (phone) {
+      customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone, customerName || undefined);
+    } else if (userId) {
+      const rows = await sql`
+        SELECT cl.*, u.name, u.phone FROM customer_loyalty cl JOIN users u ON u.id = cl.user_id WHERE cl.restaurant_id = ${restaurantId} AND cl.user_id = ${userId} LIMIT 1
+      `;
+      customerLoyalty = rows[0];
+    }
+
+    if (!customerLoyalty) return;
+
+    const validAmount = Number(amount || 0);
+
+    if (settings.min_order_amount && validAmount < Number(settings.min_order_amount)) {
+      return;
+    }
+
+    const rate = Number(settings.points_earning_rate || 0.1);
+    const pointsEarned = Math.floor(validAmount * rate);
+
+    const milestoneTarget = Number(settings.visit_milestone_count || 5);
+    let newVisitProgress = Number(customerLoyalty.visit_progress || 0) + 1;
+    let newTotalVisits = Number(customerLoyalty.total_visits || 0) + 1;
+    let newRewardsUnlocked = Number(customerLoyalty.rewards_unlocked || 0);
+    let visitRewardEarned = false;
+
+    if (newVisitProgress >= milestoneTarget) {
+      newVisitProgress = newVisitProgress % milestoneTarget;
+      newRewardsUnlocked += 1;
+      visitRewardEarned = true;
+    }
+
+    const newPointsBalance = Number(customerLoyalty.points_balance || 0) + pointsEarned;
+    const newTotalEarned = Number(customerLoyalty.total_points_earned || 0) + pointsEarned;
+    const newTotalSpent = Number(customerLoyalty.total_spent || 0) + validAmount;
+
+    await sql`
+      UPDATE customer_loyalty
+      SET points_balance = ${newPointsBalance},
+          total_points_earned = ${newTotalEarned},
+          total_visits = ${newTotalVisits},
+          visit_progress = ${newVisitProgress},
+          rewards_unlocked = ${newRewardsUnlocked},
+          total_spent = ${newTotalSpent},
+          last_visit_at = NOW(),
+          updated_at = NOW()
+      WHERE id = ${customerLoyalty.id} AND restaurant_id = ${restaurantId}
+    `;
+
+    if (pointsEarned > 0) {
+      await sql`
+        INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, order_id, transaction_type, points_delta, visit_delta, notes)
+        VALUES (${restaurantId}, ${customerLoyalty.id}, ${customerLoyalty.user_id}, ${orderId}, 'EARN_POINTS', ${pointsEarned}, 0, ${`Earned ${pointsEarned} points for order`})
+      `;
+    }
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, order_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${customerLoyalty.id}, ${customerLoyalty.user_id}, ${orderId}, 'EARN_VISIT', 0, 1, ${visitRewardEarned ? `Visit ${newTotalVisits} recorded! Reward unlocked!` : `Visit ${newTotalVisits} recorded`})
+    `;
+  } catch (err) {
+    console.error('Error processing loyalty for completed order:', err);
+  }
+}
+
+export async function processLoyaltyForCancelledOrder(restaurantId: string, orderId: string) {
+  try {
+    const existingEarnTx = await sql`
+      SELECT * FROM loyalty_transactions
+      WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} AND transaction_type = 'EARN_POINTS'
+      LIMIT 1
+    `;
+    if (existingEarnTx.length === 0) return;
+
+    const existingReversalTx = await sql`
+      SELECT id FROM loyalty_transactions
+      WHERE restaurant_id = ${restaurantId} AND order_id = ${orderId} AND transaction_type = 'REVERSAL_REFUND'
+      LIMIT 1
+    `;
+    if (existingReversalTx.length > 0) return;
+
+    const earnTx = existingEarnTx[0];
+    const pointsDeduction = Number(earnTx.points_delta || 0);
+
+    const loyaltyRes = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${earnTx.customer_loyalty_id} LIMIT 1
+    `;
+    if (loyaltyRes.length === 0) return;
+    const cl = loyaltyRes[0];
+
+    const newBalance = Math.max(0, Number(cl.points_balance || 0) - pointsDeduction);
+
+    await sql`
+      UPDATE customer_loyalty
+      SET points_balance = ${newBalance},
+          updated_at = NOW()
+      WHERE id = ${cl.id}
+    `;
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, order_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${cl.id}, ${cl.user_id}, ${orderId}, 'REVERSAL_REFUND', ${-pointsDeduction}, 0, ${'Order cancelled/refunded - points reversed'})
+    `;
+  } catch (err) {
+    console.error('Error reversing loyalty points for cancelled order:', err);
+  }
+}
+
+export async function redeemLoyaltyReward(restaurantId: string, phone: string, rewardId: string) {
+  try {
+    const customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone);
+    if (!customerLoyalty) {
+      throw new Error('Customer profile not found');
+    }
+
+    const rewardRes = await sql`
+      SELECT * FROM loyalty_rewards WHERE id = ${rewardId} AND restaurant_id = ${restaurantId} AND is_active = true LIMIT 1
+    `;
+    if (rewardRes.length === 0) {
+      throw new Error('Reward not found or inactive');
+    }
+    const reward = rewardRes[0];
+
+    const currentPoints = Number(customerLoyalty.points_balance || 0);
+    const requiredPoints = Number(reward.points_required || 0);
+
+    if (currentPoints < requiredPoints) {
+      throw new Error(`Insufficient points balance (${currentPoints} pts available, ${requiredPoints} pts required)`);
+    }
+
+    const newPointsBalance = currentPoints - requiredPoints;
+    const newTotalRedeemed = Number(customerLoyalty.total_points_redeemed || 0) + requiredPoints;
+
+    await sql`
+      UPDATE customer_loyalty
+      SET points_balance = ${newPointsBalance},
+          total_points_redeemed = ${newTotalRedeemed},
+          updated_at = NOW()
+      WHERE id = ${customerLoyalty.id} AND restaurant_id = ${restaurantId}
+    `;
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${customerLoyalty.id}, ${customerLoyalty.user_id}, 'REDEEM_POINTS', ${-requiredPoints}, 0, ${`Redeemed reward: ${reward.name}`})
+    `;
+
+    return {
+      success: true,
+      reward,
+      new_points_balance: newPointsBalance,
+      customer: {
+        id: customerLoyalty.id,
+        name: customerLoyalty.name,
+        phone: customerLoyalty.phone,
+        points_balance: newPointsBalance,
+      }
+    };
+  } catch (err: any) {
+    throw err;
   }
 }
 

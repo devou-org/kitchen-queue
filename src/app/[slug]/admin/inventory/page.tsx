@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { InventoryNav } from '@/components/modules/inventory/InventoryNav';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { inventoryService } from '@/app/services/inventory.api';
 import { InventoryDashboardSummary } from '@/types/inventory';
 import { formatPrice } from '@/lib/format';
@@ -51,57 +52,195 @@ export default function InventoryDashboardPage() {
   }, []);
 
   return (
-    <AdminContentWrapper>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
+      <style>{`
+        /* Page-scoped responsive rules to match orders, tables, and products 68px header toolbar */
+        .inventory-page-header,
+        .inventory-page-header.admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: stretch !important;
+          margin: 0 !important;
+          padding: 0 20px 0 0 !important;
+          border-bottom: 1px solid var(--border) !important;
+          background: #FFFFFF !important;
+          box-sizing: border-box !important;
+          position: relative !important;
+        }
+
+        .inventory-page-header .admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: stretch !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          gap: 12px !important;
+          width: 100% !important;
+        }
+
+        .inventory-page-header .admin-header-left,
+        .inventory-page-header .admin-header-search {
+          height: 68px !important;
+          display: flex !important;
+          align-items: stretch !important;
+          flex-wrap: nowrap !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .inventory-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: stretch !important;
+          justify-content: space-between !important;
+          gap: 12px !important;
+          width: 100% !important;
+          height: 68px !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .inventory-tabs-wrapper {
+          display: flex !important;
+          align-items: stretch !important;
+          height: 68px !important;
+          min-height: 68px !important;
+          padding-top: 10px !important;
+          padding-right: 0 !important;
+          padding-bottom: 0 !important;
+          padding-left: 0 !important;
+          box-sizing: border-box !important;
+          flex: 1 1 auto !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+          overflow-x: auto !important;
+        }
+
+        .inventory-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+          height: 68px !important;
+        }
+
+        @media (max-width: 768px) {
+          .inventory-page-header {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 8px 16px !important;
+          }
+
+          .inventory-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            height: auto !important;
+          }
+
+          .inventory-tabs-wrapper {
+            width: 100% !important;
+            height: auto !important;
+            border-bottom: 1px solid var(--border) !important;
+            padding-bottom: 2px !important;
+          }
+
+          .inventory-actions {
+            width: 100% !important;
+            margin-left: 0 !important;
+            justify-content: flex-start !important;
+            flex-wrap: wrap !important;
+            height: auto !important;
+          }
+
+          .inventory-actions > a,
+          .inventory-actions > button,
+          .inventory-actions > div {
+            flex: 1 1 auto;
+          }
+        }
+      `}</style>
       <AdminPageHeader
-        title="Inventory Overview"
-        subtitle="Live tracking of ingredients, stock valuation, consumption, and audit ledgers."
-        action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              onClick={fetchSummary}
-              disabled={loading}
-              className="btn-minimal"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                height: '38px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--border)',
-                background: '#FFFFFF',
-                cursor: 'pointer',
-              }}
-              title="Refresh inventory data"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              <span>Refresh</span>
-            </button>
-            <Link
-              href={`/${slugStr}/admin/inventory/purchases`}
-              prefetch={false}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                height: '38px',
-                padding: '0 14px',
-                borderRadius: '8px',
-                background: 'var(--primary, #971345)',
-                color: '#FFFFFF',
-                fontSize: '13px',
-                fontWeight: 700,
-                textDecoration: 'none',
-              }}
-            >
-              <Truck size={15} />
-              <span>Receive Stock</span>
-            </Link>
+        className="inventory-page-header"
+        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
+        hideMaximize={true}
+        search={
+          <div className="inventory-toolbar">
+            {/* Left Side: Inventory Navigation Tabs embedded in 68px toolbar */}
+            <div className="inventory-tabs-wrapper">
+              <InventoryNav inHeader={true} />
+            </div>
+
+            {/* Right Side Actions */}
+            <div className="inventory-actions">
+              {/* Receive Stock Button */}
+              <Link
+                href={`/${slugStr}/admin/inventory/purchases`}
+                prefetch={false}
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  background: 'var(--primary, #971345)',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <Truck size={15} />
+                <span>Receive Stock</span>
+              </Link>
+
+              {/* Refresh Button with Left Border Separator, positioned to the right of Receive Stock, icon-only */}
+              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <button
+                  type="button"
+                  onClick={fetchSummary}
+                  disabled={loading}
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    padding: 0,
+                    borderRadius: '8px',
+                    border: '1px solid var(--border, #E2E8F0)',
+                    background: '#FFFFFF',
+                    color: '#475569',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0,
+                  }}
+                  title="Refresh inventory data"
+                  aria-label="Refresh inventory data"
+                >
+                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+
+              {/* Maximize Layout Toggle */}
+              <LayoutMaximizeToggle />
+            </div>
           </div>
         }
       />
 
-      <InventoryNav />
+      <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
 
       {/* KPI Cards Grid */}
       <div
@@ -544,6 +683,7 @@ export default function InventoryDashboardPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </AdminContentWrapper>
   );

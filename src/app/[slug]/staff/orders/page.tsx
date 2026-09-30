@@ -19,6 +19,7 @@ import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapsho
 import { useAdminLayout } from '@/context/AdminLayoutContext';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 
 export default function StaffOrders() {
   const { slug } = useParams();
@@ -26,7 +27,7 @@ export default function StaffOrders() {
   const { isMaximized } = useAdminLayout();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('PENDING');
+  const [statusFilter, setStatusFilter] = useState('PREPARING');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
   const [counterFilter, setCounterFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -62,8 +63,9 @@ export default function StaffOrders() {
     setAutoPrintKot(nextVal);
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_auto_print_kot', String(nextVal));
+      localStorage.setItem('qdine_auto_print_bill', String(nextVal));
     }
-    toast.success(nextVal ? '🖨️ Auto-Print KOT: Enabled' : '⏸️ Auto-Print KOT: Paused');
+    toast.success(nextVal ? '🖨️ Auto-Print: Enabled' : '⏸️ Auto-Print: Paused');
   };
 
   const fetchTables = useCallback(() => {
@@ -115,7 +117,7 @@ export default function StaffOrders() {
         sort: 'ASC',
         date_from: bDate,
         date_to: bDate,
-        status: statusFilter
+        status: statusFilter || 'PREPARING'
       });
 
       if (data.success && data.data) {
@@ -127,7 +129,7 @@ export default function StaffOrders() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, restaurant]);
+  }, [page, statusFilter, restaurant?.timezone, restaurant?.rollover_time]);
 
   const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -259,19 +261,32 @@ export default function StaffOrders() {
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
+        is_paid: newStatus === 'PAID' ? true : undefined,
         table_number: tableNumber,
         payment_method: pMethod || undefined
       });
       if (data.success) {
         fetchTables();
         setOrders(prev => {
-          return prev.map(o => o.id === id ? { ...o, status: newStatus as Order['status'], table_number: tableNumber ?? o.table_number, payment_method: pMethod ?? o.payment_method } : o)
+          return prev.map(o => o.id === id ? {
+            ...o,
+            status: newStatus as Order['status'],
+            table_number: tableNumber ?? o.table_number,
+            payment_method: pMethod ?? o.payment_method,
+            is_paid: newStatus === 'PAID' ? true : o.is_paid
+          } : o)
             .filter(o => {
               if (statusFilter) return o.status === statusFilter;
               return o.status === 'PENDING';
             });
         });
-        setSelectedOrder((prev): Order | null => prev ? { ...prev, status: newStatus as Order['status'], table_number: tableNumber ?? prev.table_number, payment_method: pMethod ?? prev.payment_method } : null);
+        setSelectedOrder((prev): Order | null => prev ? {
+          ...prev,
+          status: newStatus as Order['status'],
+          table_number: tableNumber ?? prev.table_number,
+          payment_method: pMethod ?? prev.payment_method,
+          is_paid: newStatus === 'PAID' ? true : prev.is_paid
+        } : null);
         toast.success(`Order updated to ${newStatus}`);
       } else {
         toast.error(data.error || 'Failed to update');
@@ -326,17 +341,96 @@ export default function StaffOrders() {
 
   return (
     <AdminContentWrapper fullWidth>
+      <style>{`
+        /* Staff Orders — responsive rules for laptop (≤1280px), tablet, and mobile (≤640px) */
+        .staff-orders-toolbar,
+        .staff-orders-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+        }
+
+        /* Page-scoped responsive rules to guarantee single-row header toolbar on desktop, laptops, and tablets */
+        .staff-orders-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 6px !important;
+          width: 100% !important;
+        }
+
+        .staff-orders-search-control {
+          position: relative !important;
+          height: 38px !important;
+        }
+
+        .staff-orders-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 6px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+        }
+
+        .staff-orders-table-scroll-hint {
+          display: none;
+        }
+
+        /* Mobile Screens: Full-width stacked controls below 640px */
+        @media (max-width: 640px) {
+          .staff-orders-toolbar {
+            display: flex !important;
+            flex-direction: column !important;
+            flex-wrap: wrap !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            width: 100% !important;
+          }
+
+          .staff-orders-search-control {
+            flex: none !important;
+            height: 38px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .staff-orders-toolbar > .staff-orders-filter-control,
+          .staff-orders-toolbar > .staff-orders-filter-control > div,
+          .staff-orders-toolbar .staff-orders-select,
+          .staff-orders-toolbar .staff-orders-select > button {
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .staff-orders-actions {
+            width: 100% !important;
+            margin-left: 0 !important;
+            justify-content: flex-start !important;
+          }
+
+          .staff-orders-actions > button,
+          .staff-orders-actions > a,
+          .staff-orders-actions > div {
+            flex: 1 1 auto;
+          }
+        }
+      `}</style>
       <AdminPageHeader
+        className="staff-orders-page-header"
         style={{ paddingTop: '16px' }}
+        hideMaximize={true}
         search={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+          <div className="staff-orders-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', width: '100%', minWidth: 0 }}>
             {/* Search Input */}
-            <div style={{ position: 'relative', width: '185px', flexShrink: 0 }}>
+            <div className="staff-orders-search-control" style={{ position: 'relative', width: '240px', flex: '1 1 240px', minWidth: '140px', maxWidth: '320px', flexShrink: 1 }}>
               <Search
-                size={15}
+                size={14}
                 style={{
                   position: 'absolute',
-                  left: '12px',
+                  left: '10px',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   color: '#94A3B8',
@@ -350,9 +444,9 @@ export default function StaffOrders() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
                   height: '38px',
-                  paddingLeft: '34px',
-                  paddingRight: searchQuery ? '30px' : '12px',
-                  fontSize: '13px',
+                  paddingLeft: '30px',
+                  paddingRight: searchQuery ? '26px' : '8px',
+                  fontSize: '12px',
                   borderRadius: '8px',
                   background: 'white',
                   border: '1px solid var(--border)',
@@ -368,7 +462,7 @@ export default function StaffOrders() {
                   onClick={() => setSearchQuery('')}
                   style={{
                     position: 'absolute',
-                    right: '8px',
+                    right: '6px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -388,8 +482,8 @@ export default function StaffOrders() {
               )}
             </div>
 
-            {/* Status Dropdown (135px) */}
-            <div style={{ width: '135px', flexShrink: 0 }}>
+            {/* Status Dropdown */}
+            <div className="staff-orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <CustomSelect
                 value={statusFilter}
                 onChange={(val) => {
@@ -397,26 +491,28 @@ export default function StaffOrders() {
                   setPage(1);
                 }}
                 options={allStatuses.map((s) => ({ value: s, label: s }))}
-                buttonStyle={{ height: '38px', fontSize: '13px' }}
-                style={{ width: '135px' }}
+                buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
+                className="staff-orders-select"
+                style={{ width: '130px' }}
               />
             </div>
 
-            {/* Order Type Dropdown (145px) */}
-            <div style={{ width: '145px', flexShrink: 0 }}>
+            {/* Order Type Dropdown */}
+            <div className="staff-orders-filter-control" style={{ width: '150px', flexShrink: 0 }}>
               <OrderTypeFilter
                 value={orderTypeFilter}
                 onChange={(val) => {
                   setOrderTypeFilter(val);
                   setPage(1);
                 }}
-                style={{ width: '145px' }}
-                buttonStyle={{ height: '38px', fontSize: '13px' }}
+                className="staff-orders-select"
+                style={{ width: '150px' }}
+                buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
               />
             </div>
 
-            {/* Counter Dropdown (140px) */}
-            <div style={{ width: '140px', flexShrink: 0 }}>
+            {/* Counter Dropdown */}
+            <div className="staff-orders-filter-control" style={{ width: '135px', flexShrink: 0 }}>
               <CustomSelect
                 value={counterFilter}
                 onChange={(val) => handleCounterFilterChange(val)}
@@ -424,68 +520,85 @@ export default function StaffOrders() {
                   { value: '', label: 'All Counters' },
                   ...counters.map(c => ({ value: c.name, label: `${c.name} Station` }))
                 ]}
-                buttonStyle={{ height: '38px', fontSize: '13px' }}
-                style={{ width: '140px' }}
+                buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
+                className="staff-orders-select"
+                style={{ width: '135px' }}
               />
             </div>
-          </div>
-        }
-        action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Auto-Print Toggle Button */}
-            <button
-              onClick={toggleAutoPrint}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                height: '38px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                border: autoPrintKot ? '1px solid #86EFAC' : '1px solid var(--border)',
-                background: autoPrintKot ? '#F0FDF4' : '#F8FAFC',
-                color: autoPrintKot ? '#166534' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              title={autoPrintKot ? 'Auto-Print is ON: Thermal KOT prints automatically when orders enter PREPARING' : 'Auto-Print is Paused'}
-            >
-              <Printer size={15} style={{ color: autoPrintKot ? '#16A34A' : '#94A3B8' }} />
-              <span>{autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}</span>
-            </button>
+            {/* Far Right Action Buttons */}
+            <div className="staff-orders-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              {/* Auto-Print Toggle Button */}
+              <button
+                onClick={toggleAutoPrint}
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: autoPrintKot ? '#16A34A' : 'var(--primary, #0f172a)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+                title={autoPrintKot ? 'Auto-Print: ON' : 'Auto-Print: OFF'}
+              >
+                <Printer size={18} style={{ color: '#ffffff' }} />
+              </button>
 
-            {/* Counters & Hardware Drawer Trigger */}
-            <button
-              onClick={() => setCounterDrawerOpen(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                height: '38px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                border: '1px solid var(--border)',
-                background: '#FFFFFF',
-                color: '#0F172A',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              title="Configure Kitchen Counters & Thermal Hardware"
-            >
-              <Store size={15} style={{ color: '#2563EB' }} />
-              <span className="hidden sm:inline">Counters & Hardware</span>
-            </button>
+              {/* Counters & Hardware Drawer Trigger */}
+              <button
+                onClick={() => setCounterDrawerOpen(true)}
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--primary, #0f172a)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+                title="Counters & Hardware"
+              >
+                <Store size={18} style={{ color: '#ffffff' }} />
+              </button>
 
-            <button
-              className="btn-minimal"
-              onClick={() => setShowKitchenSnapshot(true)}
-            >
-              <ChefHat size={16} style={{ color: 'var(--primary)' }} /> Kitchen Snapshot
-            </button>
+              {/* Kitchen Snapshot Button */}
+              <button
+                onClick={() => setShowKitchenSnapshot(true)}
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--primary, #0f172a)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+                title="Kitchen Snapshot"
+              >
+                <ChefHat size={18} style={{ color: '#ffffff' }} />
+              </button>
+
+              {/* Maximize Layout Toggle */}
+              <LayoutMaximizeToggle />
+            </div>
           </div>
         }
       />
@@ -555,6 +668,10 @@ export default function StaffOrders() {
           onClose={closeModal}
           onStatusChange={handleStatusChange}
           loading={modalLoading}
+          onOrderUpdated={(updated) => {
+            setSelectedOrder(updated);
+            setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)));
+          }}
         />
       )}
 

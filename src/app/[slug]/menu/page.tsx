@@ -10,6 +10,8 @@ import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { Search, MapPin, Ticket, ClipboardList } from 'lucide-react';
+import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
+import { sortCategoriesByConfig } from '@/lib/category-order';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -409,6 +411,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
+  const [dietaryFilter, setDietaryFilter] = useState<DietaryPreferenceFilter>('ALL');
   const [isServiceActive, setIsServiceActive] = useState(true);
   const [serviceMessage, setServiceMessage] = useState('');
 
@@ -451,8 +454,16 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   useEffect(() => {
     const initPage = async () => {
       try {
-        // Fetch products
-        const res = await productService.getProducts();
+        const currentSlug = Array.isArray(slug) ? slug[0] : (slug || '');
+        // Fetch products and categories in parallel
+        const [res, catRes] = await Promise.all([
+          productService.getProducts(),
+          fetch('/api/categories', {
+            headers: { 'x-restaurant-slug': currentSlug },
+            cache: 'no-store'
+          }).then(r => r.json()).catch(() => ({ success: false, data: [] }))
+        ]);
+
         if (res.success && res.data) {
           const parsedData = res.data.map((p: any) => ({
             ...p,
@@ -461,13 +472,12 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
             buffer_quantity: Number(p.buffer_quantity)
           }));
           setProducts(parsedData);
-          // Ensure categories are unique, trimmed, and "All" is not duplicated
-          const uniqueCats = Array.from(new Set(
-            parsedData
-              .map((p: Product) => p.category?.trim())
-              .filter((cat: string) => cat && cat !== 'All')
-          ));
-          setCategories(['All', ...uniqueCats]);
+
+          const configured = (catRes.success && Array.isArray(catRes.data)) ? catRes.data : [];
+          const productCats = parsedData.map((p: Product) => p.category?.trim()).filter(Boolean);
+          const sortedCats = sortCategoriesByConfig(productCats, configured);
+
+          setCategories(['All', ...sortedCats]);
         }
 
         // Fetch Service Status
@@ -616,7 +626,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     .filter(p => {
       const matchCat = category === 'All' || p.category === category;
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+      const pref = p.dietary_preference || 'NON_VEG';
+      const matchDietary = dietaryFilter === 'ALL' || (dietaryFilter === 'VEG' ? pref === 'VEG' : pref === 'NON_VEG');
+      return matchCat && matchSearch && matchDietary;
     })
     .sort((a, b) => {
       const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
@@ -830,6 +842,11 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
               }}
             />
           </div>
+        </div>
+
+        {/* Dietary Preference Filter (Veg / Non-Veg / All) */}
+        <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
         </div>
 
         {/* Category Filter */}

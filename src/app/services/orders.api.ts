@@ -13,6 +13,9 @@ export interface CreateOrderData {
   table_number?: string;
   order_type?: string;
   is_pos?: boolean;
+  is_paid?: boolean;
+  payment_method?: string;
+  discount_amount?: number;
 }
 
 export interface UpdateOrderData {
@@ -33,7 +36,7 @@ class OrderService {
     let token: string | null = null;
     const path = window.location.pathname;
     
-    if (path.startsWith('/admin')) {
+    if (path.startsWith('/admin') || path.includes('/admin')) {
       token = localStorage.getItem('admin_token');
     } else if (path.includes('/staff')) {
       token = localStorage.getItem('staff_token') || localStorage.getItem('admin_token');

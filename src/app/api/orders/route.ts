@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customer_name, phone, items, notes, party_size, table_number, order_type } = body;
+    const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method } = body;
 
     if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
@@ -120,6 +120,8 @@ export async function POST(request: NextRequest) {
     }
     subtotal = Math.round(subtotal * 100) / 100;
 
+    const discount_amount = Math.max(0, Number(body.discount_amount) || 0);
+
     const gst_type = restaurant.gst_type || 'NONE';
     const gst_rate = Number(restaurant.gst_rate) || 0;
     let gst_amount = 0;
@@ -130,13 +132,20 @@ export async function POST(request: NextRequest) {
       total_price = subtotal + gst_amount;
     }
 
+    total_price = Math.max(0, total_price - discount_amount);
+
     const admin = await requireAdmin(request);
     const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
     // Only trust is_pos if the user is verified staff/admin. Prevents token leakage into customer UI.
     const isPos = hasAdminRights && body.is_pos === true;
+    const isPaid = hasAdminRights && Boolean(is_paid);
+    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : (hasAdminRights && payment_method ? String(payment_method) : undefined);
 
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
+
+    const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+    const staffId = (isPos && admin?.isStaff && isUuid(admin?.userId)) ? admin.userId : undefined;
 
     const order = await createOrder({
       restaurant_id: restaurant.id,
@@ -144,6 +153,7 @@ export async function POST(request: NextRequest) {
       phone,
       total_price,
       subtotal,
+      discount_amount,
       gst_amount,
       gst_rate,
       gst_type,
@@ -152,7 +162,9 @@ export async function POST(request: NextRequest) {
       table_number: order_type === 'TAKEAWAY' ? null : table_number,
       order_type: order_type || 'DINE_IN',
       is_pos: isPos,
-      staff_id: isPos ? admin?.userId : undefined,
+      is_paid: isPaid,
+      payment_method: paymentMethod,
+      staff_id: staffId,
       business_date,
       items,
     });
@@ -179,8 +191,8 @@ export async function POST(request: NextRequest) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
     }
 
-    // 🖨️ AUTO-PRINT KOT PER COUNTER when order is placed
-    if (order) {
+    // 🖨️ AUTO-PRINT KOT PER COUNTER: Only print when order is in PREPARING state (never in PENDING state)
+    if (order && order.status === 'PREPARING') {
       try {
         await autoQueueAndBroadcastKot(restaurant.id, order.id);
       } catch (kotErr) {

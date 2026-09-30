@@ -26,32 +26,53 @@ export class TablesRepository {
        FROM restaurant_tables t
        LEFT JOIN (
          SELECT 
-           restaurant_id,
-           table_number,
-           COUNT(*)::int as active_orders_count,
+           o.restaurant_id,
+           o.table_number,
+           COUNT(DISTINCT o.id)::int as active_orders_count,
            json_agg(
              json_build_object(
-               'id', id,
-               'ticket_number', ticket_number,
-               'customer_name', customer_name,
-               'phone', phone,
-               'party_size', party_size,
-               'total_price', total_price,
-               'status', status,
-               'order_type', order_type,
-               'pending_at', pending_at,
-               'preparing_at', preparing_at,
-               'ready_at', ready_at,
-               'paid_at', paid_at,
-               'created_at', created_at
-             ) ORDER BY created_at DESC
+               'id', o.id,
+               'ticket_number', o.ticket_number,
+               'customer_name', o.customer_name,
+               'phone', o.phone,
+               'party_size', o.party_size,
+               'total_price', o.total_price,
+               'subtotal', o.subtotal,
+               'gst_amount', o.gst_amount,
+               'gst_rate', o.gst_rate,
+               'gst_type', o.gst_type,
+               'status', o.status,
+               'order_type', o.order_type,
+               'notes', o.notes,
+               'pending_at', o.pending_at,
+               'preparing_at', o.preparing_at,
+               'ready_at', o.ready_at,
+               'paid_at', o.paid_at,
+               'created_at', o.created_at,
+               'items', COALESCE(items_sub.items_json, '[]'::json)
+             ) ORDER BY o.created_at DESC
            ) as orders_json
-         FROM orders
-         WHERE restaurant_id = $1
-           AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
-           AND table_number IS NOT NULL AND table_number != ''
-           AND (order_type IS NULL OR order_type != 'TAKEAWAY')
-         GROUP BY restaurant_id, table_number
+         FROM orders o
+         LEFT JOIN LATERAL (
+           SELECT json_agg(
+             json_build_object(
+               'id', oi.id,
+               'product_id', oi.product_id,
+               'quantity', oi.quantity,
+               'price_at_purchase', oi.price_at_purchase,
+               'product_name', p.name,
+               'counter', p.counter
+             ) ORDER BY oi.id ASC
+           ) as items_json
+           FROM order_items oi
+           LEFT JOIN products p ON p.id = oi.product_id
+           WHERE oi.order_id = o.id
+         ) items_sub ON true
+         WHERE o.restaurant_id = $1
+           AND o.status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
+           AND o.table_number IS NOT NULL AND o.table_number != ''
+           AND (o.order_type IS NULL OR o.order_type != 'TAKEAWAY')
+         GROUP BY o.restaurant_id, o.table_number
        ) active ON active.table_number = t.table_number
        WHERE t.restaurant_id = $1
        ORDER BY 

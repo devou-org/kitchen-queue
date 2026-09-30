@@ -8,13 +8,15 @@ interface QRCodeGeneratorProps {
   title: string;
   description?: string;
   primaryColor?: string;
+  hideCardWrapper?: boolean;
 }
 
 export function QRCodeGenerator({ 
   url, 
   title, 
   description, 
-  primaryColor = '#0f172a' 
+  primaryColor = '#0f172a',
+  hideCardWrapper = false
 }: QRCodeGeneratorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [generateKey, setGenerateKey] = useState(0); // Used to force re-render if needed
@@ -56,13 +58,9 @@ export function QRCodeGenerator({
     }
   };
 
-  return (
-    <div className="card" style={{ marginTop: '20px' }}>
-      <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <QrCode size={18} />
-        {title}
-      </h2>
-      {description && <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', marginBottom: '16px' }}>{description}</p>}
+  const qrInnerContent = (
+    <>
+      {description && <p style={{ fontSize: '12px', color: '#64748b', marginTop: 0, marginBottom: '16px' }}>{description}</p>}
       
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
         
@@ -127,6 +125,20 @@ export function QRCodeGenerator({
           </div>
         </div>
       </div>
+    </>
+  );
+
+  if (hideCardWrapper) {
+    return qrInnerContent;
+  }
+
+  return (
+    <div className="card" style={{ marginTop: '20px' }}>
+      <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <QrCode size={18} />
+        {title}
+      </h2>
+      {qrInnerContent}
     </div>
   );
 }

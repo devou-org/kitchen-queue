@@ -1,23 +1,33 @@
-# 📱 Admin Mobile Responsive Filters & Header Layout
+# 📱 Admin Mobile, Laptop Layout & Veg/Non-Veg Filtering
 
 ## What was changed
-Updated `AdminPageHeader.tsx`, `InventoryNav.tsx`, `admin/orders/page.tsx`, and `admin/products/page.tsx` to make search inputs, dropdown filter controls, action bars, and section titles stretch and stack **100% full width** on mobile devices ($\le 768\text{px}$, $\le 640\text{px}$, and $\le 480\text{px}$).
+Updated `AdminPageHeader.tsx`, `InventoryNav.tsx`, `DietaryFilter.tsx`, `menu/page.tsx`, `staff/menu/page.tsx`, `admin/orders/page.tsx`, and `admin/products/page.tsx` to add dynamic **Veg / Non-Veg / All** dietary filtering across Customer, Staff POS, and Admin screens, alongside complete mobile & laptop layout responsiveness.
 
 ## Main Features
-1. **Zero-Overlap Mobile Page Headers**:
-   - On screens $\le 640\text{px}$, `AdminPageHeader` switches to a clean 2-row vertical stack. Page titles (`h1`) resize smoothly to `20px` with `whiteSpace: normal` and `word-break: break-word`, preventing title text from overlapping action buttons (`Refresh`, `Receive Stock`, `Add Product`, etc.).
-2. **100% Full-Width Mobile Search & Dropdowns**:
-   - On mobile screens ($\le 480\text{px}$), the Search Bar, Status Dropdown (`PENDING`), Order Type Dropdown (`All Order Types`), and Counter Dropdown (`All Counters`) stack vertically and stretch 100% full width edge-to-edge.
-3. **Smooth Touch Tab Navigation (`InventoryNav`)**:
-   - Enhanced `InventoryNav` with momentum touch scrolling (`-webkit-overflow-scrolling: touch`), right padding, and clean scrollbar behavior for mobile devices.
-4. **Horizontal Table Scroll & Touch Hints**:
-   - Retained horizontal viewport touch scrolling (`min-width: 840px`) with `"Swipe left to view all order details"` hint banner.
+1. **Veg / Non-Veg / All Dietary Filter (`DietaryFilter.tsx`)**:
+   - Created reusable `<DietaryFilter />` toggle component (🟢 **Veg**, 🔴 **Non-Veg**, 🔘 **All**).
+   - Integrated dynamic, real-time filtering (without page reloads) across:
+     - Customer Digital Menu (`/[slug]/menu`)
+     - Staff POS Counter Menu (`/[slug]/staff/menu`)
+     - Admin Products Catalog (`/[slug]/admin/products`)
+   - Food items without explicit dietary preference default safely to `'NON_VEG'` when filtering by Non-Veg, and are included under `'ALL'`.
+2. **Small Laptop & Tablet Layout Support ($\le 1280\text{px}$)**:
+   - On small laptop screens (such as 1024px MacBooks/tablets with sidebars open), the Orders page header automatically splits the filter toolbar and action buttons into 2 clean horizontal rows.
+3. **Zero-Overlap Mobile Page Headers ($\le 640\text{px}$)**:
+   - Page titles (`h1`) resize smoothly to `20px` with `whiteSpace: normal` and `word-break: break-word`, preventing title text from overlapping action buttons (`Refresh`, `Receive Stock`, `Add Product`, etc.).
+4. **100% Full-Width Mobile Search & Dropdowns ($\le 640\text{px}$)**:
+   - On mobile screens ($\le 640\text{px}$), the Search Bar, Status Dropdown (`PENDING`), Order Type Dropdown (`All Order Types`), and Counter Dropdown (`All Counters`) stack vertically and stretch 100% full width edge-to-edge.
+5. **Adaptive Action Button Labels**:
+   - Displays `"Counters"` on mobile screens and `"Counters & Hardware"` on desktop screens.
+6. **Unified Header Button Color Palette**:
+   - Styled `BOM Recipes` and `Counters` buttons on Admin Products page with the primary theme color (`var(--primary)`) matching `Upload Menu` and `Add Product`.
 
 ## Database Changes
-- None (UI and responsive CSS layout changes only).
+- None (Uses existing `dietary_preference` column on `products` table).
 
 ## How to run/test it
 1. Start dev server: `npm run dev`
-2. Open `http://localhost:3000/demo/admin/inventory`, `http://localhost:3000/demo/admin/orders`, or `http://localhost:3000/demo/admin/products` in your browser.
-3. Open Browser Developer Tools (F12) and toggle Device Mode to a narrow mobile view ($\le 480\text{px}$, e.g., 320px / iPhone view).
-4. Verify title text wraps cleanly without overlapping buttons, and action buttons stack neatly underneath.
+2. Open `http://localhost:3000/demo/menu`, `http://localhost:3000/demo/staff/menu`, or `http://localhost:3000/demo/admin/products` in your browser.
+3. Click **Veg** 🟢 $\rightarrow$ Verify only Vegetarian items display dynamically.
+4. Click **Non-Veg** 🔴 $\rightarrow$ Verify only Non-Vegetarian items display dynamically.
+5. Click **All** 🔘 $\rightarrow$ Verify all items display.

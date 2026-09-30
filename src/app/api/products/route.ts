@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = await requireAdmin(request);
-    // Ideally, we should also check if the admin belongs to this restaurant_id
-    if (!admin || !admin.isAdmin) {
-      return NextResponse.json({ success: false, error: 'Forbidden - Admin only' }, { status: 403 });
+    const hasProductsPerm = admin && (admin.isAdmin || (admin.permissions && (admin.permissions.includes('products') || admin.permissions.includes('*'))));
+    if (!hasProductsPerm) {
+      return NextResponse.json({ success: false, error: 'Forbidden - Insufficient permissions' }, { status: 403 });
     }
 
     const body = await request.json();

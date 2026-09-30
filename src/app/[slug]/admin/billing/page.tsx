@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 import RecentBillingOperations from '@/components/billing/RecentBillingOperations';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
+import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 
 interface BillingData {
   restaurant: {
@@ -78,7 +79,8 @@ export default function BillingPage() {
   useEffect(() => {
     fetch('/api/admin/billing', {
       headers: {
-        'x-restaurant-slug': slug as string
+        'x-restaurant-slug': slug as string,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`
       }
     })
       .then((res) => {
@@ -112,7 +114,8 @@ export default function BillingPage() {
 
     fetch(url.toString(), {
       headers: {
-        'x-restaurant-slug': slug as string
+        'x-restaurant-slug': slug as string,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`
       }
     })
       .then((res) => res.json())
@@ -200,140 +203,216 @@ export default function BillingPage() {
   const statusStyle = getStatusColor(restaurant.billing_status || 'ACTIVE');
 
   return (
-    <AdminContentWrapper style={{ fontFamily: 'inherit' }}>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%', fontFamily: 'inherit' }}>
+      <style>{`
+        .billing-page-header {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 20px !important;
+          border-bottom: 1px solid var(--border) !important;
+          background: #FFFFFF !important;
+          box-sizing: border-box !important;
+        }
+
+        .billing-page-header .admin-page-header-container {
+          height: 68px !important;
+          min-height: 68px !important;
+          display: flex !important;
+          align-items: center !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          gap: 12px !important;
+          width: 100% !important;
+        }
+
+        .billing-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 10px !important;
+          width: 100% !important;
+          min-width: 0 !important;
+        }
+
+        .billing-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+        }
+
+        @media (max-width: 768px) {
+          .billing-page-header {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 12px 16px !important;
+          }
+
+          .billing-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+
+          .billing-actions {
+            width: 100% !important;
+            margin-left: 0 !important;
+            justify-content: space-between !important;
+            flex-wrap: wrap !important;
+          }
+        }
+      `}</style>
       <AdminPageHeader
-        action={
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px', 
-            padding: '8px 16px', 
-            borderRadius: '8px', 
-            backgroundColor: statusStyle.bg, 
-            color: statusStyle.text,
-            border: `1px solid ${statusStyle.border}`,
-            fontWeight: 700,
-            fontSize: '14px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            {restaurant.billing_status === 'ACTIVE' ? <ShieldCheck size={16} /> : <AlertCircle size={16} />}
-            {restaurant.billing_status || 'ACTIVE'} STATUS
+        className="billing-page-header"
+        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        hideMaximize={true}
+        search={
+          <div className="billing-toolbar">
+            {/* Left: Status Control */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '38px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                backgroundColor: statusStyle.bg,
+                color: statusStyle.text,
+                border: `1px solid ${statusStyle.border}`,
+                fontWeight: 700,
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap'
+              }}>
+                {restaurant.billing_status === 'ACTIVE' ? <ShieldCheck size={14} /> : <AlertCircle size={14} />}
+                <span>{restaurant.billing_status || 'ACTIVE'} STATUS</span>
+              </div>
+            </div>
+
+            {/* Right: Maximize Toggle */}
+            <div className="billing-actions">
+              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <LayoutMaximizeToggle />
+              </div>
+            </div>
           </div>
         }
       />
 
-      {/* Pricing and Tier Overview Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-        
-        {/* Active Plan Card */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          borderRadius: '8px', 
-          border: '1px solid #e5e7eb', 
-          padding: '24px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-        }}>
-          <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Current Plan</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '26px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>{restaurant.billing_tier || 'BASIC'}</span>
-            <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{restaurant.billing_model || 'SUBSCRIPTION'} MODEL</span>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', fontSize: '13px', color: '#4b5563' }}>
-            {restaurant.billing_model === 'SUBSCRIPTION' ? (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '8px' }}>
-                  <span>Base Subscription:</span>
-                  <strong style={{ color: '#111827' }}>₹{pricingConfig?.subscriptionPrice || 0}/month</strong>
+      <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
+        {/* Pricing and Tier Overview Cards */}
+        <div style={{ padding: '20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+            {/* Active Plan Card */}
+            <div style={{ 
+              backgroundColor: 'white', 
+              borderRadius: '8px', 
+              border: '1px solid #e5e7eb', 
+              padding: '20px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            }}>
+              <h2 style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Current Plan</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>{restaurant.billing_tier || 'BASIC'}</span>
+                <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{restaurant.billing_model || 'SUBSCRIPTION'} MODEL</span>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px', fontSize: '13px', color: '#4b5563' }}>
+                {restaurant.billing_model === 'SUBSCRIPTION' ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
+                      <span>Base Subscription:</span>
+                      <strong style={{ color: '#111827' }}>₹{pricingConfig?.subscriptionPrice || 0}/month</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
+                      <span>Cycle Start Date:</span>
+                      <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_start_date)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Renewal/End Date:</span>
+                      <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_end_date)}</strong>
+                    </div>
+                  </>
+                ) : restaurant.billing_model === 'PER_ORDER' ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px' }}>
+                    <span>Commission Structure:</span>
+                    <strong style={{ color: '#111827' }}>Pay-Per-Order</strong>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px' }}>
+                    <span>Fee Structure:</span>
+                    <strong style={{ color: '#111827' }}>One-Time Payment</strong>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* OTP Usage & Accrued Charges Card */}
+            <div style={{ 
+              backgroundColor: 'white', 
+              borderRadius: '8px', 
+              border: '1px solid #e5e7eb', 
+              padding: '20px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            }}>
+              <h2 style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Current Cycle Usage</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>₹{(currentOtpAmount + currentOrderAmount).toFixed(2)}</span>
+                <span style={{ fontSize: '11px', color: '#4b5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Accrued This Cycle</span>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px', fontSize: '13px', color: '#4b5563' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
+                  <span>OTPs Successfully Sent:</span>
+                  <strong style={{ color: '#111827' }}>{currentOtpCount} SMS (₹{currentOtpAmount.toFixed(2)})</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '8px' }}>
-                  <span>Cycle Start Date:</span>
-                  <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_start_date)}</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
+                  <span>Order Commissions Accrued:</span>
+                  <strong style={{ color: '#111827' }}>₹{currentOrderAmount.toFixed(2)}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Renewal/End Date:</span>
-                  <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_end_date)}</strong>
+                  <span>Total Cycle Accrued Charges:</span>
+                  <strong style={{ color: '#111827' }}>₹{(currentOtpAmount + currentOrderAmount).toFixed(2)}</strong>
                 </div>
-              </>
-            ) : restaurant.billing_model === 'PER_ORDER' ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px' }}>
-                <span>Commission Structure:</span>
-                <strong style={{ color: '#111827' }}>Pay-Per-Order</strong>
               </div>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px' }}>
-                <span>Fee Structure:</span>
-                <strong style={{ color: '#111827' }}>One-Time Payment</strong>
-              </div>
-            )}
-          </div>
-        </div>
-
-
-
-        {/* OTP Usage & Accrued Charges Card */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          borderRadius: '8px', 
-          border: '1px solid #e5e7eb', 
-          padding: '24px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-        }}>
-          <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Current Cycle Usage</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '26px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>₹{(currentOtpAmount + currentOrderAmount).toFixed(2)}</span>
-            <span style={{ fontSize: '11px', color: '#4b5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Accrued This Cycle</span>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', fontSize: '13px', color: '#4b5563' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '8px' }}>
-              <span>OTPs Successfully Sent:</span>
-              <strong style={{ color: '#111827' }}>{currentOtpCount} SMS (₹{currentOtpAmount.toFixed(2)})</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '8px' }}>
-              <span>Order Commissions Accrued:</span>
-              <strong style={{ color: '#111827' }}>₹{currentOrderAmount.toFixed(2)}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Total Cycle Accrued Charges:</span>
-              <strong style={{ color: '#111827' }}>₹{(currentOtpAmount + currentOrderAmount).toFixed(2)}</strong>
             </div>
           </div>
         </div>
 
-      </div>
-
-      {/* Main Billing Tables */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '32px' }}>
-        
-        {/* Monthly Billing Summaries (Invoices) */}
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Receipt size={18} style={{ color: '#6b7280' }} />
-              Monthly Statements
-            </h3>
-            <span style={{ fontSize: '12px', color: '#6b7280' }}>Generated aggregates at the end of each billing cycle</span>
+        {/* Monthly Billing Summaries (Invoices) Table - Flush edge-to-edge */}
+        <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflow: 'hidden', borderRadius: 0, margin: 0, padding: 0 }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', background: '#FFFFFF' }}>
+            <h2 style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <Receipt size={16} style={{ color: 'var(--primary, #971345)' }} />
+              <span>Monthly Statements</span>
+            </h2>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Generated aggregates at the end of each billing cycle</span>
           </div>
           
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+          <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: 600 }}>
-                  <th style={{ padding: '12px 24px' }}>Billing Cycle</th>
-                  <th style={{ padding: '12px 24px' }}>Sub. Fee</th>
-                  <th style={{ padding: '12px 24px' }}>Order Commissions</th>
-                  <th style={{ padding: '12px 24px' }}>OTP Delivery Costs</th>
-                  <th style={{ padding: '12px 24px' }}>Adjustments</th>
-                  <th style={{ padding: '12px 24px', textAlign: 'right' }}>Total Amount</th>
-                  <th style={{ padding: '12px 24px', textAlign: 'center' }}>Status</th>
+                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)', color: '#475569', fontWeight: 600 }}>
+                  <th style={{ paddingLeft: '20px' }}>Billing Cycle</th>
+                  <th>Sub. Fee</th>
+                  <th>Order Commissions</th>
+                  <th>OTP Delivery Costs</th>
+                  <th>Adjustments</th>
+                  <th style={{ textAlign: 'right' }}>Total Amount</th>
+                  <th style={{ textAlign: 'center', paddingRight: '20px' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {summaries.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#9ca3af' }}>
+                    <td colSpan={7} style={{ padding: '48px 20px', textAlign: 'center', color: '#9ca3af' }}>
                       No statements generated yet. Statements compile at the end of the monthly cycle.
                     </td>
                   </tr>
@@ -348,20 +427,19 @@ export default function BillingPage() {
                     const cycleName = `${startStr} to ${endStr}`;
                     return (
                       <tr key={summary.id} style={{ borderBottom: '1px solid #f3f4f6', color: '#374151' }}>
-                        <td style={{ padding: '14px 24px', fontWeight: 600, color: '#111827' }}>{cycleName}</td>
-                        <td style={{ padding: '14px 24px' }}>₹{parseFloat(summary.subscription_charges || '0').toFixed(2)}</td>
-                        <td style={{ padding: '14px 24px' }}>₹{parseFloat(summary.order_charges || '0').toFixed(2)}</td>
-                        <td style={{ padding: '14px 24px' }}>₹{parseFloat(summary.otp_charges || '0').toFixed(2)}</td>
+                        <td style={{ paddingLeft: '20px', fontWeight: 600, color: '#111827' }}>{cycleName}</td>
+                        <td>₹{parseFloat(summary.subscription_charges || '0').toFixed(2)}</td>
+                        <td>₹{parseFloat(summary.order_charges || '0').toFixed(2)}</td>
+                        <td>₹{parseFloat(summary.otp_charges || '0').toFixed(2)}</td>
                         <td style={{ 
-                          padding: '14px 24px', 
                           color: parseFloat(summary.adjustments || '0') > 0 ? '#059669' : parseFloat(summary.adjustments || '0') < 0 ? '#dc2626' : 'inherit' 
                         }}>
                           ₹{parseFloat(summary.adjustments || '0').toFixed(2)}
                         </td>
-                        <td style={{ padding: '14px 24px', textAlign: 'right', fontWeight: 700, color: '#111827' }}>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#111827' }}>
                           ₹{parseFloat(summary.total_amount || '0').toFixed(2)}
                         </td>
-                        <td style={{ padding: '14px 24px', textAlign: 'center' }}>
+                        <td style={{ textAlign: 'center', paddingRight: '20px' }}>
                           <span style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
@@ -383,8 +461,8 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Transaction History (Audit Logs) */}
-        <div style={{ marginTop: '24px' }}>
+        {/* Transaction History (Audit Logs) - Flush edge-to-edge */}
+        <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflow: 'hidden', borderRadius: 0, margin: 0, padding: 0 }}>
           <RecentBillingOperations
             transactions={paginatedTransactions}
             totalTxs={totalTxs}
@@ -397,7 +475,6 @@ export default function BillingPage() {
             txLoading={txLoading}
           />
         </div>
-
       </div>
     </AdminContentWrapper>
   );

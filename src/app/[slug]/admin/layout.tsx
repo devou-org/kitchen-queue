@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3, LogOut, PanelLeftClose, PanelLeftOpen, Gift } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
@@ -15,7 +15,28 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { slug } = useParams();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('admin_sidebar_collapsed');
+      if (saved === 'true') {
+        setIsCollapsed(true);
+      }
+    } catch {}
+  }, []);
+
+  const toggleSidebarCollapse = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('admin_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const { isMaximized } = useAdminLayout();
   const { restaurant, loading: resLoading, refresh } = useRestaurant();
@@ -24,10 +45,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
   // Controlled via Super Admin Subscription Modules
   const showInventory = restaurant?.modules?.INVENTORY === true;
+  const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM !== false;
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
-    const adminToken = localStorage.getItem('admin_token');
     const hasCookie = document.cookie.includes('admin_logged_in=1');
     
     // Allow access to login page
@@ -38,17 +59,94 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
     if (!hasCookie) {
       router.push(`/${slug}/admin/login`);
-    } else {
+      return;
+    }
+
+    // Try loading saved user from localStorage
+    const localUser = authService.getAdminUser();
+    if (localUser) {
+      setCurrentUser(localUser);
       setLoading(false);
     }
+
+    // Refresh user info in background to ensure latest permissions
+    authService.refresh().then(res => {
+      if (res.success && res.user) {
+        setCurrentUser(res.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('admin_user', JSON.stringify(res.user));
+        }
+      }
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
   }, [pathname, router, slug]);
+
+  const isSuperAdminOrOwner = currentUser?.is_admin === true || (currentUser?.permissions && currentUser.permissions.includes('*'));
+
+  const allNavLinks = [
+    ...(showOrdering ? [{ key: 'pos', name: 'POS Terminal', href: `/${slug}/admin/pos`, icon: <Store size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'orders', name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
+    ...(!showOrdering && showQueue ? [{ key: 'queue', name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
+    { key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
+    { key: 'products', name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
+    ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
+    ...(showLoyalty ? [{ key: 'loyalty', name: 'Loyalty', href: `/${slug}/admin/loyalty`, icon: <Gift size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'staff', name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
+    { key: 'billing', name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
+    { key: 'settings', name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
+  ];
+
+  // Filter links dynamically based on user role permissions
+  const navLinks = allNavLinks.filter(link => {
+    if (isSuperAdminOrOwner) return true;
+    if (!currentUser) return true; // default before user is loaded
+    const perms = currentUser.permissions || [];
+    return perms.includes(link.key);
+  });
+
+  // Route protection for unauthorized direct navigation
+  useEffect(() => {
+    if (loading || !currentUser || pathname === `/${slug}/admin/login`) return;
+    if (isSuperAdminOrOwner) return;
+
+    if (pathname.startsWith(`/${slug}/admin/ai-analyst`)) {
+      const perms = currentUser.permissions || [];
+      const firstAllowed = allNavLinks.find(link => perms.includes(link.key));
+      if (firstAllowed) {
+        router.replace(firstAllowed.href);
+      } else {
+        router.replace(`/${slug}/admin/orders`);
+      }
+      return;
+    }
+
+    const currentModule = allNavLinks.find(link => pathname.startsWith(link.href) || 
+      (link.key === 'analytics' && (pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)))
+    );
+
+    if (currentModule) {
+      const perms = currentUser.permissions || [];
+      if (!perms.includes(currentModule.key)) {
+        // Find first permitted route
+        const firstAllowed = allNavLinks.find(link => perms.includes(link.key));
+        if (firstAllowed) {
+          router.replace(firstAllowed.href);
+        }
+      }
+    }
+  }, [pathname, currentUser, loading, isSuperAdminOrOwner, router, slug]);
 
   useEffect(() => {
     if (!resLoading && restaurant && restaurant.modules?.ONLINE_ORDERING === false) {
       const isUnauthorizedPath = 
+        pathname.startsWith(`/${slug}/admin/pos`) || 
         pathname.startsWith(`/${slug}/admin/orders`) || 
         pathname.startsWith(`/${slug}/admin/statements`) || 
-        pathname.startsWith(`/${slug}/admin/sales`);
+        pathname.startsWith(`/${slug}/admin/sales`) ||
+        pathname.startsWith(`/${slug}/admin/analytics`);
       if (isUnauthorizedPath) {
         const target = showQueue ? 'queue' : 'products';
         router.replace(`/${slug}/admin/${target}`);
@@ -60,6 +158,17 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         // Double-check with a fresh fetch in case the module was just enabled in another tab/window
         refresh().then((latest) => {
           if (latest && latest.modules?.INVENTORY !== true) {
+            const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
+            router.replace(`/${slug}/admin/${target}`);
+          }
+        });
+      }
+    }
+
+    if (!resLoading && restaurant && restaurant.modules?.LOYALTY_PROGRAM === false) {
+      if (pathname.startsWith(`/${slug}/admin/loyalty`)) {
+        refresh().then((latest) => {
+          if (latest && latest.modules?.LOYALTY_PROGRAM === false) {
             const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
             router.replace(`/${slug}/admin/${target}`);
           }
@@ -122,18 +231,6 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     router.push(`/${slug}/admin/login`);
   };
 
-  const navLinks = [
-    ...(showOrdering ? [{ name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
-    ...(!showOrdering && showQueue ? [{ name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
-    { name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
-    { name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
-    ...(showInventory ? [{ name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Sales', href: `/${slug}/admin/sales`, icon: <Box size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Statements', href: `/${slug}/admin/statements`, icon: <Wallet size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
-    { name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
-    { name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
-  ];
 
   if (restaurant?.billing_status === 'SUSPENDED') {
     return (
@@ -169,10 +266,18 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           }
           ` : ''}
           .sidebar {
-            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
+            width: 200px;
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
+          }
+          .sidebar.collapsed {
+            width: 68px !important;
           }
           .admin-main {
-            transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            margin-left: 200px;
+            transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          }
+          .admin-main.sidebar-collapsed {
+            margin-left: 68px !important;
           }
           @media (min-width: 769px) {
             .sidebar.maximized-hidden {
@@ -182,6 +287,21 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             }
             .admin-main.maximized-full {
               margin-left: 0 !important;
+            }
+          }
+          @media (max-width: 768px) {
+            .sidebar {
+              width: 240px !important;
+            }
+            .sidebar.collapsed {
+              width: 240px !important;
+            }
+            .admin-main,
+            .admin-main.sidebar-collapsed {
+              margin-left: 0 !important;
+            }
+            .sidebar-diminish-toggle {
+              display: none !important;
             }
           }
         `}} />
@@ -195,60 +315,325 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Sidebar */}
-      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} ${isMaximized ? 'maximized-hidden' : ''}`}>
-        <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {restaurant?.logo_url ? (
-            <img 
-              src={restaurant.logo_url} 
-              alt={restaurant.name} 
-              style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} 
-            />
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} ${isMaximized ? 'maximized-hidden' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
+        <div 
+          className="sidebar-header" 
+          style={{ 
+            height: '68px',
+            boxSizing: 'border-box',
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: isCollapsed ? 'center' : 'space-between',
+            padding: isCollapsed ? '0 12px' : '0 14px',
+            borderBottom: '1px solid var(--border)',
+            overflow: 'hidden'
+          }}
+        >
+          {isCollapsed ? (
+            <button
+              type="button"
+              onClick={toggleSidebarCollapse}
+              title="Click to expand sidebar"
+              aria-label="Expand sidebar"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                transition: 'transform 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            >
+              {restaurant?.logo_url ? (
+                <img 
+                  src={restaurant.logo_url} 
+                  alt={restaurant.name} 
+                  style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', display: 'block' }} 
+                />
+              ) : (
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '8px',
+                  backgroundColor: restaurant?.primary_color || 'var(--primary)',
+                  color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: '15px'
+                }}>
+                  {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
+                </div>
+              )}
+            </button>
           ) : (
-            <div style={{
-              width: '32px', height: '32px', borderRadius: '8px',
-              backgroundColor: restaurant?.primary_color || 'var(--primary)',
-              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 800, fontSize: '14px', flexShrink: 0
-            }}>
-              {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
-            </div>
+            <>
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px', 
+                  minWidth: 0, 
+                  overflow: 'hidden',
+                  flex: 1
+                }}
+              >
+                {restaurant?.logo_url ? (
+                  <img 
+                    src={restaurant.logo_url} 
+                    alt={restaurant.name} 
+                    style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} 
+                  />
+                ) : (
+                  <div style={{
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    backgroundColor: restaurant?.primary_color || 'var(--primary)',
+                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 800, fontSize: '14px', flexShrink: 0
+                  }}>
+                    {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : '🌿'}
+                  </div>
+                )}
+                <div className="sidebar-brand-text">
+                  <h2 style={{ fontSize: '15px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0, color: 'var(--text-primary)' }}>
+                    {restaurant?.name || 'Renjz'} Admin
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleSidebarCollapse}
+                title="Collapse sidebar"
+                aria-label="Collapse sidebar"
+                className="sidebar-diminish-toggle"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                  marginLeft: '4px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#F3F4F6';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'none';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }}
+              >
+                <PanelLeftClose size={17} />
+              </button>
+            </>
           )}
-          <h2 style={{ fontSize: '16px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {restaurant?.name || 'Renjz'} Admin
-          </h2>
         </div>
+
         <nav className="sidebar-nav">
           {navLinks.map((link) => {
-            const isActive = pathname.startsWith(link.href);
+            const isActive = pathname.startsWith(link.href) ||
+              (link.name === 'Analytics' && (pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)));
             return (
               <Link key={link.name} 
                 href={link.href} 
                 prefetch={false}
                 className={`sidebar-link ${isActive ? 'active' : ''}`}
                 onClick={() => setSidebarOpen(false)}
+                title={link.name}
               >
-                <span>{link.icon}</span>
-                <span>{link.name}</span>
+                <span className="sidebar-link-icon">{link.icon}</span>
+                <span className="sidebar-link-text">{link.name}</span>
                 {link.name === 'Products' && (
-                  <Sparkles size={14} style={{ marginLeft: 'auto', color: '#ffffff' }} />
+                  <span className="sidebar-link-badge">
+                    <Sparkles size={14} style={{ color: isActive ? 'var(--primary)' : '#F59E0B' }} />
+                  </span>
                 )}
               </Link>
             );
           })}
         </nav>
-        <div style={{ padding: '20px', borderTop: '1px solid var(--border)', flexShrink: 0, marginTop: 'auto' }}>
-          {(showOrdering || showDigitalMenu) && <ServiceToggle />}
-          <button 
-            className="sidebar-logout-btn" 
-            onClick={handleLogout}
-          >
-            Log Out →
-          </button>
+        <div className="sidebar-footer-section" style={{ borderTop: '1px solid var(--border)', padding: isCollapsed ? '12px 8px' : '12px 14px' }}>
+          {currentUser ? (
+            isCollapsed ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
+                <div 
+                  title={`${currentUser.name || 'User'} (${isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')})\n${currentUser.email}`}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: isSuperAdminOrOwner ? '#EEF2FF' : '#F1F5F9',
+                    color: isSuperAdminOrOwner ? '#4F46E5' : '#334155',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    cursor: 'default',
+                  }}
+                >
+                  {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
+                </div>
+                <button
+                  onClick={handleLogout}
+                  title="Log Out"
+                  aria-label="Log Out"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                    padding: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#EF4444';
+                    e.currentTarget.style.background = '#FEF2F2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            ) : (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                padding: '2px 0',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1 }}>
+                  {/* Initial Avatar */}
+                  <div 
+                    title={`${currentUser.name || 'User'} (${isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')})\n${currentUser.email}`}
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '50%',
+                      background: isSuperAdminOrOwner ? '#EEF2FF' : '#F1F5F9',
+                      color: isSuperAdminOrOwner ? '#4F46E5' : '#334155',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+
+                  {/* User Details */}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{
+                        fontWeight: 700,
+                        fontSize: '12.5px',
+                        color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}>
+                        {currentUser.name || 'Team Member'}
+                      </span>
+                      <span style={{
+                        padding: '1px 5px',
+                        borderRadius: '999px',
+                        fontSize: '9.5px',
+                        fontWeight: 700,
+                        background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
+                        color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        textTransform: 'capitalize',
+                      }}>
+                        {isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontSize: '11px',
+                      color: 'var(--text-secondary)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      marginTop: '1px',
+                    }}>
+                      {currentUser.email}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clean Logout Button without Border */}
+                <button
+                  onClick={handleLogout}
+                  title="Log Out"
+                  aria-label="Log Out"
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease',
+                    padding: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#EF4444';
+                    e.currentTarget.style.background = '#FEF2F2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            )
+          ) : (
+            <button 
+              className="sidebar-logout-btn" 
+              onClick={handleLogout}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isCollapsed ? 0 : '8px', border: 'none', background: 'transparent' }}
+              title="Log Out"
+            >
+              {!isCollapsed && <span>Log Out</span>}
+              <LogOut size={15} />
+            </button>
+          )}
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className={`admin-main ${isMaximized ? 'maximized-full' : ''}`}>
+      <main className={`admin-main ${isMaximized ? 'maximized-full' : ''} ${isCollapsed ? 'sidebar-collapsed' : ''}`}>
         {/* Mobile Header */}
         <div className="md:hidden" style={{ display: 'flex', alignItems: 'center', padding: '16px', background: 'var(--card)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 40, gap: '16px' }}>
           <button 
@@ -259,7 +644,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         {children}
-        {!isMaximized && <AIAnalystWidget />}
+        {!isMaximized && isSuperAdminOrOwner && !pathname.includes('/admin/orders') && <AIAnalystWidget />}
       </main>
     </div>
     </>
