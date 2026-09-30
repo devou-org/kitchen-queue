@@ -9,7 +9,7 @@ import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { useParams } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, Banknote, CreditCard, QrCode, Check, Printer } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
@@ -627,48 +627,98 @@ export default function StaffMenuPage() {
                 <input type="text" className="input" placeholder="Less spicy, extra napkins..." value={orderForm.notes} onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} />
               </div>
 
-              <div style={{ background: orderForm.is_paid ? '#F0FDF4' : '#F8FAFC', border: orderForm.is_paid ? '1px solid #BBF7D0' : '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', marginTop: '6px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: orderForm.is_paid ? '#15803D' : '#334155' }}>Mark as Paid (Optional)</div>
-                    <div style={{ fontSize: '11px', color: '#64748B' }}>Order stays in kitchen queue</div>
+              {/* Payment Selection */}
+              <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px 14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PAYMENT</span>
+                  {orderForm.is_paid ? (
+                    <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#15803D', background: '#DCFCE7', padding: '2px 7px', borderRadius: '4px' }}>Pay Now</span>
+                  ) : (
+                    <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', background: '#F1F5F9', padding: '2px 7px', borderRadius: '4px' }}>Pay Later (Unpaid)</span>
+                  )}
+                </div>
+
+                {/* Pay Later / Pay Now Radios */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '28px', padding: '2px 0' }}>
+                  <label
+                    onClick={() => setOrderForm({ ...orderForm, is_paid: false })}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px', fontWeight: !orderForm.is_paid ? 700 : 500, color: !orderForm.is_paid ? '#0F172A' : '#64748B' }}
+                  >
+                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: !orderForm.is_paid ? '2px solid var(--primary, #059669)' : '2px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', flexShrink: 0 }}>
+                      {!orderForm.is_paid && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary, #059669)' }} />}
+                    </div>
+                    <span>Pay Later</span>
+                  </label>
+
+                  <label
+                    onClick={() => setOrderForm({ ...orderForm, is_paid: true, payment_method: orderForm.payment_method || 'CASH' })}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px', fontWeight: orderForm.is_paid ? 700 : 500, color: orderForm.is_paid ? '#0F172A' : '#64748B' }}
+                  >
+                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: orderForm.is_paid ? '2px solid var(--primary, #059669)' : '2px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', flexShrink: 0 }}>
+                      {orderForm.is_paid && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary, #059669)' }} />}
+                    </div>
+                    <span>Pay Now</span>
+                  </label>
+                </div>
+
+                {/* Payment Method Sub-selection */}
+                {orderForm.is_paid ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', letterSpacing: '0.02em' }}>Payment Method</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {[
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
+                        { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CARD', label: 'Card', icon: CreditCard },
+                      ].map((m) => {
+                        const Icon = m.icon;
+                        const selected = (orderForm.payment_method || 'CASH') === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setOrderForm({ ...orderForm, payment_method: m.id })}
+                            style={{
+                              height: '36px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '5px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: selected ? '1.5px solid var(--primary, #059669)' : '1px solid #CBD5E1',
+                              background: selected ? '#FFFFFF' : '#F8FAFC',
+                              color: selected ? 'var(--primary, #059669)' : '#475569',
+                              boxShadow: selected ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            {selected ? <Check size={14} strokeWidth={2.5} /> : <Icon size={13} />}
+                            <span>{m.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(orderForm.is_paid)}
-                    onChange={e => setOrderForm({ ...orderForm, is_paid: e.target.checked, payment_method: e.target.checked ? (orderForm.payment_method || 'CASH') : orderForm.payment_method })}
-                    style={{ width: '18px', height: '18px', accentColor: '#16A34A', cursor: 'pointer' }}
-                  />
-                </label>
-                {orderForm.is_paid && (
-                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #DCFCE7', display: 'flex', gap: '6px' }}>
-                    {['CASH', 'UPI', 'CARD'].map(m => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setOrderForm({ ...orderForm, payment_method: m })}
-                        style={{
-                          flex: 1,
-                          height: '32px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          border: (orderForm.payment_method || 'CASH') === m ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
-                          background: (orderForm.payment_method || 'CASH') === m ? '#FFFFFF' : '#F8FAFC',
-                          color: (orderForm.payment_method || 'CASH') === m ? '#15803D' : '#475569',
-                        }}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                ) : (
+                  <div style={{ fontSize: '11.5px', color: '#64748B', paddingTop: '6px', borderTop: '1px solid #F1F5F9' }}>
+                    Order will be placed as <strong>Unpaid</strong>. Settle payment upon customer departure.
                   </div>
                 )}
               </div>
 
-              <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '8px' }} disabled={submitting}>
-                {submitting ? 'Placing Order...' : 'Place Order Now'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-lg"
+                  style={{ height: '46px', fontSize: '15px', fontWeight: 700 }}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Placing Order...' : `Place Order · ${formatPrice(totalPrice)}`}
+                </button>
+              </div>
             </form>
           </div>
         </div>

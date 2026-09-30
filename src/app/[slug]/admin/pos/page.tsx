@@ -347,6 +347,57 @@ export default function AdminPosPage() {
     setCart(newCart);
   };
 
+  const triggerAutoPrintBill = async (order: any, restaurantSlug: string) => {
+    const savedPrinter = typeof window !== 'undefined'
+      ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
+      : 'POS-80C';
+
+    try {
+      const res = await fetch('/api/print/bill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': restaurantSlug,
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          printerName: savedPrinter,
+          orderData: order,
+          slug: restaurantSlug,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        console.warn('Auto-print bill server response:', data);
+        return;
+      }
+
+      if (data.mode === 'server' || data.mode === 'agent') {
+        toast.success(`🖨️ Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`);
+        return;
+      }
+
+      const { printBillFromBrowser } = await import('@/lib/client-print');
+      const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : undefined;
+      const clientRes = await printBillFromBrowser({
+        base64Bytes: data.base64Bytes,
+        billHtml: data.billHtml,
+        orderData: order,
+        billData: data.billData,
+        printerName: data.printer || savedPrinter,
+        ticketNumber: order.ticket_number,
+        localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
+      });
+
+      if (clientRes.success) {
+        toast.success(`🖨️ Auto-printed Bill #${String(order.ticket_number).padStart(3, '0')}!`);
+      }
+    } catch (err) {
+      console.error('Auto-print bill execution error:', err);
+    }
+  };
+
   const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.size === 0) {
@@ -387,9 +438,27 @@ export default function AdminPosPage() {
       if (res.success && res.data) {
         const createdOrder = res.data;
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
+
+        // Check if Print Bill button was clicked
+        const willPrintBill = Boolean((e as any)?.auto_print_bill ?? orderForm.auto_print_bill);
+
+        if (willPrintBill) {
+          triggerAutoPrintBill(createdOrder, slug as string);
+        }
+
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH' });
+        setOrderForm({
+          customer_name: '',
+          phone: '',
+          table_number: '',
+          party_size: 1,
+          notes: '',
+          order_type: 'DINE_IN',
+          is_paid: false,
+          payment_method: 'CASH',
+          auto_print_bill: willPrintBill,
+        });
         await fetchTables();
       } else {
         toast.error(res.error || 'Failed to place order');

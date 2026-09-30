@@ -1677,6 +1677,7 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   else if (status === 'PREPARING') timestampSet = ', preparing_at = COALESCE(preparing_at, CURRENT_TIMESTAMP)';
   else if (status === 'READY') timestampSet = ', ready_at = COALESCE(ready_at, CURRENT_TIMESTAMP)';
   else if (status === 'PAID') timestampSet = ', paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP), is_paid = true';
+  else if (status === 'CANCELLED' || status === 'EXPIRED') timestampSet = ', is_paid = false, paid_at = NULL';
 
   // Check if tableNumber is assigned or updated
   let tableId: string | undefined = undefined;
@@ -1749,7 +1750,16 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     
     const existing = orderRes.rows[0];
     const nextStatus = status || existing.status;
-    const nextIsPaid = (typeof isPaid === 'boolean') ? isPaid : (nextStatus === 'PAID' ? true : existing.is_paid);
+    let nextIsPaid: boolean;
+    if (nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED') {
+      nextIsPaid = false;
+    } else if (typeof isPaid === 'boolean') {
+      nextIsPaid = isPaid;
+    } else if (nextStatus === 'PAID') {
+      nextIsPaid = true;
+    } else {
+      nextIsPaid = existing.is_paid;
+    }
     
     // Update order
     const updateRes = await client.query(`
@@ -1758,7 +1768,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
           is_paid = $2,
           table_number = COALESCE($3, table_number),
           payment_method = COALESCE($6, payment_method),
-          paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() ELSE paid_at END,
+          paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() WHEN $2 = false THEN NULL ELSE paid_at END,
           updated_at = NOW()
       WHERE restaurant_id = $4 AND id = $5
       RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, paid_at
@@ -1863,19 +1873,37 @@ export async function updateOrderItemStatus(
 
     await client.query(query, params);
 
-    // Sync timestamps on order
-    if (upperStatus === 'PREPARING') {
-      await client.query(`
-        UPDATE orders 
-        SET preparing_at = COALESCE(preparing_at, NOW()) 
-        WHERE id = $1::uuid AND preparing_at IS NULL
-      `, [orderId]);
-    } else if (upperStatus === 'READY') {
-      await client.query(`
-        UPDATE orders 
-        SET ready_at = COALESCE(ready_at, NOW()) 
-        WHERE id = $1::uuid AND status = 'READY' AND ready_at IS NULL
-      `, [orderId]);
+    // Auto-sync master order status and timestamps based on item statuses
+    const itemsCheck = await client.query(`
+      SELECT status FROM order_items 
+      WHERE order_id = $1::uuid AND status NOT IN ('CANCELLED', 'REJECTED')
+    `, [orderId]);
+
+    const activeItems = itemsCheck.rows;
+    if (activeItems.length > 0) {
+      const allReadyOrServed = activeItems.every((i: any) => ['READY', 'SERVED'].includes((i.status || '').toUpperCase()));
+      const anyPreparing = activeItems.some((i: any) => (i.status || '').toUpperCase() === 'PREPARING');
+      const anyReady = activeItems.some((i: any) => (i.status || '').toUpperCase() === 'READY');
+
+      if (allReadyOrServed) {
+        // Automatically advance order to READY if it is still PENDING or PREPARING
+        await client.query(`
+          UPDATE orders
+          SET status = 'READY',
+              ready_at = COALESCE(ready_at, NOW()),
+              updated_at = NOW()
+          WHERE id = $1::uuid AND status IN ('PENDING', 'PREPARING')
+        `, [orderId]);
+      } else if (anyPreparing || anyReady) {
+        // Advance to PREPARING if currently PENDING
+        await client.query(`
+          UPDATE orders
+          SET status = 'PREPARING',
+              preparing_at = COALESCE(preparing_at, NOW()),
+              updated_at = NOW()
+          WHERE id = $1::uuid AND status = 'PENDING'
+        `, [orderId]);
+      }
     }
 
     await client.query('COMMIT');

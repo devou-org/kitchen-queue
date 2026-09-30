@@ -10,7 +10,7 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes, Layers, ArrowUpDown, Search } from 'lucide-react';
+import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes, Layers, ArrowUpDown, Search, Utensils } from 'lucide-react';
 import AdminProductForm from '@/components/AdminProductForm';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
@@ -25,6 +25,55 @@ interface ExtractedProduct {
   description: string;
   dietary_preference: string;
   selected: boolean;
+}
+
+function ProductImageThumbnail({ src, alt, size = 40 }: { src?: string; alt: string; size?: number }) {
+  const [error, setError] = useState(false);
+
+  if (!src || error) {
+    return (
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 8,
+          background: '#F1F5F9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          border: '1px solid #E2E8F0',
+          color: '#64748B',
+        }}
+      >
+        <Utensils size={Math.max(14, Math.round(size * 0.42))} strokeWidth={2} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        overflow: 'hidden',
+        border: '1px solid var(--border)',
+        background: '#FFFFFF',
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        onError={() => setError(true)}
+      />
+    </div>
+  );
 }
 
 export default function AdminProducts() {
@@ -300,7 +349,7 @@ export default function AdminProducts() {
           100% { transform: rotate(360deg); }
         }
 
-        /* Page-scoped responsive rules to match orders and tables single-row header toolbar */
+        /* Header toolbar styling */
         .products-page-header {
           height: 68px !important;
           min-height: 68px !important;
@@ -337,6 +386,47 @@ export default function AdminProducts() {
           height: 38px !important;
         }
 
+        .products-filters-row {
+          display: flex !important;
+          align-items: center !important;
+          gap: 0 !important;
+        }
+
+        .products-dietary-wrapper {
+          border-left: 1px solid #E2E8F0;
+          padding-left: 8px;
+          display: flex;
+          align-items: center;
+          height: 32px;
+          flex-shrink: 0;
+        }
+
+        .products-reorder-btn-wrapper {
+          border-left: 1px solid #E2E8F0;
+          padding-left: 8px;
+          display: flex;
+          align-items: center;
+          height: 32px;
+          flex-shrink: 0;
+        }
+
+        .products-reorder-btn {
+          width: 38px;
+          height: 38px;
+          padding: 0;
+          border-radius: 8px;
+          border: 1px solid var(--border, #cbd5e1);
+          background-color: #FFFFFF;
+          color: var(--primary, #0f172a);
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+          transition: all 0.15s ease;
+          flex-shrink: 0;
+        }
+
         .products-actions {
           display: flex !important;
           flex-wrap: nowrap !important;
@@ -350,12 +440,25 @@ export default function AdminProducts() {
           display: none;
         }
 
-        /* Mobile Screens: Full-width stacked controls below 640px */
-        @media (max-width: 640px) {
-          .products-page-header {
+        .products-mobile-card-list {
+          display: none !important;
+        }
+
+        /* Mobile Screens: Compact structured toolbar & native card list below 768px */
+        @media (max-width: 768px) {
+          .products-page-header,
+          .products-page-header.admin-page-header-container,
+          .products-page-header .admin-page-header-container {
             height: auto !important;
             min-height: auto !important;
-            padding: 12px 16px !important;
+            padding: 12px 14px !important;
+          }
+
+          .products-page-header .admin-header-left,
+          .products-page-header .admin-header-search {
+            height: auto !important;
+            min-height: auto !important;
+            width: 100% !important;
           }
 
           .products-toolbar {
@@ -375,44 +478,112 @@ export default function AdminProducts() {
             min-width: 0 !important;
           }
 
-          .products-stats-group {
-            flex-wrap: wrap !important;
-            justify-content: flex-start !important;
+          .products-filters-row {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
             width: 100% !important;
+            gap: 8px !important;
+          }
+
+          .products-dietary-wrapper {
+            border-left: none !important;
+            padding-left: 0 !important;
+            height: auto !important;
+            flex: 1 !important;
+          }
+
+          .products-dietary-wrapper .dietary-filter-container {
+            width: 100% !important;
+            display: flex !important;
+          }
+
+          .products-dietary-wrapper .dietary-filter-container button {
+            flex: 1 !important;
+            justify-content: center !important;
+            padding: 6px 8px !important;
+            font-size: 12px !important;
+          }
+
+          .products-reorder-btn-wrapper {
+            border-left: none !important;
+            padding-left: 0 !important;
+            height: auto !important;
+            flex-shrink: 0 !important;
           }
 
           .products-actions {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
             width: 100% !important;
             margin-left: 0 !important;
-            justify-content: flex-start !important;
-            flex-wrap: wrap !important;
           }
 
-          .products-actions > button,
-          .products-actions > a {
-            flex: 1 1 auto;
+          .products-upload-btn,
+          .products-counters-btn {
+            width: 100% !important;
+            height: 38px !important;
+            justify-content: center !important;
           }
-        }
 
-        @media (max-width: 768px) {
+          .products-add-btn {
+            grid-column: 1 / -1 !important;
+            width: 100% !important;
+            height: 40px !important;
+            justify-content: center !important;
+            font-size: 13px !important;
+          }
+
+          .products-maximize-wrapper {
+            display: none !important;
+          }
+
+          /* Hide desktop table and scroll hint on mobile */
           .products-table-viewport {
-            overflow-x: auto !important;
-            overscroll-behavior-x: contain;
-            -webkit-overflow-scrolling: touch;
-          }
-
-          .products-table-viewport .products-table {
-            min-width: 860px;
+            display: none !important;
           }
 
           .products-table-scroll-hint {
-            display: block;
-            padding: 8px 12px;
-            border-bottom: 1px solid var(--border);
-            background: #F8FAFC;
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-weight: 600;
+            display: none !important;
+          }
+
+          /* Show mobile card list */
+          .products-mobile-card-list {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+          }
+        }
+
+        /* Desktop & Tablet Table scrolling and sizing */
+        .products-table-card {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: auto !important;
+        }
+
+        .products-table-viewport {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
+        .products-table {
+          width: 100% !important;
+          min-width: 800px !important;
+        }
+
+        @media (min-width: 769px) and (max-width: 1120px) {
+          .products-table th,
+          .products-table td {
+            padding: 10px 10px !important;
+            font-size: 13px !important;
+          }
+
+          .products-table .product-desc {
+            max-width: 140px !important;
           }
         }
       `}</style>
@@ -480,43 +651,30 @@ export default function AdminProducts() {
               )}
             </div>
 
-            {/* Reorder Categories with left border */}
-            <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px', flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => setCategoryModalOpen(true)}
-                title="Reorder Categories"
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  padding: 0,
-                  borderRadius: '8px',
-                  border: '1px solid var(--border, #cbd5e1)',
-                  backgroundColor: '#FFFFFF',
-                  color: 'var(--primary, #0f172a)',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-              >
-                <ArrowUpDown size={15} style={{ color: 'var(--primary, #0f172a)' }} />
-              </button>
-            </div>
+            {/* Filters Row: Dietary & Reorder */}
+            <div className="products-filters-row">
+              <div className="products-dietary-wrapper">
+                <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
+              </div>
 
-            {/* Dietary Preference (Veg) Filter with left border */}
-            <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px', flexShrink: 0 }}>
-              <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
+              <div className="products-reorder-btn-wrapper">
+                <button
+                  type="button"
+                  onClick={() => setCategoryModalOpen(true)}
+                  title="Reorder Categories"
+                  className="products-reorder-btn"
+                >
+                  <ArrowUpDown size={15} style={{ color: 'var(--primary, #0f172a)' }} />
+                </button>
+              </div>
             </div>
 
             {/* Right Action Buttons */}
-            <div className="products-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
+            <div className="products-actions">
               {/* Upload Menu */}
               <button
                 type="button"
+                className="products-upload-btn"
                 onClick={() => {
                   if (!aiEnabled) {
                     toast.error(aiDisabledReason || 'AI Menu Scanner is currently disabled by administrator.');
@@ -552,6 +710,7 @@ export default function AdminProducts() {
               {/* Counters Drawer */}
               <button
                 type="button"
+                className="products-counters-btn"
                 onClick={() => setCounterDrawerOpen(true)}
                 style={{
                   height: '38px',
@@ -582,7 +741,7 @@ export default function AdminProducts() {
                   setEditingProduct(null);
                   setFormModalOpen(true);
                 }}
-                className="btn btn-primary"
+                className="btn btn-primary products-add-btn"
                 style={{
                   height: '38px',
                   padding: '0 14px',
@@ -603,7 +762,9 @@ export default function AdminProducts() {
               </button>
 
               {/* Maximize Layout Toggle */}
-              <LayoutMaximizeToggle />
+              <div className="products-maximize-wrapper">
+                <LayoutMaximizeToggle />
+              </div>
             </div>
           </div>
         }
@@ -616,7 +777,8 @@ export default function AdminProducts() {
           maxWidth: '100%',
           padding: 0,
           margin: 0,
-          overflow: 'hidden',
+          overflowX: 'auto',
+          overflowY: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
@@ -626,8 +788,8 @@ export default function AdminProducts() {
           background: '#FFFFFF',
         }}
       >
-        <div className="products-table-scroll-hint" aria-hidden="true">Swipe left to view all product details</div>
-        <div className="table-wrapper products-table-viewport" style={{ border: 'none', borderRadius: 0, width: '100%', flex: 1 }}>
+        {/* Desktop Table View */}
+        <div className="table-wrapper products-table-viewport" style={{ border: 'none', borderRadius: 0, width: '100%', flex: 1, overflowX: 'auto' }}>
           {loading ? (
             <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : (
@@ -648,14 +810,10 @@ export default function AdminProducts() {
                   <tr key={p.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <img
-                          src={p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
-                          alt={p.name}
-                          style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }}
-                        />
+                        <ProductImageThumbnail src={p.image_url} alt={p.name} size={40} />
                         <div>
                           <strong style={{ fontWeight: 600, display: 'block' }}>{p.name}</strong>
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span className="product-desc" style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {p.description}
                           </span>
                         </div>
@@ -749,6 +907,157 @@ export default function AdminProducts() {
                 )}
               </tbody>
             </table>
+          )}
+        </div>
+
+        {/* Mobile Product Cards View */}
+        <div className="products-mobile-card-list">
+          {loading ? (
+            <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              No products found matching your filters
+            </div>
+          ) : (
+            filtered.map((p) => (
+              <div
+                key={p.id}
+                className="product-mobile-card"
+                style={{
+                  background: '#FFFFFF',
+                  borderBottom: '1px solid var(--border)',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
+                {/* Top Row: Thumbnail + Details + Price */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <ProductImageThumbnail src={p.image_url} alt={p.name} size={46} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
+                      <strong style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', lineHeight: 1.3 }}>
+                        {p.name}
+                      </strong>
+                      <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>
+                        {formatPrice(p.price)}
+                      </span>
+                    </div>
+
+                    {p.description && (
+                      <p style={{ margin: '2px 0 6px 0', fontSize: '11.5px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {p.description}
+                      </p>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: p.description ? 0 : '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569', background: '#F1F5F9', padding: '2px 7px', borderRadius: '4px' }}>
+                        {p.category}
+                      </span>
+                      {p.counter && (
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#0369A1', background: '#E0F2FE', padding: '2px 7px', borderRadius: '4px' }}>
+                          {p.counter}
+                        </span>
+                      )}
+                      {showOnlineOrdering && (
+                        <span style={{ fontSize: '11px', color: '#64748B', marginLeft: 'auto' }}>
+                          Stock: <strong>{p.stock_quantity}</strong> / {p.buffer_quantity}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row: Availability Status Toggle + Actions */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: '8px',
+                    borderTop: '1px solid #F1F5F9',
+                  }}
+                >
+                  <div>
+                    {!showOnlineOrdering ? (
+                      <button
+                        onClick={() => handleToggleStatus(p.id, p.status)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          outline: 'none',
+                        }}
+                        title={`Click to mark as ${p.status === 'AVAILABLE' ? 'Out of Stock' : 'Available'}`}
+                      >
+                        <div
+                          style={{
+                            position: 'relative',
+                            width: '36px',
+                            height: '20px',
+                            background: p.status === 'AVAILABLE' ? '#10B981' : '#CBD5E1',
+                            borderRadius: '10px',
+                            transition: 'background-color 0.2s ease',
+                          }}
+                        >
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '2px',
+                              left: p.status === 'AVAILABLE' ? '18px' : '2px',
+                              width: '16px',
+                              height: '16px',
+                              background: 'white',
+                              borderRadius: '50%',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                              transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            }}
+                          />
+                        </div>
+                        <span
+                          className={`badge badge-${p.status.toLowerCase().replace(/_/g, '-')}`}
+                          style={{ margin: 0, fontSize: '11px', padding: '2px 8px' }}
+                        >
+                          {p.status.replace(/_/g, ' ')}
+                        </span>
+                      </button>
+                    ) : (
+                      <span
+                        className={`badge badge-${p.status.toLowerCase().replace(/_/g, '-')}`}
+                        style={{ margin: 0, fontSize: '11px', padding: '2px 8px' }}
+                      >
+                        {p.status.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ height: '30px', padding: '0 12px', fontSize: '12px', borderRadius: '6px' }}
+                      onClick={() => {
+                        setEditingProduct(p);
+                        setFormModalOpen(true);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      style={{ height: '30px', padding: '0 10px', fontSize: '12px', borderRadius: '6px' }}
+                      onClick={() => handleDeleteClick(p)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>

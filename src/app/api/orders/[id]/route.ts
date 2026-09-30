@@ -294,7 +294,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       // Update order and trigger billing atomically inside db transaction
-      order = await completeOrderAndBill(restaurant.id, id, status, is_paid, table_number, payment_method);
+      const effectiveIsPaid = (status === 'CANCELLED' || status === 'EXPIRED') ? false : is_paid;
+      order = await completeOrderAndBill(restaurant.id, id, status, effectiveIsPaid, table_number, payment_method);
 
       console.log(`✅ Order Updated: Order #${existing.ticket_number} → Status: ${order.status}, Table: ${order.table_number}, Paid: ${order.is_paid}`);
 

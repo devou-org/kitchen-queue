@@ -8,7 +8,7 @@ import { formatPrice, formatDateTime, getCurrentBusinessDate } from '@/lib/forma
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AnalyticsNav } from '@/components/modules/analytics/AnalyticsNav';
-import { Download, Clock, Receipt, Search, X } from 'lucide-react';
+import { Download, Clock, Receipt, Search, X, MoveHorizontal } from 'lucide-react';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import BillTemplate from '@/components/BillTemplate';
@@ -191,16 +191,7 @@ export default function AdminAnalyticsStatementsPage() {
             width: 100% !important;
           }
 
-          .analytics-page-header .admin-header-left {
-            height: 68px !important;
-            display: flex !important;
-            align-items: stretch !important;
-            flex-wrap: nowrap !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-
+          .analytics-page-header .admin-header-left,
           .analytics-page-header .admin-header-search {
             height: 68px !important;
             display: flex !important;
@@ -269,61 +260,213 @@ export default function AdminAnalyticsStatementsPage() {
             height: 68px !important;
           }
 
-          @media (max-width: 900px) {
-            .analytics-page-header {
+          .statements-kpi-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 12px !important;
+          }
+
+          @media (min-width: 1400px) {
+            .statements-kpi-grid {
+              grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+            }
+          }
+
+          .statements-scroll-hint {
+            display: none !important;
+          }
+
+          @media (max-width: 768px) {
+            .analytics-page-header,
+            .analytics-page-header.admin-page-header-container {
               height: auto !important;
               min-height: auto !important;
-              padding: 8px 16px !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: stretch !important;
+              border-bottom: 1px solid var(--border) !important;
+              background: #FFFFFF !important;
             }
 
             .analytics-page-header .admin-page-header-container,
             .analytics-page-header .admin-header-left,
             .analytics-page-header .admin-header-search {
               height: auto !important;
+              min-height: auto !important;
+              width: 100% !important;
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: stretch !important;
+              padding: 0 !important;
+              margin: 0 !important;
             }
 
             .analytics-toolbar {
               flex-direction: column !important;
               align-items: stretch !important;
-              gap: 10px !important;
+              gap: 0 !important;
               height: auto !important;
+              min-height: auto !important;
+              width: 100% !important;
+              padding: 0 !important;
+              margin: 0 !important;
             }
 
             .analytics-tabs-wrapper {
               width: 100% !important;
+              height: 44px !important;
+              min-height: 44px !important;
+              padding: 0 !important;
               border-bottom: 1px solid var(--border) !important;
-              padding-bottom: 2px !important;
-            }
-
-            .analytics-filters {
-              flex-wrap: wrap !important;
-              width: 100% !important;
+              box-sizing: border-box !important;
+              background: #FFFFFF !important;
             }
 
             .analytics-actions {
               width: 100% !important;
-              margin-left: 0 !important;
-              justify-content: space-between !important;
-              flex-wrap: wrap !important;
               height: auto !important;
+              min-height: auto !important;
+              margin-left: 0 !important;
+              padding: 10px 14px !important;
+              background: #F8FAFC !important;
+              border-bottom: 1px solid var(--border) !important;
+              box-sizing: border-box !important;
+              display: flex !important;
+              align-items: center !important;
             }
 
+            .analytics-filters {
+              width: 100% !important;
+              display: grid !important;
+              grid-template-columns: 1fr 1fr !important;
+              gap: 8px !important;
+              align-items: center !important;
+            }
+
+            .analytics-date-field {
+              display: flex !important;
+              align-items: center !important;
+              gap: 6px !important;
+              width: 100% !important;
+              min-width: 0 !important;
+            }
+
+            .analytics-date-input {
+              width: 100% !important;
+              min-width: 0 !important;
+              height: 36px !important;
+              box-sizing: border-box !important;
+              padding: 0 8px !important;
+              font-size: 12px !important;
+            }
+
+            .analytics-maximize-wrapper {
+              display: none !important;
+            }
+
+            /* Secondary Filter Bar on Mobile */
             .statements-filter-bar {
               flex-direction: column !important;
               align-items: stretch !important;
-              gap: 12px !important;
-              padding: 12px 16px !important;
+              gap: 10px !important;
+              padding: 12px 14px !important;
             }
 
-            .statements-filter-bar > div {
+            .statements-search-control {
               width: 100% !important;
               max-width: 100% !important;
+              min-width: 0 !important;
+            }
+
+            .statements-filter-controls {
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 8px !important;
+              width: 100% !important;
+            }
+
+            .statements-dropdowns-row {
+              display: grid !important;
+              grid-template-columns: 1fr 1fr !important;
+              gap: 8px !important;
+              width: 100% !important;
+            }
+
+            .statements-dropdowns-row > div {
+              width: 100% !important;
+              min-width: 0 !important;
+            }
+
+            .statements-buttons-row {
+              display: grid !important;
+              grid-template-columns: 1fr 1fr !important;
+              gap: 8px !important;
+              width: 100% !important;
+            }
+
+            .statements-buttons-row > button {
+              width: 100% !important;
+              justify-content: center !important;
+            }
+
+            /* KPI Cards on Mobile */
+            .statements-kpi-container {
+              padding: 12px 14px !important;
+            }
+
+            .statements-kpi-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+              gap: 8px !important;
+              margin-bottom: 0 !important;
+            }
+
+            .statements-kpi-grid .stat-card {
+              padding: 10px 12px !important;
+              min-width: 0 !important;
+            }
+
+            .statements-kpi-grid .stat-label {
+              font-size: 11px !important;
+              margin-bottom: 4px !important;
+            }
+
+            .statements-kpi-grid .stat-value {
+              font-size: 16px !important;
+              line-height: 1.2 !important;
+              white-space: nowrap !important;
+              overflow: hidden !important;
+              text-overflow: ellipsis !important;
+            }
+
+            .statements-kpi-grid .stat-card p:last-child {
+              font-size: 10px !important;
+              white-space: nowrap !important;
+              overflow: hidden !important;
+              text-overflow: ellipsis !important;
+              margin-top: 2px !important;
+            }
+
+            .statements-scroll-hint {
+              display: flex !important;
+              align-items: center;
+              gap: 6px;
+              padding: 8px 14px;
+              font-size: 11px;
+              color: #64748B;
+              background: #F8FAFC;
+              border-bottom: 1px solid var(--border);
+            }
+
+            .statements-table {
+              min-width: 760px !important;
             }
           }
         `}</style>
         <AdminPageHeader
           className="analytics-page-header"
-          style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
+          style={{ paddingTop: 0, marginBottom: 0 }}
           hideMaximize={true}
           search={
             <div className="analytics-toolbar">
@@ -335,13 +478,14 @@ export default function AdminAnalyticsStatementsPage() {
               {/* 2. Right Side: Date Range Pickers & Maximize */}
               <div className="analytics-actions">
                 <div className="analytics-filters">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="analytics-date-field">
                     <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>From</span>
                     <input
                       type="date"
                       value={dateFrom}
                       max={dateTo}
                       onChange={(e) => setDateFrom(e.target.value)}
+                      className="analytics-date-input"
                       style={{
                         height: '38px',
                         width: '130px',
@@ -357,13 +501,14 @@ export default function AdminAnalyticsStatementsPage() {
                       }}
                     />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="analytics-date-field">
                     <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>To</span>
                     <input
                       type="date"
                       value={dateTo}
                       min={dateFrom}
                       onChange={(e) => setDateTo(e.target.value)}
+                      className="analytics-date-input"
                       style={{
                         height: '38px',
                         width: '130px',
@@ -382,7 +527,7 @@ export default function AdminAnalyticsStatementsPage() {
                 </div>
 
                 {/* Left Border Separator */}
-                <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <div className="analytics-maximize-wrapper" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                   <LayoutMaximizeToggle />
                 </div>
               </div>
@@ -393,7 +538,7 @@ export default function AdminAnalyticsStatementsPage() {
         {/* Secondary Header: Search Bar & Filters */}
         <div className="statements-filter-bar">
           {/* Search Bar */}
-          <div style={{ position: 'relative', width: '100%', maxWidth: '320px', minWidth: '220px' }}>
+          <div className="statements-search-control" style={{ position: 'relative', width: '100%', maxWidth: '320px', minWidth: '220px' }}>
             <Search
               size={15}
               style={{
@@ -450,94 +595,92 @@ export default function AdminAnalyticsStatementsPage() {
           </div>
 
           {/* Filters & Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <div style={{ width: '140px' }}>
-              <CustomSelect
-                value={statusFilter}
-                onChange={(val) => setStatusFilter(val)}
-                options={[
-                  { value: '', label: 'All Statuses' },
-                  ...allStatuses.map((s) => ({ value: s, label: s })),
-                ]}
-                buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px' }}
-                style={{ width: '140px' }}
-              />
+          <div className="statements-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div className="statements-dropdowns-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '140px' }}>
+                <CustomSelect
+                  value={statusFilter}
+                  onChange={(val) => setStatusFilter(val)}
+                  options={[
+                    { value: '', label: 'All Statuses' },
+                    ...allStatuses.map((s) => ({ value: s, label: s })),
+                  ]}
+                  buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px', width: '100%' }}
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div style={{ width: '135px' }}>
+                <CustomSelect
+                  value={paymentMethodFilter}
+                  onChange={(val) => setPaymentMethodFilter(val)}
+                  options={[
+                    { value: '', label: 'All Methods' },
+                    { value: 'UPI', label: 'UPI' },
+                    { value: 'CASH', label: 'Cash' },
+                    { value: 'CARD', label: 'Card' },
+                  ]}
+                  buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px', width: '100%' }}
+                  style={{ width: '100%' }}
+                />
+              </div>
             </div>
-            <div style={{ width: '135px' }}>
-              <CustomSelect
-                value={paymentMethodFilter}
-                onChange={(val) => setPaymentMethodFilter(val)}
-                options={[
-                  { value: '', label: 'All Methods' },
-                  { value: 'UPI', label: 'UPI' },
-                  { value: 'CASH', label: 'Cash' },
-                  { value: 'CARD', label: 'Card' },
-                ]}
-                buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px' }}
-                style={{ width: '135px' }}
-              />
+
+            <div className="statements-buttons-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={exportCSV}
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#059669',
+                  background: 'rgba(5, 150, 105, 0.08)',
+                  border: '1px solid rgba(5, 150, 105, 0.25)',
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                <Download size={14} /> <span>Export (CSV)</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExpireOldOrders}
+                disabled={expiring}
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#DC2626',
+                  background: 'rgba(220, 38, 38, 0.08)',
+                  border: '1px solid rgba(220, 38, 38, 0.25)',
+                  whiteSpace: 'nowrap',
+                  cursor: expiring ? 'not-allowed' : 'pointer',
+                  opacity: expiring ? 0.6 : 1,
+                  flexShrink: 0,
+                }}
+              >
+                <Clock size={14} /> <span>{expiring ? 'Expiring...' : 'Expire Old'}</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={exportCSV}
-              style={{
-                height: '38px',
-                padding: '0 14px',
-                borderRadius: '8px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#059669',
-                background: 'rgba(5, 150, 105, 0.08)',
-                border: '1px solid rgba(5, 150, 105, 0.25)',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              <Download size={14} /> <span>Export (CSV)</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleExpireOldOrders}
-              disabled={expiring}
-              style={{
-                height: '38px',
-                padding: '0 14px',
-                borderRadius: '8px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#DC2626',
-                background: 'rgba(220, 38, 38, 0.08)',
-                border: '1px solid rgba(220, 38, 38, 0.25)',
-                whiteSpace: 'nowrap',
-                cursor: expiring ? 'not-allowed' : 'pointer',
-                opacity: expiring ? 0.6 : 1,
-                flexShrink: 0,
-              }}
-            >
-              <Clock size={14} /> <span>{expiring ? 'Expiring...' : 'Expire Old'}</span>
-            </button>
           </div>
         </div>
 
         <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
 
         {/* Summary Cards */}
-        <div style={{ padding: '16px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: '12px',
-              marginBottom: '12px',
-            }}
-          >
+        <div className="statements-kpi-container" style={{ padding: '16px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+          <div className="statements-kpi-grid">
             <div className="stat-card" style={{ borderLeftColor: 'var(--text-primary)', background: '#FFFFFF' }}>
               <p className="stat-label">Total Revenue</p>
               <h3 className="stat-value" style={{ color: 'var(--text-primary)' }}>
@@ -581,7 +724,7 @@ export default function AdminAnalyticsStatementsPage() {
               </div>
             )}
 
-            {restaurant?.gst_type === 'NONE' && (
+            {(!restaurant?.gst_type || restaurant?.gst_type === 'NONE') && (
               <div className="stat-card" style={{ borderLeftColor: '#6B7280', background: '#FFFFFF' }}>
                 <p className="stat-label">GST</p>
                 <h3 className="stat-value" style={{ color: '#6B7280' }}>
@@ -592,16 +735,7 @@ export default function AdminAnalyticsStatementsPage() {
                 </p>
               </div>
             )}
-          </div>
 
-          {/* Collections & Orders Count Cards */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: '12px',
-            }}
-          >
             <div className="stat-card" style={{ borderLeftColor: '#059669', background: '#FFFFFF' }}>
               <p className="stat-label">Gross Paid</p>
               <h3 className="stat-value" style={{ color: '#059669' }}>
@@ -634,13 +768,17 @@ export default function AdminAnalyticsStatementsPage() {
 
         {/* Orders Table - Flush with sidebar & header, no outer margin, no border-radius */}
         <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflow: 'hidden', borderRadius: 0, margin: 0, padding: 0 }}>
+          <div className="statements-scroll-hint" aria-hidden="true">
+            <MoveHorizontal size={13} style={{ flexShrink: 0 }} />
+            <span>Swipe horizontally to view full order columns</span>
+          </div>
           <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
             {loading ? (
               <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}>
                 <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="statements-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
                     <th style={{ paddingLeft: '20px' }}>Ticket</th>

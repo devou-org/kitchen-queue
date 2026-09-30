@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
-import { 
-  Gift, Users, Award, TrendingUp, Search, RefreshCw, Plus, 
-  Settings, History, Edit2, Trash2, CheckCircle2, 
+import {
+  Gift, Users, Award, TrendingUp, Search, RefreshCw, Plus,
+  Settings, History, Edit2, Trash2, CheckCircle2,
   XCircle, Clock, AlertCircle, ShoppingBag, Filter, X, Loader2, Sparkles
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -337,7 +337,7 @@ export default function AdminLoyaltyPage() {
           },
         }}
       />
-      
+
       <style>{`
         .loyalty-page-header,
         .loyalty-page-header.admin-page-header-container {
@@ -477,32 +477,63 @@ export default function AdminLoyaltyPage() {
           font-weight: 700;
           margin-left: 6px;
         }
+        .loyalty-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+          height: 68px !important;
+        }
 
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
           .loyalty-page-header,
           .loyalty-page-header.admin-page-header-container {
             height: auto !important;
             min-height: auto !important;
-            flex-direction: column !important;
-            padding: 0 12px !important;
-            margin-bottom: 16px !important;
-          }
-          .loyalty-page-header .admin-page-header-container {
-            height: auto !important;
-            min-height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: flex !important;
             flex-direction: column !important;
             align-items: stretch !important;
-            gap: 8px !important;
+            border-bottom: 1px solid var(--border, #e2e8f0) !important;
+            background: #FFFFFF !important;
           }
-          .loyalty-page-header .admin-header-left {
-            height: 48px !important;
+
+          .loyalty-page-header .admin-page-header-container,
+          .loyalty-page-header .admin-header-left,
+          .loyalty-page-header .admin-header-search {
+            height: auto !important;
+            min-height: auto !important;
             width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
-          .loyalty-page-header .admin-header-right {
+
+          .loyalty-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
             width: 100% !important;
-            margin-left: 0 !important;
-            padding: 4px 0 8px 0 !important;
-            justify-content: space-between !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          .loyalty-tabs-wrapper {
+            width: 100% !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            padding: 0 !important;
+            border-bottom: 1px solid var(--border, #e2e8f0) !important;
+            box-sizing: border-box !important;
+            background: #FFFFFF !important;
+            overflow-x: auto !important;
           }
           .loyalty-toolbar {
             flex-direction: column !important;
@@ -521,6 +552,20 @@ export default function AdminLoyaltyPage() {
             flex-wrap: wrap !important;
             height: auto !important;
           }
+
+          .loyalty-actions button {
+            flex: 1 !important;
+            justify-content: center !important;
+          }
+
+          .loyalty-maximize-wrapper {
+            display: none !important;
+          }
+
+          .loyalty-content-container {
+            padding: 14px 16px !important;
+          }
+
           .loyalty-metrics-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 8px !important;
@@ -537,12 +582,6 @@ export default function AdminLoyaltyPage() {
           .loyalty-metric-subtext {
             font-size: 10px !important;
           }
-          .loyalty-nav-item {
-            height: 48px !important;
-            padding: 0 10px !important;
-            font-size: 12px !important;
-            gap: 4px !important;
-          }
           .loyalty-grid-2col {
             grid-template-columns: 1fr !important;
           }
@@ -554,9 +593,6 @@ export default function AdminLoyaltyPage() {
           .rewards-grid {
             grid-template-columns: 1fr !important;
           }
-        }
-
-        @media (max-width: 768px) {
           .loyalty-table-desktop {
             display: none !important;
           }
@@ -575,7 +611,7 @@ export default function AdminLoyaltyPage() {
       `}</style>
 
       {/* Header Toolbar with Inline Navigation Tabs */}
-      <AdminPageHeader 
+      <AdminPageHeader
         className="loyalty-page-header"
         style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
         hideMaximize={true}
@@ -800,7 +836,7 @@ export default function AdminLoyaltyPage() {
                 }}
               />
               {customerSearch && (
-                <button 
+                <button
                   onClick={() => setCustomerSearch('')}
                   style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
                 >
@@ -860,13 +896,13 @@ export default function AdminLoyaltyPage() {
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <div style={{ flex: 1, height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', maxWidth: '100px' }}>
-                            <div 
-                              style={{ 
-                                height: '100%', 
-                                width: `${Math.min(100, ((c.visit_progress || 0) / (settings.visit_milestone_count || 5)) * 100)}%`, 
-                                background: '#2563eb', 
-                                borderRadius: '4px' 
-                              }} 
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${Math.min(100, ((c.visit_progress || 0) / (settings.visit_milestone_count || 5)) * 100)}%`,
+                                background: '#2563eb',
+                                borderRadius: '4px'
+                              }}
                             />
                           </div>
                           <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
@@ -1302,7 +1338,7 @@ export default function AdminLoyaltyPage() {
                         {tx.customer_name} ({tx.phone})
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <span 
+                        <span
                           style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
@@ -1346,7 +1382,7 @@ export default function AdminLoyaltyPage() {
                 <X size={18} />
               </button>
             </div>
-            
+
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
               Customer: <strong>{selectedCustomer.name}</strong> ({selectedCustomer.phone})
             </p>
