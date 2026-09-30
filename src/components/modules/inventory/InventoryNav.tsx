@@ -129,6 +129,20 @@ export function InventoryNav({ inHeader = false }: InventoryNavProps = {}) {
           background-color: color-mix(in srgb, var(--primary, #E11D48) 9%, transparent);
           border-top: 3.5px solid var(--primary, #E11D48);
         }
+
+        @media (max-width: 768px) {
+          .inventory-nav-scroll {
+            height: 44px !important;
+            min-height: 44px !important;
+            width: 100% !important;
+          }
+          .inventory-nav-item {
+            height: 44px !important;
+            min-height: 44px !important;
+            padding: 0 16px !important;
+            font-size: 13px !important;
+          }
+        }
       `}</style>
       <div className="inventory-nav-scroll">
         {tabs.map((tab) => {

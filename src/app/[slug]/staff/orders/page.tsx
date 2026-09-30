@@ -261,7 +261,7 @@ export default function StaffOrders() {
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
-        is_paid: newStatus === 'PAID' ? true : undefined,
+        is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
         payment_method: pMethod || undefined
       });
@@ -273,7 +273,7 @@ export default function StaffOrders() {
             status: newStatus as Order['status'],
             table_number: tableNumber ?? o.table_number,
             payment_method: pMethod ?? o.payment_method,
-            is_paid: newStatus === 'PAID' ? true : o.is_paid
+            is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
           } : o)
             .filter(o => {
               if (statusFilter) return o.status === statusFilter;
@@ -285,7 +285,7 @@ export default function StaffOrders() {
           status: newStatus as Order['status'],
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
-          is_paid: newStatus === 'PAID' ? true : prev.is_paid
+          is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
         toast.success(`Order updated to ${newStatus}`);
       } else {

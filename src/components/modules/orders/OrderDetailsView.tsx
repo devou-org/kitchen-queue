@@ -138,7 +138,27 @@ export function OrderDetailsView({
     if (!tempTableNumber && !order.table_number) return;
     setActionLoading(true);
     try {
-      await onStatusChange(order.id, tempStatus, tempTableNumber, paymentMethod);
+      await onStatusChange(order.id, order.status, tempTableNumber, paymentMethod);
+      setOrder((prev) => ({ ...prev, table_number: tempTableNumber }));
+      toast.success('Table updated');
+    } catch {
+      toast.error('Failed to update table');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!window.confirm(`Are you sure you want to cancel Order #${String(order.ticket_number).padStart(3, '0')}?`)) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await onStatusChange(order.id, 'CANCELLED', tempTableNumber || order.table_number, paymentMethod);
+      setOrder((prev) => ({ ...prev, status: 'CANCELLED', is_paid: false }));
+      toast.success('Order cancelled');
+    } catch {
+      toast.error('Failed to cancel order');
     } finally {
       setActionLoading(false);
     }
@@ -899,93 +919,69 @@ export function OrderDetailsView({
         }}
       >
 
-        {/* SECTION: STATUS & TABLE CONTROLS */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '10px' }}>
-            Status & Table
+        {/* SECTION: TABLE ASSIGNMENT */}
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '8px' }}>
+            Assigned Table
           </div>
 
-          {/* Status Select */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              Status
-            </label>
+          <div style={{ display: 'flex', gap: '6px' }}>
             <CustomSelect
-              value={tempStatus}
+              style={{ flex: 1 }}
+              value={tempTableNumber}
               disabled={actionLoading || loading}
-              onChange={(val) => {
-                setTempStatus(val);
-                handleUpdateStatus(val);
-              }}
+              onChange={(val) => setTempTableNumber(val)}
               direction="auto"
-              options={allStatuses.map((s) => ({ value: s, label: s }))}
+              options={[
+                { value: '', label: '-- No Table --' },
+                ...tables
+                  .filter((t: any) => {
+                    const partySize = Number(order.party_size) || 1;
+                    const check = checkTableAssignment(t, partySize, {
+                      orderId: order.id,
+                      phone: order.phone,
+                      customerName: order.customer_name,
+                    });
+                    const isCurrent = t.table_number === tempTableNumber;
+                    return check.allowed || isCurrent;
+                  })
+                  .map((t: any) => {
+                    const partySize = Number(order.party_size) || 1;
+                    const check = checkTableAssignment(t, partySize, {
+                      orderId: order.id,
+                      phone: order.phone,
+                      customerName: order.customer_name,
+                    });
+                    const cap = Number(t.capacity) || 0;
+                    const seated = check.occupiedSeats;
+                    const rawNum = String(t.table_number || '').trim();
+                    let tableLabel = rawNum;
+                    if (/^\d+$/.test(rawNum)) {
+                      tableLabel = `T${rawNum}`;
+                    } else if (rawNum.toLowerCase().startsWith('t-')) {
+                      tableLabel = `T-${rawNum.slice(2)}`;
+                    }
+                    const freeSeats = Math.max(0, cap - seated);
+
+                    return {
+                      value: String(t.table_number),
+                      label: `${tableLabel} · ${seated}/${cap} (${freeSeats} free)`,
+                    };
+                  }),
+                ...(tempTableNumber && !tables.some((t: any) => String(t.table_number) === String(tempTableNumber))
+                  ? [{ value: tempTableNumber, label: `Table ${tempTableNumber}` }]
+                  : []),
+              ]}
               buttonStyle={{ height: '36px', fontSize: '13px' }}
             />
-          </div>
-
-          {/* Table Select */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              Assigned Table
-            </label>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <CustomSelect
-                style={{ flex: 1 }}
-                value={tempTableNumber}
-                disabled={actionLoading || loading}
-                onChange={(val) => setTempTableNumber(val)}
-                direction="auto"
-                options={[
-                  { value: '', label: '-- No Table --' },
-                  ...tables
-                    .filter((t: any) => {
-                      const partySize = Number(order.party_size) || 1;
-                      const check = checkTableAssignment(t, partySize, {
-                        orderId: order.id,
-                        phone: order.phone,
-                        customerName: order.customer_name,
-                      });
-                      const isCurrent = t.table_number === tempTableNumber;
-                      return check.allowed || isCurrent;
-                    })
-                    .map((t: any) => {
-                      const partySize = Number(order.party_size) || 1;
-                      const check = checkTableAssignment(t, partySize, {
-                        orderId: order.id,
-                        phone: order.phone,
-                        customerName: order.customer_name,
-                      });
-                      const cap = Number(t.capacity) || 0;
-                      const seated = check.occupiedSeats;
-                      const rawNum = String(t.table_number || '').trim();
-                      let tableLabel = rawNum;
-                      if (/^\d+$/.test(rawNum)) {
-                        tableLabel = `T${rawNum}`;
-                      } else if (rawNum.toLowerCase().startsWith('t-')) {
-                        tableLabel = `T-${rawNum.slice(2)}`;
-                      }
-                      const freeSeats = Math.max(0, cap - seated);
-
-                      return {
-                        value: String(t.table_number),
-                        label: `${tableLabel} · ${seated}/${cap} (${freeSeats} free)`,
-                      };
-                    }),
-                  ...(tempTableNumber && !tables.some((t: any) => String(t.table_number) === String(tempTableNumber))
-                    ? [{ value: tempTableNumber, label: `Table ${tempTableNumber}` }]
-                    : []),
-                ]}
-                buttonStyle={{ height: '36px', fontSize: '13px' }}
-              />
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={handleUpdateTable}
-                disabled={actionLoading || loading || tempTableNumber === (order.table_number || '')}
-                style={{ height: '36px', padding: '0 12px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '8px' }}
-              >
-                Save
-              </button>
-            </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleUpdateTable}
+              disabled={actionLoading || loading || tempTableNumber === (order.table_number || '')}
+              style={{ height: '36px', padding: '0 14px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', borderRadius: '8px' }}
+            >
+              Save
+            </button>
           </div>
         </div>
 
@@ -1476,6 +1472,36 @@ export function OrderDetailsView({
             <p style={{ margin: 0, fontSize: '12px', color: '#92400E', fontStyle: 'italic', lineHeight: 1.4 }}>
               "{order.notes}"
             </p>
+          </div>
+        )}
+
+        {/* ACTION: CANCEL ORDER (if active) */}
+        {order.status !== 'CANCELLED' && (
+          <div style={{ padding: '16px 20px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'flex-end', background: '#FAFAFA' }}>
+            <button
+              type="button"
+              onClick={handleCancelOrder}
+              disabled={actionLoading || loading}
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #FECACA',
+                borderRadius: '8px',
+                color: '#DC2626',
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '7px 14px',
+                cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#FFFFFF'; }}
+            >
+              <X size={13} />
+              <span>Cancel Order</span>
+            </button>
           </div>
         )}
       </div>
