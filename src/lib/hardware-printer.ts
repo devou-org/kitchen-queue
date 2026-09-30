@@ -701,7 +701,8 @@ export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise
   message?: string;
 }> {
   const ticketNo = options.kotData?.ticketNumber;
-  if (ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName)) {
+  const isAddOn = Boolean(options.kotData?.isAddOn);
+  if (!isAddOn && ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName)) {
     console.warn(`[HardwarePrinter] Duplicate print suppressed for Ticket #${ticketNo} (${options.counterName || options.counterId || 'ALL'})`);
     return Promise.resolve({
       success: true,

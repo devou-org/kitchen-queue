@@ -323,8 +323,8 @@ export default function AdminLoyaltyPage() {
 
   return (
     <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
-      <Toaster
-        position="top-right"
+      <Toaster 
+        position="top-right" 
         containerStyle={{
           position: 'fixed',
           top: 20,
@@ -404,51 +404,68 @@ export default function AdminLoyaltyPage() {
           overflow-x: auto !important;
         }
 
-        .loyalty-nav-bar {
+        .loyalty-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+          height: 68px !important;
+        }
+
+        .loyalty-nav-scroll {
           display: flex;
           align-items: stretch;
+          gap: 0;
           overflow-x: auto;
           overscroll-behavior-x: contain;
           -webkit-overflow-scrolling: touch;
           touch-action: pan-x;
-          scrollbar-width: none;
-          -ms-overflow-style: none;
+          border-top: none;
           height: 100%;
-          gap: 0;
           padding: 0;
           margin: 0;
+          border-bottom: none;
+          background-color: transparent;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          box-sizing: border-box;
+          position: relative;
         }
-        .loyalty-nav-bar::-webkit-scrollbar {
+        .loyalty-nav-scroll::-webkit-scrollbar {
           display: none;
         }
         .loyalty-nav-item {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
+          justify-content: center;
+          height: 100%;
+          box-sizing: border-box;
           padding: 0 20px;
+          border-radius: 0;
           font-size: 13.5px;
           font-weight: 500;
           color: #475569;
-          background: transparent;
+          text-decoration: none;
+          white-space: nowrap;
+          flex-shrink: 0;
+          cursor: pointer;
           border: none;
           border-top: 3.5px solid transparent;
-          cursor: pointer;
-          white-space: nowrap;
+          margin-top: 0;
+          background-color: transparent;
           transition: all 0.15s ease-in-out;
-          flex-shrink: 0;
-          height: 100%;
-          user-select: none;
-          touch-action: manipulation;
         }
-        .loyalty-nav-item:hover:not(.active) {
-          color: #0f172a;
+        .loyalty-nav-item:hover:not(.loyalty-nav-item--active) {
+          color: #0F172A;
           background-color: rgba(0, 0, 0, 0.035);
         }
-        .loyalty-nav-item.active {
+        .loyalty-nav-item--active {
           font-weight: 600;
-          color: var(--primary, #059669);
-          background-color: color-mix(in srgb, var(--primary, #059669) 9%, transparent);
-          border-top: 3.5px solid var(--primary, #059669);
+          color: var(--primary, #971345);
+          background-color: color-mix(in srgb, var(--primary, #971345) 9%, transparent);
+          border-top: 3.5px solid var(--primary, #971345);
         }
         .loyalty-badge {
           display: inline-flex;
@@ -458,6 +475,7 @@ export default function AdminLoyaltyPage() {
           border-radius: 12px;
           font-size: 11px;
           font-weight: 700;
+          margin-left: 6px;
         }
         .loyalty-actions {
           display: flex !important;
@@ -517,32 +535,22 @@ export default function AdminLoyaltyPage() {
             background: #FFFFFF !important;
             overflow-x: auto !important;
           }
-
-          .loyalty-nav-bar {
-            height: 44px !important;
-            min-height: 44px !important;
-            width: 100% !important;
+          .loyalty-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            height: auto !important;
           }
-
-          .loyalty-nav-item {
-            height: 44px !important;
-            min-height: 44px !important;
-            padding: 0 14px !important;
-            font-size: 13px !important;
-          }
-
-          .loyalty-actions {
+          .loyalty-tabs-wrapper {
             width: 100% !important;
             height: auto !important;
-            min-height: auto !important;
+          }
+          .loyalty-actions {
+            width: 100% !important;
             margin-left: 0 !important;
-            padding: 10px 14px !important;
-            background: #F8FAFC !important;
-            border-bottom: 1px solid var(--border, #e2e8f0) !important;
-            box-sizing: border-box !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 8px !important;
+            justify-content: flex-start !important;
+            flex-wrap: wrap !important;
+            height: auto !important;
           }
 
           .loyalty-actions button {
@@ -605,49 +613,53 @@ export default function AdminLoyaltyPage() {
       {/* Header Toolbar with Inline Navigation Tabs */}
       <AdminPageHeader
         className="loyalty-page-header"
-        style={{ paddingTop: 0, marginBottom: 0 }}
+        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="loyalty-toolbar">
             <div className="loyalty-tabs-wrapper">
-              <div className="loyalty-nav-bar">
+              <div className="loyalty-nav-scroll">
                 <button
+                  type="button"
                   onClick={() => setActiveTab('customers')}
-                  className={`loyalty-nav-item ${activeTab === 'customers' ? 'active' : ''}`}
+                  className={`loyalty-nav-item ${activeTab === 'customers' ? 'loyalty-nav-item--active' : ''}`}
                 >
-                  <Users size={16} />
+                  <Users size={15} style={{ marginRight: '6px' }} />
                   <span>Customers</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? '#dcfce7' : '#f1f5f9', color: activeTab === 'customers' ? '#15803d' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {customers.length}
                   </span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setActiveTab('settings')}
-                  className={`loyalty-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+                  className={`loyalty-nav-item ${activeTab === 'settings' ? 'loyalty-nav-item--active' : ''}`}
                 >
-                  <Settings size={16} />
+                  <Settings size={15} style={{ marginRight: '6px' }} />
                   <span>Rules</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setActiveTab('rewards')}
-                  className={`loyalty-nav-item ${activeTab === 'rewards' ? 'active' : ''}`}
+                  className={`loyalty-nav-item ${activeTab === 'rewards' ? 'loyalty-nav-item--active' : ''}`}
                 >
-                  <Gift size={16} />
+                  <Gift size={15} style={{ marginRight: '6px' }} />
                   <span>Rewards</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? '#dcfce7' : '#f1f5f9', color: activeTab === 'rewards' ? '#15803d' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {rewards.length}
                   </span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setActiveTab('transactions')}
-                  className={`loyalty-nav-item ${activeTab === 'transactions' ? 'active' : ''}`}
+                  className={`loyalty-nav-item ${activeTab === 'transactions' ? 'loyalty-nav-item--active' : ''}`}
                 >
-                  <History size={16} />
+                  <History size={15} style={{ marginRight: '6px' }} />
                   <span>Audit Log</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? '#dcfce7' : '#f1f5f9', color: activeTab === 'transactions' ? '#15803d' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {transactions.length}
                   </span>
                 </button>
@@ -661,18 +673,20 @@ export default function AdminLoyaltyPage() {
                   onClick={(e) => handleSaveSettings(e as any)}
                   disabled={isSavingSettings}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
                     height: '38px',
-                    padding: '0 16px',
+                    padding: '0 14px',
                     borderRadius: '8px',
-                    background: 'var(--primary, #059669)',
-                    color: 'white',
-                    fontSize: '13px',
+                    background: 'var(--primary, #971345)',
+                    color: '#FFFFFF',
+                    fontSize: '12px',
                     fontWeight: 700,
                     border: 'none',
                     cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
                     opacity: isSavingSettings ? 0.7 : 1,
                   }}
                 >
@@ -683,6 +697,7 @@ export default function AdminLoyaltyPage() {
 
               {activeTab === 'rewards' && (
                 <button
+                  type="button"
                   onClick={() => {
                     setEditingReward(null);
                     setRewardForm({
@@ -697,57 +712,63 @@ export default function AdminLoyaltyPage() {
                     setShowRewardModal(true);
                   }}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
                     height: '38px',
-                    padding: '0 16px',
+                    padding: '0 14px',
                     borderRadius: '8px',
-                    background: 'var(--primary, #059669)',
-                    color: 'white',
-                    fontSize: '13px',
+                    background: 'var(--primary, #971345)',
+                    color: '#FFFFFF',
+                    fontSize: '12px',
                     fontWeight: 700,
                     border: 'none',
                     cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
                   }}
                 >
-                  <Plus size={15} /> <span>Add New Reward</span>
+                  <Plus size={15} />
+                  <span>Add New Reward</span>
                 </button>
               )}
 
-              <button
-                onClick={() => fetchData()}
-                title="Refresh Loyalty Data"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  height: '38px',
-                  padding: '0 14px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border, #cbd5e1)',
-                  background: 'white',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: '#334155',
-                  cursor: 'pointer',
-                }}
-              >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-
-              <div className="loyalty-maximize-wrapper" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
-                <LayoutMaximizeToggle />
+              {/* Refresh Button with Left Border Separator, matching Inventory */}
+              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <button
+                  type="button"
+                  onClick={() => fetchData()}
+                  title="Refresh Loyalty Data"
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    padding: 0,
+                    borderRadius: '8px',
+                    border: '1px solid var(--border, #E2E8F0)',
+                    background: '#FFFFFF',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0,
+                  }}
+                >
+                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                </button>
               </div>
+
+              {/* Maximize Layout Toggle */}
+              <LayoutMaximizeToggle />
             </div>
           </div>
         }
       />
 
-      <div className="loyalty-content-container" style={{ padding: '24px 32px' }}>
-
-      {/* Metrics Row */}
+      <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        {/* Metrics Row */}
       <div className="loyalty-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
