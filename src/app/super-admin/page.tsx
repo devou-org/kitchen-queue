@@ -31,7 +31,7 @@ type Restaurant = {
 
 type ModalMode = 'create' | 'edit' | null;
 
-const EMPTY_FORM = { name: '', slug: '', phone: '', address_street: '', address_city: '', address_state: '', address_zip: '', address_country: '', logo_url: '', primary_color: '#800020', secondary_color: '#ecfdf5', timezone: 'Asia/Kolkata', opening_time: '09:00:00', closing_time: '22:00:00', rollover_time: '00:00:00', modules: [] as string[] };
+const EMPTY_FORM = { name: '', slug: '', phone: '', address_street: '', address_city: '', address_state: '', address_zip: '', address_country: '', logo_url: '', primary_color: '#800020', secondary_color: '#ffffff', timezone: 'Asia/Kolkata', opening_time: '09:00:00', closing_time: '22:00:00', rollover_time: '00:00:00', modules: [] as string[] };
 
 export default function SuperAdminDashboard() {
   const router = useRouter();

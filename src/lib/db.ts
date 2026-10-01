@@ -587,9 +587,10 @@ export async function createRestaurant(data: {
 }) {
   let restaurant: any = null;
   try {
+    const secondaryColor = (data.secondary_color && data.secondary_color.toUpperCase() !== '#EC7951') ? data.secondary_color : '#ffffff';
     const rows = await sql`
       INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate)
-      VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'}, ${data.timezone || 'Asia/Kolkata'}, ${data.opening_time || '09:00:00'}, ${data.closing_time || '22:00:00'}, ${data.rollover_time || '00:00:00'}, ${data.gst_type || 'NONE'}, ${data.gst_number || null}, ${data.gst_rate || 5.00})
+      VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${secondaryColor}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'}, ${data.timezone || 'Asia/Kolkata'}, ${data.opening_time || '09:00:00'}, ${data.closing_time || '22:00:00'}, ${data.rollover_time || '00:00:00'}, ${data.gst_type || 'NONE'}, ${data.gst_number || null}, ${data.gst_rate || 5.00})
       RETURNING *
     `;
     restaurant = rows[0];
@@ -597,10 +598,11 @@ export async function createRestaurant(data: {
     if (error.message?.includes('column') || error.message?.includes('does not exist')) {
       console.log("Missing menu columns detected in createRestaurant. Attempting auto-migration...");
       await runAutoMigration(sql);
+      const secondaryColor = (data.secondary_color && data.secondary_color.toUpperCase() !== '#EC7951') ? data.secondary_color : '#ffffff';
       try {
         const rows = await sql`
           INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description)
-          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
+          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${secondaryColor}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
           RETURNING *
         `;
         restaurant = rows[0];
@@ -608,7 +610,7 @@ export async function createRestaurant(data: {
         // Safe fallback without custom columns
         const rows = await sql`
           INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout)
-          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'})
+          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${secondaryColor}, ${data.menu_layout || 'LIST'})
           RETURNING *
         `;
         restaurant = rows[0];
@@ -1450,6 +1452,39 @@ export async function createOrder(data: {
     const updatedCount = Number(reserveResult.rows[0]?.updated_count || 0);
 
     if (updatedCount !== requestedCount) {
+      const stockCheck = await client.query(
+        `
+          SELECT 
+            r.pid AS product_id,
+            r.qty AS requested_qty,
+            p.name,
+            COALESCE(p.stock_quantity, 0) AS current_stock,
+            p.is_active
+          FROM unnest($1::uuid[], $2::int[]) AS r(pid, qty)
+          LEFT JOIN products p ON p.id = r.pid
+        `,
+        [productIds, quantities]
+      );
+
+      const issues: string[] = [];
+      for (const row of stockCheck.rows) {
+        const reqQty = Number(row.requested_qty || 0);
+        const name = row.name || 'Selected item';
+        const isAvailable = Boolean(row.name && row.is_active);
+        const availStock = Number(row.current_stock ?? 0);
+
+        if (!isAvailable) {
+          issues.push(`"${name}" is no longer available`);
+        } else if (availStock <= 0) {
+          issues.push(`"${name}" is out of stock (0 available)`);
+        } else if (availStock < reqQty) {
+          issues.push(`"${name}" only has ${availStock} available (${reqQty} requested)`);
+        }
+      }
+
+      if (issues.length > 0) {
+        throw new Error(issues.join(' • '));
+      }
       throw new Error('One or more items are out of stock or no longer available.');
     }
 

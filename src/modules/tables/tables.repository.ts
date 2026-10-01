@@ -44,6 +44,8 @@ export class TablesRepository {
                'status', o.status,
                'order_type', o.order_type,
                'notes', o.notes,
+               'is_paid', o.is_paid,
+               'payment_method', o.payment_method,
                'pending_at', o.pending_at,
                'preparing_at', o.preparing_at,
                'ready_at', o.ready_at,
