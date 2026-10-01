@@ -318,14 +318,21 @@ export default function StaffMenuPage() {
     const product = products.find(p => p.id === id);
     if (!product) return;
 
-    if (delta > 0 && product.status === 'OUT_OF_STOCK') {
-      toast.error('This item is out of stock');
+    const currentStock = typeof product.stock_quantity === 'number' ? product.stock_quantity : null;
+
+    if (delta > 0 && (product.status === 'OUT_OF_STOCK' || (currentStock !== null && currentStock <= 0))) {
+      toast.error(`"${product.name}" is out of stock (0 available)`);
       return;
     }
 
     const newCart = new Map(cart);
     const existing = newCart.get(id);
     const newQty = (existing?.quantity || 0) + delta;
+
+    if (delta > 0 && currentStock !== null && newQty > currentStock) {
+      toast.error(`"${product.name}" only has ${currentStock} available`);
+      return;
+    }
 
     if (newQty <= 0) {
       newCart.delete(id);
@@ -348,6 +355,24 @@ export default function StaffMenuPage() {
     const isTakeaway = orderForm.order_type === 'TAKEAWAY';
     if (!isTakeaway && !orderForm.customer_name && !orderForm.table_number) {
       return toast.error('Please provide a Customer Name or Table Number');
+    }
+
+    // Pre-validate cart items against current product stock
+    const stockErrors: string[] = [];
+    for (const [productId, cartItem] of cart.entries()) {
+      const prod = products.find(p => p.id === productId);
+      if (prod) {
+        const avail = typeof prod.stock_quantity === 'number' ? prod.stock_quantity : null;
+        if (prod.status === 'OUT_OF_STOCK' || (avail !== null && avail <= 0)) {
+          stockErrors.push(`"${prod.name}" is out of stock (0 available)`);
+        } else if (avail !== null && cartItem.quantity > avail) {
+          stockErrors.push(`"${prod.name}" only has ${avail} available (${cartItem.quantity} selected)`);
+        }
+      }
+    }
+    if (stockErrors.length > 0) {
+      toast.error(stockErrors.join(' • '));
+      return;
     }
 
     setSubmitting(true);

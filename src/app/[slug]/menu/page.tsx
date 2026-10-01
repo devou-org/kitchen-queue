@@ -595,14 +595,21 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
       : product.status;
 
-    if (delta > 0 && pStatus === 'OUT_OF_STOCK') {
-      toast.error('This item is out of stock');
+    const currentStock = typeof product.stock_quantity === 'number' ? product.stock_quantity : null;
+
+    if (delta > 0 && (pStatus === 'OUT_OF_STOCK' || (currentStock !== null && currentStock <= 0))) {
+      toast.error(`"${product.name}" is out of stock (0 available)`);
       return;
     }
 
     const newCart = new Map(cart);
     const existing = newCart.get(id);
     const newQty = (existing?.quantity || 0) + delta;
+
+    if (delta > 0 && currentStock !== null && newQty > currentStock) {
+      toast.error(`"${product.name}" only has ${currentStock} available`);
+      return;
+    }
 
     if (newQty <= 0) {
       newCart.delete(id);
