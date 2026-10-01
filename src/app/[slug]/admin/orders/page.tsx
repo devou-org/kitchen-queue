@@ -375,9 +375,11 @@ export default function AdminOrders() {
           counterName: data.counter_name,
           isAutoPrint: true,
         });
+
+        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${data.counter_name} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
-            id: `print-${data.order_id}-${data.counter_name}`,
+          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
           });
         } else {
           toast.error(result.message || '⚠️ Thermal printer not paired. Tap "Pair Printer" at the top.', {

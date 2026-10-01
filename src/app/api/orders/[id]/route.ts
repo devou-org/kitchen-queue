@@ -95,10 +95,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ success: false, error: 'No items provided' }, { status: 400 });
       }
       
-      // ... rest of the customer logic
-
       // 🛡️ SECURITY FIX: Enforce that customers CANNOT remove items or decrease quantities.
-      // E.g., someone intercepting the API request to delete items after the kitchen started cooking.
       const existingQtyMap = new Map<string, number>();
       for (const item of (existing.items || [])) {
         existingQtyMap.set(item.product_id, (existingQtyMap.get(item.product_id) || 0) + Number(item.quantity));
@@ -231,13 +228,35 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           }
 
           if (deltas.length > 0) {
-            const products = await sql`SELECT id, name FROM products WHERE id = ANY(${Array.from(productIdsToFetch)})` as {id: string, name: string}[];
-            const nameMap = new Map<string, string>((products || []).map((p: {id: string, name: string}) => [p.id, p.name]));
+            const products = await sql`SELECT id, name, counter FROM products WHERE id = ANY(${Array.from(productIdsToFetch)})` as {id: string, name: string, counter?: string}[];
+            const prodMap = new Map<string, {id: string, name: string, counter?: string}>((products || []).map(p => [p.id, p]));
             
-            addedItemsList = deltas.map(d => ({
-              product_name: (nameMap.get(d.product_id) || 'Unknown Item') as string,
-              quantity: d.quantity
+            const kotAddOnItems = deltas.map(d => {
+              const p = prodMap.get(d.product_id);
+              return {
+                product_name: (p?.name || 'Unknown Item') as string,
+                counter: (p?.counter && p.counter.trim()) ? p.counter.trim() : 'Kitchen',
+                quantity: d.quantity,
+              };
+            });
+
+            addedItemsList = kotAddOnItems.map(d => ({
+              product_name: d.product_name,
+              quantity: d.quantity,
             }));
+
+            // 🖨️ AUTO-PRINT RUNNING KOT: If and only if items were added to an already active/preparing order
+            if (existing.status !== 'PENDING' && kotAddOnItems.length > 0) {
+              try {
+                await autoQueueAndBroadcastKot(restaurant.id, id, {
+                  isAddOn: true,
+                  overrideItems: kotAddOnItems,
+                });
+                console.log(`🖨️ Auto-printed running KOT for ${kotAddOnItems.length} added items on Order #${existing.ticket_number}`);
+              } catch (kotErr) {
+                console.error('❌ Automatic running KOT print error:', kotErr);
+              }
+            }
           }
         }
 
@@ -297,7 +316,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       console.log(`✅ Order Updated: Order #${existing.ticket_number} → Status: ${order.status}, Table: ${order.table_number}, Paid: ${order.is_paid}`);
 
       // 🖨️ AUTO-PRINT KOT PER COUNTER when transitioning to PREPARING
-      if (status === 'PREPARING') {
+      if (status === 'PREPARING' && existing.status !== 'PREPARING') {
         try {
           await autoQueueAndBroadcastKot(restaurant.id, id, true);
         } catch (kotErr) {
@@ -313,6 +332,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: order.status,
+          order_type: order.order_type,
           table_number: order.table_number,
           is_paid: order.is_paid,
           timestamp: new Date().toISOString(),
@@ -341,4 +361,4 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export const PATCH = PUT;
+export const PATCH = PUT;
