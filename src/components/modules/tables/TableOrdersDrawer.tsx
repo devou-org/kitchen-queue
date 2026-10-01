@@ -137,7 +137,16 @@ export function TableOrdersDrawer({
       }
     } catch (err: any) {
       console.error('Bill print error:', err);
-      toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      try {
+        const { printBillTemplateDirectly } = await import('@/lib/bill-template-html');
+        printBillTemplateDirectly(order, {
+          name: (order as any).restaurant_name || 'Restaurant',
+          primary_color: primaryColor,
+        });
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, { id: toastId });
+      } catch {
+        toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
     } finally {
       setPrintingOrderId(null);
     }

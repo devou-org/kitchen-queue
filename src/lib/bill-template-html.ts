@@ -37,17 +37,25 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaurantInfo): string {
+export function generateBillTemplateContentHTML(order: Order, restaurant?: BillRestaurantInfo): string {
   const pc = restaurant?.primary_color || '#059669';
-  const ticketNum = String(order.ticket_number || '').padStart(3, '0');
+  const rawTicket = String(order.ticket_number ?? '');
+  const ticketNum = /^\d+$/.test(rawTicket) ? rawTicket.padStart(3, '0') : (rawTicket || '000');
   const invoiceDate = formatInvoiceDate(order.created_at);
-  const items = (order.items || []).filter((i) => (i.quantity || 0) > 0);
-  const subtotal = items.reduce((s, item) => s + (item.price_at_purchase || 0) * (item.quantity || 1), 0);
+  const items = (order.items || []).filter((i: any) => (i.quantity || 0) > 0);
   
+  const computedSubtotal = items.reduce((s: number, item: any) => {
+    const price = Number(item.price_at_purchase ?? item.price ?? 0);
+    const qty = Number(item.quantity || 1);
+    return s + (price * qty);
+  }, 0);
+  const subtotal = order.subtotal !== undefined && order.subtotal !== null ? Number(order.subtotal) : computedSubtotal;
+
   const getOrderTypeLabel = () => {
     if (order.table_number) return 'Dine-in';
-    if ((order as any).order_type) {
-      const t = String((order as any).order_type).toLowerCase().replace('_', '-');
+    const rawType = (order as any).order_type;
+    if (rawType) {
+      const t = String(rawType).toLowerCase().replace(/_/g, '-');
       return t.charAt(0).toUpperCase() + t.slice(1);
     }
     return 'Dine-in';
@@ -58,7 +66,7 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
 
   // Circular logo matching Starbucks layout
   const logoOrInitial = restaurant?.logo_url
-    ? `<img src="${restaurant.logo_url}" alt="${escapeHtml(restName)}" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; display: block;" />`
+    ? `<img src="${escapeHtml(restaurant.logo_url)}" alt="${escapeHtml(restName)}" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; display: block;" />`
     : `<div style="width: 52px; height: 52px; border-radius: 50%; background: ${pc}; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 22px; margin-bottom: 8px;">${firstChar}</div>`;
 
   let addressAndContact = '';
@@ -70,22 +78,31 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
     </p>`;
   }
 
-  const itemsHtml = items.map((item) => `
-    <div style="display: grid; grid-template-columns: minmax(0, 1.8fr) 26px 56px 64px; gap: 4px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; box-sizing: border-box; align-items: center;">
-      <span style="font-size: 11px; font-weight: 800; color: #111827; text-transform: uppercase; overflow-wrap: break-word; word-break: break-word; line-height: 1.25;">
-        ${escapeHtml(item.product_name || (item as any).name || 'Item')}
-      </span>
-      <span style="font-size: 11px; font-weight: 500; color: #6b7280; text-align: center; white-space: nowrap;">
-        ${item.quantity || 1}
-      </span>
-      <span style="font-size: 11px; font-weight: 500; color: #6b7280; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;">
-        ${formatPrice(item.price_at_purchase || 0)}
-      </span>
-      <span style="font-size: 11px; font-weight: 800; color: #111827; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;">
-        ${formatPrice((item.price_at_purchase || 0) * (item.quantity || 1))}
-      </span>
-    </div>
-  `).join('');
+  const itemsHtml = items.map((item: any) => {
+    const name = escapeHtml(item.product_name || item.name || 'Item');
+    const qty = item.quantity || 1;
+    const unitPrice = Number(item.price_at_purchase ?? item.price ?? 0);
+    const lineTotal = unitPrice * qty;
+    const noteHtml = item.notes ? `<div style="grid-column: 1 / -1; font-size: 10px; font-style: italic; color: #6b7280; padding: 1px 0 2px 0;">★ ${escapeHtml(item.notes)}</div>` : '';
+
+    return `
+      <div style="display: grid; grid-template-columns: minmax(0, 1.8fr) 26px 56px 64px; gap: 4px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; box-sizing: border-box; align-items: center;">
+        <span style="font-size: 11px; font-weight: 800; color: #111827; text-transform: uppercase; overflow-wrap: break-word; word-break: break-word; line-height: 1.25;">
+          ${name}
+        </span>
+        <span style="font-size: 11px; font-weight: 500; color: #6b7280; text-align: center; white-space: nowrap;">
+          ${qty}
+        </span>
+        <span style="font-size: 11px; font-weight: 500; color: #6b7280; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;">
+          ${formatPrice(unitPrice)}
+        </span>
+        <span style="font-size: 11px; font-weight: 800; color: #111827; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;">
+          ${formatPrice(lineTotal)}
+        </span>
+        ${noteHtml}
+      </div>
+    `;
+  }).join('');
 
   let gstHtml = '';
   if ((order as any).gst_type === 'REGULAR') {
@@ -111,10 +128,19 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
   }
 
   const customerDisplay = order.customer_name || 'Guest';
-  const tableDisplay = order.table_number || (order.ticket_number ? `#${ticketNum}` : '-');
+  const rawTable = order.table_number ? String(order.table_number).trim() : '';
+  const tableDisplay = rawTable
+    ? (rawTable.toLowerCase().startsWith('table') ? rawTable : `Table ${rawTable}`)
+    : (ticketNum ? `#${ticketNum}` : '-');
 
-  const content = `
-    <div class="bill-container" style="max-width: 380px; margin: 0 auto; padding: 24px 20px 20px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+  const grandTotal = order.total_price !== undefined && order.total_price !== null
+    ? Number(order.total_price)
+    : (subtotal + Number((order as any).gst_amount || 0) - Number((order as any).discount_amount || 0));
+
+  const paymentMethod = (order as any).payment_method || ((order as any).is_paid ? 'PAID' : '');
+
+  return `
+    <div class="bill-container" style="max-width: 380px; margin: 0 auto; padding: 24px 20px 20px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1a1a1a;">
       <!-- Header: Logo, Name, Address, Tel, GSTIN -->
       <div style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 16px;">
         ${logoOrInitial}
@@ -178,14 +204,28 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
       </div>
       ` : ''}
 
+      ${paymentMethod ? `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; color: #4b5563;">
+        <span style="font-size: 12.5px; font-weight: 600;">Payment</span>
+        <span style="font-size: 11px; font-weight: 800; color: #166534; background: #dcfce7; border: 1px solid #86efac; border-radius: 4px; padding: 1px 6px; text-transform: uppercase;">✓ ${escapeHtml(paymentMethod)}</span>
+      </div>
+      ` : ''}
+
       <!-- Solid Brand Color Line before Grand Total -->
       <div style="height: 2px; background: ${pc}; margin: 8px 0 4px 0;"></div>
 
       <!-- Grand Total -->
       <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0 4px 0;">
         <span style="font-size: 15.5px; font-weight: 900; color: #111827;">Grand Total</span>
-        <span style="font-size: 18px; font-weight: 900; color: ${pc}; white-space: nowrap; font-variant-numeric: tabular-nums;">${formatPrice(order.total_price)}</span>
+        <span style="font-size: 18px; font-weight: 900; color: ${pc}; white-space: nowrap; font-variant-numeric: tabular-nums;">${formatPrice(grandTotal)}</span>
       </div>
+
+      ${order.notes && order.notes.trim() ? `
+      <div style="margin-top: 10px; padding: 6px 8px; background: #f9fafb; border-left: 3px solid ${pc}; font-size: 11px; border-radius: 0 4px 4px 0;">
+        <div style="font-weight: 800; color: #374151; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">Note:</div>
+        <div style="color: #4b5563; font-style: italic;">"${escapeHtml(order.notes.trim())}"</div>
+      </div>
+      ` : ''}
 
       <!-- Dashed Divider before Footer -->
       <hr style="border: none; border-top: 1.5px dashed #d1d5db; margin: 18px 0 14px 0;" />
@@ -200,6 +240,13 @@ export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaura
       </div>
     </div>
   `;
+}
+
+export function generateBillTemplateHTML(order: Order, restaurant?: BillRestaurantInfo): string {
+  const content = generateBillTemplateContentHTML(order, restaurant);
+  const rawTicket = String(order.ticket_number ?? '');
+  const ticketNum = /^\d+$/.test(rawTicket) ? rawTicket.padStart(3, '0') : (rawTicket || '000');
+  const restName = restaurant?.name || (order as any).restaurant_name || 'Restaurant';
 
   return `<!DOCTYPE html>
 <html>
