@@ -402,7 +402,19 @@ export function OrderDetailsView({
       }
     } catch (err: any) {
       console.error('Bill print error:', err);
-      toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      try {
+        printBillTemplateDirectly(order, restaurant ? {
+          name: restaurant.name,
+          logo_url: restaurant.logo_url,
+          address: restaurant.address,
+          phone: restaurant.phone,
+          primary_color: restaurant.primary_color,
+          gst_number: restaurant.gst_number,
+        } : undefined);
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, { id: toastId });
+      } catch {
+        toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
     } finally {
       setIsPrintingBill(false);
     }

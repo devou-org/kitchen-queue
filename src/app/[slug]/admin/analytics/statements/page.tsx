@@ -1154,52 +1154,12 @@ export default function AdminAnalyticsStatementsPage() {
       )}
 
       {/* Bill Modal */}
-      {showBill && selectedOrder && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            padding: '20px',
-          }}
-          onClick={() => setShowBill(false)}
-        >
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderRadius: '12px',
-              maxWidth: '420px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: '20px',
-              position: 'relative',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>Tax Invoice / Bill</h3>
-              <button
-                className="btn-ghost"
-                onClick={() => setShowBill(false)}
-                style={{ fontSize: '20px', cursor: 'pointer', border: 'none', background: 'transparent' }}
-              >
-                ✕
-              </button>
-            </div>
-            {restaurant && (
-              <BillTemplate
-                order={selectedOrder}
-                restaurant={restaurant}
-                onClose={() => setShowBill(false)}
-              />
-            )}
-          </div>
-        </div>
+      {showBill && selectedOrder && restaurant && (
+        <BillTemplate
+          order={selectedOrder}
+          restaurant={restaurant}
+          onClose={() => setShowBill(false)}
+        />
       )}
     </>
   );

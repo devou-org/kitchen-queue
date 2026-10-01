@@ -11,16 +11,21 @@ import toast from 'react-hot-toast';
 // Every invoice across the application uses
 // this component for a consistent layout.
 // ============================================
-
 import {
   BillRestaurantInfo,
   formatInvoiceDate,
   generateBillTemplateHTML,
+  generateBillTemplateContentHTML,
   printBillTemplateDirectly,
 } from '@/lib/bill-template-html';
 
 export type { BillRestaurantInfo };
-export { formatInvoiceDate, generateBillTemplateHTML, printBillTemplateDirectly };
+export {
+  formatInvoiceDate,
+  generateBillTemplateHTML,
+  generateBillTemplateContentHTML,
+  printBillTemplateDirectly,
+};
 
 export interface BillProps {
   order: Order;
@@ -31,106 +36,31 @@ export interface BillProps {
 export default function BillTemplate({ order, restaurant, onClose }: BillProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
-  /**
-   * Build the complete standalone HTML string for the bill.
-   * Used by both print and PDF download.
-   */
-  const buildBillHTML = useCallback((content: string) => {
-    const pc = restaurant.primary_color || '#971345';
-    const ticketNum = String(order.ticket_number).padStart(3, '0');
-    return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bill #${ticketNum} - ${restaurant.name}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      color: #1a1a1a; background: #fff; -webkit-font-smoothing: antialiased;
-    }
-    .bill-container { max-width: 380px; margin: 0 auto; padding: 28px 24px 20px; }
-    @page {
-      margin: 0;
-    }
-    @media print {
-      html, body {
-        width: 100% !important;
-        background: #fff !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      .bill-container {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 4mm 12mm 16mm 10mm !important;
-        margin: 0 !important;
-        box-shadow: none !important;
-        border: none !important;
-        box-sizing: border-box !important;
-      }
-    }
-  </style>
-</head>
-<body>
-  ${content}
-</body>
-</html>`;
-  }, [order, restaurant]);
-
   const handlePrint = useCallback(() => {
-    if (!printRef.current) return;
-    const html = buildBillHTML(printRef.current.innerHTML);
-
-    const iframeId = `bill-print-modal-iframe-${Date.now()}`;
-    let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
-    if (iframe) iframe.remove();
-    iframe = document.createElement('iframe');
-    iframe.id = iframeId;
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;z-index:-9999';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    let printed = false;
-    const triggerPrint = () => {
-      if (printed) return;
-      printed = true;
-      try {
-        iframe?.contentWindow?.focus();
-        iframe?.contentWindow?.print();
-        setTimeout(() => { try { iframe?.remove(); } catch {} }, 60000);
-      } catch (err) {
-        console.error('Modal print error:', err);
-      }
-    };
-
-    iframe.onload = triggerPrint;
-    setTimeout(triggerPrint, 500);
-  }, [buildBillHTML]);
+    try {
+      printBillTemplateDirectly(order, restaurant);
+    } catch (err) {
+      console.error('Print bill error:', err);
+      toast.error('Failed to open print dialog');
+    }
+  }, [order, restaurant]);
 
   const handleDownloadPDF = useCallback(async () => {
     if (!printRef.current) return;
     try {
       const toastId = toast.loading('Generating PDF...', { icon: '⏳' });
-      // Dynamically import html2pdf.js to avoid SSR issues
       const html2pdf = (await import('html2pdf.js')).default;
-      
-      const ticketNum = String(order.ticket_number).padStart(3, '0');
-      const filename = `Bill_${ticketNum}_${restaurant.name.replace(/\s+/g, '_')}.pdf`;
+
+      const rawTicket = String(order.ticket_number ?? '');
+      const ticketNum = /^\d+$/.test(rawTicket) ? rawTicket.padStart(3, '0') : (rawTicket || '001');
+      const filename = `Bill_${ticketNum}_${(restaurant?.name || 'Restaurant').replace(/\s+/g, '_')}.pdf`;
 
       const opt = {
-        margin:       [0.5, 0.5, 0.5, 0.5] as [number, number, number, number],
-        filename:     filename,
-        image:        { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'in' as const, format: 'a4' as const, orientation: 'portrait' as const }
+        margin: [0.3, 0.3, 0.3, 0.3] as [number, number, number, number],
+        filename: filename,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in' as const, format: 'a4' as const, orientation: 'portrait' as const },
       };
 
       await html2pdf().set(opt).from(printRef.current).save();
@@ -141,17 +71,8 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
     }
   }, [order, restaurant]);
 
-  const invoiceDate = formatInvoiceDate(order.created_at);
-  const items = order.items || [];
-  const subtotal = items.reduce((s, item) => s + item.price_at_purchase * item.quantity, 0);
-  const primaryColor = restaurant.primary_color || '#971345';
-
-  // Determine order type label
-  const getOrderTypeLabel = () => {
-    if (order.table_number) return 'Dine-in';
-    if ((order as any).order_type) return (order as any).order_type;
-    return 'Dine-in';
-  };
+  const billContentHtml = generateBillTemplateContentHTML(order, restaurant);
+  const primaryColor = restaurant?.primary_color || '#059669';
 
   return (
     <div
@@ -262,238 +183,20 @@ export default function BillTemplate({ order, restaurant, onClose }: BillProps) 
         </div>
 
         {/* Scrollable Bill Content */}
-        <div style={{ overflowY: 'auto', flex: 1, padding: '0 4px' }}>
-          <div ref={printRef}>
-            <div className="bill-container" style={{
-              maxWidth: '380px',
-              margin: '0 auto',
-              padding: '28px 24px 20px',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            }}>
-
-              {/* Header: Logo + Restaurant Info */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '20px' }}>
-                {restaurant.logo_url ? (
-                  <img
-                    src={restaurant.logo_url}
-                    alt={restaurant.name}
-                    style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '10px',
-                      objectFit: 'cover',
-                      marginBottom: '8px',
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '10px',
-                    background: primaryColor,
-                    color: '#fff',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 900,
-                    fontSize: '20px',
-                    marginBottom: '8px',
-                  }}>
-                    {restaurant.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#1a1a1a', marginBottom: '2px' }}>
-                  {restaurant.name}
-                </h2>
-                {(restaurant.address || restaurant.phone) && (
-                  <p style={{ fontSize: '11px', color: '#6b7280', lineHeight: 1.5 }}>
-                    {restaurant.address && <>{restaurant.address}<br /></>}
-                    {restaurant.phone && <><br />Tel: {restaurant.phone}</>}
-                    {restaurant.gst_number && <><br />GSTIN: <span style={{fontWeight: 700}}>{restaurant.gst_number}</span></>}
-                  </p>
-                )}
-              </div>
-
-              {/* Divider */}
-              <hr style={{ border: 'none', borderTop: '2px solid #e5e7eb', margin: '14px 0' }} />
-
-              {/* Order Meta */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginBottom: '4px' }}>
-                <div>
-                  <p style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Date & Time
-                  </p>
-                  <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>{invoiceDate}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Order Type
-                  </p>
-                  <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>{getOrderTypeLabel()}</p>
-                </div>
-                {order.customer_name && (
-                  <div>
-                    <p style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Customer
-                    </p>
-                    <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>{order.customer_name}</p>
-                  </div>
-                )}
-                {order.table_number && (
-                  <div>
-                    <p style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Table No.
-                    </p>
-                    <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>{order.table_number}</p>
-                  </div>
-                )}
-                {!order.table_number && order.ticket_number && (
-                  <div>
-                    <p style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Token
-                    </p>
-                    <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>
-                      #{String(order.ticket_number).padStart(3, '0')}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Divider */}
-              <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '14px 0' }} />
-
-              {/* Itemized Table */}
-              <div>
-                {/* Header */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1.8fr) 24px 50px 58px',
-                  gap: '6px',
-                  padding: '6px 0',
-                  borderBottom: '1px solid #e5e7eb',
-                  boxSizing: 'border-box',
-                }}>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Item
-                  </span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    Qty
-                  </span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    Price
-                  </span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    Total
-                  </span>
-                </div>
-
-                {/* Items */}
-                {items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'minmax(0, 1.8fr) 24px 50px 58px',
-                      gap: '6px',
-                      padding: '6px 0',
-                      borderBottom: '1px solid #f3f4f6',
-                      boxSizing: 'border-box',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#1a1a1a', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: 1.25 }}>
-                      {item.product_name || 'Item'}
-                    </span>
-                    <span style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      {item.quantity}
-                    </span>
-                    <span style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatPrice(item.price_at_purchase)}
-                    </span>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#1a1a1a', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatPrice(item.price_at_purchase * item.quantity)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Divider */}
-              <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '12px 0' }} />
-
-              {/* Subtotal */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '4px 0',
-              }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Subtotal</span>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatPrice(subtotal)}</span>
-              </div>
-
-              {/* GST Breakdown */}
-              {(order as any).gst_type === 'REGULAR' && (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#4b5563' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 500 }}>CGST {((order as any).gst_rate || 0) / 2}%</span>
-                    <span style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#4b5563' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 500 }}>SGST {((order as any).gst_rate || 0) / 2}%</span>
-                    <span style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}</span>
-                  </div>
-                  <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '4px 0' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#1a1a1a' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Total GST {((order as any).gst_rate || 0)}%</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatPrice((order as any).gst_amount || 0)}</span>
-                  </div>
-                </>
-              )}
-
-              {order.discount_amount && Number(order.discount_amount) > 0 ? (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', color: '#16a34a' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600 }}>Discount</span>
-                  <span style={{ fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                    -{formatPrice(order.discount_amount)}
-                  </span>
-                </div>
-              ) : null}
-
-              {/* Grand Total */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '10px 0',
-                marginTop: '4px',
-                borderTop: `2px solid ${primaryColor}`,
-              }}>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a1a' }}>Grand Total</span>
-                <span style={{ fontSize: '17px', fontWeight: 900, color: primaryColor, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                  {formatPrice(order.total_price)}
-                </span>
-              </div>
-
-              {/* Footer */}
-              <div style={{
-                textAlign: 'center',
-                marginTop: '20px',
-                paddingTop: '16px',
-                borderTop: '1px dashed #d1d5db',
-              }}>
-                <p style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
-                  Thank you for your visit!
-                </p>
-                <p style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.6 }}>
-                  We hope you enjoyed your meal.
-                  <br />
-                  Please visit us again!
-                </p>
-              </div>
-            </div>
-          </div>
+        <div style={{ overflowY: 'auto', flex: 1, padding: '12px 16px', background: '#f8fafc' }}>
+          <div
+            ref={printRef}
+            style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+              overflow: 'hidden',
+            }}
+            dangerouslySetInnerHTML={{ __html: billContentHtml }}
+          />
         </div>
       </div>
     </div>
   );
 }
+
