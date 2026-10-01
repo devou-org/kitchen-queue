@@ -25,6 +25,7 @@ export function getOrderStatusConfig(status?: string) {
         label: 'Preparing',
       };
     case 'READY':
+    case 'SERVED':
       return {
         bg: '#f0fdf4',
         color: '#15803d',
@@ -32,14 +33,21 @@ export function getOrderStatusConfig(status?: string) {
         dot: '#22c55e',
         label: 'Ready',
       };
-    case 'SERVED':
+    case 'PAID':
+      return {
+        bg: '#f0fdf4',
+        color: '#15803d',
+        border: '#bbf7d0',
+        dot: '#22c55e',
+        label: 'Paid',
+      };
     case 'COMPLETED':
       return {
         bg: '#f8fafc',
         color: '#475569',
         border: '#e2e8f0',
         dot: '#94a3b8',
-        label: normalized === 'SERVED' ? 'Served' : 'Completed',
+        label: 'Completed',
       };
     case 'CANCELLED':
       return {

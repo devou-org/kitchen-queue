@@ -60,7 +60,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items, payment_method } = body;
+    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items, payment_method, order_type } = body;
 
     const existing = await getOrderById(restaurant.id, id);
     if (!existing) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
@@ -95,10 +95,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ success: false, error: 'No items provided' }, { status: 400 });
       }
       
-      // ... rest of the customer logic
-
       // 🛡️ SECURITY FIX: Enforce that customers CANNOT remove items or decrease quantities.
-      // E.g., someone intercepting the API request to delete items after the kitchen started cooking.
       const existingQtyMap = new Map<string, number>();
       for (const item of (existing.items || [])) {
         existingQtyMap.set(item.product_id, (existingQtyMap.get(item.product_id) || 0) + Number(item.quantity));
@@ -150,6 +147,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       || typeof notes === 'string'
       || notes === null
       || typeof party_size === 'number'
+      || typeof order_type === 'string'
+      || table_number !== undefined
       || Array.isArray(items);
 
     if (shouldUpdateDetails) {
@@ -159,8 +158,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         notes?: string | null;
         party_size?: number;
         table_number?: string | null;
+        order_type?: string;
         items?: { product_id: string; quantity: number }[];
       } = {};
+
+      if (typeof order_type === 'string' && ['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(order_type.toUpperCase())) {
+        payload.order_type = order_type.toUpperCase();
+      }
+
+      if (table_number !== undefined) {
+        const effectiveType = payload.order_type || existing.order_type;
+        if (effectiveType === 'TAKEAWAY' || effectiveType === 'DELIVERY') {
+          payload.table_number = null;
+        } else {
+          payload.table_number = table_number ? String(table_number).trim() : null;
+        }
+      } else if (payload.order_type === 'TAKEAWAY' || payload.order_type === 'DELIVERY') {
+        payload.table_number = null;
+      }
 
       if (typeof customer_name === 'string') {
         const nextName = customer_name.trim();
@@ -253,6 +268,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: order.status,
+          order_type: order.order_type,
           table_number: order.table_number,
           is_paid: order.is_paid,
           timestamp: new Date().toISOString(),
@@ -263,7 +279,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // ✅ UPDATE STATUS, TABLE NUMBER & PAYMENT STATUS ATOMICALLY
-    const shouldUpdateStatusOrPayment = Boolean(status || table_number || typeof is_paid === 'boolean' || payment_method);
+    const shouldUpdateStatusOrPayment = Boolean(status || typeof is_paid === 'boolean' || payment_method || (!shouldUpdateDetails && table_number !== undefined));
     if (shouldUpdateStatusOrPayment) {
       if (status && status !== existing.status) {
         // Fetch queue statuses for the restaurant to validate the new status
@@ -316,6 +332,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: order.status,
+          order_type: order.order_type,
           table_number: order.table_number,
           is_paid: order.is_paid,
           timestamp: new Date().toISOString(),
@@ -343,3 +360,5 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ success: false, error: message }, { status: isBusinessError ? 400 : 500 });
   }
 }
+
+export const PATCH = PUT;
