@@ -222,15 +222,51 @@ export function POSCheckoutDrawer({
     return { gstAmount: gst, totalPrice: total };
   }, [subtotal, restaurant]);
 
-  // Person Options for CustomSelect (1 to 15)
-  const personOptions = useMemo(
-    () =>
-      Array.from({ length: 15 }, (_, i) => ({
-        value: String(i + 1),
-        label: `${i + 1} ${i === 0 ? 'Person' : 'Persons'}`,
-      })),
-    []
-  );
+  // Helper to calculate max free seats for a table
+  const getTableFreeSeats = (table: any, partyContext?: { phone?: string; customerName?: string }): number => {
+    if (!table) return 1;
+    const cap = Number(table.capacity) || 1;
+    const check = checkTableAssignment(table, 1, partyContext);
+    const seated = check.occupiedSeats || 0;
+    const free = cap - seated;
+    return free > 0 ? free : 1;
+  };
+
+  // Dynamic Person Options based on selected table's max free seats
+  const personOptions = useMemo(() => {
+    const selectedTable = tables.find(
+      (t: any) => String(t.table_number) === String(orderForm.table_number)
+    );
+    const maxFree = selectedTable
+      ? getTableFreeSeats(selectedTable, {
+          phone: orderForm.phone,
+          customerName: orderForm.customer_name,
+        })
+      : 15;
+
+    return Array.from({ length: Math.max(1, maxFree) }, (_, i) => ({
+      value: String(i + 1),
+      label: `${i + 1} ${i === 0 ? 'Person' : 'Persons'}`,
+    }));
+  }, [tables, orderForm.table_number, orderForm.phone, orderForm.customer_name]);
+
+  // Ensure party_size is always clamped to max free seats on the selected table
+  useEffect(() => {
+    if (orderForm.table_number && tables.length > 0) {
+      const selectedTable = tables.find(
+        (t: any) => String(t.table_number) === String(orderForm.table_number)
+      );
+      if (selectedTable) {
+        const maxFree = getTableFreeSeats(selectedTable, {
+          phone: orderForm.phone,
+          customerName: orderForm.customer_name,
+        });
+        if (!orderForm.party_size || orderForm.party_size > maxFree) {
+          setOrderForm((prev) => ({ ...prev, party_size: maxFree }));
+        }
+      }
+    }
+  }, [orderForm.table_number, tables, orderForm.party_size, orderForm.phone, orderForm.customer_name, setOrderForm]);
 
   // Table Options for CustomSelect
   const tableOptions = useMemo(() => {
@@ -238,8 +274,7 @@ export function POSCheckoutDrawer({
       { value: '', label: '-- Select Table --' },
       ...tables
         .filter((t: any) => {
-          const partySize = Number(orderForm.party_size) || 1;
-          const check = checkTableAssignment(t, partySize, {
+          const check = checkTableAssignment(t, 1, {
             phone: orderForm.phone,
             customerName: orderForm.customer_name,
           });
@@ -247,8 +282,7 @@ export function POSCheckoutDrawer({
           return check.allowed || isCurrent;
         })
         .map((t: any) => {
-          const partySize = Number(orderForm.party_size) || 1;
-          const check = checkTableAssignment(t, partySize, {
+          const check = checkTableAssignment(t, 1, {
             phone: orderForm.phone,
             customerName: orderForm.customer_name,
           });
@@ -292,7 +326,7 @@ export function POSCheckoutDrawer({
     }
 
     return list;
-  }, [tables, orderForm.party_size, orderForm.phone, orderForm.customer_name, orderForm.table_number]);
+  }, [tables, orderForm.phone, orderForm.customer_name, orderForm.table_number]);
 
   if (!mounted || !isOpen) return null;
 
@@ -750,12 +784,16 @@ export function POSCheckoutDrawer({
                           const matchedTable = tables.find(
                             (t: any) => String(t.table_number) === selectedNum
                           );
+                          const maxFree = matchedTable
+                            ? getTableFreeSeats(matchedTable, {
+                                phone: orderForm.phone,
+                                customerName: orderForm.customer_name,
+                              })
+                            : 1;
                           setOrderForm((prev) => ({
                             ...prev,
                             table_number: selectedNum,
-                            party_size: matchedTable?.capacity
-                              ? Number(matchedTable.capacity)
-                              : prev.party_size,
+                            party_size: maxFree,
                           }));
                         }}
                         options={tableOptions}

@@ -10,7 +10,6 @@ import {
   Printer,
   Calendar,
   Clock,
-  CheckCircle2,
   AlertCircle,
   MapPin,
   ChevronRight,
@@ -47,6 +46,8 @@ export function TableOrdersDrawer({
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
   const [printingKotId, setPrintingKotId] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [closingOrderId, setClosingOrderId] = useState<string | null>(null);
+  const [closingAll, setClosingAll] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -209,6 +210,83 @@ export function TableOrdersDrawer({
       toast.error(err.message || 'Failed to print KOT.', { id: toastId });
     } finally {
       setPrintingKotId(null);
+    }
+  };
+
+  // Close Single Ticket & Mark as Paid
+  const handleCloseTicket = async (order: any) => {
+    if (closingOrderId) return;
+    setClosingOrderId(order.id);
+    const toastId = toast.loading(`Closing Ticket #${String(order.ticket_number).padStart(3, '0')}...`);
+
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': slug,
+        },
+        body: JSON.stringify({
+          status: 'PAID',
+          is_paid: true,
+          table_number: table.table_number,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Ticket #${String(order.ticket_number).padStart(3, '0')} closed & marked Paid!`, { id: toastId });
+        onRefresh?.();
+      } else {
+        toast.error(data.error || 'Failed to close ticket', { id: toastId });
+      }
+    } catch (err: any) {
+      console.error('Error closing ticket:', err);
+      toast.error('Network error closing ticket', { id: toastId });
+    } finally {
+      setClosingOrderId(null);
+    }
+  };
+
+  // Close All Tickets for Table
+  const handleCloseAllTickets = async () => {
+    if (closingAll || activeOrders.length === 0) return;
+    if (!window.confirm(`Close all ${activeOrders.length} ticket(s) for Table #${table.table_number} and mark as Paid?`)) {
+      return;
+    }
+    setClosingAll(true);
+    const toastId = toast.loading(`Closing all tickets for Table #${table.table_number}...`);
+
+    try {
+      let successCount = 0;
+      for (const order of activeOrders) {
+        try {
+          const res = await fetch(`/api/orders/${order.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-restaurant-slug': slug,
+            },
+            body: JSON.stringify({
+              status: 'PAID',
+              is_paid: true,
+              table_number: table.table_number,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            successCount++;
+          }
+        } catch (_) {}
+      }
+
+      toast.success(`${successCount} ticket(s) closed & table settled!`, { id: toastId });
+      onRefresh?.();
+    } catch (err: any) {
+      console.error('Error closing all tickets:', err);
+      toast.error('Failed to close all tickets', { id: toastId });
+    } finally {
+      setClosingAll(false);
     }
   };
 
@@ -430,9 +508,51 @@ export function TableOrdersDrawer({
             justifyContent: 'space-between',
           }}
         >
-          <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>
-            {activeOrders.length} Active {activeOrders.length === 1 ? 'Order' : 'Orders'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 700 }}>
+              {activeOrders.length} Active {activeOrders.length === 1 ? 'Order' : 'Orders'}
+            </span>
+            {activeOrders.length > 1 && (
+              <button
+                type="button"
+                onClick={handleCloseAllTickets}
+                disabled={closingAll}
+                style={{
+                  height: '26px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  border: '1px solid #A7F3D0',
+                  background: '#ECFDF5',
+                  color: '#065F46',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: closingAll ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (!closingAll) {
+                    e.currentTarget.style.background = '#D1FAE5';
+                    e.currentTarget.style.borderColor = '#6EE7B7';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!closingAll) {
+                    e.currentTarget.style.background = '#ECFDF5';
+                    e.currentTarget.style.borderColor = '#A7F3D0';
+                  }
+                }}
+                title="Close all active tickets on this table and mark as Paid"
+              >
+                {closingAll && (
+                  <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                )}
+                <span>Close All Tickets</span>
+              </button>
+            )}
+          </div>
           <div style={{ textAlign: 'right' }}>
             <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600, display: 'block' }}>Table Total</span>
             <span style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
@@ -528,12 +648,55 @@ export function TableOrdersDrawer({
                         </span>
                       </div>
 
-                      {/* Right: Order Total & Print Bill Button */}
+                      {/* Right: Order Total, Close Ticket & Print Bill */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                        <span style={{ fontSize: '14px', fontWeight: 900, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 900, color: '#0F172A', fontVariantNumeric: 'tabular-nums', marginRight: '2px' }}>
                           {formatPrice(order.total_price)}
                         </span>
 
+                        {/* Close Ticket Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleCloseTicket(order)}
+                          disabled={closingOrderId === order.id}
+                          style={{
+                            height: '28px',
+                            padding: '0 12px',
+                            borderRadius: '6px',
+                            border: '1px solid #059669',
+                            background: '#059669',
+                            color: '#FFFFFF',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: closingOrderId === order.id ? 'wait' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            boxShadow: '0 1px 2px rgba(5, 150, 105, 0.2)',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (closingOrderId !== order.id) {
+                              e.currentTarget.style.background = '#047857';
+                              e.currentTarget.style.borderColor = '#047857';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (closingOrderId !== order.id) {
+                              e.currentTarget.style.background = '#059669';
+                              e.currentTarget.style.borderColor = '#059669';
+                            }
+                          }}
+                          title={`Close Ticket #${ticketNum} and mark as Paid`}
+                        >
+                          {closingOrderId === order.id && (
+                            <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                          )}
+                          <span>Close Ticket</span>
+                        </button>
+
+                        {/* Print Bill Button */}
                         <button
                           type="button"
                           onClick={() => handlePrintBill(order)}

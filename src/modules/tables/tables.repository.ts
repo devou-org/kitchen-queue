@@ -71,7 +71,7 @@ export class TablesRepository {
          WHERE o.restaurant_id = $1
            AND o.status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
            AND o.table_number IS NOT NULL AND o.table_number != ''
-           AND (o.order_type IS NULL OR o.order_type != 'TAKEAWAY')
+           AND (o.order_type IS NULL OR o.order_type NOT IN ('TAKEAWAY', 'DELIVERY'))
          GROUP BY o.restaurant_id, o.table_number
        ) active ON active.table_number = t.table_number
        WHERE t.restaurant_id = $1

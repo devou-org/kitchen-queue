@@ -849,6 +849,17 @@ export async function createProduct(data: {
             ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'}, ${data.counter || null})
     RETURNING *
   `;
+
+  if (data.category && data.category.trim()) {
+    try {
+      await sql`
+        INSERT INTO categories (restaurant_id, name, sort_order)
+        VALUES (${data.restaurant_id}, ${data.category.trim()}, COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = ${data.restaurant_id}), 0) + 10)
+        ON CONFLICT (restaurant_id, name) DO NOTHING
+      `;
+    } catch (_) {}
+  }
+
   return rows[0];
 }
 
@@ -901,6 +912,16 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
         restaurantId, id, data.counter ?? null
       ]
     );
+
+    if (data.category && data.category.trim()) {
+      try {
+        await client.query(`
+          INSERT INTO categories (restaurant_id, name, sort_order)
+          VALUES ($1, $2, COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = $1), 0) + 10)
+          ON CONFLICT (restaurant_id, name) DO NOTHING
+        `, [restaurantId, data.category.trim()]);
+      } catch (_) {}
+    }
 
     await client.query('COMMIT');
     return result.rows[0];
@@ -1648,7 +1669,8 @@ export async function checkAndCloseTableSession(
      FROM orders
      WHERE restaurant_id = $1
        AND (table_id = $2 OR table_number = $3)
-       AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')`,
+       AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
+       AND (order_type IS NULL OR order_type NOT IN ('TAKEAWAY', 'DELIVERY'))`,
     [restaurantId, tableId, cleanTableNum]
   );
 
@@ -1719,10 +1741,8 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   // Sync item status if master order status changed
   if (status === 'CANCELLED') {
     try { await pool.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]); } catch (_) {}
-  } else if (status === 'READY') {
+  } else if (status === 'READY' || status === 'SERVED' || status === 'COMPLETED' || status === 'PAID') {
     try { await pool.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]); } catch (_) {}
-  } else if (status === 'SERVED' || status === 'COMPLETED' || status === 'PAID') {
-    try { await pool.query(`UPDATE order_items SET status = 'SERVED' WHERE order_id = $1 AND status != 'CANCELLED'`, [id]); } catch (_) {}
   }
   // Trigger Loyalty Points processing
   if (status === 'PAID' || status === 'COMPLETED' || updatedOrder?.is_paid) {
@@ -1741,7 +1761,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     
     // Fetch existing order to verify values
     const orderRes = await client.query(`
-      SELECT is_paid, status, total_price, ticket_number FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
+      SELECT is_paid, status, total_price, ticket_number, table_number, table_id, table_session_id, party_size, order_type FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
     `, [restaurantId, id]);
     
     if (orderRes.rows.length === 0) {
@@ -1760,29 +1780,50 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     } else {
       nextIsPaid = existing.is_paid;
     }
+
+    const previousTable = existing.table_number;
+    let nextTableNumber = existing.table_number;
+    let nextTableId = existing.table_id;
+    let nextTableSessionId = existing.table_session_id;
+
+    if (tableNumber !== undefined) {
+      const trimmedTable = tableNumber ? tableNumber.trim() : null;
+      if (!trimmedTable) {
+        nextTableNumber = null;
+        nextTableId = null;
+        nextTableSessionId = null;
+      } else {
+        nextTableNumber = trimmedTable;
+        if (nextTableNumber !== previousTable) {
+          const sessionInfo = await findOrCreateTableSession(client, restaurantId, nextTableNumber, existing.party_size || 1);
+          nextTableId = sessionInfo.tableId;
+          nextTableSessionId = sessionInfo.tableSessionId;
+        }
+      }
+    }
     
     // Update order
     const updateRes = await client.query(`
       UPDATE orders
       SET status = $1,
           is_paid = $2,
-          table_number = COALESCE($3, table_number),
+          table_number = $3,
+          table_id = $4,
+          table_session_id = $5,
           payment_method = COALESCE($6, payment_method),
           paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() WHEN $2 = false THEN NULL ELSE paid_at END,
           updated_at = NOW()
-      WHERE restaurant_id = $4 AND id = $5
+      WHERE restaurant_id = $7 AND id = $8
       RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, paid_at
-    `, [nextStatus, nextIsPaid, tableNumber || null, restaurantId, id, paymentMethod || null]);
+    `, [nextStatus, nextIsPaid, nextTableNumber, nextTableId, nextTableSessionId, paymentMethod || null, restaurantId, id]);
     
     const updatedOrder = updateRes.rows[0];
 
     // Sync item status if master order status changed
     if (nextStatus === 'CANCELLED') {
       await client.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]);
-    } else if (nextStatus === 'READY') {
+    } else if (nextStatus === 'READY' || nextStatus === 'SERVED' || nextStatus === 'COMPLETED' || nextStatus === 'PAID') {
       await client.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]);
-    } else if (nextStatus === 'SERVED' || nextStatus === 'COMPLETED' || nextStatus === 'PAID') {
-      await client.query(`UPDATE order_items SET status = 'SERVED' WHERE order_id = $1 AND status != 'CANCELLED'`, [id]);
     }
     
     // Process billing if order is now paid/completed (and wasn't paid before)
@@ -1793,8 +1834,16 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     
     await client.query('COMMIT');
 
-    // Re-evaluate table occupancy and close session if order is PAID, CANCELLED, or EXPIRED
-    const activeTableNum = tableNumber || updatedOrder?.table_number;
+    // Re-evaluate table occupancy and close session if table changed or order is PAID, CANCELLED, or EXPIRED
+    if (previousTable && (nextTableNumber !== previousTable)) {
+      try {
+        await checkAndCloseTableSession(pool, restaurantId, previousTable);
+      } catch (tblErr) {
+        console.error('Error re-evaluating previous table occupancy:', tblErr);
+      }
+    }
+
+    const activeTableNum = nextTableNumber || previousTable;
     if (activeTableNum && (nextStatus === 'PAID' || nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED')) {
       try {
         await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
@@ -1848,27 +1897,30 @@ export async function updateOrderItemStatus(
   try {
     await client.query('BEGIN');
 
+    const effectiveStatus = upperStatus === 'SERVED' ? 'READY' : upperStatus;
     let query = `
       UPDATE order_items
       SET status = $1::varchar
     `;
-    if (upperStatus === 'PREPARING') {
+    if (effectiveStatus === 'PREPARING') {
       query += `, prepared_at = COALESCE(prepared_at, NOW())`;
-    } else if (upperStatus === 'READY') {
+    } else if (effectiveStatus === 'READY') {
       query += `, ready_at = COALESCE(ready_at, NOW())`;
     }
     query += ` WHERE order_id = $2::uuid`;
 
-    const params: any[] = [upperStatus, orderId];
+    const params: any[] = [effectiveStatus, orderId];
 
     if (itemIds && itemIds.length > 0) {
       params.push(itemIds);
       query += ` AND id = ANY($${params.length}::uuid[])`;
-    }
-
-    if (counter && counter.trim() !== '') {
+    } else if (counter && counter.trim() !== '') {
       params.push(counter.trim().toLowerCase());
-      query += ` AND LOWER(COALESCE(NULLIF(counter, ''), 'kitchen')) = $${params.length}::varchar`;
+      query += ` AND id IN (
+        SELECT oi2.id FROM order_items oi2 
+        LEFT JOIN products p2 ON p2.id = oi2.product_id 
+        WHERE oi2.order_id = $2::uuid AND LOWER(COALESCE(NULLIF(oi2.counter, ''), NULLIF(p2.counter, ''), 'kitchen')) = $${params.length}::varchar
+      )`;
     }
 
     await client.query(query, params);
@@ -1924,6 +1976,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
   notes?: string | null;
   party_size?: number;
   table_number?: string | null;
+  order_type?: string;
   items?: { product_id: string; quantity: number }[];
 }) {
   const existingOrder = await getOrderById(restaurantId, id);
@@ -2171,13 +2224,39 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
     `;
   }
 
+  const previousTable = existingOrder.table_number;
+  const effectiveOrderType = (data.order_type || existingOrder.order_type || 'DINE_IN').toUpperCase();
+
+  let nextTableNumber: string | null = existingOrder.table_number || null;
+  let nextTableId: string | null = existingOrder.table_id || null;
+  let nextTableSessionId: string | null = existingOrder.table_session_id || null;
+
+  if (effectiveOrderType === 'TAKEAWAY' || effectiveOrderType === 'DELIVERY') {
+    nextTableNumber = null;
+    nextTableId = null;
+    nextTableSessionId = null;
+  } else if (data.table_number !== undefined) {
+    nextTableNumber = data.table_number ? data.table_number.trim() : null;
+    if (!nextTableNumber) {
+      nextTableId = null;
+      nextTableSessionId = null;
+    } else if (nextTableNumber !== previousTable) {
+      const sessionInfo = await findOrCreateTableSession(pool, restaurantId, nextTableNumber, data.party_size || existingOrder.party_size || 1);
+      nextTableId = sessionInfo.tableId;
+      nextTableSessionId = sessionInfo.tableSessionId;
+    }
+  }
+
   const rows = await sql`
     UPDATE orders
     SET customer_name = COALESCE(${data.customer_name ?? null}, customer_name),
         phone = COALESCE(${data.phone ?? null}, phone),
         notes = COALESCE(${data.notes ?? null}, notes),
         party_size = COALESCE(${data.party_size ?? null}, party_size),
-        table_number = COALESCE(${data.table_number ?? null}, table_number),
+        order_type = ${effectiveOrderType},
+        table_number = ${nextTableNumber},
+        table_id = ${nextTableId},
+        table_session_id = ${nextTableSessionId},
         total_price = ${nextTotalPrice},
         updated_at = NOW()
     WHERE restaurant_id = ${restaurantId} AND id = ${id}
@@ -2186,6 +2265,15 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
 
   if (!rows[0]) {
     throw new Error('Order not found');
+  }
+
+  // If table was changed or cleared, re-evaluate session of previous table
+  if (previousTable && (nextTableNumber !== previousTable)) {
+    try {
+      await checkAndCloseTableSession(pool, restaurantId, previousTable);
+    } catch (tblErr) {
+      console.error('Error re-evaluating previous table occupancy:', tblErr);
+    }
   }
 
   return await getOrderById(restaurantId, id);
@@ -2812,6 +2900,46 @@ export async function updateCategorySequence(restaurantId: string, orderedCatego
     await client.query('ROLLBACK');
     console.error('❌ Error updating category sequence:', err);
     return { success: false, error: err.message || 'Failed to update category sequence' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCategory(restaurantId: string, categoryId: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const catRes = await client.query(
+      `SELECT id, name FROM categories WHERE id = $1 AND restaurant_id = $2 LIMIT 1`,
+      [categoryId, restaurantId]
+    );
+
+    if (catRes.rows.length === 0) {
+      throw new Error('Category not found');
+    }
+
+    const categoryName = catRes.rows[0].name;
+
+    // Delete category
+    await client.query(
+      `DELETE FROM categories WHERE id = $1 AND restaurant_id = $2`,
+      [categoryId, restaurantId]
+    );
+
+    // Reassign products in this category to 'General' so auto-sync won't recreate it
+    await client.query(
+      `UPDATE products 
+       SET category = 'General', updated_at = NOW() 
+       WHERE restaurant_id = $1 AND LOWER(TRIM(category)) = LOWER(TRIM($2))`,
+      [restaurantId, categoryName]
+    );
+
+    await client.query('COMMIT');
+    return { success: true, deletedName: categoryName };
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    throw err;
   } finally {
     client.release();
   }

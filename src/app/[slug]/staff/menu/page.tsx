@@ -532,19 +532,23 @@ export default function StaffMenuPage() {
                         value={orderForm.table_number}
                         onChange={e => {
                           const selectedNum = e.target.value;
-                          const matchedTable = tables.find((t: any) => t.table_number === selectedNum);
+                          const matchedTable = tables.find((t: any) => String(t.table_number) === String(selectedNum));
+                          const check = matchedTable ? checkTableAssignment(matchedTable, 1, {
+                            phone: orderForm.phone,
+                            customerName: orderForm.customer_name,
+                          }) : null;
+                          const maxFree = matchedTable ? Math.max(1, (Number(matchedTable.capacity) || 1) - (check?.occupiedSeats || 0)) : 1;
                           setOrderForm({
                             ...orderForm,
                             table_number: selectedNum,
-                            party_size: matchedTable?.capacity ? Number(matchedTable.capacity) : orderForm.party_size
+                            party_size: maxFree
                           });
                         }}
                       >
                         <option value="">-- Select Table --</option>
                         {tables
                           .filter((t: any) => {
-                            const partySize = Number(orderForm.party_size) || 1;
-                            const check = checkTableAssignment(t, partySize, {
+                            const check = checkTableAssignment(t, 1, {
                               phone: orderForm.phone,
                               customerName: orderForm.customer_name,
                             });
@@ -552,8 +556,7 @@ export default function StaffMenuPage() {
                             return check.allowed || isCurrent;
                           })
                           .map((t: any) => {
-                            const partySize = Number(orderForm.party_size) || 1;
-                            const check = checkTableAssignment(t, partySize, {
+                            const check = checkTableAssignment(t, 1, {
                               phone: orderForm.phone,
                               customerName: orderForm.customer_name,
                             });
@@ -603,9 +606,17 @@ export default function StaffMenuPage() {
                       onChange={e => setOrderForm({ ...orderForm, party_size: parseInt(e.target.value) || 1 })}
                       style={{ paddingRight: '30px' }}
                     >
-                      {[...Array(10)].map((_, i) => (
-                        <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
-                      ))}
+                      {(() => {
+                        const currentTable = tables.find((t: any) => String(t.table_number) === String(orderForm.table_number));
+                        const check = currentTable ? checkTableAssignment(currentTable, 1, {
+                          phone: orderForm.phone,
+                          customerName: orderForm.customer_name,
+                        }) : null;
+                        const maxCount = currentTable ? Math.max(1, (Number(currentTable.capacity) || 1) - (check?.occupiedSeats || 0)) : 10;
+                        return [...Array(maxCount)].map((_, i) => (
+                          <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
+                        ));
+                      })()}
                     </select>
                   </div>
                 </div>

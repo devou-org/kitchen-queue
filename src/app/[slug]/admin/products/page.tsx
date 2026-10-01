@@ -1608,8 +1608,12 @@ export default function AdminProducts() {
       {/* Reorder Food Categories Modal */}
       <CategoryReorderModal
         isOpen={categoryModalOpen}
-        onClose={() => setCategoryModalOpen(false)}
+        onClose={() => {
+          setCategoryModalOpen(false);
+          fetchProducts();
+        }}
         slug={Array.isArray(slug) ? slug[0] : (slug || '')}
+        onReordered={fetchProducts}
       />
 
     </AdminContentWrapper>

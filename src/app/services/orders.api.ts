@@ -21,11 +21,12 @@ export interface CreateOrderData {
 export interface UpdateOrderData {
   status?: string;
   is_paid?: boolean;
-  table_number?: string;
+  table_number?: string | null;
   customer_name?: string;
   phone?: string;
   notes?: string | null;
   party_size?: number;
+  order_type?: string;
   items?: { product_id: string; quantity: number }[];
   payment_method?: string;
 }
