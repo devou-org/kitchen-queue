@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp, ArrowDown, Layers, X, Plus, Loader2, Check } from 'lucide-react';
+import { ArrowUp, ArrowDown, Layers, X, Plus, Loader2, Check, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface CategoryItem {
@@ -26,18 +26,24 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [newCatName, setNewCatName] = useState('');
   const [addingCat, setAddingCat] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const cleanSlug = useMemo(() => {
+    let s = (Array.isArray(slug) ? slug[0] : (slug || '')) as string;
+    return s.replace(/[\[\]'"]/g, '').trim();
+  }, [slug]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const loadCategories = useCallback(async () => {
-    if (!slug) return;
+    if (!cleanSlug) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/categories', {
+      const res = await fetch(`/api/categories?slug=${encodeURIComponent(cleanSlug)}`, {
         headers: {
-          'x-restaurant-slug': slug,
+          'x-restaurant-slug': cleanSlug,
           'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`,
         },
         cache: 'no-store',
@@ -52,7 +58,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [cleanSlug]);
 
   useEffect(() => {
     if (isOpen) {
@@ -76,6 +82,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
 
   const handleSaveAndClose = async () => {
     if (!isDirty) {
+      if (onReordered) onReordered();
       onClose();
       return;
     }
@@ -87,7 +94,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-restaurant-slug': slug,
+          'x-restaurant-slug': cleanSlug,
           'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`,
         },
         body: JSON.stringify({ orderedCategoryIds }),
@@ -127,7 +134,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-restaurant-slug': slug,
+          'x-restaurant-slug': cleanSlug,
           'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`,
         },
         body: JSON.stringify({ name: trimmed }),
@@ -137,7 +144,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
         setNewCatName('');
         await loadCategories();
         if (onReordered) onReordered();
-        toast.success('New category added to bottom of sequence');
+        toast.success(`Category "${trimmed}" added`);
       } else {
         toast.error(data.error || 'Failed to add category');
       }
@@ -148,12 +155,44 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
     }
   };
 
+  const handleDeleteCategory = async (cat: CategoryItem) => {
+    if (!window.confirm(`Delete category "${cat.name}"?\n\nAny products currently assigned to this category will be moved to "General".`)) {
+      return;
+    }
+
+    setDeletingId(cat.id);
+    try {
+      const res = await fetch(`/api/categories?id=${encodeURIComponent(cat.id)}&slug=${encodeURIComponent(cleanSlug)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-restaurant-slug': cleanSlug,
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Category "${cat.name}" deleted`);
+        setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+        if (onReordered) onReordered();
+      } else {
+        toast.error(data.error || 'Failed to delete category');
+      }
+    } catch {
+      toast.error('Error deleting category');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (!mounted || !isOpen) return null;
 
   return createPortal(
     <div
       className="modal-backdrop"
-      onClick={onClose}
+      onClick={() => {
+        if (onReordered) onReordered();
+        onClose();
+      }}
       style={{
         position: 'fixed',
         top: 0,
@@ -212,14 +251,17 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
               <Layers size={20} />
             </span>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0F172A' }}>Reorder Food Categories</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0F172A' }}>Reorder & Manage Categories</h2>
               <p style={{ fontSize: '12px', color: '#64748B', margin: 0 }}>
-                Set display order for Staff POS and Customer Menu
+                Set display order, add new, or delete categories
               </p>
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (onReordered) onReordered();
+              onClose();
+            }}
             style={{
               background: 'none',
               border: 'none',
@@ -302,6 +344,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
             categories.map((cat, index) => {
               const isFirst = index === 0;
               const isLast = index === categories.length - 1;
+              const isDeletingThis = deletingId === cat.id;
 
               return (
                 <div
@@ -317,7 +360,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                     <span
                       style={{
                         width: '26px',
@@ -335,17 +378,17 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                     >
                       {index + 1}
                     </span>
-                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {cat.name}
                     </span>
                   </div>
 
-                  {/* Move Up / Down Buttons (Local Reorder) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {/* Move Up / Down Buttons & Delete Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     <button
                       type="button"
                       onClick={() => handleMoveLocal(index, 'up')}
-                      disabled={isFirst || saving}
+                      disabled={isFirst || saving || isDeletingThis}
                       title={isFirst ? 'Already at top' : 'Move Up'}
                       style={{
                         width: '32px',
@@ -354,7 +397,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                         border: '1px solid #CBD5E1',
                         backgroundColor: isFirst ? '#F1F5F9' : '#FFFFFF',
                         color: isFirst ? '#94A3B8' : '#0F172A',
-                        cursor: isFirst || saving ? 'not-allowed' : 'pointer',
+                        cursor: isFirst || saving || isDeletingThis ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -367,7 +410,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                     <button
                       type="button"
                       onClick={() => handleMoveLocal(index, 'down')}
-                      disabled={isLast || saving}
+                      disabled={isLast || saving || isDeletingThis}
                       title={isLast ? 'Already at bottom' : 'Move Down'}
                       style={{
                         width: '32px',
@@ -376,7 +419,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                         border: '1px solid #CBD5E1',
                         backgroundColor: isLast ? '#F1F5F9' : '#FFFFFF',
                         color: isLast ? '#94A3B8' : '#0F172A',
-                        cursor: isLast || saving ? 'not-allowed' : 'pointer',
+                        cursor: isLast || saving || isDeletingThis ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -385,6 +428,28 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
                       }}
                     >
                       <ArrowDown size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(cat)}
+                      disabled={saving || isDeletingThis}
+                      title={`Delete "${cat.name}" category`}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        border: '1px solid #FECACA',
+                        backgroundColor: '#FEF2F2',
+                        color: '#DC2626',
+                        cursor: saving || isDeletingThis ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: saving || isDeletingThis ? 0.5 : 1,
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {isDeletingThis ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                     </button>
                   </div>
                 </div>
@@ -397,7 +462,10 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
         <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              if (onReordered) onReordered();
+              onClose();
+            }}
             disabled={saving}
             style={{
               padding: '8px 16px',

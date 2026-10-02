@@ -27,8 +27,6 @@ import {
 import toast from 'react-hot-toast';
 import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
-import { CustomSelect } from '@/components/ui/CustomSelect';
-import { checkTableAssignment } from '@/lib/table-capacity';
 import { printKotFromBrowser, printBillFromBrowser } from '@/lib/client-print';
 import { printBillTemplateDirectly } from '@/components/BillTemplate';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -134,11 +132,18 @@ export function OrderDetailsView({
     }
   };
 
-  const handleUpdateTable = async () => {
-    if (!tempTableNumber && !order.table_number) return;
+
+  const handleCancelOrder = async () => {
+    if (!window.confirm(`Are you sure you want to cancel Order #${String(order.ticket_number).padStart(3, '0')}?`)) {
+      return;
+    }
     setActionLoading(true);
     try {
-      await onStatusChange(order.id, tempStatus, tempTableNumber, paymentMethod);
+      await onStatusChange(order.id, 'CANCELLED', tempTableNumber || order.table_number, paymentMethod);
+      setOrder((prev) => ({ ...prev, status: 'CANCELLED', is_paid: false }));
+      toast.success('Order cancelled');
+    } catch {
+      toast.error('Failed to cancel order');
     } finally {
       setActionLoading(false);
     }
@@ -191,61 +196,40 @@ export function OrderDetailsView({
 
   const uniqueCounters = React.useMemo(() => Object.keys(counterGroups), [counterGroups]);
 
-  const [updatingItemIds, setUpdatingItemIds] = useState<Record<string, boolean>>({});
   const [updatingCounters, setUpdatingCounters] = useState<Record<string, boolean>>({});
 
   const getItemStatusBadgeConfig = (status?: string) => {
     const s = (status || 'PENDING').toUpperCase();
     switch (s) {
       case 'PREPARING':
-        return { label: 'Preparing', bg: '#FEF3C7', text: '#B45309', border: '#FDE68A', next: 'READY' };
+        return { label: 'Preparing', bg: '#EFF6FF', text: '#1D4ED8', border: '#BFDBFE' };
       case 'READY':
-        return { label: 'Ready', bg: '#ECFDF5', text: '#047857', border: '#A7F3D0', next: 'SERVED' };
       case 'SERVED':
-        return { label: 'Served', bg: '#F1F5F9', text: '#475569', border: '#E2E8F0', next: 'PREPARING' };
+        return { label: 'Ready', bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' };
       case 'CANCELLED':
-        return { label: 'Cancelled', bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA', next: 'PENDING' };
+        return { label: 'Cancelled', bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA' };
       case 'PENDING':
       default:
-        return { label: 'Pending', bg: '#FFF7ED', text: '#C2410C', border: '#FFEDD5', next: 'PREPARING' };
-    }
-  };
-
-  const handleItemStatusChange = async (item: any, nextStatus: string) => {
-    if (!item.id) return;
-    setUpdatingItemIds(prev => ({ ...prev, [item.id]: true }));
-    try {
-      const res = await orderService.updateOrderItemStatus(order.id, {
-        item_ids: [item.id],
-        status: nextStatus,
-      });
-      if (res.success && res.data) {
-        setOrder(res.data);
-        setTempStatus(res.data.status);
-        if (onOrderUpdated) onOrderUpdated(res.data);
-        toast.success(`${item.product_name || 'Item'} marked as ${nextStatus}`);
-      } else {
-        toast.error(res.error || 'Failed to update item status');
-      }
-    } catch {
-      toast.error('Network error');
-    } finally {
-      setUpdatingItemIds(prev => ({ ...prev, [item.id]: false }));
+        return { label: 'Pending', bg: '#FFF7ED', text: '#C2410C', border: '#FFEDD5' };
     }
   };
 
   const handleCounterStatusChange = async (counterName: string, nextStatus: string) => {
     setUpdatingCounters(prev => ({ ...prev, [counterName]: true }));
     try {
+      const itemsInCounter = counterGroups[counterName] || [];
+      const itemIds = itemsInCounter.map((i: any) => i.id).filter(Boolean);
+
       const res = await orderService.updateOrderItemStatus(order.id, {
         counter: counterName,
+        item_ids: itemIds,
         status: nextStatus,
       });
       if (res.success && res.data) {
         setOrder(res.data);
         setTempStatus(res.data.status);
         if (onOrderUpdated) onOrderUpdated(res.data);
-        toast.success(`All ${counterName} items marked as ${nextStatus}`);
+        toast.success(`All ${counterName} items marked as Ready`);
       } else {
         toast.error(res.error || 'Failed to update counter items');
       }
@@ -418,7 +402,19 @@ export function OrderDetailsView({
       }
     } catch (err: any) {
       console.error('Bill print error:', err);
-      toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      try {
+        printBillTemplateDirectly(order, restaurant ? {
+          name: restaurant.name,
+          logo_url: restaurant.logo_url,
+          address: restaurant.address,
+          phone: restaurant.phone,
+          primary_color: restaurant.primary_color,
+          gst_number: restaurant.gst_number,
+        } : undefined);
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, { id: toastId });
+      } catch {
+        toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
     } finally {
       setIsPrintingBill(false);
     }
@@ -583,8 +579,7 @@ export function OrderDetailsView({
                 #{String(order.ticket_number).padStart(3, '0')}
               </span>
               <OrderTypeBadge type={order.order_type} variant="minimal" />
-              <OrderStatusBadge status={order.status} />
-              {order.table_number && (
+              {order.order_type !== 'TAKEAWAY' && order.order_type !== 'DELIVERY' && order.table_number && (
                 <span
                   style={{
                     display: 'inline-flex',
@@ -899,95 +894,6 @@ export function OrderDetailsView({
         }}
       >
 
-        {/* SECTION: STATUS & TABLE CONTROLS */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '10px' }}>
-            Status & Table
-          </div>
-
-          {/* Status Select */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              Status
-            </label>
-            <CustomSelect
-              value={tempStatus}
-              disabled={actionLoading || loading}
-              onChange={(val) => {
-                setTempStatus(val);
-                handleUpdateStatus(val);
-              }}
-              direction="auto"
-              options={allStatuses.map((s) => ({ value: s, label: s }))}
-              buttonStyle={{ height: '36px', fontSize: '13px' }}
-            />
-          </div>
-
-          {/* Table Select */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              Assigned Table
-            </label>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <CustomSelect
-                style={{ flex: 1 }}
-                value={tempTableNumber}
-                disabled={actionLoading || loading}
-                onChange={(val) => setTempTableNumber(val)}
-                direction="auto"
-                options={[
-                  { value: '', label: '-- No Table --' },
-                  ...tables
-                    .filter((t: any) => {
-                      const partySize = Number(order.party_size) || 1;
-                      const check = checkTableAssignment(t, partySize, {
-                        orderId: order.id,
-                        phone: order.phone,
-                        customerName: order.customer_name,
-                      });
-                      const isCurrent = t.table_number === tempTableNumber;
-                      return check.allowed || isCurrent;
-                    })
-                    .map((t: any) => {
-                      const partySize = Number(order.party_size) || 1;
-                      const check = checkTableAssignment(t, partySize, {
-                        orderId: order.id,
-                        phone: order.phone,
-                        customerName: order.customer_name,
-                      });
-                      const cap = Number(t.capacity) || 0;
-                      const seated = check.occupiedSeats;
-                      const rawNum = String(t.table_number || '').trim();
-                      let tableLabel = rawNum;
-                      if (/^\d+$/.test(rawNum)) {
-                        tableLabel = `T${rawNum}`;
-                      } else if (rawNum.toLowerCase().startsWith('t-')) {
-                        tableLabel = `T-${rawNum.slice(2)}`;
-                      }
-                      const freeSeats = Math.max(0, cap - seated);
-
-                      return {
-                        value: String(t.table_number),
-                        label: `${tableLabel} · ${seated}/${cap} (${freeSeats} free)`,
-                      };
-                    }),
-                  ...(tempTableNumber && !tables.some((t: any) => String(t.table_number) === String(tempTableNumber))
-                    ? [{ value: tempTableNumber, label: `Table ${tempTableNumber}` }]
-                    : []),
-                ]}
-                buttonStyle={{ height: '36px', fontSize: '13px' }}
-              />
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={handleUpdateTable}
-                disabled={actionLoading || loading || tempTableNumber === (order.table_number || '')}
-                style={{ height: '36px', padding: '0 12px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '8px' }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
 
 
         {/* SECTION: ORDER ITEMS (COUNTER ROUTED & PER-ITEM STATUS) */}
@@ -1008,8 +914,8 @@ export function OrderDetailsView({
             {uniqueCounters.length > 0 ? (
               uniqueCounters.map((cName) => {
                 const itemsInCounter = counterGroups[cName] || [];
-                const readyOrServedCount = itemsInCounter.filter((i: any) => ['READY', 'SERVED'].includes((i.status || 'PENDING').toUpperCase())).length;
-                const isAllReady = itemsInCounter.length > 0 && readyOrServedCount === itemsInCounter.length;
+                const readyCount = itemsInCounter.filter((i: any) => ['READY', 'SERVED'].includes((i.status || 'PENDING').toUpperCase())).length;
+                const isAllReady = itemsInCounter.length > 0 && readyCount === itemsInCounter.length;
                 const isCounterUpdating = Boolean(updatingCounters[cName]);
 
                 return (
@@ -1053,7 +959,7 @@ export function OrderDetailsView({
                             {cName}
                           </span>
                           <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>
-                            ({readyOrServedCount}/{itemsInCounter.length} Ready)
+                            ({readyCount}/{itemsInCounter.length} Ready)
                           </span>
                         </div>
                       </div>
@@ -1112,7 +1018,6 @@ export function OrderDetailsView({
                     {/* Counter Items List */}
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       {itemsInCounter.map((item: any, idx: number) => {
-                        const isItemUpdating = Boolean(updatingItemIds[item.id]);
                         const statusConfig = getItemStatusBadgeConfig(item.status);
 
                         return (
@@ -1164,13 +1069,9 @@ export function OrderDetailsView({
                               </div>
                             </div>
 
-                            {/* Item Status Toggle & Price */}
+                            {/* Item Status (Static Badge) & Price */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                              <button
-                                type="button"
-                                disabled={isItemUpdating}
-                                onClick={() => handleItemStatusChange(item, statusConfig.next)}
-                                title={`Current: ${statusConfig.label}. Click to mark ${statusConfig.next}`}
+                              <span
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -1182,24 +1083,19 @@ export function OrderDetailsView({
                                   border: `1px solid ${statusConfig.border}`,
                                   padding: '3px 8px',
                                   borderRadius: '6px',
-                                  cursor: isItemUpdating ? 'not-allowed' : 'pointer',
-                                  transition: 'all 0.15s ease',
+                                  userSelect: 'none',
                                 }}
                               >
-                                {isItemUpdating ? (
-                                  <Loader2 size={11} className="animate-spin" />
-                                ) : (
-                                  <span
-                                    style={{
-                                      width: '6px',
-                                      height: '6px',
-                                      borderRadius: '50%',
-                                      backgroundColor: statusConfig.text,
-                                    }}
-                                  />
-                                )}
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: statusConfig.text,
+                                  }}
+                                />
                                 {statusConfig.label}
-                              </button>
+                              </span>
 
                               <div
                                 style={{
@@ -1476,6 +1372,36 @@ export function OrderDetailsView({
             <p style={{ margin: 0, fontSize: '12px', color: '#92400E', fontStyle: 'italic', lineHeight: 1.4 }}>
               "{order.notes}"
             </p>
+          </div>
+        )}
+
+        {/* ACTION: CANCEL ORDER (if active) */}
+        {order.status !== 'CANCELLED' && (
+          <div style={{ padding: '16px 20px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'flex-end', background: '#FAFAFA' }}>
+            <button
+              type="button"
+              onClick={handleCancelOrder}
+              disabled={actionLoading || loading}
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #FECACA',
+                borderRadius: '8px',
+                color: '#DC2626',
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '7px 14px',
+                cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#FFFFFF'; }}
+            >
+              <X size={13} />
+              <span>Cancel Order</span>
+            </button>
           </div>
         )}
       </div>

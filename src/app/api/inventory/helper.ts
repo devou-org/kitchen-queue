@@ -3,17 +3,32 @@ import { getRestaurantBySlug, getRestaurantModules } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 
 export async function resolveRestaurantId(request: NextRequest): Promise<string | null> {
-  const admin = await requireAdmin(request);
-  let restaurantId: string | null = admin?.restaurantId || null;
+  const headerSlug = request.headers.get('x-restaurant-slug');
+  const { searchParams } = new URL(request.url);
+  const querySlug = searchParams.get('slug');
+
+  let rawSlug = querySlug || headerSlug || '';
+  if (rawSlug.startsWith('["') || rawSlug.startsWith("['")) {
+    try {
+      const parsed = JSON.parse(rawSlug);
+      if (Array.isArray(parsed) && parsed[0]) rawSlug = parsed[0];
+    } catch {
+      // ignore
+    }
+  }
+  const cleanSlug = rawSlug.replace(/[\[\]'"]/g, '').trim();
+
+  let restaurantId: string | null = null;
+  if (cleanSlug) {
+    const restaurant = await getRestaurantBySlug(cleanSlug);
+    if (restaurant) restaurantId = restaurant.id;
+  }
 
   if (!restaurantId) {
-    const headerSlug = request.headers.get('x-restaurant-slug');
-    const { searchParams } = new URL(request.url);
-    const querySlug = searchParams.get('slug');
-    const slug = querySlug?.trim() || headerSlug?.trim() || admin?.restaurantSlug;
-
-    if (slug) {
-      const restaurant = await getRestaurantBySlug(slug);
+    const admin = await requireAdmin(request);
+    restaurantId = admin?.restaurantId || (admin as any)?.restaurant_id || null;
+    if (!restaurantId && admin?.restaurantSlug) {
+      const restaurant = await getRestaurantBySlug(admin.restaurantSlug);
       if (restaurant) restaurantId = restaurant.id;
     }
   }

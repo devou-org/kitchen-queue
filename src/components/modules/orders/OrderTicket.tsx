@@ -77,11 +77,6 @@ export default function OrderTicket({ order, onUpdateStatus }: OrderTicketProps)
               Ready
             </button>
           )}
-          {order.status === 'READY' && (
-            <button onClick={() => onUpdateStatus(order.id, 'SERVED')} className="flex-1 bg-gray-800 text-white font-bold py-2 rounded shadow hover:bg-gray-900 transition">
-              Serve
-            </button>
-          )}
         </div>
       )}
     </div>

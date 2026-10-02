@@ -375,9 +375,11 @@ export default function AdminOrders() {
           counterName: data.counter_name,
           isAutoPrint: true,
         });
+
+        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${data.counter_name} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
-            id: `print-${data.order_id}-${data.counter_name}`,
+          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
           });
         } else {
           toast.error(result.message || '⚠️ Thermal printer not paired. Tap "Pair Printer" at the top.', {
@@ -407,7 +409,7 @@ export default function AdminOrders() {
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
-        is_paid: newStatus === 'PAID' ? true : undefined,
+        is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
         payment_method: pMethod || undefined
       });
@@ -421,7 +423,7 @@ export default function AdminOrders() {
             status: newStatus as Order['status'],
             table_number: tableNumber ?? o.table_number,
             payment_method: pMethod ?? o.payment_method,
-            is_paid: newStatus === 'PAID' ? true : o.is_paid
+            is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
           } : o)
             .filter(o => {
               if (currentFilter !== 'ALL') return o.status === currentFilter;
@@ -433,7 +435,7 @@ export default function AdminOrders() {
           status: newStatus as Order['status'],
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
-          is_paid: newStatus === 'PAID' ? true : prev.is_paid
+          is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
         toast.success(`Order updated to ${newStatus}`);
       } else {

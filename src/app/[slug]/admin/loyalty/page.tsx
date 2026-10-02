@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
-import { 
-  Gift, Users, Award, TrendingUp, Search, RefreshCw, Plus, 
-  Settings, History, Edit2, Trash2, CheckCircle2, 
+import {
+  Gift, Users, Award, TrendingUp, Search, RefreshCw, Plus,
+  Settings, History, Edit2, Trash2, CheckCircle2,
   XCircle, Clock, AlertCircle, ShoppingBag, Filter, X, Loader2, Sparkles
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -322,7 +322,7 @@ export default function AdminLoyaltyPage() {
   const totalSpentSum = customers.reduce((acc, c) => acc + Number(c.total_spent || 0), 0);
 
   return (
-    <AdminContentWrapper>
+    <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
       <Toaster 
         position="top-right" 
         containerStyle={{
@@ -337,7 +337,7 @@ export default function AdminLoyaltyPage() {
           },
         }}
       />
-      
+
       <style>{`
         .loyalty-page-header,
         .loyalty-page-header.admin-page-header-container {
@@ -345,7 +345,7 @@ export default function AdminLoyaltyPage() {
           min-height: 68px !important;
           display: flex !important;
           align-items: stretch !important;
-          margin: 0 0 24px 0 !important;
+          margin: 0 !important;
           padding: 0 20px 0 0 !important;
           border-bottom: 1px solid var(--border, #e2e8f0) !important;
           background: #FFFFFF !important;
@@ -364,7 +364,8 @@ export default function AdminLoyaltyPage() {
           width: 100% !important;
         }
 
-        .loyalty-page-header .admin-header-left {
+        .loyalty-page-header .admin-header-left,
+        .loyalty-page-header .admin-header-search {
           height: 68px !important;
           display: flex !important;
           align-items: stretch !important;
@@ -374,47 +375,97 @@ export default function AdminLoyaltyPage() {
           padding: 0 !important;
         }
 
-        .loyalty-nav-bar {
+        .loyalty-toolbar {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: stretch !important;
+          justify-content: space-between !important;
+          gap: 12px !important;
+          width: 100% !important;
+          height: 68px !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .loyalty-tabs-wrapper {
+          display: flex !important;
+          align-items: stretch !important;
+          height: 68px !important;
+          min-height: 68px !important;
+          padding-top: 10px !important;
+          padding-right: 0 !important;
+          padding-bottom: 0 !important;
+          padding-left: 0 !important;
+          box-sizing: border-box !important;
+          flex: 1 1 auto !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+          overflow-x: auto !important;
+        }
+
+        .loyalty-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+          height: 68px !important;
+        }
+
+        .loyalty-nav-scroll {
           display: flex;
           align-items: stretch;
-          overflow-x: auto;
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-          height: 68px;
           gap: 0;
+          overflow-x: auto;
+          overscroll-behavior-x: contain;
+          -webkit-overflow-scrolling: touch;
+          touch-action: pan-x;
+          border-top: none;
+          height: 100%;
           padding: 0;
           margin: 0;
-          flex: 1 1 100%;
+          border-bottom: none;
+          background-color: transparent;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          box-sizing: border-box;
+          position: relative;
         }
-        .loyalty-nav-bar::-webkit-scrollbar {
+        .loyalty-nav-scroll::-webkit-scrollbar {
           display: none;
         }
         .loyalty-nav-item {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
+          justify-content: center;
+          height: 100%;
+          box-sizing: border-box;
           padding: 0 20px;
+          border-radius: 0;
           font-size: 13.5px;
           font-weight: 500;
           color: #475569;
-          background: transparent;
+          text-decoration: none;
+          white-space: nowrap;
+          flex-shrink: 0;
+          cursor: pointer;
           border: none;
           border-top: 3.5px solid transparent;
-          cursor: pointer;
-          white-space: nowrap;
+          margin-top: 0;
+          background-color: transparent;
           transition: all 0.15s ease-in-out;
-          flex-shrink: 0;
-          height: 100%;
         }
-        .loyalty-nav-item:hover:not(.active) {
-          color: #0f172a;
+        .loyalty-nav-item:hover:not(.loyalty-nav-item--active) {
+          color: #0F172A;
           background-color: rgba(0, 0, 0, 0.035);
         }
-        .loyalty-nav-item.active {
+        .loyalty-nav-item--active {
           font-weight: 600;
-          color: var(--primary, #059669);
-          background-color: color-mix(in srgb, var(--primary, #059669) 9%, transparent);
-          border-top: 3.5px solid var(--primary, #059669);
+          color: var(--primary, #971345);
+          background-color: color-mix(in srgb, var(--primary, #971345) 9%, transparent);
+          border-top: 3.5px solid var(--primary, #971345);
         }
         .loyalty-badge {
           display: inline-flex;
@@ -424,37 +475,97 @@ export default function AdminLoyaltyPage() {
           border-radius: 12px;
           font-size: 11px;
           font-weight: 700;
+          margin-left: 6px;
+        }
+        .loyalty-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+          height: 68px !important;
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
           .loyalty-page-header,
           .loyalty-page-header.admin-page-header-container {
             height: auto !important;
             min-height: auto !important;
-            flex-direction: column !important;
-            padding: 0 12px !important;
-            margin-bottom: 16px !important;
-          }
-          .loyalty-page-header .admin-page-header-container {
-            height: auto !important;
-            min-height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: flex !important;
             flex-direction: column !important;
             align-items: stretch !important;
-            gap: 8px !important;
+            border-bottom: 1px solid var(--border, #e2e8f0) !important;
+            background: #FFFFFF !important;
           }
-          .loyalty-page-header .admin-header-left {
-            height: 48px !important;
+
+          .loyalty-page-header .admin-page-header-container,
+          .loyalty-page-header .admin-header-left,
+          .loyalty-page-header .admin-header-search {
+            height: auto !important;
+            min-height: auto !important;
             width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
-          .loyalty-page-header .admin-header-right {
+
+          .loyalty-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          .loyalty-tabs-wrapper {
+            width: 100% !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            padding: 0 !important;
+            border-bottom: 1px solid var(--border, #e2e8f0) !important;
+            box-sizing: border-box !important;
+            background: #FFFFFF !important;
+            overflow-x: auto !important;
+          }
+          .loyalty-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            height: auto !important;
+          }
+          .loyalty-tabs-wrapper {
+            width: 100% !important;
+            height: auto !important;
+          }
+          .loyalty-actions {
             width: 100% !important;
             margin-left: 0 !important;
-            padding: 4px 0 8px 0 !important;
-            justify-content: space-between !important;
+            justify-content: flex-start !important;
+            flex-wrap: wrap !important;
+            height: auto !important;
           }
-          .loyalty-nav-bar {
-            height: 48px !important;
+
+          .loyalty-actions button {
+            flex: 1 !important;
+            justify-content: center !important;
           }
+
+          .loyalty-maximize-wrapper {
+            display: none !important;
+          }
+
+          .loyalty-content-container {
+            padding: 14px 16px !important;
+          }
+
           .loyalty-metrics-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 8px !important;
@@ -471,12 +582,6 @@ export default function AdminLoyaltyPage() {
           .loyalty-metric-subtext {
             font-size: 10px !important;
           }
-          .loyalty-nav-item {
-            height: 48px !important;
-            padding: 0 10px !important;
-            font-size: 12px !important;
-            gap: 4px !important;
-          }
           .loyalty-grid-2col {
             grid-template-columns: 1fr !important;
           }
@@ -488,9 +593,6 @@ export default function AdminLoyaltyPage() {
           .rewards-grid {
             grid-template-columns: 1fr !important;
           }
-        }
-
-        @media (max-width: 768px) {
           .loyalty-table-desktop {
             display: none !important;
           }
@@ -509,139 +611,164 @@ export default function AdminLoyaltyPage() {
       `}</style>
 
       {/* Header Toolbar with Inline Navigation Tabs */}
-      <AdminPageHeader 
+      <AdminPageHeader
         className="loyalty-page-header"
+        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
+        hideMaximize={true}
         search={
-          <div className="loyalty-nav-bar">
-            <button
-              onClick={() => setActiveTab('customers')}
-              className={`loyalty-nav-item ${activeTab === 'customers' ? 'active' : ''}`}
-            >
-              <Users size={16} />
-              Customers
-              <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? '#dcfce7' : '#f1f5f9', color: activeTab === 'customers' ? '#15803d' : '#64748b' }}>
-                {customers.length}
-              </span>
-            </button>
+          <div className="loyalty-toolbar">
+            <div className="loyalty-tabs-wrapper">
+              <div className="loyalty-nav-scroll">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('customers')}
+                  className={`loyalty-nav-item ${activeTab === 'customers' ? 'loyalty-nav-item--active' : ''}`}
+                >
+                  <Users size={15} style={{ marginRight: '6px' }} />
+                  <span>Customers</span>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
+                    {customers.length}
+                  </span>
+                </button>
 
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`loyalty-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            >
-              <Settings size={16} />
-              Rules
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('settings')}
+                  className={`loyalty-nav-item ${activeTab === 'settings' ? 'loyalty-nav-item--active' : ''}`}
+                >
+                  <Settings size={15} style={{ marginRight: '6px' }} />
+                  <span>Rules</span>
+                </button>
 
-            <button
-              onClick={() => setActiveTab('rewards')}
-              className={`loyalty-nav-item ${activeTab === 'rewards' ? 'active' : ''}`}
-            >
-              <Gift size={16} />
-              Rewards
-              <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? '#dcfce7' : '#f1f5f9', color: activeTab === 'rewards' ? '#15803d' : '#64748b' }}>
-                {rewards.length}
-              </span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('rewards')}
+                  className={`loyalty-nav-item ${activeTab === 'rewards' ? 'loyalty-nav-item--active' : ''}`}
+                >
+                  <Gift size={15} style={{ marginRight: '6px' }} />
+                  <span>Rewards</span>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
+                    {rewards.length}
+                  </span>
+                </button>
 
-            <button
-              onClick={() => setActiveTab('transactions')}
-              className={`loyalty-nav-item ${activeTab === 'transactions' ? 'active' : ''}`}
-            >
-              <History size={16} />
-              Audit Log
-              <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? '#dcfce7' : '#f1f5f9', color: activeTab === 'transactions' ? '#15803d' : '#64748b' }}>
-                {transactions.length}
-              </span>
-            </button>
-          </div>
-        }
-        action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {activeTab === 'settings' && (
-              <button
-                type="button"
-                onClick={(e) => handleSaveSettings(e as any)}
-                disabled={isSavingSettings}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  background: 'var(--primary, #059669)',
-                  color: 'white',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  opacity: isSavingSettings ? 0.7 : 1,
-                }}
-              >
-                <CheckCircle2 size={15} className={isSavingSettings ? 'animate-spin' : ''} />
-                <span>{isSavingSettings ? 'Saving...' : 'Save Program Rules'}</span>
-              </button>
-            )}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('transactions')}
+                  className={`loyalty-nav-item ${activeTab === 'transactions' ? 'loyalty-nav-item--active' : ''}`}
+                >
+                  <History size={15} style={{ marginRight: '6px' }} />
+                  <span>Audit Log</span>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
+                    {transactions.length}
+                  </span>
+                </button>
+              </div>
+            </div>
 
-            {activeTab === 'rewards' && (
-              <button
-                onClick={() => {
-                  setEditingReward(null);
-                  setRewardForm({
-                    name: '',
-                    points_required: 100,
-                    reward_type: 'DISCOUNT_AMOUNT',
-                    discount_value: 50,
-                    selected_product_ids: [],
-                    min_purchase_amount: 0,
-                    valid_until: '',
-                  });
-                  setShowRewardModal(true);
-                }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  background: 'var(--primary, #059669)',
-                  color: 'white',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                }}
-              >
-                <Plus size={15} /> Add New Reward
-              </button>
-            )}
+            <div className="loyalty-actions">
+              {activeTab === 'settings' && (
+                <button
+                  type="button"
+                  onClick={(e) => handleSaveSettings(e as any)}
+                  disabled={isSavingSettings}
+                  style={{
+                    height: '38px',
+                    padding: '0 14px',
+                    borderRadius: '8px',
+                    background: 'var(--primary, #971345)',
+                    color: '#FFFFFF',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                    opacity: isSavingSettings ? 0.7 : 1,
+                  }}
+                >
+                  <CheckCircle2 size={15} className={isSavingSettings ? 'animate-spin' : ''} />
+                  <span>{isSavingSettings ? 'Saving...' : 'Save Program Rules'}</span>
+                </button>
+              )}
 
-            <button
-              onClick={() => fetchData()}
-              title="Refresh Loyalty Data"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                border: '1px solid var(--border, #cbd5e1)',
-                background: 'white',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#334155',
-                cursor: 'pointer',
-              }}
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
+              {activeTab === 'rewards' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingReward(null);
+                    setRewardForm({
+                      name: '',
+                      points_required: 100,
+                      reward_type: 'DISCOUNT_AMOUNT',
+                      discount_value: 50,
+                      selected_product_ids: [],
+                      min_purchase_amount: 0,
+                      valid_until: '',
+                    });
+                    setShowRewardModal(true);
+                  }}
+                  style={{
+                    height: '38px',
+                    padding: '0 14px',
+                    borderRadius: '8px',
+                    background: 'var(--primary, #971345)',
+                    color: '#FFFFFF',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                  }}
+                >
+                  <Plus size={15} />
+                  <span>Add New Reward</span>
+                </button>
+              )}
+
+              {/* Refresh Button with Left Border Separator, matching Inventory */}
+              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <button
+                  type="button"
+                  onClick={() => fetchData()}
+                  title="Refresh Loyalty Data"
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    padding: 0,
+                    borderRadius: '8px',
+                    border: '1px solid var(--border, #E2E8F0)',
+                    background: '#FFFFFF',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0,
+                  }}
+                >
+                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+
+              {/* Maximize Layout Toggle */}
+              <LayoutMaximizeToggle />
+            </div>
           </div>
         }
       />
 
-      {/* Metrics Row */}
+      <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        {/* Metrics Row */}
       <div className="loyalty-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -709,7 +836,7 @@ export default function AdminLoyaltyPage() {
                 }}
               />
               {customerSearch && (
-                <button 
+                <button
                   onClick={() => setCustomerSearch('')}
                   style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
                 >
@@ -769,13 +896,13 @@ export default function AdminLoyaltyPage() {
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <div style={{ flex: 1, height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', maxWidth: '100px' }}>
-                            <div 
-                              style={{ 
-                                height: '100%', 
-                                width: `${Math.min(100, ((c.visit_progress || 0) / (settings.visit_milestone_count || 5)) * 100)}%`, 
-                                background: '#2563eb', 
-                                borderRadius: '4px' 
-                              }} 
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${Math.min(100, ((c.visit_progress || 0) / (settings.visit_milestone_count || 5)) * 100)}%`,
+                                background: '#2563eb',
+                                borderRadius: '4px'
+                              }}
                             />
                           </div>
                           <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
@@ -1211,7 +1338,7 @@ export default function AdminLoyaltyPage() {
                         {tx.customer_name} ({tx.phone})
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <span 
+                        <span
                           style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
@@ -1241,6 +1368,7 @@ export default function AdminLoyaltyPage() {
           </div>
         </div>
       )}
+      </div>
 
       {/* MODAL: MANUAL POINTS ADJUSTMENT */}
       {mounted && selectedCustomer && createPortal(
@@ -1254,7 +1382,7 @@ export default function AdminLoyaltyPage() {
                 <X size={18} />
               </button>
             </div>
-            
+
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
               Customer: <strong>{selectedCustomer.name}</strong> ({selectedCustomer.phone})
             </p>

@@ -13,7 +13,7 @@ export async function GET() {
         address TEXT,
         logo_url TEXT,
         primary_color VARCHAR(50) DEFAULT '#971345',
-        secondary_color VARCHAR(50) DEFAULT '#EC7951',
+        secondary_color VARCHAR(50) DEFAULT '#ffffff',
         menu_layout VARCHAR(50) DEFAULT 'GRID',
         menu_title VARCHAR(200) DEFAULT 'Today''s Specials',
         menu_description TEXT DEFAULT 'Hand-curated coastal delicacies prepared with traditional recipes.',

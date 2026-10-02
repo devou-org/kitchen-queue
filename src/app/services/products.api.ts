@@ -46,15 +46,43 @@ class ProductService {
     return headers;
   }
 
-  async getCategories(): Promise<ApiResponse<{ id: string; name: string; sort_order?: number }[]>> {
+  async getCategories(slug?: string): Promise<ApiResponse<{ id: string; name: string; sort_order?: number }[]>> {
     try {
-      const res = await fetch('/api/categories', { 
+      const url = slug ? `/api/categories?slug=${encodeURIComponent(slug)}` : '/api/categories';
+      const res = await fetch(url, { 
         headers: this.getAuthHeaders(),
         cache: 'no-store' 
       });
       return await res.json();
     } catch {
       return { success: false, error: 'Network error fetching food categories' };
+    }
+  }
+
+  async createCategory(name: string, slug?: string): Promise<ApiResponse<{ id: string; name: string; sort_order?: number }>> {
+    try {
+      const url = slug ? `/api/categories?slug=${encodeURIComponent(slug)}` : '/api/categories';
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ name }),
+      });
+      return await res.json();
+    } catch {
+      return { success: false, error: 'Network error creating category' };
+    }
+  }
+
+  async deleteCategory(id: string, slug?: string): Promise<ApiResponse<{ success: boolean; deletedName?: string }>> {
+    try {
+      const query = slug ? `?id=${encodeURIComponent(id)}&slug=${encodeURIComponent(slug)}` : `?id=${encodeURIComponent(id)}`;
+      const res = await fetch(`/api/categories${query}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+      return await res.json();
+    } catch {
+      return { success: false, error: 'Network error deleting category' };
     }
   }
 

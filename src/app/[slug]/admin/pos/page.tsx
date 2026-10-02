@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
 import { Product, CartItem, ProductStatus } from '@/types';
@@ -112,7 +113,9 @@ export default function AdminPosPage() {
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
 
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    setMounted(true);
     tryAutoConnectBluetooth();
   }, []);
 
@@ -251,9 +254,10 @@ export default function AdminPosPage() {
           counterName: data.counter_name,
           isAutoPrint: true,
         });
+        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${data.counter_name || 'KOT'} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
-            id: `kot-auto-${data.ticket_number}-${data.counter_name}`,
+          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
           });
         }
       } catch (err: any) {
@@ -322,14 +326,21 @@ export default function AdminPosPage() {
     const product = products.find(p => p.id === id);
     if (!product) return;
 
-    if (delta > 0 && product.status === 'OUT_OF_STOCK') {
-      toast.error('This item is out of stock');
+    const currentStock = typeof product.stock_quantity === 'number' ? product.stock_quantity : null;
+
+    if (delta > 0 && (product.status === 'OUT_OF_STOCK' || (currentStock !== null && currentStock <= 0))) {
+      toast.error(`"${product.name}" is out of stock (0 available)`);
       return;
     }
 
     const newCart = new Map(cart);
     const existing = newCart.get(id);
     const newQty = (existing?.quantity || 0) + delta;
+
+    if (delta > 0 && currentStock !== null && newQty > currentStock) {
+      toast.error(`"${product.name}" only has ${currentStock} available`);
+      return;
+    }
 
     if (newQty <= 0) {
       newCart.delete(id);
@@ -346,6 +357,57 @@ export default function AdminPosPage() {
     setCart(newCart);
   };
 
+  const triggerAutoPrintBill = async (order: any, restaurantSlug: string) => {
+    const savedPrinter = typeof window !== 'undefined'
+      ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
+      : 'POS-80C';
+
+    try {
+      const res = await fetch('/api/print/bill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': restaurantSlug,
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          printerName: savedPrinter,
+          orderData: order,
+          slug: restaurantSlug,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        console.warn('Auto-print bill server response:', data);
+        return;
+      }
+
+      if (data.mode === 'server' || data.mode === 'agent') {
+        toast.success(`🖨️ Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`);
+        return;
+      }
+
+      const { printBillFromBrowser } = await import('@/lib/client-print');
+      const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : undefined;
+      const clientRes = await printBillFromBrowser({
+        base64Bytes: data.base64Bytes,
+        billHtml: data.billHtml,
+        orderData: order,
+        billData: data.billData,
+        printerName: data.printer || savedPrinter,
+        ticketNumber: order.ticket_number,
+        localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
+      });
+
+      if (clientRes.success) {
+        toast.success(`🖨️ Auto-printed Bill #${String(order.ticket_number).padStart(3, '0')}!`);
+      }
+    } catch (err) {
+      console.error('Auto-print bill execution error:', err);
+    }
+  };
+
   const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.size === 0) {
@@ -355,6 +417,24 @@ export default function AdminPosPage() {
     const isTakeaway = orderForm.order_type === 'TAKEAWAY';
     if (!isTakeaway && !orderForm.customer_name && !orderForm.table_number) {
       toast.error('Please provide a Customer Name or Table Number');
+      return;
+    }
+
+    // Pre-validate cart items against current product stock
+    const stockErrors: string[] = [];
+    for (const [productId, cartItem] of cart.entries()) {
+      const prod = products.find(p => p.id === productId);
+      if (prod) {
+        const avail = typeof prod.stock_quantity === 'number' ? prod.stock_quantity : null;
+        if (prod.status === 'OUT_OF_STOCK' || (avail !== null && avail <= 0)) {
+          stockErrors.push(`"${prod.name}" is out of stock (0 available)`);
+        } else if (avail !== null && cartItem.quantity > avail) {
+          stockErrors.push(`"${prod.name}" only has ${avail} available (${cartItem.quantity} selected)`);
+        }
+      }
+    }
+    if (stockErrors.length > 0) {
+      toast.error(stockErrors.join(' • '));
       return;
     }
 
@@ -386,9 +466,27 @@ export default function AdminPosPage() {
       if (res.success && res.data) {
         const createdOrder = res.data;
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
+
+        // Check if Print Bill button was clicked
+        const willPrintBill = Boolean((e as any)?.auto_print_bill ?? orderForm.auto_print_bill);
+
+        if (willPrintBill) {
+          triggerAutoPrintBill(createdOrder, slug as string);
+        }
+
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH' });
+        setOrderForm({
+          customer_name: '',
+          phone: '',
+          table_number: '',
+          party_size: 1,
+          notes: '',
+          order_type: 'DINE_IN',
+          is_paid: false,
+          payment_method: 'CASH',
+          auto_print_bill: willPrintBill,
+        });
         await fetchTables();
       } else {
         toast.error(res.error || 'Failed to place order');
@@ -591,7 +689,7 @@ export default function AdminPosPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', paddingBottom: totalItems > 0 ? '90px' : '24px' }}>
         {filtered.map(product => (
           <ProductCard
             key={product.id}
@@ -602,17 +700,75 @@ export default function AdminPosPage() {
         ))}
       </div>
 
-      {totalItems > 0 && (
-        <div style={{ position: 'fixed', bottom: '24px', left: 0, right: 0, padding: '0 16px', zIndex: 40, display: 'flex', justifyContent: 'center' }}>
+      {mounted && totalItems > 0 && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: 0,
+            right: 0,
+            padding: '0 20px',
+            zIndex: 99999,
+            pointerEvents: 'none',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
           <button
+            type="button"
             className="btn btn-primary"
             onClick={() => setCheckoutOpen(true)}
-            style={{ width: '100%', maxWidth: '400px', borderRadius: '8px', height: '48px', fontSize: '15px', fontWeight: 700, display: 'flex', justifyContent: 'space-between', padding: '0 20px', boxShadow: '0 8px 20px rgba(0,0,0,0.2)' }}
+            style={{
+              pointerEvents: 'auto',
+              width: '100%',
+              maxWidth: '460px',
+              borderRadius: '12px',
+              height: '52px',
+              fontSize: '15px',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 20px',
+              boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)',
+              cursor: 'pointer',
+              border: 'none',
+              background: 'var(--primary, #059669)',
+              color: '#FFFFFF',
+              letterSpacing: '-0.01em',
+              transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
+              e.currentTarget.style.boxShadow = '0 16px 36px -4px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(5, 150, 105, 0.55)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)';
+            }}
           >
-            <span>{totalItems} items</span>
-            <span>Checkout {formatPrice(totalPrice)}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span
+                style={{
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  padding: '3px 10px',
+                  borderRadius: '999px',
+                  fontSize: '13px',
+                  fontWeight: 900,
+                }}
+              >
+                {totalItems} {totalItems === 1 ? 'item' : 'items'}
+              </span>
+              <span style={{ fontSize: '15px', fontWeight: 800 }}>View Cart &amp; Checkout</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 900 }}>
+              <span>{formatPrice(totalPrice)}</span>
+              <span style={{ fontSize: '19px', lineHeight: 1 }}>→</span>
+            </div>
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       <POSCheckoutDrawer

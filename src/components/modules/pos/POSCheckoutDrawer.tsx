@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import toast from 'react-hot-toast';
 import {
   X,
   ShoppingBag,
@@ -19,6 +20,7 @@ import {
   CreditCard,
   Banknote,
   QrCode,
+  Printer,
 } from 'lucide-react';
 import { CartItem, OrderType } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -35,6 +37,7 @@ export interface POSOrderFormData {
   order_type: OrderType | string;
   is_paid?: boolean;
   payment_method?: string;
+  auto_print_bill?: boolean;
 }
 
 export interface POSCheckoutDrawerProps {
@@ -64,10 +67,108 @@ export function POSCheckoutDrawer({
 }: POSCheckoutDrawerProps) {
   const [mounted, setMounted] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [printingBill, setPrintingBill] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handlePrintCurrentBill = async () => {
+    if (printingBill || cart.size === 0) {
+      if (cart.size === 0) toast.error('Cart is empty');
+      return;
+    }
+    setPrintingBill(true);
+
+    const savedPrinter = typeof window !== 'undefined'
+      ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
+      : 'POS-80C';
+
+    const items = Array.from(cart.values()).map((item) => ({
+      product_id: item.product_id,
+      product_name: item.name,
+      name: item.name,
+      quantity: item.quantity,
+      price_at_purchase: item.price,
+      price: item.price,
+    }));
+
+    const targetSlug = restaurant?.slug || (typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : '');
+
+    const billOrderData: any = {
+      ticket_number: orderForm.table_number ? `T-${orderForm.table_number}` : 'EST',
+      customer_name: orderForm.customer_name || (orderForm.order_type === 'TAKEAWAY' ? 'Takeaway Customer' : (orderForm.table_number ? `Table ${orderForm.table_number}` : 'Customer')),
+      phone: orderForm.phone || '',
+      table_number: orderForm.table_number || '',
+      order_type: orderForm.order_type || 'DINE_IN',
+      items,
+      subtotal,
+      gst_type: restaurant?.gst_type || 'NONE',
+      gst_rate: restaurant?.gst_rate || 0,
+      gst_amount: gstAmount,
+      total_price: totalPrice,
+      is_paid: Boolean(orderForm.is_paid),
+      payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
+      notes: orderForm.notes || '',
+      created_at: new Date().toISOString(),
+    };
+
+    const toastId = toast.loading('🖨️ Printing Bill...');
+
+    try {
+      const res = await fetch('/api/print/bill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-restaurant-slug': targetSlug,
+        },
+        body: JSON.stringify({
+          printerName: savedPrinter,
+          orderData: billOrderData,
+          slug: targetSlug,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to print bill');
+      }
+
+      if (data.mode === 'server' || data.mode === 'agent') {
+        toast.success(data.message || 'Bill printed successfully!', { id: toastId });
+        return;
+      }
+
+      const { printBillFromBrowser } = await import('@/lib/client-print');
+      const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : undefined;
+      const clientRes = await printBillFromBrowser({
+        base64Bytes: data.base64Bytes,
+        billHtml: data.billHtml,
+        orderData: billOrderData,
+        billData: data.billData,
+        printerName: data.printer || savedPrinter,
+        ticketNumber: billOrderData.ticket_number,
+        localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
+      });
+
+      if (clientRes.success) {
+        toast.success(clientRes.message || 'Bill printed successfully!', { id: toastId });
+      } else {
+        toast.error(clientRes.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
+    } catch (err: any) {
+      console.error('Print bill error:', err);
+      try {
+        const { printBillTemplateDirectly } = await import('@/lib/bill-template-html');
+        printBillTemplateDirectly(billOrderData, restaurant);
+        toast.success('Bill sent to printer!', { id: toastId });
+      } catch (directErr: any) {
+        toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
+    } finally {
+      setPrintingBill(false);
+    }
+  };
 
   const handleDismiss = () => {
     if (submitting || isClosing) return;
@@ -121,15 +222,51 @@ export function POSCheckoutDrawer({
     return { gstAmount: gst, totalPrice: total };
   }, [subtotal, restaurant]);
 
-  // Person Options for CustomSelect (1 to 15)
-  const personOptions = useMemo(
-    () =>
-      Array.from({ length: 15 }, (_, i) => ({
-        value: String(i + 1),
-        label: `${i + 1} ${i === 0 ? 'Person' : 'Persons'}`,
-      })),
-    []
-  );
+  // Helper to calculate max free seats for a table
+  const getTableFreeSeats = (table: any, partyContext?: { phone?: string; customerName?: string }): number => {
+    if (!table) return 1;
+    const cap = Number(table.capacity) || 1;
+    const check = checkTableAssignment(table, 1, partyContext);
+    const seated = check.occupiedSeats || 0;
+    const free = cap - seated;
+    return free > 0 ? free : 1;
+  };
+
+  // Dynamic Person Options based on selected table's max free seats
+  const personOptions = useMemo(() => {
+    const selectedTable = tables.find(
+      (t: any) => String(t.table_number) === String(orderForm.table_number)
+    );
+    const maxFree = selectedTable
+      ? getTableFreeSeats(selectedTable, {
+          phone: orderForm.phone,
+          customerName: orderForm.customer_name,
+        })
+      : 15;
+
+    return Array.from({ length: Math.max(1, maxFree) }, (_, i) => ({
+      value: String(i + 1),
+      label: `${i + 1} ${i === 0 ? 'Person' : 'Persons'}`,
+    }));
+  }, [tables, orderForm.table_number, orderForm.phone, orderForm.customer_name]);
+
+  // Ensure party_size is always clamped to max free seats on the selected table
+  useEffect(() => {
+    if (orderForm.table_number && tables.length > 0) {
+      const selectedTable = tables.find(
+        (t: any) => String(t.table_number) === String(orderForm.table_number)
+      );
+      if (selectedTable) {
+        const maxFree = getTableFreeSeats(selectedTable, {
+          phone: orderForm.phone,
+          customerName: orderForm.customer_name,
+        });
+        if (!orderForm.party_size || orderForm.party_size > maxFree) {
+          setOrderForm((prev) => ({ ...prev, party_size: maxFree }));
+        }
+      }
+    }
+  }, [orderForm.table_number, tables, orderForm.party_size, orderForm.phone, orderForm.customer_name, setOrderForm]);
 
   // Table Options for CustomSelect
   const tableOptions = useMemo(() => {
@@ -137,8 +274,7 @@ export function POSCheckoutDrawer({
       { value: '', label: '-- Select Table --' },
       ...tables
         .filter((t: any) => {
-          const partySize = Number(orderForm.party_size) || 1;
-          const check = checkTableAssignment(t, partySize, {
+          const check = checkTableAssignment(t, 1, {
             phone: orderForm.phone,
             customerName: orderForm.customer_name,
           });
@@ -146,8 +282,7 @@ export function POSCheckoutDrawer({
           return check.allowed || isCurrent;
         })
         .map((t: any) => {
-          const partySize = Number(orderForm.party_size) || 1;
-          const check = checkTableAssignment(t, partySize, {
+          const check = checkTableAssignment(t, 1, {
             phone: orderForm.phone,
             customerName: orderForm.customer_name,
           });
@@ -191,7 +326,7 @@ export function POSCheckoutDrawer({
     }
 
     return list;
-  }, [tables, orderForm.party_size, orderForm.phone, orderForm.customer_name, orderForm.table_number]);
+  }, [tables, orderForm.phone, orderForm.customer_name, orderForm.table_number]);
 
   if (!mounted || !isOpen) return null;
 
@@ -649,12 +784,16 @@ export function POSCheckoutDrawer({
                           const matchedTable = tables.find(
                             (t: any) => String(t.table_number) === selectedNum
                           );
+                          const maxFree = matchedTable
+                            ? getTableFreeSeats(matchedTable, {
+                                phone: orderForm.phone,
+                                customerName: orderForm.customer_name,
+                              })
+                            : 1;
                           setOrderForm((prev) => ({
                             ...prev,
                             table_number: selectedNum,
-                            party_size: matchedTable?.capacity
-                              ? Number(matchedTable.capacity)
-                              : prev.party_size,
+                            party_size: maxFree,
                           }));
                         }}
                         options={tableOptions}
@@ -854,89 +993,176 @@ export function POSCheckoutDrawer({
               </div>
             </div>
 
-            {/* Section: Payment Settlement (Optional) */}
+            {/* Section: Payment Selection */}
             <div
               style={{
-                background: orderForm.is_paid ? '#F0FDF4' : '#F8FAFC',
-                border: orderForm.is_paid ? '1px solid #BBF7D0' : '1px solid #E2E8F0',
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
                 borderRadius: '8px',
                 padding: '12px 14px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '10px',
+                gap: '12px',
                 transition: 'all 0.15s ease',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
-                onClick={() =>
-                  setOrderForm((prev) => ({
-                    ...prev,
-                    is_paid: !prev.is_paid,
-                    payment_method: !prev.is_paid ? (prev.payment_method || 'CASH') : prev.payment_method,
-                  }))
-                }
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CreditCard size={16} style={{ color: orderForm.is_paid ? '#16A34A' : '#64748B' }} />
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: orderForm.is_paid ? '#15803D' : '#0F172A' }}>
-                      Mark as Paid (Optional)
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#64748B' }}>
-                      Record payment now without changing kitchen status
-                    </div>
-                  </div>
-                </div>
-
-                <input
-                  type="checkbox"
-                  checked={Boolean(orderForm.is_paid)}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    setOrderForm((prev) => ({
-                      ...prev,
-                      is_paid: e.target.checked,
-                      payment_method: e.target.checked ? (prev.payment_method || 'CASH') : prev.payment_method,
-                    }));
-                  }}
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span
                   style={{
-                    width: '18px',
-                    height: '18px',
-                    accentColor: '#16A34A',
-                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
                   }}
-                />
+                >
+                  PAYMENT
+                </span>
+                {orderForm.is_paid ? (
+                  <span
+                    style={{
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      color: '#15803D',
+                      background: '#DCFCE7',
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    Pay Now
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      color: '#64748B',
+                      background: '#F1F5F9',
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    Pay Later (Unpaid)
+                  </span>
+                )}
               </div>
 
-              {orderForm.is_paid && (
+              {/* Pay Later / Pay Now Radio Options */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '28px', padding: '2px 0' }}>
+                {/* Pay Later */}
+                <label
+                  onClick={() => setOrderForm((prev) => ({ ...prev, is_paid: false }))}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    fontSize: '13.5px',
+                    fontWeight: !orderForm.is_paid ? 700 : 500,
+                    color: !orderForm.is_paid ? '#0F172A' : '#64748B',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      border: !orderForm.is_paid ? '2px solid var(--primary, #059669)' : '2px solid #CBD5E1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#FFFFFF',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {!orderForm.is_paid && (
+                      <div
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: 'var(--primary, #059669)',
+                        }}
+                      />
+                    )}
+                  </div>
+                  <span>Pay Later</span>
+                </label>
+
+                {/* Pay Now */}
+                <label
+                  onClick={() =>
+                    setOrderForm((prev) => ({
+                      ...prev,
+                      is_paid: true,
+                      payment_method: prev.payment_method || 'CASH',
+                    }))
+                  }
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    fontSize: '13.5px',
+                    fontWeight: orderForm.is_paid ? 700 : 500,
+                    color: orderForm.is_paid ? '#0F172A' : '#64748B',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      border: orderForm.is_paid ? '2px solid var(--primary, #059669)' : '2px solid #CBD5E1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#FFFFFF',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {orderForm.is_paid && (
+                      <div
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: 'var(--primary, #059669)',
+                        }}
+                      />
+                    )}
+                  </div>
+                  <span>Pay Now</span>
+                </label>
+              </div>
+
+              {/* Payment Method Sub-selection (When Pay Now is active) */}
+              {orderForm.is_paid ? (
                 <div
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '6px',
+                    gap: '8px',
                     paddingTop: '8px',
-                    borderTop: '1px solid #DCFCE7',
+                    borderTop: '1px solid #F1F5F9',
                   }}
                 >
                   <label
                     style={{
                       fontSize: '11px',
                       fontWeight: 700,
-                      color: '#166534',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
+                      color: '#475569',
+                      letterSpacing: '0.02em',
                     }}
                   >
                     Payment Method
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                     {[
                       { id: 'CASH', label: 'Cash', icon: Banknote },
                       { id: 'UPI', label: 'UPI / QR', icon: QrCode },
@@ -953,7 +1179,7 @@ export function POSCheckoutDrawer({
                             setOrderForm((prev) => ({ ...prev, payment_method: m.id }));
                           }}
                           style={{
-                            height: '34px',
+                            height: '36px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -962,19 +1188,30 @@ export function POSCheckoutDrawer({
                             fontSize: '12px',
                             fontWeight: 600,
                             cursor: 'pointer',
-                            border: selected ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
+                            border: selected ? '1.5px solid var(--primary, #059669)' : '1px solid #CBD5E1',
                             background: selected ? '#FFFFFF' : '#F8FAFC',
-                            color: selected ? '#15803D' : '#475569',
-                            boxShadow: selected ? '0 1px 3px rgba(22, 163, 74, 0.15)' : 'none',
+                            color: selected ? 'var(--primary, #059669)' : '#475569',
+                            boxShadow: selected ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
                             transition: 'all 0.15s ease',
                           }}
                         >
-                          <Icon size={13} />
+                          {selected ? <Check size={14} strokeWidth={2.5} /> : <Icon size={13} />}
                           <span>{m.label}</span>
                         </button>
                       );
                     })}
                   </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    fontSize: '11.5px',
+                    color: '#64748B',
+                    paddingTop: '6px',
+                    borderTop: '1px solid #F1F5F9',
+                  }}
+                >
+                  Order will be placed as <strong>Unpaid</strong>. Settle payment upon customer departure.
                 </div>
               )}
             </div>
@@ -1055,6 +1292,7 @@ export function POSCheckoutDrawer({
               flexShrink: 0,
             }}
           >
+            {/* Primary Action Button: Place Order */}
             <button
               type="submit"
               disabled={submitting || cart.size === 0}
@@ -1063,7 +1301,7 @@ export function POSCheckoutDrawer({
                 height: '46px',
                 borderRadius: '8px',
                 border: 'none',
-                background: 'var(--primary, #971345)',
+                background: 'var(--primary, #059669)',
                 color: '#FFFFFF',
                 fontSize: '15px',
                 fontWeight: 700,
@@ -1073,7 +1311,7 @@ export function POSCheckoutDrawer({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 12px rgba(151, 19, 69, 0.25)',
+                boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
                 transition: 'all 0.15s ease',
               }}
             >
@@ -1090,26 +1328,42 @@ export function POSCheckoutDrawer({
               )}
             </button>
 
+            {/* Independent Action Button: Print Bill (Prints bill directly, does NOT place order) */}
             <button
               type="button"
-              onClick={handleDismiss}
-              disabled={submitting}
+              onClick={handlePrintCurrentBill}
+              disabled={printingBill || cart.size === 0}
               style={{
                 width: '100%',
-                height: '36px',
+                height: '42px',
                 borderRadius: '8px',
-                border: '1px solid #CBD5E1',
+                border: '1.5px solid var(--primary, #059669)',
                 background: '#FFFFFF',
-                color: '#475569',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: submitting ? 'not-allowed' : 'pointer',
+                color: 'var(--primary, #059669)',
+                fontSize: '14.5px',
+                fontWeight: 700,
+                cursor: printingBill || cart.size === 0 ? 'not-allowed' : 'pointer',
+                opacity: printingBill || cart.size === 0 ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
                 transition: 'all 0.15s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#F0FDF4')}
               onMouseLeave={(e) => (e.currentTarget.style.background = '#FFFFFF')}
             >
-              Continue Ordering
+              {printingBill ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Printing Bill...</span>
+                </>
+              ) : (
+                <>
+                  <Printer size={17} />
+                  <span>Print Bill</span>
+                </>
+              )}
             </button>
           </div>
         </form>

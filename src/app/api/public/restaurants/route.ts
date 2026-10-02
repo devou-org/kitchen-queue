@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       address: address ? String(address).trim() : undefined,
       logo_url: logo_url ? String(logo_url).trim() : undefined,
       primary_color: primary_color || '#971345',
-      secondary_color: secondary_color || '#EC7951',
+      secondary_color: (secondary_color && secondary_color.toUpperCase() !== '#EC7951') ? secondary_color : '#ffffff',
       menu_layout: menu_layout || 'LIST',
       menu_title: menu_title || "Today's Specials",
       menu_description: menu_description || 'Hand-curated delicacies prepared fresh daily.',
