@@ -32,6 +32,7 @@ import { CustomSelect } from '@/components/ui/CustomSelect';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { COUNTRY_CODES } from '@/lib/constants';
+import { CountryCodeSelect } from '@/components/ui/CountryCodeSelect';
 
 export interface POSOrderFormData {
   customer_name: string;
@@ -1061,36 +1062,15 @@ export function POSCheckoutDrawer({
                   Phone Number *
                 </label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <select
+                  <CountryCodeSelect
                     value={countryCode}
-                    onChange={(e) => {
-                      const code = e.target.value;
+                    onChange={(code) => {
                       setCountryCode(code);
                       const clean = phoneDigits.replace(/\D/g, '');
                       setOrderForm((prev) => ({ ...prev, phone: clean ? `${code}${clean}` : '' }));
                     }}
-                    style={{
-                      width: '75px',
-                      height: '42px',
-                      flexShrink: 0,
-                      paddingLeft: '8px',
-                      paddingRight: '20px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      background: '#FFFFFF',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      color: '#0F172A',
-                      cursor: 'pointer',
-                      outlineColor: 'var(--primary, #059669)',
-                    }}
-                  >
-                    {COUNTRY_CODES.map((c, i) => (
-                      <option key={`${c.code}-${i}`} value={c.code}>
-                        {c.code}
-                      </option>
-                    ))}
-                  </select>
+                    buttonHeight="42px"
+                  />
                   <input
                     type="tel"
                     placeholder="9xxxxxxxxx"

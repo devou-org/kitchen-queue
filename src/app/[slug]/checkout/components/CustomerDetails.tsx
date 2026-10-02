@@ -6,6 +6,7 @@ import { User, BadgeCheck, Info, Gift, Tag, Check, Loader2 } from 'lucide-react'
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { COUNTRY_CODES } from '@/lib/constants';
+import { CountryCodeSelect } from '@/components/ui/CountryCodeSelect';
 
 export interface LoyaltyRewardOption {
   id: string;
@@ -257,17 +258,15 @@ export default function CustomerDetails({
           <div>
             <label className="label">Phone Number *</label>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <select
-                className="select"
+              <CountryCodeSelect
                 value={countryCode}
-                onChange={handleCountryCodeChange}
-                style={{ width: '75px', flexShrink: 0, paddingLeft: '8px', paddingRight: '20px' }}
+                onChange={(code) => {
+                  setCountryCode(code);
+                  setForm(f => ({ ...f, phone: `${code}${phoneDigits}` }));
+                }}
                 disabled={otpStep || isVerified}
-              >
-                {COUNTRY_CODES.map((c, i) => (
-                  <option key={`${c.code}-${i}`} value={c.code}>{c.code}</option>
-                ))}
-              </select>
+                buttonHeight="44px"
+              />
               <input
                 type="tel"
                 className="input"
