@@ -31,6 +31,7 @@ import { formatPrice } from '@/lib/format';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { checkTableAssignment } from '@/lib/table-capacity';
+import { COUNTRY_CODES } from '@/lib/constants';
 
 export interface POSOrderFormData {
   customer_name: string;
@@ -1069,11 +1070,11 @@ export function POSCheckoutDrawer({
                       setOrderForm((prev) => ({ ...prev, phone: clean ? `${code}${clean}` : '' }));
                     }}
                     style={{
-                      width: '75px',
+                      width: '90px',
                       height: '42px',
                       flexShrink: 0,
                       paddingLeft: '8px',
-                      paddingRight: '20px',
+                      paddingRight: '16px',
                       borderRadius: '8px',
                       border: '1px solid #CBD5E1',
                       background: '#FFFFFF',
@@ -1081,9 +1082,14 @@ export function POSCheckoutDrawer({
                       fontWeight: 600,
                       color: '#0F172A',
                       cursor: 'pointer',
+                      outlineColor: 'var(--primary, #059669)',
                     }}
                   >
-                    <option value="+91">+91</option>
+                    {COUNTRY_CODES.map((c, i) => (
+                      <option key={`${c.code}-${i}`} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
                   <input
                     type="tel"

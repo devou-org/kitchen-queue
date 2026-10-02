@@ -5,10 +5,7 @@ import { User, BadgeCheck, Info, Gift, Tag, Check, Loader2 } from 'lucide-react'
 
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
-
-const COUNTRY_CODES = [
-  { code: '+91', label: '+91', country: 'India' },
-];
+import { COUNTRY_CODES } from '@/lib/constants';
 
 export interface LoyaltyRewardOption {
   id: string;
@@ -264,11 +261,11 @@ export default function CustomerDetails({
                 className="select"
                 value={countryCode}
                 onChange={handleCountryCodeChange}
-                style={{ width: '75px', flexShrink: 0, paddingLeft: '8px', paddingRight: '24px' }}
+                style={{ width: '90px', flexShrink: 0, paddingLeft: '8px', paddingRight: '16px' }}
                 disabled={otpStep || isVerified}
               >
-                {COUNTRY_CODES.map(c => (
-                  <option key={c.code} value={c.code}>{c.label}</option>
+                {COUNTRY_CODES.map((c, i) => (
+                  <option key={`${c.code}-${i}`} value={c.code}>{c.label}</option>
                 ))}
               </select>
               <input

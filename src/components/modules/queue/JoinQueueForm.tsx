@@ -6,10 +6,7 @@ import { authService } from '@/app/services/auth.api';
 import toast from 'react-hot-toast';
 import { User, BadgeCheck } from 'lucide-react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-
-const COUNTRY_CODES = [
-  { code: '+91', label: 'IN +91', country: 'India' },
-];
+import { COUNTRY_CODES } from '@/lib/constants';
 
 export default function JoinQueueForm({ restaurantId }: { restaurantId: string }) {
   const params = useParams();
