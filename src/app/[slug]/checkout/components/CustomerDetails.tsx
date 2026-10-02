@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { authService } from '@/app/services/auth.api';
 import { User, BadgeCheck, Info, Gift, Tag, Check, Loader2 } from 'lucide-react';
 
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
-import { COUNTRY_CODES } from '@/lib/constants';
+import { COUNTRY_CODES, getDefaultCallingCode } from '@/lib/constants';
 import { CountryCodeSelect } from '@/components/ui/CountryCodeSelect';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export interface LoyaltyRewardOption {
   id: string;
@@ -65,6 +66,11 @@ export default function CustomerDetails({
   selectedReward,
   onSelectReward
 }: CustomerDetailsProps) {
+  const { restaurant } = useRestaurant();
+  const defaultCallingCode = useMemo(() => {
+    return getDefaultCallingCode(restaurant?.country_code, restaurant?.country);
+  }, [restaurant?.country_code, restaurant?.country]);
+
   const [otpStep, setOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState<string[]>(['', '', '', '']);
   const [otpToken, setOtpToken] = useState('');
@@ -72,7 +78,7 @@ export default function CustomerDetails({
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
 
-  const [countryCode, setCountryCode] = useState('+91');
+  const [countryCode, setCountryCode] = useState(defaultCallingCode);
   const [phoneDigits, setPhoneDigits] = useState('');
 
   // Loyalty & Rewards State
@@ -136,22 +142,26 @@ export default function CustomerDetails({
 
   // Sync from parent when populated
   useEffect(() => {
-    if (form.phone) {
-      if (form.phone.startsWith('+91')) {
-        setCountryCode('+91');
-        setPhoneDigits(form.phone.replace('+91', ''));
-      } else if (!form.phone.startsWith('+')) {
-        const cleanDigits = form.phone.replace(/\D/g, '');
-        setPhoneDigits(cleanDigits);
-        // Correct the parent state to include the country code
-        if (cleanDigits) {
-           setForm(f => ({ ...f, phone: `+91${cleanDigits}` }));
-        }
-      } else {
-        setPhoneDigits(form.phone.replace(/\D/g, ''));
-      }
+    if (!form.phone) {
+      setCountryCode(defaultCallingCode);
+      setPhoneDigits('');
+      return;
     }
-  }, [form.phone]);
+    const matched = COUNTRY_CODES.find((c) => form.phone.startsWith(c.code));
+    if (matched) {
+      setCountryCode(matched.code);
+      setPhoneDigits(form.phone.replace(matched.code, '').replace(/\D/g, ''));
+    } else if (!form.phone.startsWith('+')) {
+      const cleanDigits = form.phone.replace(/\D/g, '');
+      setPhoneDigits(cleanDigits);
+      setCountryCode(defaultCallingCode);
+      if (cleanDigits) {
+        setForm((f) => ({ ...f, phone: `${defaultCallingCode}${cleanDigits}` }));
+      }
+    } else {
+      setPhoneDigits(form.phone.replace(/\D/g, ''));
+    }
+  }, [form.phone, defaultCallingCode, setForm]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '');

@@ -355,9 +355,17 @@ async function runAutoMigration(sqlConnection: any) {
         visit_milestone_count INT DEFAULT 5,
         visit_reward_type VARCHAR(50) DEFAULT 'DISCOUNT_AMOUNT',
         visit_reward_value VARCHAR(255) DEFAULT '100',
+        loyalty_mode VARCHAR(50) DEFAULT 'POINTS',
+        punch_card_reward_type VARCHAR(50) DEFAULT 'FREE_ITEM',
+        punch_card_reward_value VARCHAR(255) DEFAULT '100',
+        punch_card_product_id UUID,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+      ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS loyalty_mode VARCHAR(50) DEFAULT 'POINTS';
+      ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS punch_card_reward_type VARCHAR(50) DEFAULT 'FREE_ITEM';
+      ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS punch_card_reward_value VARCHAR(255) DEFAULT '100';
+      ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS punch_card_product_id UUID;
 
       CREATE TABLE IF NOT EXISTS loyalty_rewards (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3569,8 +3577,9 @@ export async function getLoyaltySettings(restaurantId: string) {
         INSERT INTO loyalty_settings (
           restaurant_id, is_enabled, points_earning_rate, points_redemption_rate_points,
           points_redemption_rate_amount, points_expiry_type, points_expiry_days,
-          min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value
-        ) VALUES (${restaurantId}, true, 0.1000, 100, 50.00, 'NEVER', 365, 0.00, 5, 'DISCOUNT_AMOUNT', '100')
+          min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value,
+          loyalty_mode, punch_card_reward_type, punch_card_reward_value
+        ) VALUES (${restaurantId}, true, 0.1000, 100, 50.00, 'NEVER', 365, 0.00, 5, 'DISCOUNT_AMOUNT', '100', 'POINTS', 'FREE_ITEM', '100')
         ON CONFLICT (restaurant_id) DO NOTHING
         RETURNING *
       `;
@@ -3580,7 +3589,7 @@ export async function getLoyaltySettings(restaurantId: string) {
     }
     return rows[0] || null;
   } catch (err: any) {
-    if (err.message?.includes('does not exist')) {
+    if (err.message?.includes('does not exist') || err.message?.includes('column')) {
       await runAutoMigration(sql);
       return null;
     }
@@ -3599,13 +3608,18 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
   visit_milestone_count?: number;
   visit_reward_type?: string;
   visit_reward_value?: string;
+  loyalty_mode?: string;
+  punch_card_reward_type?: string;
+  punch_card_reward_value?: string;
+  punch_card_product_id?: string | null;
 }) {
   try {
     const rows = await sql`
       INSERT INTO loyalty_settings (
         restaurant_id, is_enabled, points_earning_rate, points_redemption_rate_points,
         points_redemption_rate_amount, points_expiry_type, points_expiry_days,
-        min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value, updated_at
+        min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value,
+        loyalty_mode, punch_card_reward_type, punch_card_reward_value, punch_card_product_id, updated_at
       ) VALUES (
         ${restaurantId},
         COALESCE(${data.is_enabled ?? true}, true),
@@ -3618,6 +3632,10 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
         COALESCE(${data.visit_milestone_count ?? 5}, 5),
         COALESCE(${data.visit_reward_type ?? 'DISCOUNT_AMOUNT'}, 'DISCOUNT_AMOUNT'),
         COALESCE(${data.visit_reward_value ?? '100'}, '100'),
+        COALESCE(${data.loyalty_mode ?? 'POINTS'}, 'POINTS'),
+        COALESCE(${data.punch_card_reward_type ?? 'FREE_ITEM'}, 'FREE_ITEM'),
+        COALESCE(${data.punch_card_reward_value ?? '100'}, '100'),
+        ${data.punch_card_product_id || null},
         NOW()
       )
       ON CONFLICT (restaurant_id) DO UPDATE SET
@@ -3631,12 +3649,16 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
         visit_milestone_count = EXCLUDED.visit_milestone_count,
         visit_reward_type = EXCLUDED.visit_reward_type,
         visit_reward_value = EXCLUDED.visit_reward_value,
+        loyalty_mode = EXCLUDED.loyalty_mode,
+        punch_card_reward_type = EXCLUDED.punch_card_reward_type,
+        punch_card_reward_value = EXCLUDED.punch_card_reward_value,
+        punch_card_product_id = EXCLUDED.punch_card_product_id,
         updated_at = NOW()
       RETURNING *
     `;
     return rows[0];
   } catch (err: any) {
-    if (err.message?.includes('does not exist')) {
+    if (err.message?.includes('does not exist') || err.message?.includes('column')) {
       await runAutoMigration(sql);
       return null;
     }

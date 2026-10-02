@@ -31,7 +31,7 @@ import { formatPrice } from '@/lib/format';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { checkTableAssignment } from '@/lib/table-capacity';
-import { COUNTRY_CODES } from '@/lib/constants';
+import { COUNTRY_CODES, getDefaultCallingCode } from '@/lib/constants';
 import { CountryCodeSelect } from '@/components/ui/CountryCodeSelect';
 
 export interface POSOrderFormData {
@@ -77,8 +77,13 @@ export function POSCheckoutDrawer({
   const [isClosing, setIsClosing] = useState(false);
   const [printingBill, setPrintingBill] = useState(false);
 
+  // Compute default country code based on restaurant location
+  const defaultCallingCode = useMemo(() => {
+    return getDefaultCallingCode(restaurant?.country_code, restaurant?.country);
+  }, [restaurant?.country_code, restaurant?.country]);
+
   // Phone input local state
-  const [countryCode, setCountryCode] = useState('+91');
+  const [countryCode, setCountryCode] = useState(defaultCallingCode);
   const [phoneDigits, setPhoneDigits] = useState('');
 
   // Loyalty & Rewards State
@@ -94,16 +99,23 @@ export function POSCheckoutDrawer({
   // Sync phoneDigits with orderForm.phone
   useEffect(() => {
     const p = orderForm.phone || '';
-    if (p.startsWith('+91')) {
-      setCountryCode('+91');
-      setPhoneDigits(p.replace('+91', ''));
+    if (!p) {
+      setCountryCode(defaultCallingCode);
+      setPhoneDigits('');
+      return;
+    }
+    const matched = COUNTRY_CODES.find((c) => p.startsWith(c.code));
+    if (matched) {
+      setCountryCode(matched.code);
+      setPhoneDigits(p.replace(matched.code, '').replace(/\D/g, ''));
     } else if (!p.startsWith('+')) {
       const clean = p.replace(/\D/g, '');
       setPhoneDigits(clean);
+      setCountryCode(defaultCallingCode);
     } else {
       setPhoneDigits(p.replace(/\D/g, '').slice(-10));
     }
-  }, [orderForm.phone]);
+  }, [orderForm.phone, defaultCallingCode]);
 
   // Fetch loyalty data on phone change
   useEffect(() => {

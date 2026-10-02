@@ -67,6 +67,76 @@ export interface CountryCodeItem {
   label: string;
 }
 
+const ISO_TO_CALLING_CODE: Record<string, string> = {
+  IN: '+91',
+  AE: '+971',
+  US: '+1',
+  CA: '+1',
+  GB: '+44',
+  UK: '+44',
+  SA: '+966',
+  QA: '+974',
+  OM: '+968',
+  KW: '+965',
+  BH: '+973',
+  SG: '+65',
+  MY: '+60',
+  AU: '+61',
+  DE: '+49',
+  FR: '+33',
+  PH: '+63',
+  PK: '+92',
+  BD: '+880',
+  LK: '+94',
+  NP: '+977',
+  TH: '+66',
+  ID: '+62',
+  NZ: '+64',
+  ZA: '+27',
+  EG: '+20',
+  JP: '+81',
+  KR: '+82',
+  CN: '+86',
+  HK: '+852',
+  TW: '+886',
+  VN: '+84',
+  BR: '+55',
+  MX: '+52',
+  IT: '+39',
+  ES: '+34',
+  NL: '+31',
+  BE: '+32',
+  CH: '+41',
+  SE: '+46',
+  NO: '+47',
+  DK: '+45',
+  FI: '+358',
+  IE: '+353',
+  RU: '+7',
+  TR: '+90'
+};
+
+export function getDefaultCallingCode(isoCode?: string | null, countryName?: string | null): string {
+  if (isoCode) {
+    const cleanIso = isoCode.trim().toUpperCase();
+    if (ISO_TO_CALLING_CODE[cleanIso]) {
+      return ISO_TO_CALLING_CODE[cleanIso];
+    }
+  }
+  if (countryName) {
+    const cleanName = countryName.trim().toLowerCase();
+    const match = COUNTRY_CODES.find(c => 
+      c.country.toLowerCase() === cleanName || 
+      c.country.toLowerCase().includes(cleanName) || 
+      cleanName.includes(c.country.toLowerCase())
+    );
+    if (match) {
+      return match.code;
+    }
+  }
+  return '+91';
+}
+
 export const COUNTRY_CODES: CountryCodeItem[] = [
   // Popular Regions
   { code: '+91', country: 'India', label: '+91' },
