@@ -370,6 +370,8 @@ export default function AdminPosPage() {
       const phoneToUse = orderForm.phone || `+910000000000`;
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
+      const discountAmount = Math.max(0, Number(orderForm.discount_amount) || 0);
+
       const res = await orderService.createOrder({
         customer_name: nameToUse,
         phone: phoneToUse,
@@ -381,14 +383,34 @@ export default function AdminPosPage() {
         is_pos: true,
         is_paid: Boolean(orderForm.is_paid),
         payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
+        discount_amount: discountAmount,
       });
 
       if (res.success && res.data) {
         const createdOrder = res.data;
+
+        // If a loyalty reward was selected, trigger redemption API
+        if (orderForm.selected_reward_id && orderForm.phone) {
+          try {
+            const slugStr = Array.isArray(slug) ? slug[0] : slug;
+            await fetch('/api/admin/loyalty/redeem', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                slug: slugStr,
+                phone: orderForm.phone.trim(),
+                reward_id: orderForm.selected_reward_id,
+              }),
+            });
+          } catch (err) {
+            console.error('Loyalty reward redemption call error:', err);
+          }
+        }
+
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH' });
+        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH', discount_amount: 0, selected_reward_id: undefined });
         await fetchTables();
       } else {
         toast.error(res.error || 'Failed to place order');

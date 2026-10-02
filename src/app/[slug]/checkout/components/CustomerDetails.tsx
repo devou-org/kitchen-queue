@@ -92,12 +92,15 @@ export default function CustomerDetails({
     const fetchLoyaltyData = async () => {
       setLoadingLoyalty(true);
       try {
-        const cleanedPhone = form.phone.replace(/\D/g, '');
+        const cleanedPhone = form.phone.replace(/\D/g, '').slice(-10);
         // Fetch customer profile
         const custRes = await fetch(`/api/admin/loyalty/customers?slug=${slug}&search=${encodeURIComponent(cleanedPhone)}`);
         const custJson = await custRes.json();
         if (custJson.success && Array.isArray(custJson.data)) {
-          const match = custJson.data.find((c: any) => c.phone.replace(/\D/g, '') === cleanedPhone);
+          const match = custJson.data.find((c: any) => {
+            const cPhone = (c.phone || '').replace(/\D/g, '');
+            return cPhone.endsWith(cleanedPhone) || cleanedPhone.endsWith(cPhone);
+          });
           if (match) {
             setLoyaltyProfile({
               id: match.id,

@@ -732,52 +732,6 @@ export default function AdminLoyaltyPage() {
       />
 
       <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        {/* Metrics Row */}
-      <div className="loyalty-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span className="loyalty-metric-title" style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Total CRM Members</span>
-            <div style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', width: '34px', height: '34px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Users size={18} />
-            </div>
-          </div>
-          <div className="loyalty-metric-value" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalMembers}</div>
-          <div className="loyalty-metric-subtext" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', fontWeight: 600 }}>Active Member Profiles</div>
-        </div>
-
-        <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span className="loyalty-metric-title" style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Active Points Balance</span>
-            <div style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', width: '34px', height: '34px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Gift size={18} />
-            </div>
-          </div>
-          <div className="loyalty-metric-value" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalActivePoints.toLocaleString()} pts</div>
-          <div className="loyalty-metric-subtext" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', fontWeight: 600 }}>Available for Redemption</div>
-        </div>
-
-        <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span className="loyalty-metric-title" style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Punch Card Visits</span>
-            <div style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', width: '34px', height: '34px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Award size={18} />
-            </div>
-          </div>
-          <div className="loyalty-metric-value" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{totalVisitsCount}</div>
-          <div className="loyalty-metric-subtext" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', fontWeight: 600 }}>Recorded Visits</div>
-        </div>
-
-        <div className="loyalty-metric-card" style={{ background: 'white', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span className="loyalty-metric-title" style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Cumulative Spend</span>
-            <div style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', width: '34px', height: '34px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUp size={18} />
-            </div>
-          </div>
-          <div className="loyalty-metric-value" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>₹{totalSpentSum.toLocaleString()}</div>
-          <div className="loyalty-metric-subtext" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', fontWeight: 600 }}>Total Loyalty Revenue</div>
-        </div>
-      </div>
 
       {/* TAB 1: CUSTOMERS DIRECTORY */}
       {activeTab === 'customers' && (

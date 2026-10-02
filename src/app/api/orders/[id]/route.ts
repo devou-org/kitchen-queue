@@ -39,8 +39,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
-    if (!admin && customer?.phone !== order.phone) {
-      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+    if (!admin) {
+      const normCust = customer?.phone?.replace(/\D/g, '').slice(-10);
+      const normOrder = order.phone?.replace(/\D/g, '').slice(-10);
+      if (!normCust || !normOrder || normCust !== normOrder) {
+        return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+      }
     }
 
     return NextResponse.json({ success: true, data: order });
@@ -137,8 +141,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       // Verify the order belongs to this customer (by phone)
-      if (customer.phone && existing.phone !== customer.phone) {
-        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      if (customer.phone) {
+        const normCust = customer.phone.replace(/\D/g, '').slice(-10);
+        const normOrder = existing.phone?.replace(/\D/g, '').slice(-10);
+        if (!normCust || !normOrder || normCust !== normOrder) {
+          return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+        }
       }
     }
 

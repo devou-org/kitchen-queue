@@ -137,7 +137,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
   const finalTotal = Math.max(0, total - discountAmount);
 
-  const isVerified = currentUser && currentUser.phone === form.phone;
+  const normalizeDigits = (p?: string) => (p ? p.replace(/\D/g, '').slice(-10) : '');
+  const isVerified = Boolean(
+    currentUser &&
+    currentUser.phone &&
+    form.phone &&
+    normalizeDigits(currentUser.phone) === normalizeDigits(form.phone)
+  );
 
 
   // ── PLACE NEW ORDER ──────────────────────────────────────────────
@@ -175,7 +181,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     }
 
     // Dynamic verification check (user may have changed phone number)
-    const verified = user && user.phone === form.phone;
+    const verified = Boolean(
+      user &&
+      user.phone &&
+      form.phone &&
+      normalizeDigits(user.phone) === normalizeDigits(form.phone)
+    );
     if (!verified) {
       toast.error('Please verify your phone number first.');
       return;

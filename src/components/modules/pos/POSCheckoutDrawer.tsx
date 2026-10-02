@@ -19,6 +19,9 @@ import {
   CreditCard,
   Banknote,
   QrCode,
+  Gift,
+  Tag,
+  Award,
 } from 'lucide-react';
 import { CartItem, OrderType } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -35,6 +38,8 @@ export interface POSOrderFormData {
   order_type: OrderType | string;
   is_paid?: boolean;
   payment_method?: string;
+  discount_amount?: number;
+  selected_reward_id?: string;
 }
 
 export interface POSCheckoutDrawerProps {
@@ -65,9 +70,77 @@ export function POSCheckoutDrawer({
   const [mounted, setMounted] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
+  // Loyalty & Rewards State
+  const [loyaltyProfile, setLoyaltyProfile] = useState<any>(null);
+  const [activeRewards, setActiveRewards] = useState<any[]>([]);
+  const [selectedReward, setSelectedReward] = useState<any>(null);
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch loyalty data on phone change
+  useEffect(() => {
+    const rawPhone = orderForm.phone || '';
+    const cleaned = rawPhone.replace(/\D/g, '');
+    const slugStr = restaurant?.slug || '';
+    if (!cleaned || cleaned.length < 7 || !slugStr) {
+      setLoyaltyProfile(null);
+      setActiveRewards([]);
+      setSelectedReward(null);
+      return;
+    }
+
+    let isSubscribed = true;
+    setLoadingLoyalty(true);
+
+    Promise.all([
+      fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(cleaned)}`).then((r) => r.json()),
+      fetch(`/api/admin/loyalty/rewards?slug=${slugStr}`).then((r) => r.json()),
+    ])
+      .then(([custJson, rewJson]) => {
+        if (!isSubscribed) return;
+
+        if (custJson.success && Array.isArray(custJson.data)) {
+          const match = custJson.data.find(
+            (c: any) =>
+              (c.phone || '').replace(/\D/g, '').endsWith(cleaned) ||
+              cleaned.endsWith((c.phone || '').replace(/\D/g, ''))
+          );
+          if (match) {
+            setLoyaltyProfile({
+              id: match.id,
+              points_balance: Number(match.points_balance || 0),
+              total_visits: Number(match.total_visits || 0),
+              total_spent: Number(match.total_spent || 0),
+              phone: match.phone,
+              name: match.name,
+            });
+            if (match.name && !orderForm.customer_name) {
+              setOrderForm((prev) => ({ ...prev, customer_name: match.name }));
+            }
+          } else {
+            setLoyaltyProfile(null);
+          }
+        }
+
+        if (rewJson.success && Array.isArray(rewJson.data)) {
+          const activeList = rewJson.data.filter((r: any) => r.is_active !== false);
+          setActiveRewards(activeList);
+        }
+      })
+      .catch(() => {
+        if (isSubscribed) setLoyaltyProfile(null);
+      })
+      .finally(() => {
+        if (isSubscribed) setLoadingLoyalty(false);
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [orderForm.phone, restaurant?.slug]);
 
   const handleDismiss = () => {
     if (submitting || isClosing) return;
@@ -110,16 +183,41 @@ export function POSCheckoutDrawer({
     [cart]
   );
 
+  // Compute discount amount
+  const loyaltyDiscountAmount = useMemo(() => {
+    if (!selectedReward || !loyaltyProfile) return 0;
+    if (loyaltyProfile.points_balance < Number(selectedReward.points_required || 0)) return 0;
+    if (subtotal < Number(selectedReward.min_purchase_amount || 0)) return 0;
+
+    if (selectedReward.reward_type === 'DISCOUNT_PERCENTAGE') {
+      return Math.round(((subtotal * Number(selectedReward.discount_value || 0)) / 100) * 100) / 100;
+    }
+    return Math.min(subtotal, Number(selectedReward.discount_value || 0));
+  }, [selectedReward, loyaltyProfile, subtotal]);
+
+  // Sync discount amount into orderForm
+  useEffect(() => {
+    setOrderForm((prev) => {
+      if (prev.discount_amount === loyaltyDiscountAmount && prev.selected_reward_id === (selectedReward?.id || undefined)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        discount_amount: loyaltyDiscountAmount,
+        selected_reward_id: selectedReward?.id || undefined,
+      };
+    });
+  }, [loyaltyDiscountAmount, selectedReward]);
+
   const { gstAmount, totalPrice } = useMemo(() => {
     let gst = 0;
-    let total = subtotal;
     if (restaurant?.gst_type === 'REGULAR') {
       const rate = Number(restaurant.gst_rate) || 0;
       gst = Math.round(((subtotal * rate) / 100) * 100) / 100;
-      total = subtotal + gst;
     }
-    return { gstAmount: gst, totalPrice: total };
-  }, [subtotal, restaurant]);
+    const finalTotal = Math.max(0, subtotal + gst - loyaltyDiscountAmount);
+    return { gstAmount: gst, totalPrice: finalTotal };
+  }, [subtotal, restaurant, loyaltyDiscountAmount]);
 
   // Person Options for CustomSelect (1 to 15)
   const personOptions = useMemo(
@@ -854,6 +952,171 @@ export function POSCheckoutDrawer({
               </div>
             </div>
 
+            {/* Section: Customer Loyalty Profile & Rewards */}
+            {orderForm.phone && orderForm.phone.trim().length >= 7 && (
+              <div
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Gift size={15} color="var(--primary, #971345)" />
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                      Customer Loyalty & Rewards
+                    </span>
+                  </div>
+                  {loadingLoyalty && <Loader2 size={13} className="animate-spin" color="var(--primary, #971345)" />}
+                </div>
+
+                {loyaltyProfile ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                          {loyaltyProfile.name || orderForm.customer_name || 'Loyalty Member'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B' }}>
+                          {loyaltyProfile.total_visits || 0} visits recorded
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 800,
+                          padding: '3px 10px',
+                          borderRadius: '999px',
+                          background: 'rgba(151, 19, 69, 0.08)',
+                          color: 'var(--primary, #971345)',
+                        }}
+                      >
+                        {loyaltyProfile.points_balance.toLocaleString()} pts
+                      </span>
+                    </div>
+
+                    {activeRewards.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                            Redeem Reward
+                          </label>
+                          {selectedReward && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReward(null)}
+                              style={{
+                                fontSize: '11px',
+                                color: '#EF4444',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontWeight: 600,
+                              }}
+                            >
+                              ✕ Clear Reward
+                            </button>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {activeRewards.map((reward) => {
+                            const reqPts = Number(reward.points_required || 0);
+                            const minAmount = Number(reward.min_purchase_amount || 0);
+                            const hasPts = loyaltyProfile.points_balance >= reqPts;
+                            const meetsMin = subtotal >= minAmount;
+                            const isEligible = hasPts && meetsMin;
+                            const isSelected = selectedReward?.id === reward.id;
+
+                            let label = reward.name;
+                            if (reward.reward_type === 'DISCOUNT_AMOUNT') {
+                              label = `${reward.name} (₹${reward.discount_value} Off)`;
+                            } else if (reward.reward_type === 'DISCOUNT_PERCENTAGE') {
+                              label = `${reward.name} (${reward.discount_value}% Off)`;
+                            }
+
+                            return (
+                              <button
+                                key={reward.id}
+                                type="button"
+                                disabled={!isEligible}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedReward(null);
+                                  } else {
+                                    setSelectedReward(reward);
+                                  }
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  borderRadius: '6px',
+                                  border: isSelected
+                                    ? '1.5px solid #16A34A'
+                                    : isEligible
+                                    ? '1px solid #E2E8F0'
+                                    : '1px dashed #CBD5E1',
+                                  background: isSelected
+                                    ? '#F0FDF4'
+                                    : isEligible
+                                    ? '#FFFFFF'
+                                    : '#F8FAFC',
+                                  color: isSelected ? '#15803D' : isEligible ? '#0F172A' : '#94A3B8',
+                                  cursor: isEligible ? 'pointer' : 'not-allowed',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  fontSize: '12px',
+                                  fontWeight: isSelected ? 700 : 500,
+                                  textAlign: 'left',
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Tag size={13} style={{ color: isSelected ? '#16A34A' : '#64748B' }} />
+                                  <span>{label}</span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '11px', fontWeight: 700, color: isEligible ? '#64748B' : '#94A3B8' }}>
+                                    {reqPts} pts
+                                  </span>
+                                  {isSelected && <Check size={14} color="#16A34A" />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>
+                        No active rewards configured currently.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>
+                    Loyalty profile active. Member points will automatically accumulate on this order.
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Section: Payment Settlement (Optional) */}
             <div
               style={{
@@ -1014,6 +1277,21 @@ export function POSCheckoutDrawer({
                 >
                   <span>GST ({restaurant?.gst_rate || 0}%)</span>
                   <span style={{ fontWeight: 600, color: '#0F172A' }}>{formatPrice(gstAmount)}</span>
+                </div>
+              )}
+
+              {loyaltyDiscountAmount > 0 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '13px',
+                    color: '#16A34A',
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>Loyalty Discount ({selectedReward?.name || 'Reward'})</span>
+                  <span>-{formatPrice(loyaltyDiscountAmount)}</span>
                 </div>
               )}
 

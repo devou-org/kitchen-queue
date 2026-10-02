@@ -2577,14 +2577,56 @@ export async function updateCategorySequence(restaurantId: string, orderedCatego
 // USER QUERIES
 // ============================================
 
+export function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+  let cleaned = phone.trim().replace(/[^\d]/g, '');
+  if (cleaned.length === 12 && cleaned.startsWith('91')) {
+    cleaned = cleaned.slice(2);
+  } else if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    cleaned = cleaned.slice(1);
+  }
+  return cleaned;
+}
+
 export async function getUserByPhone(phone: string) {
-  const rows = await sql`SELECT * FROM users WHERE phone = ${phone} LIMIT 1`;
+  if (!phone) return null;
+  const norm = normalizePhoneNumber(phone);
+  const rawClean = phone.trim();
+  const rows = await sql`
+    SELECT * FROM users 
+    WHERE phone = ${rawClean}
+       OR phone = ${norm}
+       OR phone = ${'+91' + norm}
+       OR phone = ${'91' + norm}
+       OR REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') LIKE ${'%' + (norm || rawClean)}
+    ORDER BY created_at ASC 
+    LIMIT 1
+  `;
   return rows[0] || null;
 }
 
 export async function createUser(phone: string, name?: string) {
+  if (!phone) return null;
+  const norm = normalizePhoneNumber(phone);
+  const phoneToStore = norm.length === 10 ? norm : phone.trim();
+  
+  const existing = await getUserByPhone(phone);
+  if (existing) {
+    if (name && name.trim()) {
+      const updated = await sql`
+        UPDATE users 
+        SET name = COALESCE(${name.trim()}, name),
+            phone = ${phoneToStore}
+        WHERE id = ${existing.id}
+        RETURNING *
+      `;
+      return updated[0] || existing;
+    }
+    return existing;
+  }
+
   const rows = await sql`
-    INSERT INTO users (phone, name) VALUES (${phone}, ${name || null})
+    INSERT INTO users (phone, name) VALUES (${phoneToStore}, ${name?.trim() || null})
     ON CONFLICT (phone) DO UPDATE SET name = COALESCE(EXCLUDED.name, users.name)
     RETURNING *
   `;
@@ -3194,9 +3236,93 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
   }
 }
 
+export async function mergeDuplicateCustomerLoyalty(restaurantId: string) {
+  try {
+    const records = await sql`
+      SELECT cl.*, u.phone, u.name
+      FROM customer_loyalty cl
+      JOIN users u ON u.id = cl.user_id
+      WHERE cl.restaurant_id = ${restaurantId}
+      ORDER BY cl.created_at ASC
+    `;
+
+    const groups = new Map<string, any[]>();
+    for (const rec of records) {
+      const norm = normalizePhoneNumber(rec.phone || '');
+      if (!norm) continue;
+      if (!groups.has(norm)) {
+        groups.set(norm, []);
+      }
+      groups.get(norm)!.push(rec);
+    }
+
+    for (const [norm, items] of groups.entries()) {
+      if (items.length <= 1) continue;
+
+      const primary = items[0];
+      let sumBalance = Number(primary.points_balance || 0);
+      let sumEarned = Number(primary.total_points_earned || 0);
+      let sumRedeemed = Number(primary.total_points_redeemed || 0);
+      let sumVisits = Number(primary.total_visits || 0);
+      let sumSpent = Number(primary.total_spent || 0);
+      let bestName = (primary.name && primary.name !== 'System Admin') ? primary.name : '';
+
+      for (let i = 1; i < items.length; i++) {
+        const dup = items[i];
+        sumBalance += Number(dup.points_balance || 0);
+        sumEarned += Number(dup.total_points_earned || 0);
+        sumRedeemed += Number(dup.total_points_redeemed || 0);
+        sumVisits += Number(dup.total_visits || 0);
+        sumSpent += Number(dup.total_spent || 0);
+        if (dup.name && dup.name !== 'System Admin' && (!bestName || dup.name.length > bestName.length)) {
+          bestName = dup.name;
+        }
+
+        // Re-point transactions and orders
+        await sql`UPDATE loyalty_transactions SET customer_loyalty_id = ${primary.id}, user_id = ${primary.user_id} WHERE customer_loyalty_id = ${dup.id} OR user_id = ${dup.user_id}`;
+        await sql`UPDATE orders SET user_id = ${primary.user_id} WHERE user_id = ${dup.user_id}`;
+
+        // Delete duplicate customer loyalty record & duplicate user
+        await sql`DELETE FROM customer_loyalty WHERE id = ${dup.id}`;
+        if (dup.user_id !== primary.user_id) {
+          await sql`DELETE FROM users WHERE id = ${dup.user_id}`;
+        }
+      }
+
+      // Update primary user & loyalty totals
+      const cleanPhone = norm.length === 10 ? norm : primary.phone;
+      if (bestName) {
+        await sql`UPDATE users SET phone = ${cleanPhone}, name = ${bestName} WHERE id = ${primary.user_id}`;
+      } else {
+        await sql`UPDATE users SET phone = ${cleanPhone} WHERE id = ${primary.user_id}`;
+      }
+
+      const milestoneCount = 5;
+      const progress = sumVisits % milestoneCount;
+      const unlocked = Math.floor(sumVisits / milestoneCount);
+
+      await sql`
+        UPDATE customer_loyalty
+        SET points_balance = ${sumBalance},
+            total_points_earned = ${sumEarned},
+            total_points_redeemed = ${sumRedeemed},
+            total_visits = ${sumVisits},
+            visit_progress = ${progress},
+            rewards_unlocked = ${unlocked},
+            total_spent = ${sumSpent},
+            updated_at = NOW()
+        WHERE id = ${primary.id}
+      `;
+    }
+  } catch (err) {
+    console.error('Error merging duplicate customer loyalty records:', err);
+  }
+}
+
 export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
   try {
-    // Auto-sync any completed/paid orders to loyalty customers & points
+    // Merge duplicate customer accounts and sync completed/paid orders
+    await mergeDuplicateCustomerLoyalty(restaurantId);
     await syncAllCompletedOrdersToLoyalty(restaurantId);
 
     let query;
