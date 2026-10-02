@@ -1064,7 +1064,11 @@ export function OrderDetailsView({
                                   {item.product_name}
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#64748B' }}>
-                                  {formatPrice(item.price_at_purchase)} each
+                                  {Number(item.price_at_purchase || 0) === 0 ? (
+                                    <span style={{ color: '#16A34A', fontWeight: 700 }}>₹0.00 (FREE)</span>
+                                  ) : (
+                                    `${formatPrice(item.price_at_purchase)} each`
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1101,13 +1105,13 @@ export function OrderDetailsView({
                                 style={{
                                   fontSize: '13px',
                                   fontWeight: 700,
-                                  color: '#0F172A',
+                                  color: Number(item.price_at_purchase || 0) === 0 ? '#16A34A' : '#0F172A',
                                   fontVariantNumeric: 'tabular-nums',
                                   minWidth: '60px',
                                   textAlign: 'right',
                                 }}
                               >
-                                {formatPrice(item.price_at_purchase * item.quantity)}
+                                {Number(item.price_at_purchase || 0) === 0 ? '₹0.00' : formatPrice(item.price_at_purchase * item.quantity)}
                               </div>
                             </div>
                           </div>

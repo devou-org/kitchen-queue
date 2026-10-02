@@ -17,6 +17,7 @@ export interface LoyaltyRewardOption {
   reward_type: 'DISCOUNT_AMOUNT' | 'DISCOUNT_PERCENTAGE' | 'FREE_ITEM';
   discount_value: number;
   min_purchase_amount: number;
+  selected_product_ids?: string[];
   is_active: boolean;
 }
 
@@ -467,116 +468,142 @@ export default function CustomerDetails({
                   )}
                 </div>
 
-                {/* Available Rewards Catalog */}
+                {/* Available Rewards Catalog - Carousel Format */}
                 {activeRewards.length > 0 && (
-                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Redeem Available Reward
+                  <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Redeem Available Reward
+                      </span>
+                      {activeRewards.length > 1 && (
+                        <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
+                          Scroll for more →
+                        </span>
+                      )}
                     </div>
 
-                    {activeRewards.map(reward => {
-                      const userPoints = loyaltyProfile?.points_balance || 0;
-                      const hasEnoughPoints = userPoints >= reward.points_required;
-                      const meetsMinSpend = subtotal >= reward.min_purchase_amount;
-                      const isSelected = selectedReward?.id === reward.id;
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '12px',
+                        overflowX: 'auto',
+                        paddingBottom: '8px',
+                        paddingTop: '2px',
+                        scrollSnapType: 'x mandatory',
+                        WebkitOverflowScrolling: 'touch',
+                      }}
+                    >
+                      {activeRewards.map(reward => {
+                        const userPoints = loyaltyProfile?.points_balance || 0;
+                        const hasEnoughPoints = userPoints >= reward.points_required;
+                        const meetsMinSpend = subtotal >= reward.min_purchase_amount;
+                        const isSelected = selectedReward?.id === reward.id;
 
-                      let benefitText = '';
-                      if (reward.reward_type === 'DISCOUNT_AMOUNT') {
-                        benefitText = `₹${reward.discount_value} Flat Discount`;
-                      } else if (reward.reward_type === 'DISCOUNT_PERCENTAGE') {
-                        benefitText = `${reward.discount_value}% Off Order`;
-                      } else {
-                        benefitText = `Free Item Voucher`;
-                      }
+                        let benefitText = '';
+                        if (reward.reward_type === 'DISCOUNT_AMOUNT') {
+                          benefitText = `₹${reward.discount_value} Flat Discount`;
+                        } else if (reward.reward_type === 'DISCOUNT_PERCENTAGE') {
+                          benefitText = `${reward.discount_value}% Off Order`;
+                        } else {
+                          benefitText = `Free Item Voucher`;
+                        }
 
-                      return (
-                        <div
-                          key={reward.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            background: isSelected ? 'color-mix(in srgb, var(--primary, #059669) 8%, white)' : 'white',
-                            border: isSelected ? '1.5px solid var(--primary, #059669)' : '1px solid #cbd5e1',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                            gap: '8px',
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <Tag size={13} style={{ color: 'var(--primary, #059669)', flexShrink: 0 }} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reward.name}</span>
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: 700, color: '#d97706' }}>{reward.points_required} pts required</span>
-                              <span>•</span>
-                              <span>{benefitText}</span>
+                        return (
+                          <div
+                            key={reward.id}
+                            style={{
+                              flex: '0 0 230px',
+                              minWidth: '230px',
+                              scrollSnapAlign: 'start',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              padding: '12px',
+                              borderRadius: '12px',
+                              background: isSelected ? 'color-mix(in srgb, var(--primary, #059669) 8%, white)' : 'white',
+                              border: isSelected ? '1.5px solid var(--primary, #059669)' : '1px solid #cbd5e1',
+                              boxShadow: isSelected ? '0 4px 12px rgba(5, 150, 105, 0.12)' : '0 1px 3px rgba(0,0,0,0.04)',
+                              gap: '10px',
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                <Tag size={14} style={{ color: 'var(--primary, #059669)', flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reward.name}</span>
+                              </div>
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: '#059669', marginBottom: '4px' }}>
+                                {benefitText}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#d97706', fontWeight: 700 }}>
+                                {reward.points_required} pts required
+                              </div>
                               {reward.min_purchase_amount > 0 && (
-                                <>
-                                  <span>•</span>
-                                  <span>Min spend ₹{reward.min_purchase_amount}</span>
-                                </>
+                                <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
+                                  Min spend: ₹{reward.min_purchase_amount}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Button */}
+                            <div>
+                              {isSelected ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectReward(null)}
+                                  style={{
+                                    width: '100%',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px',
+                                    padding: '7px 12px',
+                                    borderRadius: '8px',
+                                    background: 'var(--primary, #059669)',
+                                    color: 'white',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <Check size={14} /> Applied
+                                </button>
+                              ) : hasEnoughPoints && meetsMinSpend ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectReward(reward)}
+                                  style={{
+                                    width: '100%',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px',
+                                    padding: '7px 12px',
+                                    borderRadius: '8px',
+                                    background: 'white',
+                                    color: 'var(--primary, #059669)',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    border: '1px solid var(--primary, #059669)',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Redeem
+                                </button>
+                              ) : !meetsMinSpend ? (
+                                <div style={{ width: '100%', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '6px 8px', borderRadius: '6px' }}>
+                                  Min spend ₹{reward.min_purchase_amount}
+                                </div>
+                              ) : (
+                                <div style={{ width: '100%', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '6px 8px', borderRadius: '6px' }}>
+                                  Needs {reward.points_required - userPoints} pts
+                                </div>
                               )}
                             </div>
                           </div>
-
-                          {/* Action Button */}
-                          {isSelected ? (
-                            <button
-                              type="button"
-                              onClick={() => onSelectReward(null)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                background: 'var(--primary, #059669)',
-                                color: 'white',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                border: 'none',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              <Check size={13} /> Applied
-                            </button>
-                          ) : hasEnoughPoints && meetsMinSpend ? (
-                            <button
-                              type="button"
-                              onClick={() => onSelectReward(reward)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                background: 'white',
-                                color: 'var(--primary, #059669)',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                border: '1px solid var(--primary, #059669)',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              Redeem
-                            </button>
-                          ) : !meetsMinSpend ? (
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                              Min spend ₹{reward.min_purchase_amount}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                              Needs {reward.points_required - userPoints} pts
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

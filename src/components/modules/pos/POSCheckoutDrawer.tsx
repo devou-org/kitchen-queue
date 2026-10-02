@@ -24,6 +24,7 @@ import {
   Tag,
   Award,
   Printer,
+  BadgeCheck,
 } from 'lucide-react';
 import { CartItem, OrderType } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -74,6 +75,10 @@ export function POSCheckoutDrawer({
   const [isClosing, setIsClosing] = useState(false);
   const [printingBill, setPrintingBill] = useState(false);
 
+  // Phone input local state
+  const [countryCode, setCountryCode] = useState('+91');
+  const [phoneDigits, setPhoneDigits] = useState('');
+
   // Loyalty & Rewards State
   const [loyaltyProfile, setLoyaltyProfile] = useState<any>(null);
   const [activeRewards, setActiveRewards] = useState<any[]>([]);
@@ -83,6 +88,20 @@ export function POSCheckoutDrawer({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Sync phoneDigits with orderForm.phone
+  useEffect(() => {
+    const p = orderForm.phone || '';
+    if (p.startsWith('+91')) {
+      setCountryCode('+91');
+      setPhoneDigits(p.replace('+91', ''));
+    } else if (!p.startsWith('+')) {
+      const clean = p.replace(/\D/g, '');
+      setPhoneDigits(clean);
+    } else {
+      setPhoneDigits(p.replace(/\D/g, '').slice(-10));
+    }
+  }, [orderForm.phone]);
 
   // Fetch loyalty data on phone change
   useEffect(() => {
@@ -993,72 +1012,148 @@ export function POSCheckoutDrawer({
                 <span>Customer & Notes (Optional)</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#334155',
-                      marginBottom: '5px',
-                    }}
-                  >
-                    Customer Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Guest / Customer Name"
-                    value={orderForm.customer_name}
-                    onChange={(e) =>
-                      setOrderForm((prev) => ({ ...prev, customer_name: e.target.value }))
-                    }
-                    style={{
-                      width: '100%',
-                      height: '38px',
-                      padding: '0 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      background: '#FFFFFF',
-                      fontSize: '13px',
-                      color: '#0F172A',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
+              {/* Customer Name */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Guest / Customer Name"
+                  value={orderForm.customer_name}
+                  onChange={(e) =>
+                    setOrderForm((prev) => ({ ...prev, customer_name: e.target.value }))
+                  }
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    background: '#FFFFFF',
+                    fontSize: '13px',
+                    color: '#0F172A',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
 
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#334155',
-                      marginBottom: '5px',
+              {/* Phone Number Field */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#334155',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Phone Number *
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <select
+                    value={countryCode}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setCountryCode(code);
+                      const clean = phoneDigits.replace(/\D/g, '');
+                      setOrderForm((prev) => ({ ...prev, phone: clean ? `${code}${clean}` : '' }));
                     }}
-                  >
-                    Phone
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 9876543210"
-                    value={orderForm.phone}
-                    onChange={(e) => setOrderForm((prev) => ({ ...prev, phone: e.target.value }))}
                     style={{
-                      width: '100%',
-                      height: '38px',
-                      padding: '0 12px',
+                      width: '75px',
+                      height: '42px',
+                      flexShrink: 0,
+                      paddingLeft: '8px',
+                      paddingRight: '20px',
                       borderRadius: '8px',
                       border: '1px solid #CBD5E1',
                       background: '#FFFFFF',
                       fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#0F172A',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="+91">+91</option>
+                  </select>
+                  <input
+                    type="tel"
+                    placeholder="9xxxxxxxxx"
+                    value={phoneDigits}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setPhoneDigits(val);
+                      setOrderForm((prev) => ({ ...prev, phone: val ? `${countryCode}${val}` : '' }));
+                    }}
+                    maxLength={10}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      height: '42px',
+                      padding: '0 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 500,
                       color: '#0F172A',
                       boxSizing: 'border-box',
                     }}
                   />
+                  {loadingLoyalty ? (
+                    <span
+                      style={{
+                        height: '42px',
+                        padding: '0 10px',
+                        borderRadius: '8px',
+                        background: '#F1F5F9',
+                        color: '#64748B',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Loader2 size={14} className="animate-spin" />
+                      Checking...
+                    </span>
+                  ) : loyaltyProfile ? (
+                    <span
+                      style={{
+                        height: '42px',
+                        padding: '0 12px',
+                        borderRadius: '8px',
+                        background: '#ECFDF5',
+                        color: '#10B981',
+                        border: '1px solid #A7F3D0',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <BadgeCheck size={16} /> Verified
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
+              {/* Kitchen Notes */}
               <div>
                 <label
                   style={{
@@ -1155,7 +1250,7 @@ export function POSCheckoutDrawer({
                           <label style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
                             Redeem Reward
                           </label>
-                          {selectedReward && (
+                          {selectedReward ? (
                             <button
                               type="button"
                               onClick={() => setSelectedReward(null)}
@@ -1171,10 +1266,23 @@ export function POSCheckoutDrawer({
                             >
                               ✕ Clear Reward
                             </button>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: '#94A3B8' }}>Scroll for more →</span>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {/* Rewards Carousel Container */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '10px',
+                            overflowX: 'auto',
+                            paddingBottom: '8px',
+                            paddingTop: '2px',
+                            scrollSnapType: 'x mandatory',
+                            WebkitOverflowScrolling: 'touch',
+                          }}
+                        >
                           {activeRewards.map((reward) => {
                             const reqPts = Number(reward.points_required || 0);
                             const minAmount = Number(reward.min_purchase_amount || 0);
@@ -1183,61 +1291,111 @@ export function POSCheckoutDrawer({
                             const isEligible = hasPts && meetsMin;
                             const isSelected = selectedReward?.id === reward.id;
 
-                            let label = reward.name;
+                            let benefitText = '';
                             if (reward.reward_type === 'DISCOUNT_AMOUNT') {
-                              label = `${reward.name} (₹${reward.discount_value} Off)`;
+                              benefitText = `₹${reward.discount_value} Flat Off`;
                             } else if (reward.reward_type === 'DISCOUNT_PERCENTAGE') {
-                              label = `${reward.name} (${reward.discount_value}% Off)`;
+                              benefitText = `${reward.discount_value}% Off Order`;
+                            } else {
+                              benefitText = `Free Item Voucher`;
                             }
 
                             return (
-                              <button
+                              <div
                                 key={reward.id}
-                                type="button"
-                                disabled={!isEligible}
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setSelectedReward(null);
-                                  } else {
-                                    setSelectedReward(reward);
-                                  }
-                                }}
                                 style={{
-                                  padding: '8px 12px',
-                                  borderRadius: '6px',
+                                  flex: '0 0 210px',
+                                  minWidth: '210px',
+                                  scrollSnapAlign: 'start',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 12px',
+                                  borderRadius: '10px',
                                   border: isSelected
                                     ? '1.5px solid #16A34A'
                                     : isEligible
-                                    ? '1px solid #E2E8F0'
+                                    ? '1px solid #CBD5E1'
                                     : '1px dashed #CBD5E1',
                                   background: isSelected
                                     ? '#F0FDF4'
                                     : isEligible
                                     ? '#FFFFFF'
                                     : '#F8FAFC',
-                                  color: isSelected ? '#15803D' : isEligible ? '#0F172A' : '#94A3B8',
-                                  cursor: isEligible ? 'pointer' : 'not-allowed',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  fontSize: '12px',
-                                  fontWeight: isSelected ? 700 : 500,
-                                  textAlign: 'left',
-                                  transition: 'all 0.15s ease',
+                                  boxShadow: isSelected ? '0 3px 10px rgba(22, 163, 74, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
+                                  gap: '8px',
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Tag size={13} style={{ color: isSelected ? '#16A34A' : '#64748B' }} />
-                                  <span>{label}</span>
+                                <div>
+                                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: isSelected ? '#15803D' : '#0F172A', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
+                                    <Tag size={13} style={{ color: isSelected ? '#16A34A' : 'var(--primary, #971345)', flexShrink: 0 }} />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reward.name}</span>
+                                  </div>
+                                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16A34A', marginBottom: '2px' }}>
+                                    {benefitText}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#D97706', fontWeight: 700 }}>
+                                    {reqPts} pts required
+                                  </div>
+                                  {minAmount > 0 && (
+                                    <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '1px' }}>
+                                      Min spend: ₹{minAmount}
+                                    </div>
+                                  )}
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '11px', fontWeight: 700, color: isEligible ? '#64748B' : '#94A3B8' }}>
-                                    {reqPts} pts
-                                  </span>
-                                  {isSelected && <Check size={14} color="#16A34A" />}
-                                </div>
-                              </button>
+                                <button
+                                  type="button"
+                                  disabled={!isEligible}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedReward(null);
+                                    } else {
+                                      setSelectedReward(reward);
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    border: isSelected
+                                      ? 'none'
+                                      : isEligible
+                                      ? '1px solid var(--primary, #971345)'
+                                      : 'none',
+                                    background: isSelected
+                                      ? '#16A34A'
+                                      : isEligible
+                                      ? '#FFFFFF'
+                                      : '#E2E8F0',
+                                    color: isSelected
+                                      ? '#FFFFFF'
+                                      : isEligible
+                                      ? 'var(--primary, #971345)'
+                                      : '#94A3B8',
+                                    cursor: isEligible ? 'pointer' : 'not-allowed',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px',
+                                    fontSize: '11.5px',
+                                    fontWeight: 700,
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                >
+                                  {isSelected ? (
+                                    <>
+                                      <Check size={13} /> Applied
+                                    </>
+                                  ) : isEligible ? (
+                                    'Redeem'
+                                  ) : !meetsMin ? (
+                                    `Min spend ₹${minAmount}`
+                                  ) : (
+                                    `Needs ${reqPts - loyaltyProfile.points_balance} pts`
+                                  )}
+                                </button>
+                              </div>
                             );
                           })}
                         </div>

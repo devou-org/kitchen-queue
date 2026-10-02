@@ -57,12 +57,15 @@ export default function OrderTicket({ order, onUpdateStatus }: OrderTicketProps)
       </div>
 
       <div className="space-y-2 mb-5">
-        {order.items?.map((item, idx) => (
-          <div key={idx} className="flex justify-between text-sm font-medium">
-            <span>{item.quantity}x {item.name}</span>
-            <span className="opacity-80">₹{item.price * item.quantity}</span>
-          </div>
-        ))}
+        {order.items?.map((item, idx) => {
+          const itemPrice = Number(item.price || 0);
+          return (
+            <div key={idx} className="flex justify-between text-sm font-medium">
+              <span>{item.quantity}x {item.name} {itemPrice === 0 ? <span className="text-xs font-bold text-green-600 ml-1">[FREE]</span> : null}</span>
+              <span className="opacity-80">{itemPrice === 0 ? '₹0.00' : `₹${itemPrice * item.quantity}`}</span>
+            </div>
+          );
+        })}
       </div>
 
       {onUpdateStatus && (
