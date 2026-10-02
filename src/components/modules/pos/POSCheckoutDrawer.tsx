@@ -1070,11 +1070,11 @@ export function POSCheckoutDrawer({
                       setOrderForm((prev) => ({ ...prev, phone: clean ? `${code}${clean}` : '' }));
                     }}
                     style={{
-                      width: '90px',
+                      width: '75px',
                       height: '42px',
                       flexShrink: 0,
                       paddingLeft: '8px',
-                      paddingRight: '16px',
+                      paddingRight: '20px',
                       borderRadius: '8px',
                       border: '1px solid #CBD5E1',
                       background: '#FFFFFF',
@@ -1087,7 +1087,7 @@ export function POSCheckoutDrawer({
                   >
                     {COUNTRY_CODES.map((c, i) => (
                       <option key={`${c.code}-${i}`} value={c.code}>
-                        {c.label}
+                        {c.code}
                       </option>
                     ))}
                   </select>

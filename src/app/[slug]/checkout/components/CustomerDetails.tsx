@@ -261,11 +261,11 @@ export default function CustomerDetails({
                 className="select"
                 value={countryCode}
                 onChange={handleCountryCodeChange}
-                style={{ width: '90px', flexShrink: 0, paddingLeft: '8px', paddingRight: '16px' }}
+                style={{ width: '75px', flexShrink: 0, paddingLeft: '8px', paddingRight: '20px' }}
                 disabled={otpStep || isVerified}
               >
                 {COUNTRY_CODES.map((c, i) => (
-                  <option key={`${c.code}-${i}`} value={c.code}>{c.label}</option>
+                  <option key={`${c.code}-${i}`} value={c.code}>{c.code}</option>
                 ))}
               </select>
               <input
