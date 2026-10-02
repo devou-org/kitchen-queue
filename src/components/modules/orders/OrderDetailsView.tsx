@@ -19,12 +19,14 @@ import {
   Printer,
   ChevronDown,
   Loader2,
+  Banknote,
+  QrCode,
+  Check,
+  ChefHat,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
-import { CustomSelect } from '@/components/ui/CustomSelect';
-import { checkTableAssignment } from '@/lib/table-capacity';
 import { printKotFromBrowser, printBillFromBrowser } from '@/lib/client-print';
 import { printBillTemplateDirectly } from '@/components/BillTemplate';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -62,7 +64,7 @@ export function OrderDetailsView({
   const [mounted, setMounted] = useState(false);
   const [tempStatus, setTempStatus] = useState(initialOrder.status);
   const [tempTableNumber, setTempTableNumber] = useState(initialOrder.table_number || '');
-  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || '');
+  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'CASH');
   const [actionLoading, setActionLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
@@ -107,7 +109,7 @@ export function OrderDetailsView({
   React.useEffect(() => {
     setTempStatus(order.status);
     setTempTableNumber(order.table_number || '');
-    setPaymentMethod(order.payment_method || '');
+    setPaymentMethod(order.payment_method || 'CASH');
     setIsClosing(false);
   }, [order.id, order.status, order.table_number, order.payment_method]);
 
@@ -130,37 +132,42 @@ export function OrderDetailsView({
     }
   };
 
-  const handleUpdateTable = async () => {
-    if (!tempTableNumber && !order.table_number) return;
+
+  const handleCancelOrder = async () => {
+    if (!window.confirm(`Are you sure you want to cancel Order #${String(order.ticket_number).padStart(3, '0')}?`)) {
+      return;
+    }
     setActionLoading(true);
     try {
-      await onStatusChange(order.id, tempStatus, tempTableNumber, paymentMethod);
+      await onStatusChange(order.id, 'CANCELLED', tempTableNumber || order.table_number, paymentMethod);
+      setOrder((prev) => ({ ...prev, status: 'CANCELLED', is_paid: false }));
+      toast.success('Order cancelled');
+    } catch {
+      toast.error('Failed to cancel order');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleMarkAsPaid = async () => {
+  const handleMarkAsPaid = async (methodToUse?: string) => {
     setActionLoading(true);
     try {
-      const pMethod = order.payment_method || paymentMethod || 'CASH';
+      const pMethod = methodToUse || paymentMethod || order.payment_method || 'CASH';
       const res = await orderService.updateOrder(order.id, {
-        status: 'PAID',
         is_paid: true,
         payment_method: pMethod,
         table_number: tempTableNumber || order.table_number,
       });
       if (res.success && res.data) {
         setOrder(res.data);
-        setTempStatus('PAID');
         setPaymentMethod(res.data.payment_method || pMethod);
         if (onOrderUpdated) onOrderUpdated(res.data);
-        toast.success('Order marked as PAID');
+        toast.success(`Payment recorded as Paid (${pMethod})`);
       } else {
-        toast.error(res.error || 'Failed to update order');
+        toast.error(res.error || 'Failed to update payment');
       }
     } catch {
-      toast.error('Network error updating order');
+      toast.error('Network error updating payment');
     } finally {
       setActionLoading(false);
     }
@@ -180,7 +187,7 @@ export function OrderDetailsView({
   const counterGroups = React.useMemo(() => {
     const map: Record<string, typeof itemsWithCounter> = {};
     for (const item of itemsWithCounter) {
-      const c = (item.counter || '').trim() || 'Unassigned';
+      const c = (item.counter || '').trim() || 'Kitchen';
       if (!map[c]) map[c] = [];
       map[c].push(item);
     }
@@ -188,6 +195,50 @@ export function OrderDetailsView({
   }, [itemsWithCounter]);
 
   const uniqueCounters = React.useMemo(() => Object.keys(counterGroups), [counterGroups]);
+
+  const [updatingCounters, setUpdatingCounters] = useState<Record<string, boolean>>({});
+
+  const getItemStatusBadgeConfig = (status?: string) => {
+    const s = (status || 'PENDING').toUpperCase();
+    switch (s) {
+      case 'PREPARING':
+        return { label: 'Preparing', bg: '#EFF6FF', text: '#1D4ED8', border: '#BFDBFE' };
+      case 'READY':
+      case 'SERVED':
+        return { label: 'Ready', bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' };
+      case 'CANCELLED':
+        return { label: 'Cancelled', bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA' };
+      case 'PENDING':
+      default:
+        return { label: 'Pending', bg: '#FFF7ED', text: '#C2410C', border: '#FFEDD5' };
+    }
+  };
+
+  const handleCounterStatusChange = async (counterName: string, nextStatus: string) => {
+    setUpdatingCounters(prev => ({ ...prev, [counterName]: true }));
+    try {
+      const itemsInCounter = counterGroups[counterName] || [];
+      const itemIds = itemsInCounter.map((i: any) => i.id).filter(Boolean);
+
+      const res = await orderService.updateOrderItemStatus(order.id, {
+        counter: counterName,
+        item_ids: itemIds,
+        status: nextStatus,
+      });
+      if (res.success && res.data) {
+        setOrder(res.data);
+        setTempStatus(res.data.status);
+        if (onOrderUpdated) onOrderUpdated(res.data);
+        toast.success(`All ${counterName} items marked as Ready`);
+      } else {
+        toast.error(res.error || 'Failed to update counter items');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setUpdatingCounters(prev => ({ ...prev, [counterName]: false }));
+    }
+  };
 
   const [isPrinting, setIsPrinting] = useState(false);
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
@@ -351,7 +402,19 @@ export function OrderDetailsView({
       }
     } catch (err: any) {
       console.error('Bill print error:', err);
-      toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      try {
+        printBillTemplateDirectly(order, restaurant ? {
+          name: restaurant.name,
+          logo_url: restaurant.logo_url,
+          address: restaurant.address,
+          phone: restaurant.phone,
+          primary_color: restaurant.primary_color,
+          gst_number: restaurant.gst_number,
+        } : undefined);
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, { id: toastId });
+      } catch {
+        toast.error(err.message || 'Failed to print bill. Check printer connection.', { id: toastId });
+      }
     } finally {
       setIsPrintingBill(false);
     }
@@ -516,8 +579,7 @@ export function OrderDetailsView({
                 #{String(order.ticket_number).padStart(3, '0')}
               </span>
               <OrderTypeBadge type={order.order_type} variant="minimal" />
-              <OrderStatusBadge status={order.status} />
-              {order.table_number && (
+              {order.order_type !== 'TAKEAWAY' && order.order_type !== 'DELIVERY' && order.table_number && (
                 <span
                   style={{
                     display: 'inline-flex',
@@ -832,193 +894,229 @@ export function OrderDetailsView({
         }}
       >
 
-        {/* SECTION: STATUS & TABLE CONTROLS */}
+
+
+        {/* SECTION: ORDER ITEMS (COUNTER ROUTED & PER-ITEM STATUS) */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '10px' }}>
-            Status & Table
-          </div>
-
-          {/* Status Select */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              Status
-            </label>
-            <CustomSelect
-              value={tempStatus}
-              disabled={actionLoading || loading}
-              onChange={(val) => {
-                setTempStatus(val);
-                handleUpdateStatus(val);
-              }}
-              direction="auto"
-              options={allStatuses.map((s) => ({ value: s, label: s }))}
-              buttonStyle={{ height: '36px', fontSize: '13px' }}
-            />
-          </div>
-
-          {/* Table Select */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-              Assigned Table
-            </label>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <CustomSelect
-                style={{ flex: 1 }}
-                value={tempTableNumber}
-                disabled={actionLoading || loading}
-                onChange={(val) => setTempTableNumber(val)}
-                direction="auto"
-                options={[
-                  { value: '', label: '-- No Table --' },
-                  ...tables
-                    .filter((t: any) => {
-                      const partySize = Number(order.party_size) || 1;
-                      const check = checkTableAssignment(t, partySize, {
-                        orderId: order.id,
-                        phone: order.phone,
-                        customerName: order.customer_name,
-                      });
-                      const isCurrent = t.table_number === tempTableNumber;
-                      return check.allowed || isCurrent;
-                    })
-                    .map((t: any) => {
-                      const partySize = Number(order.party_size) || 1;
-                      const check = checkTableAssignment(t, partySize, {
-                        orderId: order.id,
-                        phone: order.phone,
-                        customerName: order.customer_name,
-                      });
-                      const cap = Number(t.capacity) || 0;
-                      const seated = check.occupiedSeats;
-                      const rawNum = String(t.table_number || '').trim();
-                      let tableLabel = rawNum;
-                      if (/^\d+$/.test(rawNum)) {
-                        tableLabel = `T${rawNum}`;
-                      } else if (rawNum.toLowerCase().startsWith('t-')) {
-                        tableLabel = `T-${rawNum.slice(2)}`;
-                      }
-                      const freeSeats = Math.max(0, cap - seated);
-
-                      return {
-                        value: String(t.table_number),
-                        label: `${tableLabel} · ${seated}/${cap} (${freeSeats} free)`,
-                      };
-                    }),
-                  ...(tempTableNumber && !tables.some((t: any) => String(t.table_number) === String(tempTableNumber))
-                    ? [{ value: tempTableNumber, label: `Table ${tempTableNumber}` }]
-                    : []),
-                ]}
-                buttonStyle={{ height: '36px', fontSize: '13px' }}
-              />
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={handleUpdateTable}
-                disabled={actionLoading || loading || tempTableNumber === (order.table_number || '')}
-                style={{ height: '36px', padding: '0 12px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '8px' }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-
-
-        {/* SECTION: ORDER ITEMS */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Utensils size={12} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Utensils size={13} />
               Order Items ({totalItemsCount})
             </span>
+            {uniqueCounters.length > 1 && (
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#4F46E5', background: '#EEF2FF', padding: '2px 8px', borderRadius: '12px', border: '1px solid #E0E7FF' }}>
+                {uniqueCounters.length} Counters
+              </span>
+            )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {(order.items && order.items.length > 0) ? (
-              order.items.map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    background: '#F8FAFC',
-                    border: '1px solid #F1F5F9',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '4px',
-                        background: '#E2E8F0',
-                        color: '#0F172A',
-                        fontWeight: 700,
-                        fontSize: '11px',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {item.quantity}×
-                    </span>
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          color: '#0F172A',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
-                      >
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.product_name}
-                        </span>
-                        {item.counter && (
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              backgroundColor: '#EEF2FF',
-                              color: '#4F46E5',
-                              border: '1px solid #E0E7FF',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {item.counter}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#64748B' }}>
-                        {formatPrice(item.price_at_purchase)} each
-                      </div>
-                    </div>
-                  </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {uniqueCounters.length > 0 ? (
+              uniqueCounters.map((cName) => {
+                const itemsInCounter = counterGroups[cName] || [];
+                const readyCount = itemsInCounter.filter((i: any) => ['READY', 'SERVED'].includes((i.status || 'PENDING').toUpperCase())).length;
+                const isAllReady = itemsInCounter.length > 0 && readyCount === itemsInCounter.length;
+                const isCounterUpdating = Boolean(updatingCounters[cName]);
 
+                return (
                   <div
+                    key={cName}
                     style={{
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: '#0F172A',
-                      fontVariantNumeric: 'tabular-nums',
-                      flexShrink: 0,
-                      marginLeft: '8px',
+                      borderRadius: '8px',
+                      border: '1px solid #E2E8F0',
+                      background: '#FFFFFF',
+                      overflow: 'hidden',
                     }}
                   >
-                    {formatPrice(item.price_at_purchase * item.quantity)}
+                    {/* Counter Station Header */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        background: '#F8FAFC',
+                        borderBottom: '1px solid #E2E8F0',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '5px',
+                            background: '#EEF2FF',
+                            color: '#4F46E5',
+                          }}
+                        >
+                          <ChefHat size={13} />
+                        </span>
+                        <div>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                            {cName}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>
+                            ({readyCount}/{itemsInCounter.length} Ready)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Station Bulk Action */}
+                      <div>
+                        {isAllReady ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#047857',
+                              background: '#ECFDF5',
+                              border: '1px solid #A7F3D0',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                            }}
+                          >
+                            <Check size={12} /> All Ready
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isCounterUpdating}
+                            onClick={() => handleCounterStatusChange(cName, 'READY')}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#047857',
+                              background: '#ECFDF5',
+                              border: '1px solid #A7F3D0',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              cursor: isCounterUpdating ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                            title={`Mark all items for ${cName} as Ready`}
+                          >
+                            {isCounterUpdating ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <CheckCircle2 size={12} />
+                            )}
+                            Mark {cName} Ready
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Counter Items List */}
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {itemsInCounter.map((item: any, idx: number) => {
+                        const statusConfig = getItemStatusBadgeConfig(item.status);
+
+                        return (
+                          <div
+                            key={item.id || idx}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '9px 12px',
+                              borderBottom: idx < itemsInCounter.length - 1 ? '1px solid #F1F5F9' : 'none',
+                              background: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '22px',
+                                  height: '22px',
+                                  borderRadius: '4px',
+                                  background: '#E2E8F0',
+                                  color: '#0F172A',
+                                  fontWeight: 700,
+                                  fontSize: '11px',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {item.quantity}×
+                              </span>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div
+                                  style={{
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    color: '#0F172A',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {item.product_name}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#64748B' }}>
+                                  {formatPrice(item.price_at_purchase)} each
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Item Status (Static Badge) & Price */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  color: statusConfig.text,
+                                  background: statusConfig.bg,
+                                  border: `1px solid ${statusConfig.border}`,
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  userSelect: 'none',
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: statusConfig.text,
+                                  }}
+                                />
+                                {statusConfig.label}
+                              </span>
+
+                              <div
+                                style={{
+                                  fontSize: '13px',
+                                  fontWeight: 700,
+                                  color: '#0F172A',
+                                  fontVariantNumeric: 'tabular-nums',
+                                  minWidth: '60px',
+                                  textAlign: 'right',
+                                }}
+                              >
+                                {formatPrice(item.price_at_purchase * item.quantity)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div style={{ padding: '16px 0', textAlign: 'center', color: '#94A3B8', fontSize: '12px' }}>
                 No items recorded.
@@ -1095,33 +1193,129 @@ export function OrderDetailsView({
                   <span style={{ color: '#B45309', fontWeight: 600 }}>Unpaid</span>
                 )}
               </div>
-              {order.status !== 'PAID' && (
-                <button
-                  type="button"
-                  disabled={actionLoading || loading}
-                  onClick={handleMarkAsPaid}
+
+              {!order.is_paid && (
+                <div
                   style={{
-                    width: '100%',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    borderRadius: '6px',
-                    border: '1px solid #16A34A',
                     background: '#F0FDF4',
-                    color: '#15803D',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                    border: '1px solid #BBF7D0',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    marginTop: '4px',
                     transition: 'all 0.15s ease',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#DCFCE7')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = '#F0FDF4')}
                 >
-                  <CheckCircle2 size={14} />
-                  <span>Mark as Paid</span>
-                </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CreditCard size={15} style={{ color: '#16A34A' }} />
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#15803D' }}>
+                        Mark as Paid
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: '#64748B' }}>
+                        Record payment without changing kitchen status
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      paddingTop: '8px',
+                      borderTop: '1px solid #DCFCE7',
+                    }}
+                  >
+                    <label
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        color: '#166534',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      Payment Method
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                      {[
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
+                        { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CARD', label: 'Card', icon: CreditCard },
+                      ].map((m) => {
+                        const Icon = m.icon;
+                        const selected = (paymentMethod || 'CASH') === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setPaymentMethod(m.id)}
+                            style={{
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: selected ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
+                              background: selected ? '#FFFFFF' : '#F8FAFC',
+                              color: selected ? '#15803D' : '#475569',
+                              boxShadow: selected ? '0 1px 3px rgba(22, 163, 74, 0.15)' : 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <Icon size={12} />
+                            <span>{m.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={actionLoading || loading}
+                      onClick={() => handleMarkAsPaid()}
+                      style={{
+                        marginTop: '4px',
+                        width: '100%',
+                        height: '34px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: '#16A34A',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#15803D')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = '#16A34A')}
+                    >
+                      {actionLoading ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          <span>Recording Payment...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={14} />
+                          <span>Confirm as Paid · {paymentMethod || 'CASH'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1178,6 +1372,36 @@ export function OrderDetailsView({
             <p style={{ margin: 0, fontSize: '12px', color: '#92400E', fontStyle: 'italic', lineHeight: 1.4 }}>
               "{order.notes}"
             </p>
+          </div>
+        )}
+
+        {/* ACTION: CANCEL ORDER (if active) */}
+        {order.status !== 'CANCELLED' && (
+          <div style={{ padding: '16px 20px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'flex-end', background: '#FAFAFA' }}>
+            <button
+              type="button"
+              onClick={handleCancelOrder}
+              disabled={actionLoading || loading}
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #FECACA',
+                borderRadius: '8px',
+                color: '#DC2626',
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '7px 14px',
+                cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#FFFFFF'; }}
+            >
+              <X size={13} />
+              <span>Cancel Order</span>
+            </button>
           </div>
         )}
       </div>

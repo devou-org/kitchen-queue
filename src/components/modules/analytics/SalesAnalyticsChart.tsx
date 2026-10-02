@@ -193,6 +193,25 @@ export function SalesAnalyticsChart({
         .analytics-metric-switcher::-webkit-scrollbar {
           display: none;
         }
+        @media (max-width: 768px) {
+          .sales-quick-stats-ribbon {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+            padding: 8px 10px !important;
+          }
+          .sales-quick-stats-ribbon > div {
+            min-width: 0 !important;
+          }
+          .sales-quick-stats-ribbon > div:last-child:nth-child(odd) {
+            grid-column: 1 / -1 !important;
+          }
+          .sales-quick-stats-ribbon span {
+            font-size: 10px !important;
+          }
+          .sales-quick-stats-ribbon div {
+            font-size: 13.5px !important;
+          }
+        }
       `}</style>
 
       {/* Header & Controls */}
@@ -344,6 +363,7 @@ export function SalesAnalyticsChart({
 
       {/* Metric Quick Stats Ribbon */}
       <div
+        className="sales-quick-stats-ribbon"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',

@@ -48,6 +48,14 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0;
     `;
     await sqlConnection`
+      ALTER TABLE order_items
+      ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+      ADD COLUMN IF NOT EXISTS counter VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS prepared_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
+      CREATE INDEX IF NOT EXISTS idx_order_items_counter_status ON order_items(order_id, counter, status);
+    `;
+    await sqlConnection`
       INSERT INTO gemini_request_config (request_type, max_output_tokens)
       VALUES ('BUSINESS_ANALYST_CHAT', 10000)
       ON CONFLICT (request_type) DO UPDATE SET max_output_tokens = 10000;
@@ -579,9 +587,10 @@ export async function createRestaurant(data: {
 }) {
   let restaurant: any = null;
   try {
+    const secondaryColor = (data.secondary_color && data.secondary_color.toUpperCase() !== '#EC7951') ? data.secondary_color : '#ffffff';
     const rows = await sql`
       INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate)
-      VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'}, ${data.timezone || 'Asia/Kolkata'}, ${data.opening_time || '09:00:00'}, ${data.closing_time || '22:00:00'}, ${data.rollover_time || '00:00:00'}, ${data.gst_type || 'NONE'}, ${data.gst_number || null}, ${data.gst_rate || 5.00})
+      VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${secondaryColor}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'}, ${data.timezone || 'Asia/Kolkata'}, ${data.opening_time || '09:00:00'}, ${data.closing_time || '22:00:00'}, ${data.rollover_time || '00:00:00'}, ${data.gst_type || 'NONE'}, ${data.gst_number || null}, ${data.gst_rate || 5.00})
       RETURNING *
     `;
     restaurant = rows[0];
@@ -589,10 +598,11 @@ export async function createRestaurant(data: {
     if (error.message?.includes('column') || error.message?.includes('does not exist')) {
       console.log("Missing menu columns detected in createRestaurant. Attempting auto-migration...");
       await runAutoMigration(sql);
+      const secondaryColor = (data.secondary_color && data.secondary_color.toUpperCase() !== '#EC7951') ? data.secondary_color : '#ffffff';
       try {
         const rows = await sql`
           INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description)
-          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
+          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${secondaryColor}, ${data.menu_layout || 'LIST'}, ${data.menu_title || 'Today\'s Specials'}, ${data.menu_description || 'Hand-curated coastal delicacies prepared with traditional recipes.'})
           RETURNING *
         `;
         restaurant = rows[0];
@@ -600,7 +610,7 @@ export async function createRestaurant(data: {
         // Safe fallback without custom columns
         const rows = await sql`
           INSERT INTO restaurants (name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout)
-          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${data.secondary_color || null}, ${data.menu_layout || 'LIST'})
+          VALUES (${data.name}, ${data.slug}, ${data.phone || null}, ${data.address || null}, ${data.logo_url || null}, ${data.primary_color || null}, ${secondaryColor}, ${data.menu_layout || 'LIST'})
           RETURNING *
         `;
         restaurant = rows[0];
@@ -841,6 +851,17 @@ export async function createProduct(data: {
             ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'}, ${data.counter || null})
     RETURNING *
   `;
+
+  if (data.category && data.category.trim()) {
+    try {
+      await sql`
+        INSERT INTO categories (restaurant_id, name, sort_order)
+        VALUES (${data.restaurant_id}, ${data.category.trim()}, COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = ${data.restaurant_id}), 0) + 10)
+        ON CONFLICT (restaurant_id, name) DO NOTHING
+      `;
+    } catch (_) {}
+  }
+
   return rows[0];
 }
 
@@ -894,6 +915,16 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
       ]
     );
 
+    if (data.category && data.category.trim()) {
+      try {
+        await client.query(`
+          INSERT INTO categories (restaurant_id, name, sort_order)
+          VALUES ($1, $2, COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = $1), 0) + 10)
+          ON CONFLICT (restaurant_id, name) DO NOTHING
+        `, [restaurantId, data.category.trim()]);
+      } catch (_) {}
+    }
+
     await client.query('COMMIT');
     return result.rows[0];
   } catch (error) {
@@ -933,7 +964,7 @@ export async function getOrders(restaurantId: string, filters: {
     if (filters.status) {
       if (sort === 'DESC') {
         return await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status} 
             AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
@@ -944,7 +975,7 @@ export async function getOrders(restaurantId: string, filters: {
         `;
       }
       return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status} 
           AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
@@ -957,7 +988,7 @@ export async function getOrders(restaurantId: string, filters: {
       const statuses = filters.status_in.split(',');
       if (sort === 'DESC') {
         return await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
             AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
@@ -968,7 +999,7 @@ export async function getOrders(restaurantId: string, filters: {
         `;
       }
       return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
           AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
@@ -980,7 +1011,7 @@ export async function getOrders(restaurantId: string, filters: {
     } else {
       if (sort === 'DESC') {
         return await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
           ORDER BY o.business_date DESC,
@@ -990,7 +1021,7 @@ export async function getOrders(restaurantId: string, filters: {
         `;
       }
       return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
         ORDER BY o.business_date ASC,
@@ -1004,13 +1035,13 @@ export async function getOrders(restaurantId: string, filters: {
   if (filters.status) {
     if (sort === 'DESC') {
       return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status}
         ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
       `;
     }
     return await sql`
-      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
       FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status}
       ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
     `;
@@ -1020,13 +1051,13 @@ export async function getOrders(restaurantId: string, filters: {
     const statuses = filters.status_in.split(',');
     if (sort === 'DESC') {
       return await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
           ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
         `;
     }
     return await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
         ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
       `;
@@ -1034,13 +1065,13 @@ export async function getOrders(restaurantId: string, filters: {
 
   if (sort === 'DESC') {
     return await sql`
-      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
       FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
       ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
     `;
   }
   return await sql`
-    SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', p.counter) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+    SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
     ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
   `;
@@ -1178,7 +1209,11 @@ export async function getOrderById(restaurantId: string, id: string) {
         'product_id', oi.product_id, 
         'quantity', oi.quantity, 
         'price_at_purchase', oi.price_at_purchase,
-        'product_name', p.name, 'counter', p.counter,
+        'product_name', p.name, 
+        'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'),
+        'status', COALESCE(oi.status, 'PENDING'),
+        'prepared_at', oi.prepared_at,
+        'ready_at', oi.ready_at,
         'product_image', p.image_url
       ) ORDER BY oi.id) as items
     FROM orders o 
@@ -1210,10 +1245,14 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
       COALESCE(ar.pos, 0) as queue_position,
       json_agg(json_build_object(
         'id', oi.id, 
-        'product_id', oi.product_id,
+        'product_id', oi.product_id, 
         'quantity', oi.quantity, 
         'price_at_purchase', oi.price_at_purchase,
-        'product_name', p.name, 'counter', p.counter,
+        'product_name', p.name, 
+        'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'),
+        'status', COALESCE(oi.status, 'PENDING'),
+        'prepared_at', oi.prepared_at,
+        'ready_at', oi.ready_at,
         'product_image', p.image_url
       ) ORDER BY oi.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
@@ -1253,7 +1292,11 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
           'product_id', oi.product_id,
           'quantity', oi.quantity, 
           'price_at_purchase', oi.price_at_purchase,
-          'product_name', p.name, 'counter', p.counter
+          'product_name', p.name, 
+          'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'),
+          'status', COALESCE(oi.status, 'PENDING'),
+          'prepared_at', oi.prepared_at,
+          'ready_at', oi.ready_at
         ) ORDER BY oi.id) 
         FROM order_items oi 
         LEFT JOIN products p ON p.id = oi.product_id 
@@ -1321,6 +1364,7 @@ export async function createOrder(data: {
   party_size?: number;
   table_number?: string;
   order_type?: string;
+  status?: string;
   is_pos?: boolean;
   is_paid?: boolean;
   payment_method?: string;
@@ -1408,6 +1452,39 @@ export async function createOrder(data: {
     const updatedCount = Number(reserveResult.rows[0]?.updated_count || 0);
 
     if (updatedCount !== requestedCount) {
+      const stockCheck = await client.query(
+        `
+          SELECT 
+            r.pid AS product_id,
+            r.qty AS requested_qty,
+            p.name,
+            COALESCE(p.stock_quantity, 0) AS current_stock,
+            p.is_active
+          FROM unnest($1::uuid[], $2::int[]) AS r(pid, qty)
+          LEFT JOIN products p ON p.id = r.pid
+        `,
+        [productIds, quantities]
+      );
+
+      const issues: string[] = [];
+      for (const row of stockCheck.rows) {
+        const reqQty = Number(row.requested_qty || 0);
+        const name = row.name || 'Selected item';
+        const isAvailable = Boolean(row.name && row.is_active);
+        const availStock = Number(row.current_stock ?? 0);
+
+        if (!isAvailable) {
+          issues.push(`"${name}" is no longer available`);
+        } else if (availStock <= 0) {
+          issues.push(`"${name}" is out of stock (0 available)`);
+        } else if (availStock < reqQty) {
+          issues.push(`"${name}" only has ${availStock} available (${reqQty} requested)`);
+        }
+      }
+
+      if (issues.length > 0) {
+        throw new Error(issues.join(' • '));
+      }
       throw new Error('One or more items are out of stock or no longer available.');
     }
 
@@ -1422,7 +1499,8 @@ export async function createOrder(data: {
 
     // 2. Check if order is placed via table QR (table_number exists) or POS -> Set PREPARING, else PENDING
     const isTableOrder = Boolean(data.table_number && data.table_number.trim() !== '');
-    const targetStatus = (data.is_pos || isTableOrder) ? 'PREPARING' : 'PENDING';
+    const isPosOrder = Boolean(data.is_pos);
+    const targetStatus = (data.status === 'PREPARING' || isPosOrder || isTableOrder) ? 'PREPARING' : (data.status || 'PENDING');
     
     let statusRes = await client.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = $2 LIMIT 1`, [data.restaurant_id, targetStatus]);
     
@@ -1501,11 +1579,19 @@ export async function createOrder(data: {
 
     await client.query(
       `
-        INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
-        SELECT $1::uuid, pid, qty, price
+        INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase, status, counter, prepared_at)
+        SELECT 
+          $1::uuid, 
+          t.pid, 
+          t.qty, 
+          t.price, 
+          $5::varchar, 
+          COALESCE(NULLIF(p.counter, ''), 'Kitchen'),
+          CASE WHEN $5::varchar = 'PREPARING' THEN NOW() ELSE NULL END
         FROM unnest($2::uuid[], $3::int[], $4::numeric[]) AS t(pid, qty, price)
+        LEFT JOIN products p ON p.id = t.pid
       `,
-      [orderId, productIds, quantities, prices]
+      [orderId, productIds, quantities, prices, defaultStatus]
     );
 
     // Auto-deduct inventory ingredients for products with configured BOM recipes
@@ -1618,7 +1704,8 @@ export async function checkAndCloseTableSession(
      FROM orders
      WHERE restaurant_id = $1
        AND (table_id = $2 OR table_number = $3)
-       AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')`,
+       AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
+       AND (order_type IS NULL OR order_type NOT IN ('TAKEAWAY', 'DELIVERY'))`,
     [restaurantId, tableId, cleanTableNum]
   );
 
@@ -1647,6 +1734,7 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   else if (status === 'PREPARING') timestampSet = ', preparing_at = COALESCE(preparing_at, CURRENT_TIMESTAMP)';
   else if (status === 'READY') timestampSet = ', ready_at = COALESCE(ready_at, CURRENT_TIMESTAMP)';
   else if (status === 'PAID') timestampSet = ', paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP), is_paid = true';
+  else if (status === 'CANCELLED' || status === 'EXPIRED') timestampSet = ', is_paid = false, paid_at = NULL';
 
   // Check if tableNumber is assigned or updated
   let tableId: string | undefined = undefined;
@@ -1685,6 +1773,12 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
     }
   }
 
+  // Sync item status if master order status changed
+  if (status === 'CANCELLED') {
+    try { await pool.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]); } catch (_) {}
+  } else if (status === 'READY' || status === 'SERVED' || status === 'COMPLETED' || status === 'PAID') {
+    try { await pool.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]); } catch (_) {}
+  }
   // Trigger Loyalty Points processing
   if (status === 'PAID' || status === 'COMPLETED' || updatedOrder?.is_paid) {
     processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
@@ -1702,7 +1796,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     
     // Fetch existing order to verify values
     const orderRes = await client.query(`
-      SELECT is_paid, status, total_price, ticket_number FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
+      SELECT is_paid, status, total_price, ticket_number, table_number, table_id, table_session_id, party_size, order_type FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
     `, [restaurantId, id]);
     
     if (orderRes.rows.length === 0) {
@@ -1711,22 +1805,61 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     
     const existing = orderRes.rows[0];
     const nextStatus = status || existing.status;
-    const nextIsPaid = (typeof isPaid === 'boolean') ? isPaid : (nextStatus === 'PAID' ? true : existing.is_paid);
+    let nextIsPaid: boolean;
+    if (nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED') {
+      nextIsPaid = false;
+    } else if (typeof isPaid === 'boolean') {
+      nextIsPaid = isPaid;
+    } else if (nextStatus === 'PAID') {
+      nextIsPaid = true;
+    } else {
+      nextIsPaid = existing.is_paid;
+    }
+
+    const previousTable = existing.table_number;
+    let nextTableNumber = existing.table_number;
+    let nextTableId = existing.table_id;
+    let nextTableSessionId = existing.table_session_id;
+
+    if (tableNumber !== undefined) {
+      const trimmedTable = tableNumber ? tableNumber.trim() : null;
+      if (!trimmedTable) {
+        nextTableNumber = null;
+        nextTableId = null;
+        nextTableSessionId = null;
+      } else {
+        nextTableNumber = trimmedTable;
+        if (nextTableNumber !== previousTable) {
+          const sessionInfo = await findOrCreateTableSession(client, restaurantId, nextTableNumber, existing.party_size || 1);
+          nextTableId = sessionInfo.tableId;
+          nextTableSessionId = sessionInfo.tableSessionId;
+        }
+      }
+    }
     
     // Update order
     const updateRes = await client.query(`
       UPDATE orders
       SET status = $1,
           is_paid = $2,
-          table_number = COALESCE($3, table_number),
+          table_number = $3,
+          table_id = $4,
+          table_session_id = $5,
           payment_method = COALESCE($6, payment_method),
-          paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() ELSE paid_at END,
+          paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() WHEN $2 = false THEN NULL ELSE paid_at END,
           updated_at = NOW()
-      WHERE restaurant_id = $4 AND id = $5
+      WHERE restaurant_id = $7 AND id = $8
       RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, paid_at
-    `, [nextStatus, nextIsPaid, tableNumber || null, restaurantId, id, paymentMethod || null]);
+    `, [nextStatus, nextIsPaid, nextTableNumber, nextTableId, nextTableSessionId, paymentMethod || null, restaurantId, id]);
     
     const updatedOrder = updateRes.rows[0];
+
+    // Sync item status if master order status changed
+    if (nextStatus === 'CANCELLED') {
+      await client.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]);
+    } else if (nextStatus === 'READY' || nextStatus === 'SERVED' || nextStatus === 'COMPLETED' || nextStatus === 'PAID') {
+      await client.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]);
+    }
     
     // Process billing if order is now paid/completed (and wasn't paid before)
     if (nextIsPaid && !existing.is_paid) {
@@ -1736,8 +1869,16 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     
     await client.query('COMMIT');
 
-    // Re-evaluate table occupancy and close session if order is PAID, CANCELLED, or EXPIRED
-    const activeTableNum = tableNumber || updatedOrder?.table_number;
+    // Re-evaluate table occupancy and close session if table changed or order is PAID, CANCELLED, or EXPIRED
+    if (previousTable && (nextTableNumber !== previousTable)) {
+      try {
+        await checkAndCloseTableSession(pool, restaurantId, previousTable);
+      } catch (tblErr) {
+        console.error('Error re-evaluating previous table occupancy:', tblErr);
+      }
+    }
+
+    const activeTableNum = nextTableNumber || previousTable;
     if (activeTableNum && (nextStatus === 'PAID' || nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED')) {
       try {
         await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
@@ -1762,6 +1903,107 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
   }
 }
 
+export async function updateOrderItemStatus(
+  restaurantId: string,
+  orderId: string,
+  options: {
+    itemIds?: string[];
+    counter?: string;
+    status: string;
+  }
+) {
+  const { itemIds, counter, status } = options;
+  const upperStatus = status.toUpperCase();
+
+  const validStatuses = ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CANCELLED', 'REJECTED'];
+  if (!validStatuses.includes(upperStatus)) {
+    throw new Error(`Invalid status: ${status}. Must be one of ${validStatuses.join(', ')}`);
+  }
+
+  const orderCheck = await sql`
+    SELECT id, restaurant_id, status FROM orders 
+    WHERE id = ${orderId} AND restaurant_id = ${restaurantId}
+  `;
+  if (!orderCheck || orderCheck.length === 0) {
+    throw new Error('Order not found or access denied');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const effectiveStatus = upperStatus === 'SERVED' ? 'READY' : upperStatus;
+    let query = `
+      UPDATE order_items
+      SET status = $1::varchar
+    `;
+    if (effectiveStatus === 'PREPARING') {
+      query += `, prepared_at = COALESCE(prepared_at, NOW())`;
+    } else if (effectiveStatus === 'READY') {
+      query += `, ready_at = COALESCE(ready_at, NOW())`;
+    }
+    query += ` WHERE order_id = $2::uuid`;
+
+    const params: any[] = [effectiveStatus, orderId];
+
+    if (itemIds && itemIds.length > 0) {
+      params.push(itemIds);
+      query += ` AND id = ANY($${params.length}::uuid[])`;
+    } else if (counter && counter.trim() !== '') {
+      params.push(counter.trim().toLowerCase());
+      query += ` AND id IN (
+        SELECT oi2.id FROM order_items oi2 
+        LEFT JOIN products p2 ON p2.id = oi2.product_id 
+        WHERE oi2.order_id = $2::uuid AND LOWER(COALESCE(NULLIF(oi2.counter, ''), NULLIF(p2.counter, ''), 'kitchen')) = $${params.length}::varchar
+      )`;
+    }
+
+    await client.query(query, params);
+
+    // Auto-sync master order status and timestamps based on item statuses
+    const itemsCheck = await client.query(`
+      SELECT status FROM order_items 
+      WHERE order_id = $1::uuid AND status NOT IN ('CANCELLED', 'REJECTED')
+    `, [orderId]);
+
+    const activeItems = itemsCheck.rows;
+    if (activeItems.length > 0) {
+      const allReadyOrServed = activeItems.every((i: any) => ['READY', 'SERVED'].includes((i.status || '').toUpperCase()));
+      const anyPreparing = activeItems.some((i: any) => (i.status || '').toUpperCase() === 'PREPARING');
+      const anyReady = activeItems.some((i: any) => (i.status || '').toUpperCase() === 'READY');
+
+      if (allReadyOrServed) {
+        // Automatically advance order to READY if it is still PENDING or PREPARING
+        await client.query(`
+          UPDATE orders
+          SET status = 'READY',
+              ready_at = COALESCE(ready_at, NOW()),
+              updated_at = NOW()
+          WHERE id = $1::uuid AND status IN ('PENDING', 'PREPARING')
+        `, [orderId]);
+      } else if (anyPreparing || anyReady) {
+        // Advance to PREPARING if currently PENDING
+        await client.query(`
+          UPDATE orders
+          SET status = 'PREPARING',
+              preparing_at = COALESCE(preparing_at, NOW()),
+              updated_at = NOW()
+          WHERE id = $1::uuid AND status = 'PENDING'
+        `, [orderId]);
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  return await getOrderById(restaurantId, orderId);
+}
+
 
 export async function updateOrderDetails(restaurantId: string, id: string, data: {
   customer_name?: string;
@@ -1769,6 +2011,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
   notes?: string | null;
   party_size?: number;
   table_number?: string | null;
+  order_type?: string;
   items?: { product_id: string; quantity: number }[];
 }) {
   const existingOrder = await getOrderById(restaurantId, id);
@@ -1795,22 +2038,61 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
     const nextItems = Array.from(normalizedMap.entries()).map(([product_id, quantity]) => ({ product_id, quantity }));
 
     const existingItemRows = await sql`
-      SELECT product_id, quantity
+      SELECT id, product_id, quantity, price_at_purchase, status, counter, prepared_at, ready_at
       FROM order_items
       WHERE order_id = ${id}
-    `;
+    ` as {
+      id: string;
+      product_id: string;
+      quantity: number;
+      price_at_purchase: number;
+      status?: string;
+      counter?: string;
+      prepared_at?: string | Date | null;
+      ready_at?: string | Date | null;
+    }[];
 
     const currentQtyByProduct = new Map<string, number>();
+    const existingItemMap = new Map<string, {
+      id: string;
+      product_id: string;
+      quantity: number;
+      price_at_purchase: number;
+      status: string;
+      counter: string;
+      prepared_at: string | null;
+      ready_at: string | null;
+    }>();
+
     for (const row of existingItemRows) {
-      currentQtyByProduct.set(row.product_id, (currentQtyByProduct.get(row.product_id) || 0) + Number(row.quantity));
+      const q = Number(row.quantity);
+      currentQtyByProduct.set(row.product_id, (currentQtyByProduct.get(row.product_id) || 0) + q);
+      existingItemMap.set(row.product_id, {
+        id: row.id,
+        product_id: row.product_id,
+        quantity: q,
+        price_at_purchase: Number(row.price_at_purchase),
+        status: (row.status || 'PENDING').toUpperCase(),
+        counter: (row.counter && row.counter.trim()) ? row.counter.trim() : 'Kitchen',
+        prepared_at: row.prepared_at ? new Date(row.prepared_at).toISOString() : null,
+        ready_at: row.ready_at ? new Date(row.ready_at).toISOString() : null,
+      });
     }
 
     const targetProductIds = nextItems.map((item) => item.product_id);
     const productRows = await sql`
-      SELECT id, name, price, stock_quantity, buffer_quantity, is_active
+      SELECT id, name, price, stock_quantity, buffer_quantity, is_active, counter
       FROM products
       WHERE id = ANY(${targetProductIds})
-    `;
+    ` as {
+      id: string;
+      name: string;
+      price: number;
+      stock_quantity: number;
+      buffer_quantity: number;
+      is_active: boolean;
+      counter?: string;
+    }[];
 
     if (productRows.length !== targetProductIds.length) {
       throw new Error('One or more selected products do not exist');
@@ -1823,6 +2105,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
       stock_quantity: number;
       buffer_quantity: number;
       is_active: boolean;
+      counter?: string;
     }>();
 
     for (const row of productRows) {
@@ -1833,6 +2116,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
         stock_quantity: Number(row.stock_quantity),
         buffer_quantity: Number(row.buffer_quantity),
         is_active: Boolean(row.is_active),
+        counter: (row.counter && row.counter.trim()) ? row.counter.trim() : 'Kitchen',
       });
     }
 
@@ -1882,35 +2166,79 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
       `;
     }
 
-    await sql`DELETE FROM order_items WHERE order_id = ${id}`;
+    // 1. Delete items that were completely removed from order
+    const nextProductIdsSet = new Set(nextItems.map((i) => i.product_id));
+    const itemsToDelete = existingItemRows.filter((r) => !nextProductIdsSet.has(r.product_id));
+    if (itemsToDelete.length > 0) {
+      const idsToDelete = itemsToDelete.map((r) => r.id);
+      await sql`DELETE FROM order_items WHERE id = ANY(${idsToDelete})`;
+    }
 
-    const insertItems = nextItems.map((item) => {
+    // 2. Insert new items or update existing items preserving status, counter, and timestamps
+    for (const item of nextItems) {
       const product = productById.get(item.product_id);
       if (!product) {
         throw new Error('A selected product is invalid');
       }
-      return {
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price_at_purchase: product.price,
-      };
-    });
 
-    const productIds = insertItems.map((i) => i.product_id);
-    const quantities = insertItems.map((i) => i.quantity);
-    const prices = insertItems.map((i) => i.price_at_purchase);
+      const existing = existingItemMap.get(item.product_id);
+      const counter = existing?.counter || product.counter || 'Kitchen';
+      const priceAtPurchase = existing?.price_at_purchase ?? product.price;
 
-    await sql`
-      INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
-      SELECT ${id}, pid, qty, price
-      FROM unnest(
-        ${productIds}::uuid[],
-        ${quantities}::int[],
-        ${prices}::numeric[]
-      ) AS t(pid, qty, price)
-    `;
+      if (existing) {
+        const isIncreased = item.quantity > existing.quantity;
+        let newStatus = existing.status;
+        let preparedAt = existing.prepared_at;
+        let readyAt = existing.ready_at;
 
-    const newSubtotal = Math.round(insertItems.reduce((acc, item) => acc + (item.price_at_purchase * item.quantity), 0) * 100) / 100;
+        if (isIncreased) {
+          // If items were added to this product, more prep is required
+          if (['READY', 'SERVED'].includes(existing.status)) {
+            newStatus = 'PREPARING';
+            readyAt = null; // Additional quantity not yet ready
+          }
+          if (!preparedAt) {
+            preparedAt = new Date().toISOString();
+          }
+        }
+
+        await sql`
+          UPDATE order_items
+          SET quantity = ${item.quantity},
+              price_at_purchase = ${priceAtPurchase},
+              status = ${newStatus},
+              counter = ${counter},
+              prepared_at = ${preparedAt},
+              ready_at = ${readyAt}
+          WHERE id = ${existing.id}
+        `;
+      } else {
+        // Brand new item added to the order
+        const initialStatus = existingOrder.status === 'PENDING' ? 'PENDING' : 'PREPARING';
+        const preparedAt = initialStatus === 'PREPARING' ? new Date().toISOString() : null;
+
+        await sql`
+          INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase, status, counter, prepared_at)
+          VALUES (
+            ${id}, 
+            ${item.product_id}, 
+            ${item.quantity}, 
+            ${priceAtPurchase}, 
+            ${initialStatus}, 
+            ${counter}, 
+            ${preparedAt}
+          )
+        `;
+      }
+    }
+
+    const newSubtotal = Math.round(nextItems.reduce((acc, item) => {
+      const product = productById.get(item.product_id);
+      const existing = existingItemMap.get(item.product_id);
+      const price = existing?.price_at_purchase ?? product?.price ?? 0;
+      return acc + (price * item.quantity);
+    }, 0) * 100) / 100;
+
     const gstType = existingOrder.gst_type || 'NONE';
     const gstRate = Number(existingOrder.gst_rate) || 0;
     let newGstAmount = 0;
@@ -1931,13 +2259,39 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
     `;
   }
 
+  const previousTable = existingOrder.table_number;
+  const effectiveOrderType = (data.order_type || existingOrder.order_type || 'DINE_IN').toUpperCase();
+
+  let nextTableNumber: string | null = existingOrder.table_number || null;
+  let nextTableId: string | null = existingOrder.table_id || null;
+  let nextTableSessionId: string | null = existingOrder.table_session_id || null;
+
+  if (effectiveOrderType === 'TAKEAWAY' || effectiveOrderType === 'DELIVERY') {
+    nextTableNumber = null;
+    nextTableId = null;
+    nextTableSessionId = null;
+  } else if (data.table_number !== undefined) {
+    nextTableNumber = data.table_number ? data.table_number.trim() : null;
+    if (!nextTableNumber) {
+      nextTableId = null;
+      nextTableSessionId = null;
+    } else if (nextTableNumber !== previousTable) {
+      const sessionInfo = await findOrCreateTableSession(pool, restaurantId, nextTableNumber, data.party_size || existingOrder.party_size || 1);
+      nextTableId = sessionInfo.tableId;
+      nextTableSessionId = sessionInfo.tableSessionId;
+    }
+  }
+
   const rows = await sql`
     UPDATE orders
     SET customer_name = COALESCE(${data.customer_name ?? null}, customer_name),
         phone = COALESCE(${data.phone ?? null}, phone),
         notes = COALESCE(${data.notes ?? null}, notes),
         party_size = COALESCE(${data.party_size ?? null}, party_size),
-        table_number = COALESCE(${data.table_number ?? null}, table_number),
+        order_type = ${effectiveOrderType},
+        table_number = ${nextTableNumber},
+        table_id = ${nextTableId},
+        table_session_id = ${nextTableSessionId},
         total_price = ${nextTotalPrice},
         updated_at = NOW()
     WHERE restaurant_id = ${restaurantId} AND id = ${id}
@@ -1946,6 +2300,15 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
 
   if (!rows[0]) {
     throw new Error('Order not found');
+  }
+
+  // If table was changed or cleared, re-evaluate session of previous table
+  if (previousTable && (nextTableNumber !== previousTable)) {
+    try {
+      await checkAndCloseTableSession(pool, restaurantId, previousTable);
+    } catch (tblErr) {
+      console.error('Error re-evaluating previous table occupancy:', tblErr);
+    }
   }
 
   return await getOrderById(restaurantId, id);
@@ -2092,7 +2455,12 @@ export async function setQueueNumber(restaurantId: string, number: number) {
 export async function getPendingQueueOrders() {
   const rows = await sql`
     SELECT o.*, s.name as staff_name, 
-      json_agg(json_build_object('product_name', p.name, 'counter', p.counter, 'quantity', oi.quantity) ORDER BY oi.id) as items
+      json_agg(json_build_object(
+        'product_name', p.name, 
+        'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 
+        'status', COALESCE(oi.status, 'PENDING'),
+        'quantity', oi.quantity
+      ) ORDER BY oi.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN products p ON p.id = oi.product_id
@@ -2567,6 +2935,46 @@ export async function updateCategorySequence(restaurantId: string, orderedCatego
     await client.query('ROLLBACK');
     console.error('❌ Error updating category sequence:', err);
     return { success: false, error: err.message || 'Failed to update category sequence' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCategory(restaurantId: string, categoryId: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const catRes = await client.query(
+      `SELECT id, name FROM categories WHERE id = $1 AND restaurant_id = $2 LIMIT 1`,
+      [categoryId, restaurantId]
+    );
+
+    if (catRes.rows.length === 0) {
+      throw new Error('Category not found');
+    }
+
+    const categoryName = catRes.rows[0].name;
+
+    // Delete category
+    await client.query(
+      `DELETE FROM categories WHERE id = $1 AND restaurant_id = $2`,
+      [categoryId, restaurantId]
+    );
+
+    // Reassign products in this category to 'General' so auto-sync won't recreate it
+    await client.query(
+      `UPDATE products 
+       SET category = 'General', updated_at = NOW() 
+       WHERE restaurant_id = $1 AND LOWER(TRIM(category)) = LOWER(TRIM($2))`,
+      [restaurantId, categoryName]
+    );
+
+    await client.query('COMMIT');
+    return { success: true, deletedName: categoryName };
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    throw err;
   } finally {
     client.release();
   }

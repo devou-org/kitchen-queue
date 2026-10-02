@@ -58,8 +58,9 @@ export class OrdersService {
       // 3. Insert order items
       for (const item of items) {
         await client.query(`
-          INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase)
-          VALUES ($1, $2, $3, $4)
+          INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase, status, counter)
+          SELECT $1, $2, $3, $4, 'PENDING', COALESCE(NULLIF(p.counter, ''), 'Kitchen')
+          FROM products p WHERE p.id = $2
         `, [orderId, item.productId, item.quantity, item.priceAtPurchase]);
       }
 

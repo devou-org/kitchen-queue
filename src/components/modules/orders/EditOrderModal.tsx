@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Plus, Minus, Trash2, Loader2, Utensils, User, Phone, MapPin, Users, Check } from 'lucide-react';
+import { X, Search, Plus, Minus, Trash2, Loader2, Utensils, User, Phone, MapPin, Users, Check, ShoppingBag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Order, Product } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -10,6 +10,7 @@ import { validatePhone } from '@/lib/validators';
 import { orderService } from '@/app/services/orders.api';
 import { productService } from '@/app/services/products.api';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import { checkTableAssignment } from '@/lib/table-capacity';
 
 export interface EditOrderModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export function EditOrderModal({
   const [saving, setSaving] = useState(false);
 
   // Form Fields
+  const [orderType, setOrderType] = useState<string>(order.order_type || 'DINE_IN');
   const [customerName, setCustomerName] = useState(order.customer_name || '');
   const [phone, setPhone] = useState(order.phone || '');
   const [notes, setNotes] = useState(order.notes || '');
@@ -61,6 +63,7 @@ export function EditOrderModal({
   // Sync state whenever the order prop changes or modal opens
   useEffect(() => {
     if (isOpen && order) {
+      setOrderType(order.order_type || 'DINE_IN');
       setCustomerName(order.customer_name || '');
       setPhone(order.phone || '');
       setNotes(order.notes || '');
@@ -239,12 +242,33 @@ export function EditOrderModal({
       return;
     }
 
+    const isDineIn = orderType === 'DINE_IN';
+    const finalTable = isDineIn ? (tableNumber ? tableNumber.trim() : null) : null;
+
+    if (isDineIn && finalTable) {
+      const selectedT = tables.find((t: any) => String(t.table_number) === String(finalTable));
+      if (selectedT) {
+        const check = checkTableAssignment(selectedT, Number(partySize) || 1, {
+          orderId: order?.id,
+          phone: trimmedPhone || order?.phone,
+          customerName: trimmedName || order?.customer_name,
+        });
+        const cap = Number(selectedT.capacity) || 0;
+        const freeSeats = Math.max(0, cap - check.occupiedSeats);
+        if (freeSeats <= 0 && !check.allowed) {
+          toast.error(`Table ${finalTable} is full. Please choose an available table.`);
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       const payload = {
+        order_type: orderType,
         customer_name: trimmedName,
         phone: trimmedPhone || undefined,
-        table_number: tableNumber || undefined,
+        table_number: finalTable,
         party_size: Number(partySize),
         notes: notes.trim() || null,
         items: items.map((i) => ({
@@ -271,28 +295,60 @@ export function EditOrderModal({
     }
   };
 
-  if (!mounted || !isOpen) return null;
-
   // Party size options (1 to 15)
   const partySizeOptions = Array.from({ length: 15 }, (_, i) => ({
     value: String(i + 1),
     label: `${i + 1} ${i === 0 ? 'Person' : 'Persons'}`,
   }));
 
-  // Table options
-  const tableOptions = [
-    { value: '', label: '-- No Table / Takeaway --' },
-    ...tables.map((t: any) => {
-      const rawNum = String(t.table_number || '').trim();
+  // Table options (Filtering out full tables, displaying exact availability)
+  const tableOptions = useMemo(() => {
+    const opts = [{ value: '', label: '-- No Table Assigned --' }];
+
+    const pSize = Number(partySize) || 1;
+
+    // Filter tables: If table is full (freeSeats <= 0), DO NOT show in list
+    const availableTables = (tables || []).filter((t: any) => {
+      const check = checkTableAssignment(t, pSize, {
+        orderId: order?.id,
+        phone: phone || order?.phone,
+        customerName: customerName || order?.customer_name,
+      });
       const cap = Number(t.capacity) || 0;
-      let label = rawNum;
-      if (/^\d+$/.test(rawNum)) label = `Table ${rawNum}`;
-      return {
+      const seated = check.occupiedSeats;
+      const freeSeats = Math.max(0, cap - seated);
+
+      // Do NOT show in the list if free seats <= 0
+      return freeSeats > 0 && check.allowed;
+    });
+
+    for (const t of availableTables) {
+      const check = checkTableAssignment(t, pSize, {
+        orderId: order?.id,
+        phone: phone || order?.phone,
+        customerName: customerName || order?.customer_name,
+      });
+      const cap = Number(t.capacity) || 0;
+      const seated = check.occupiedSeats;
+      const rawNum = String(t.table_number || '').trim();
+      let tableLabel = rawNum;
+      if (/^\d+$/.test(rawNum)) {
+        tableLabel = `Table ${rawNum}`;
+      } else if (rawNum.toLowerCase().startsWith('t-')) {
+        tableLabel = `Table ${rawNum.slice(2)}`;
+      }
+      const freeSeats = Math.max(0, cap - seated);
+
+      opts.push({
         value: String(t.table_number),
-        label: `${label} (${cap > 0 ? `${cap} seats` : 'Open'})`,
-      };
-    }),
-  ];
+        label: `${tableLabel} · ${seated}/${cap} (${freeSeats} free)`,
+      });
+    }
+
+    return opts;
+  }, [tables, partySize, order?.id, phone, customerName]);
+
+  if (!mounted || !isOpen) return null;
 
   return createPortal(
     <div
@@ -467,6 +523,62 @@ export function EditOrderModal({
               </div>
 
               {/* Row 1: Name and Phone */}
+              {/* Order Type Selection */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#334155',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Order Type
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {[
+                    { id: 'DINE_IN', label: 'Dine-in', icon: Utensils },
+                    { id: 'TAKEAWAY', label: 'Takeaway', icon: ShoppingBag },
+                    { id: 'DELIVERY', label: 'Delivery', icon: MapPin },
+                  ].map((t) => {
+                    const Icon = t.icon;
+                    const isSelected = orderType === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setOrderType(t.id);
+                          if (t.id === 'TAKEAWAY' || t.id === 'DELIVERY') {
+                            setTableNumber('');
+                          }
+                        }}
+                        style={{
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: isSelected ? '1.5px solid #2563EB' : '1px solid #CBD5E1',
+                          background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                          color: isSelected ? '#1D4ED8' : '#475569',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <Icon size={13} style={{ color: isSelected ? '#1D4ED8' : '#64748B' }} />
+                        <span>{t.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Row 1: Name and Phone */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                 <div>
                   <label
@@ -537,27 +649,38 @@ export function EditOrderModal({
               {/* Row 2: Table and Party Size */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                 <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#334155',
-                      marginBottom: '5px',
-                    }}
-                  >
-                    Assigned Table
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: orderType === 'DINE_IN' ? '#334155' : '#94A3B8',
+                      }}
+                    >
+                      Assigned Table
+                    </label>
+                    {orderType !== 'DINE_IN' && (
+                      <span style={{ fontSize: '11px', color: '#64748B', fontStyle: 'italic' }}>
+                        Disabled for {orderType === 'TAKEAWAY' ? 'Takeaway' : 'Delivery'}
+                      </span>
+                    )}
+                  </div>
                   <CustomSelect
                     value={tableNumber}
+                    disabled={orderType !== 'DINE_IN'}
                     onChange={(val) => setTableNumber(val)}
                     options={tableOptions}
-                    placeholder="Select table..."
+                    placeholder={orderType === 'DINE_IN' ? "Select table..." : "-- No Table (Takeaway) --"}
                     buttonStyle={{
                       height: '38px',
                       fontSize: '13px',
                       borderRadius: '8px',
                       border: '1px solid #CBD5E1',
+                      background: orderType === 'DINE_IN' ? '#FFFFFF' : '#F1F5F9',
+                      color: orderType === 'DINE_IN' ? '#0F172A' : '#94A3B8',
+                      cursor: orderType === 'DINE_IN' ? 'pointer' : 'not-allowed',
+                      opacity: orderType === 'DINE_IN' ? 1 : 0.7,
                     }}
                     dropdownStyle={{
                       borderRadius: '8px',

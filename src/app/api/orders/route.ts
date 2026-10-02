@@ -136,16 +136,20 @@ export async function POST(request: NextRequest) {
 
     const admin = await requireAdmin(request);
     const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
-    // Only trust is_pos if the user is verified staff/admin. Prevents token leakage into customer UI.
-    const isPos = hasAdminRights && body.is_pos === true;
-    const isPaid = hasAdminRights && Boolean(is_paid);
-    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : (hasAdminRights && payment_method ? String(payment_method) : undefined);
+    // Explicit is_pos from POS terminal or authenticated staff/admin placing an order
+    const isPos = body.is_pos === true || hasAdminRights;
+    const isPaid = (hasAdminRights || body.is_pos === true) && Boolean(is_paid);
+    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : ((hasAdminRights || body.is_pos === true) && payment_method ? String(payment_method) : undefined);
 
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
     const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
     const staffId = (isPos && admin?.isStaff && isUuid(admin?.userId)) ? admin.userId : undefined;
+
+    const isTableOrder = Boolean(table_number && String(table_number).trim() !== '');
+    // Orders from POS or table QR scans must always go directly to PREPARING state
+    const determinedStatus = (isPos || isTableOrder || body.status === 'PREPARING') ? 'PREPARING' : (body.status || 'PENDING');
 
     const order = await createOrder({
       restaurant_id: restaurant.id,
@@ -163,6 +167,7 @@ export async function POST(request: NextRequest) {
       order_type: order_type || 'DINE_IN',
       is_pos: isPos,
       is_paid: isPaid,
+      status: determinedStatus,
       payment_method: paymentMethod,
       staff_id: staffId,
       business_date,
