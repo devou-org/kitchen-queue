@@ -23,8 +23,11 @@ import {
   QrCode,
   Check,
   ChefHat,
+  Split,
+  ArrowRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import SplitPaymentBreakdown, { SplitAmounts, formatSplitSummary, parseSplitFromSummary, normalizeSplitAmounts } from './SplitPaymentBreakdown';
 import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
 import { printKotFromBrowser, printBillFromBrowser } from '@/lib/client-print';
@@ -51,7 +54,7 @@ export function OrderDetailsView({
   slug,
   isStaff = false,
   tables = [],
-  allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'],
+  allStatuses = ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CLOSED', 'CANCELLED'],
   onClose,
   onBack,
   onStatusChange,
@@ -59,17 +62,48 @@ export function OrderDetailsView({
   onOrderUpdated,
 }: OrderDetailsViewProps) {
   const { restaurant } = useRestaurant();
+  const primaryColor = restaurant?.primary_color || '#4F46E5';
+
+  const primarySoftBg = React.useMemo(() => {
+    if (!primaryColor || typeof primaryColor !== 'string') return 'rgba(79, 70, 229, 0.08)';
+    let c = primaryColor.replace('#', '').trim();
+    if (c.length === 3) c = c.split('').map((x) => x + x).join('');
+    if (c.length === 6) {
+      const num = parseInt(c, 16);
+      return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, 0.08)`;
+    }
+    return 'rgba(79, 70, 229, 0.08)';
+  }, [primaryColor]);
+
+  const primaryBorder = React.useMemo(() => {
+    if (!primaryColor || typeof primaryColor !== 'string') return 'rgba(79, 70, 229, 0.25)';
+    let c = primaryColor.replace('#', '').trim();
+    if (c.length === 3) c = c.split('').map((x) => x + x).join('');
+    if (c.length === 6) {
+      const num = parseInt(c, 16);
+      return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, 0.25)`;
+    }
+    return 'rgba(79, 70, 229, 0.25)';
+  }, [primaryColor]);
   const [order, setOrder] = useState<Order>(initialOrder);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [tempStatus, setTempStatus] = useState(initialOrder.status);
   const [tempTableNumber, setTempTableNumber] = useState(initialOrder.table_number || '');
   const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'CASH');
-  const [actionLoading, setActionLoading] = useState(false);
+  const [splitAmounts, setSplitAmounts] = useState<SplitAmounts>(() => {
+    return normalizeSplitAmounts(initialOrder.payment_split, initialOrder.payment_method);
+  });
+  const [isStatusUpdating, setIsStatusUpdating] = useState(false);
+  const [isPaymentUpdating, setIsPaymentUpdating] = useState(false);
+  const [isCancelUpdating, setIsCancelUpdating] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+
+  const isAnyActionBusy = isStatusUpdating || isPaymentUpdating || isCancelUpdating || loading;
 
   React.useEffect(() => {
     setOrder(initialOrder);
+    setSplitAmounts(normalizeSplitAmounts(initialOrder.payment_split, initialOrder.payment_method));
   }, [initialOrder]);
 
   React.useEffect(() => {
@@ -110,34 +144,47 @@ export function OrderDetailsView({
     setTempStatus(order.status);
     setTempTableNumber(order.table_number || '');
     setPaymentMethod(order.payment_method || 'CASH');
+    setSplitAmounts(normalizeSplitAmounts(order.payment_split, order.payment_method));
     setIsClosing(false);
-  }, [order.id, order.status, order.table_number, order.payment_method]);
+  }, [order.id, order.status, order.table_number, order.payment_method, order.payment_split]);
 
   const handleUpdateStatus = async (statusToApply: string) => {
-    setActionLoading(true);
+    setIsStatusUpdating(true);
     try {
-      const pMethod = statusToApply === 'PAID' ? (order.payment_method || paymentMethod || 'CASH') : paymentMethod;
+      let pMethod = statusToApply === 'CLOSED' ? (order.payment_method || paymentMethod || 'CASH') : paymentMethod;
+      let pSplit: any = null;
+
+      if (statusToApply === 'CLOSED' && (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT'))) {
+        const totalSplit = (splitAmounts.CASH || 0) + (splitAmounts.UPI || 0) + (splitAmounts.CARD || 0);
+        if (totalSplit <= 0) {
+          toast.error('Please allocate the split amounts across methods');
+          setIsStatusUpdating(false);
+          return;
+        }
+        pMethod = formatSplitSummary(splitAmounts);
+        pSplit = splitAmounts;
+      }
+
       await onStatusChange(order.id, statusToApply, tempTableNumber, pMethod);
       setTempStatus(statusToApply as any);
-      if (statusToApply === 'PAID') {
-        setOrder((prev) => ({
-          ...prev,
-          status: 'PAID',
-          is_paid: true,
-          payment_method: prev.payment_method || pMethod,
-        }));
-      }
+      setOrder((prev) => ({
+        ...prev,
+        status: statusToApply as any,
+        is_paid: statusToApply === 'CLOSED' ? true : prev.is_paid,
+        payment_method: statusToApply === 'CLOSED' ? (prev.payment_method || pMethod) : prev.payment_method,
+        payment_split: statusToApply === 'CLOSED' ? (pSplit || prev.payment_split) : prev.payment_split,
+      }));
+      toast.success(`Order status updated to ${statusToApply}`);
     } finally {
-      setActionLoading(false);
+      setIsStatusUpdating(false);
     }
   };
-
 
   const handleCancelOrder = async () => {
     if (!window.confirm(`Are you sure you want to cancel Order #${String(order.ticket_number).padStart(3, '0')}?`)) {
       return;
     }
-    setActionLoading(true);
+    setIsCancelUpdating(true);
     try {
       await onStatusChange(order.id, 'CANCELLED', tempTableNumber || order.table_number, paymentMethod);
       setOrder((prev) => ({ ...prev, status: 'CANCELLED', is_paid: false }));
@@ -145,31 +192,56 @@ export function OrderDetailsView({
     } catch {
       toast.error('Failed to cancel order');
     } finally {
-      setActionLoading(false);
+      setIsCancelUpdating(false);
     }
   };
 
   const handleMarkAsPaid = async (methodToUse?: string) => {
-    setActionLoading(true);
+    setIsPaymentUpdating(true);
     try {
-      const pMethod = methodToUse || paymentMethod || order.payment_method || 'CASH';
+      let pMethod = methodToUse || paymentMethod || order.payment_method || 'CASH';
+      let pSplit: any = null;
+
+      if (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT')) {
+        const totalSplit = (splitAmounts.CASH || 0) + (splitAmounts.UPI || 0) + (splitAmounts.CARD || 0);
+        if (totalSplit <= 0) {
+          toast.error('Please allocate the split amounts across methods');
+          setIsPaymentUpdating(false);
+          return;
+        }
+        pMethod = formatSplitSummary(splitAmounts);
+        pSplit = splitAmounts;
+      }
+
+      const currentSt = (order.status || '').toUpperCase();
+      // If food is ALREADY served (fulfilled), paying closes the order.
+      // If food is still PENDING, PREPARING, or READY, keep kitchen status unchanged as stated in the UI ("Record payment without changing kitchen status")!
+      const targetStatus = currentSt === 'SERVED' ? 'CLOSED' : order.status;
+
       const res = await orderService.updateOrder(order.id, {
+        status: targetStatus,
         is_paid: true,
         payment_method: pMethod,
+        payment_split: pSplit,
         table_number: tempTableNumber || order.table_number,
       });
       if (res.success && res.data) {
         setOrder(res.data);
+        setTempStatus(res.data.status);
         setPaymentMethod(res.data.payment_method || pMethod);
         if (onOrderUpdated) onOrderUpdated(res.data);
-        toast.success(`Payment recorded as Paid (${pMethod})`);
+        if (targetStatus === 'CLOSED') {
+          toast.success(`Payment recorded as Paid (${pMethod}) & Order Closed`);
+        } else {
+          toast.success(`Payment recorded as Paid (${pMethod})`);
+        }
       } else {
         toast.error(res.error || 'Failed to update payment');
       }
     } catch {
       toast.error('Network error updating payment');
     } finally {
-      setActionLoading(false);
+      setIsPaymentUpdating(false);
     }
   };
 
@@ -204,8 +276,9 @@ export function OrderDetailsView({
       case 'PREPARING':
         return { label: 'Preparing', bg: '#EFF6FF', text: '#1D4ED8', border: '#BFDBFE' };
       case 'READY':
-      case 'SERVED':
         return { label: 'Ready', bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' };
+      case 'SERVED':
+        return { label: 'Served', bg: '#F5F3FF', text: '#6D28D9', border: '#DDD6FE' };
       case 'CANCELLED':
         return { label: 'Cancelled', bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA' };
       case 'PENDING':
@@ -229,7 +302,7 @@ export function OrderDetailsView({
         setOrder(res.data);
         setTempStatus(res.data.status);
         if (onOrderUpdated) onOrderUpdated(res.data);
-        toast.success(`All ${counterName} items marked as Ready`);
+        toast.success(`All ${counterName} items marked as ${nextStatus === 'SERVED' ? 'Served' : 'Ready'}`);
       } else {
         toast.error(res.error || 'Failed to update counter items');
       }
@@ -579,6 +652,7 @@ export function OrderDetailsView({
                 #{String(order.ticket_number).padStart(3, '0')}
               </span>
               <OrderTypeBadge type={order.order_type} variant="minimal" />
+              <OrderStatusBadge status={order.status} />
               {order.order_type !== 'TAKEAWAY' && order.order_type !== 'DELIVERY' && order.table_number && (
                 <span
                   style={{
@@ -692,7 +766,7 @@ export function OrderDetailsView({
                 {isPrinting ? (
                   <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
                 ) : (
-                  <Printer size={13} style={{ color: 'var(--primary, #2563eb)' }} />
+                  <Printer size={13} style={{ color: '#475569' }} />
                 )}
                 <span>Print KOT</span>
                 {uniqueCounters.length > 1 && (
@@ -772,10 +846,10 @@ export function OrderDetailsView({
                       justifyContent: 'space-between',
                       fontSize: '12px',
                       fontWeight: 700,
-                      color: 'var(--primary, #2563eb)',
+                      color: primaryColor,
                       cursor: 'pointer',
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#EFF6FF')}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = primarySoftBg)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <span>All Counters (Separate Slips)</span>
@@ -827,22 +901,22 @@ export function OrderDetailsView({
                 gap: '5px',
                 fontWeight: 600,
                 borderRadius: '8px',
-                background: isPrintingBill ? '#F8FAFC' : '#ECFDF5',
-                border: '1px solid #6EE7B7',
-                color: '#065F46',
+                background: isPrintingBill ? '#F8FAFC' : '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                color: '#0F172A',
                 cursor: isPrintingBill ? 'wait' : 'pointer',
                 boxSizing: 'border-box',
                 whiteSpace: 'nowrap',
                 transition: 'all 0.15s ease',
               }}
-              onMouseEnter={(e) => { if (!isPrintingBill) e.currentTarget.style.background = '#D1FAE5'; }}
-              onMouseLeave={(e) => { if (!isPrintingBill) e.currentTarget.style.background = '#ECFDF5'; }}
+              onMouseEnter={(e) => { if (!isPrintingBill) e.currentTarget.style.background = '#F8FAFC'; }}
+              onMouseLeave={(e) => { if (!isPrintingBill) e.currentTarget.style.background = '#FFFFFF'; }}
               title="Print customer bill / receipt"
             >
               {isPrintingBill ? (
-                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite', color: '#065F46' }} />
+                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite', color: '#475569' }} />
               ) : (
-                <CreditCard size={13} style={{ color: '#059669' }} />
+                <CreditCard size={13} style={{ color: '#475569' }} />
               )}
               <span>Print Bill</span>
             </button>
@@ -896,6 +970,89 @@ export function OrderDetailsView({
 
 
 
+        {/* SECTION: KITCHEN WORKFLOW LIFECYCLE CONTROLS */}
+        {(() => {
+          const isKot = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+          const currentSt = (order.status || 'PENDING').toUpperCase();
+
+          let nextTargetStatus: string | null = null;
+          let nextButtonLabel = '';
+          let buttonBg = primaryColor;
+
+          if (currentSt === 'PENDING') {
+            nextTargetStatus = 'PREPARING';
+            nextButtonLabel = 'Start Preparing (Kitchen)';
+            buttonBg = primaryColor;
+          } else if (currentSt === 'PREPARING') {
+            if (isKot) {
+              nextTargetStatus = 'SERVED';
+              nextButtonLabel = 'Mark Order as Served';
+              buttonBg = primaryColor;
+            } else {
+              nextTargetStatus = 'READY';
+              nextButtonLabel = 'Mark Order as Ready';
+              buttonBg = primaryColor;
+            }
+          } else if (currentSt === 'READY') {
+            nextTargetStatus = 'SERVED';
+            nextButtonLabel = 'Mark Order as Served';
+            buttonBg = primaryColor;
+          } else if (currentSt === 'SERVED') {
+            nextTargetStatus = 'CLOSED';
+            nextButtonLabel = 'Close Order & Complete';
+            buttonBg = '#0F172A';
+          }
+
+          if (!nextTargetStatus && currentSt !== 'CLOSED') {
+            return null;
+          }
+
+          return (
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
+              {/* Action Button */}
+              {nextTargetStatus && currentSt !== 'CANCELLED' && currentSt !== 'EXPIRED' && (
+                <button
+                  type="button"
+                  disabled={isAnyActionBusy}
+                  onClick={() => handleUpdateStatus(nextTargetStatus!)}
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: buttonBg,
+                    color: '#FFFFFF',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
+                    opacity: isAnyActionBusy && !isStatusUpdating ? 0.7 : 1,
+                    boxShadow: `0 2px 8px ${primaryBorder}`,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {isStatusUpdating ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={14} />
+                  )}
+                  <span>{isStatusUpdating ? 'Updating Status...' : nextButtonLabel}</span>
+                </button>
+              )}
+
+              {currentSt === 'CLOSED' && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', background: '#F1F5F9', borderRadius: '8px', color: '#475569', fontSize: '12px', fontWeight: 700 }}>
+                  <Check size={14} style={{ color: '#16A34A' }} />
+                  <span>Order is Closed & Completed</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* SECTION: ORDER ITEMS (COUNTER ROUTED & PER-ITEM STATUS) */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -914,7 +1071,14 @@ export function OrderDetailsView({
             {uniqueCounters.length > 0 ? (
               uniqueCounters.map((cName) => {
                 const itemsInCounter = counterGroups[cName] || [];
-                const readyCount = itemsInCounter.filter((i: any) => ['READY', 'SERVED'].includes((i.status || 'PENDING').toUpperCase())).length;
+                const isKot = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+                const targetCompletionStatus = isKot ? 'SERVED' : 'READY';
+                const completionLabel = isKot ? 'Served' : 'Ready';
+
+                const readyCount = itemsInCounter.filter((i: any) => {
+                  const st = (i.status || 'PENDING').toUpperCase();
+                  return isKot ? st === 'SERVED' : ['READY', 'SERVED'].includes(st);
+                }).length;
                 const isAllReady = itemsInCounter.length > 0 && readyCount === itemsInCounter.length;
                 const isCounterUpdating = Boolean(updatingCounters[cName]);
 
@@ -948,8 +1112,8 @@ export function OrderDetailsView({
                             width: '22px',
                             height: '22px',
                             borderRadius: '5px',
-                            background: '#EEF2FF',
-                            color: '#4F46E5',
+                            background: primarySoftBg,
+                            color: primaryColor,
                           }}
                         >
                           <ChefHat size={13} />
@@ -959,7 +1123,7 @@ export function OrderDetailsView({
                             {cName}
                           </span>
                           <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>
-                            ({readyCount}/{itemsInCounter.length} Ready)
+                            ({readyCount}/{itemsInCounter.length} {completionLabel})
                           </span>
                         </div>
                       </div>
@@ -974,42 +1138,42 @@ export function OrderDetailsView({
                               gap: '4px',
                               fontSize: '11px',
                               fontWeight: 700,
-                              color: '#047857',
-                              background: '#ECFDF5',
-                              border: '1px solid #A7F3D0',
+                              color: '#475569',
+                              background: '#F1F5F9',
+                              border: '1px solid #E2E8F0',
                               padding: '3px 8px',
                               borderRadius: '6px',
                             }}
                           >
-                            <Check size={12} /> All Ready
+                            <Check size={12} /> All {completionLabel}
                           </span>
                         ) : (
                           <button
                             type="button"
                             disabled={isCounterUpdating}
-                            onClick={() => handleCounterStatusChange(cName, 'READY')}
+                            onClick={() => handleCounterStatusChange(cName, targetCompletionStatus)}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '5px',
                               fontSize: '11px',
                               fontWeight: 700,
-                              color: '#047857',
-                              background: '#ECFDF5',
-                              border: '1px solid #A7F3D0',
+                              color: primaryColor,
+                              background: primarySoftBg,
+                              border: `1px solid ${primaryBorder}`,
                               padding: '4px 10px',
                               borderRadius: '6px',
                               cursor: isCounterUpdating ? 'not-allowed' : 'pointer',
                               transition: 'all 0.15s ease',
                             }}
-                            title={`Mark all items for ${cName} as Ready`}
+                            title={`Mark all items for ${cName} as ${completionLabel}`}
                           >
                             {isCounterUpdating ? (
                               <Loader2 size={12} className="animate-spin" />
                             ) : (
                               <CheckCircle2 size={12} />
                             )}
-                            Mark {cName} Ready
+                            Mark {cName} {completionLabel}
                           </button>
                         )}
                       </div>
@@ -1178,7 +1342,7 @@ export function OrderDetailsView({
                 style={{
                   fontSize: '18px',
                   fontWeight: 800,
-                  color: 'var(--primary)',
+                  color: '#0F172A',
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
@@ -1214,13 +1378,8 @@ export function OrderDetailsView({
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CreditCard size={15} style={{ color: '#16A34A' }} />
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#15803D' }}>
-                        Mark as Paid
-                      </div>
-                      <div style={{ fontSize: '10.5px', color: '#64748B' }}>
-                        Record payment without changing kitchen status
-                      </div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#15803D' }}>
+                      Mark as Paid
                     </div>
                   </div>
 
@@ -1244,19 +1403,36 @@ export function OrderDetailsView({
                     >
                       Payment Method
                     </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                       {[
                         { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'UPI', label: 'UPI / QR', icon: QrCode },
                         { id: 'CARD', label: 'Card', icon: CreditCard },
+                        { id: 'SPLIT', label: 'Split', icon: Split },
                       ].map((m) => {
                         const Icon = m.icon;
-                        const selected = (paymentMethod || 'CASH') === m.id;
+                        const selected = m.id === 'SPLIT'
+                          ? (paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT'))
+                          : (paymentMethod || 'CASH') === m.id;
                         return (
                           <button
                             key={m.id}
                             type="button"
-                            onClick={() => setPaymentMethod(m.id)}
+                            onClick={() => {
+                              if (m.id === 'SPLIT') {
+                                if (splitAmounts.CASH === 0 && splitAmounts.UPI === 0 && splitAmounts.CARD === 0) {
+                                  const half = Math.round((Number(order.total_price || 0) / 2) * 100) / 100;
+                                  const rest = Math.round((Number(order.total_price || 0) - half) * 100) / 100;
+                                  const initialSplit = { CASH: half, UPI: rest, CARD: 0 };
+                                  setSplitAmounts(initialSplit);
+                                  setPaymentMethod(formatSplitSummary(initialSplit));
+                                } else {
+                                  setPaymentMethod(formatSplitSummary(splitAmounts));
+                                }
+                              } else {
+                                setPaymentMethod(m.id);
+                              }
+                            }}
                             style={{
                               height: '32px',
                               display: 'flex',
@@ -1268,7 +1444,7 @@ export function OrderDetailsView({
                               fontWeight: 600,
                               cursor: 'pointer',
                               border: selected ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
-                              background: selected ? '#FFFFFF' : '#F8FAFC',
+                              background: '#FFFFFF',
                               color: selected ? '#15803D' : '#475569',
                               boxShadow: selected ? '0 1px 3px rgba(22, 163, 74, 0.15)' : 'none',
                               transition: 'all 0.15s ease',
@@ -1281,9 +1457,21 @@ export function OrderDetailsView({
                       })}
                     </div>
 
+                    {(paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT')) && (
+                      <SplitPaymentBreakdown
+                        totalAmount={Number(order.total_price || 0)}
+                        split={splitAmounts}
+                        onChange={(newSplit, summary) => {
+                          setSplitAmounts(newSplit);
+                          setPaymentMethod(summary);
+                        }}
+                        theme="emerald"
+                      />
+                    )}
+
                     <button
                       type="button"
-                      disabled={actionLoading || loading}
+                      disabled={isAnyActionBusy}
                       onClick={() => handleMarkAsPaid()}
                       style={{
                         marginTop: '4px',
@@ -1299,14 +1487,15 @@ export function OrderDetailsView({
                         color: '#FFFFFF',
                         fontSize: '12px',
                         fontWeight: 700,
-                        cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                        cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
+                        opacity: isAnyActionBusy && !isPaymentUpdating ? 0.7 : 1,
                         boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
                         transition: 'all 0.15s ease',
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = '#15803D')}
                       onMouseLeave={(e) => (e.currentTarget.style.background = '#16A34A')}
                     >
-                      {actionLoading ? (
+                      {isPaymentUpdating ? (
                         <>
                           <Loader2 size={13} className="animate-spin" />
                           <span>Recording Payment...</span>
@@ -1314,7 +1503,7 @@ export function OrderDetailsView({
                       ) : (
                         <>
                           <Check size={14} />
-                          <span>Confirm as Paid · {paymentMethod || 'CASH'}</span>
+                          <span>Confirm as Paid · {paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split Payment' : (paymentMethod || 'CASH')}</span>
                         </>
                       )}
                     </button>
@@ -1385,7 +1574,7 @@ export function OrderDetailsView({
             <button
               type="button"
               onClick={handleCancelOrder}
-              disabled={actionLoading || loading}
+              disabled={isAnyActionBusy}
               style={{
                 background: '#FFFFFF',
                 border: '1px solid #FECACA',
@@ -1394,7 +1583,8 @@ export function OrderDetailsView({
                 fontSize: '12px',
                 fontWeight: 600,
                 padding: '7px 14px',
-                cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
+                opacity: isAnyActionBusy && !isCancelUpdating ? 0.7 : 1,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
@@ -1403,8 +1593,17 @@ export function OrderDetailsView({
               onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = '#FFFFFF'; }}
             >
-              <X size={13} />
-              <span>Cancel Order</span>
+              {isCancelUpdating ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Cancelling...</span>
+                </>
+              ) : (
+                <>
+                  <X size={13} />
+                  <span>Cancel Order</span>
+                </>
+              )}
             </button>
           </div>
         )}

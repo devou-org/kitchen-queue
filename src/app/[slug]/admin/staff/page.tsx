@@ -99,6 +99,11 @@ export default function StaffAdminPage() {
     const url = isEdit ? `/api/admin/staff/${editingStaff.id}` : '/api/admin/staff';
     const method = isEdit ? 'PUT' : 'POST';
 
+    const payload = { ...staffFormData };
+    if (isEdit && !payload.password?.trim()) {
+      delete (payload as any).password;
+    }
+
     try {
       const res = await fetch(url, {
         method,
@@ -106,7 +111,7 @@ export default function StaffAdminPage() {
           'Content-Type': 'application/json',
           'x-restaurant-slug': slug as string
         },
-        body: JSON.stringify(staffFormData)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
 

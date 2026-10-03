@@ -24,6 +24,7 @@ import {
   Tag,
   Award,
   Printer,
+  Split,
   BadgeCheck,
 } from 'lucide-react';
 import { CartItem, OrderType } from '@/types';
@@ -31,6 +32,7 @@ import { formatPrice } from '@/lib/format';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { checkTableAssignment } from '@/lib/table-capacity';
+import SplitPaymentBreakdown, { SplitAmounts, formatSplitSummary, parseSplitFromSummary } from '@/components/modules/orders/SplitPaymentBreakdown';
 import { COUNTRY_CODES, getDefaultCallingCode } from '@/lib/constants';
 import { CountryCodeSelect } from '@/components/ui/CountryCodeSelect';
 
@@ -43,6 +45,7 @@ export interface POSOrderFormData {
   order_type: OrderType | string;
   is_paid?: boolean;
   payment_method?: string;
+  payment_split?: any;
   discount_amount?: number;
   selected_reward_id?: string;
   auto_print_bill?: boolean;
@@ -352,6 +355,19 @@ export function POSCheckoutDrawer({
     const finalTotal = Math.max(0, subtotal + gst - loyaltyDiscountAmount);
     return { gstAmount: gst, totalPrice: finalTotal };
   }, [subtotal, restaurant, loyaltyDiscountAmount]);
+
+  const [posSplit, setPosSplit] = useState<SplitAmounts>(() => {
+    return (orderForm.payment_split as SplitAmounts) || parseSplitFromSummary(orderForm.payment_method) || { CASH: 0, UPI: 0, CARD: 0 };
+  });
+
+  useEffect(() => {
+    if (orderForm.payment_split) {
+      setPosSplit(orderForm.payment_split as SplitAmounts);
+    } else if (orderForm.payment_method?.toUpperCase().startsWith('SPLIT')) {
+      const parsed = parseSplitFromSummary(orderForm.payment_method);
+      if (parsed) setPosSplit(parsed);
+    }
+  }, [orderForm.payment_method, orderForm.payment_split]);
 
   // Helper to calculate max free seats for a table
   const getTableFreeSeats = (table: any, partyContext?: { phone?: string; customerName?: string }): number => {
@@ -1581,30 +1597,53 @@ export function POSCheckoutDrawer({
                   >
                     Payment Method
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                     {[
                       { id: 'CASH', label: 'Cash', icon: Banknote },
                       { id: 'UPI', label: 'UPI / QR', icon: QrCode },
                       { id: 'CARD', label: 'Card', icon: CreditCard },
+                      { id: 'SPLIT', label: 'Split', icon: Split },
                     ].map((m) => {
                       const Icon = m.icon;
-                      const selected = (orderForm.payment_method || 'CASH') === m.id;
+                      const selected = m.id === 'SPLIT'
+                        ? (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))
+                        : (orderForm.payment_method || 'CASH') === m.id;
                       return (
                         <button
                           key={m.id}
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOrderForm((prev) => ({ ...prev, payment_method: m.id }));
+                            if (m.id === 'SPLIT') {
+                              if (posSplit.CASH === 0 && posSplit.UPI === 0 && posSplit.CARD === 0) {
+                                const half = Math.round((totalPrice / 2) * 100) / 100;
+                                const other = Math.round((totalPrice - half) * 100) / 100;
+                                const init = { CASH: half, UPI: other, CARD: 0 };
+                                setPosSplit(init);
+                                setOrderForm((prev) => ({
+                                  ...prev,
+                                  payment_method: formatSplitSummary(init),
+                                  payment_split: init,
+                                }));
+                              } else {
+                                setOrderForm((prev) => ({
+                                  ...prev,
+                                  payment_method: formatSplitSummary(posSplit),
+                                  payment_split: posSplit,
+                                }));
+                              }
+                            } else {
+                              setOrderForm((prev) => ({ ...prev, payment_method: m.id, payment_split: null }));
+                            }
                           }}
                           style={{
                             height: '36px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '5px',
+                            gap: '4px',
                             borderRadius: '6px',
-                            fontSize: '12px',
+                            fontSize: '11.5px',
                             fontWeight: 600,
                             cursor: 'pointer',
                             border: selected ? '1.5px solid var(--primary, #059669)' : '1px solid #CBD5E1',
@@ -1614,12 +1653,28 @@ export function POSCheckoutDrawer({
                             transition: 'all 0.15s ease',
                           }}
                         >
-                          {selected ? <Check size={14} strokeWidth={2.5} /> : <Icon size={13} />}
+                          {selected ? <Check size={13} strokeWidth={2.5} /> : <Icon size={13} />}
                           <span>{m.label}</span>
                         </button>
                       );
                     })}
                   </div>
+
+                  {(orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT')) && (
+                    <SplitPaymentBreakdown
+                      totalAmount={totalPrice}
+                      split={posSplit}
+                      onChange={(newSplit, summary) => {
+                        setPosSplit(newSplit);
+                        setOrderForm((prev) => ({
+                          ...prev,
+                          payment_method: summary,
+                          payment_split: newSplit,
+                        }));
+                      }}
+                      theme="emerald"
+                    />
+                  )}
                 </div>
               ) : (
                 <div

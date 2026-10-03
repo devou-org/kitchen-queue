@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method } = body;
+    const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method, payment_split } = body;
 
     if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
@@ -169,6 +169,7 @@ export async function POST(request: NextRequest) {
       is_paid: isPaid,
       status: determinedStatus,
       payment_method: paymentMethod,
+      payment_split: payment_split || null,
       staff_id: staffId,
       business_date,
       items,

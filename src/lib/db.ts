@@ -35,7 +35,8 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS district VARCHAR(100) DEFAULT 'Kannur',
       ADD COLUMN IF NOT EXISTS city VARCHAR(150) DEFAULT 'Thalassery',
       ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,7) DEFAULT 11.7750435,
-      ADD COLUMN IF NOT EXISTS longitude DECIMAL(10,7) DEFAULT 75.496864;
+      ADD COLUMN IF NOT EXISTS longitude DECIMAL(10,7) DEFAULT 75.496864,
+      ADD COLUMN IF NOT EXISTS kitchen_mode VARCHAR(20) DEFAULT 'KOT';
     `;
     await sqlConnection`
       ALTER TABLE orders
@@ -43,16 +44,21 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS gst_amount NUMERIC(12,2),
       ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2),
       ADD COLUMN IF NOT EXISTS gst_type VARCHAR(20) DEFAULT 'NONE',
-      ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS payment_method VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS payment_split JSONB,
       ADD COLUMN IF NOT EXISTS order_type VARCHAR(50) DEFAULT 'DINE_IN',
-      ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0;
+      ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS served_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
+      ALTER TABLE orders ALTER COLUMN payment_method TYPE VARCHAR(255);
     `;
     await sqlConnection`
       ALTER TABLE order_items
       ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
       ADD COLUMN IF NOT EXISTS counter VARCHAR(100),
       ADD COLUMN IF NOT EXISTS prepared_at TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
+      ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS served_at TIMESTAMPTZ;
       CREATE INDEX IF NOT EXISTS idx_order_items_counter_status ON order_items(order_id, counter, status);
     `;
     await sqlConnection`
@@ -433,6 +439,9 @@ async function runAutoMigration(sqlConnection: any) {
 
       ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
+
+      ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_name_key;
+      DROP INDEX IF EXISTS categories_name_key;
     `;
     console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, admins, and loyalty schema successfully!");
   } catch (err) {
@@ -1376,6 +1385,7 @@ export async function createOrder(data: {
   is_pos?: boolean;
   is_paid?: boolean;
   payment_method?: string;
+  payment_split?: any;
   staff_id?: string;
   business_date?: string;
   items: { product_id: string; quantity: number; price_at_purchase: number }[];
@@ -1561,22 +1571,23 @@ export async function createOrder(data: {
     const isPaid = Boolean(data.is_paid);
     const paidAt = isPaid ? new Date().toISOString() : null;
     const paymentMethod = isPaid ? (data.payment_method || 'CASH') : (data.payment_method || null);
+    const paymentSplit = data.payment_split ? JSON.stringify(data.payment_split) : null;
 
     const orderResult = await client.query(
       `
         INSERT INTO orders (
           restaurant_id, queue_id, user_id, customer_name, phone, total_price, status, is_paid, 
           notes, party_size, ticket_number, table_number, table_id, table_session_id, staff_id, business_date, subtotal, 
-          gst_amount, gst_rate, gst_type, pending_at, preparing_at, order_type, paid_at, payment_method, discount_amount
+          gst_amount, gst_rate, gst_type, pending_at, preparing_at, order_type, paid_at, payment_method, payment_split, discount_amount
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, CURRENT_DATE), $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, CURRENT_DATE), $17, $18, $19, $20, $21, $22, $23, $24, $25, $26::jsonb, $27)
         RETURNING id
       `,
       [
         data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
         isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
-        pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, discountVal
+        pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, paymentSplit, discountVal
       ]
     );
 
@@ -1712,7 +1723,7 @@ export async function checkAndCloseTableSession(
      FROM orders
      WHERE restaurant_id = $1
        AND (table_id = $2 OR table_number = $3)
-       AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
+       AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
        AND (order_type IS NULL OR order_type NOT IN ('TAKEAWAY', 'DELIVERY'))`,
     [restaurantId, tableId, cleanTableNum]
   );
@@ -1737,11 +1748,16 @@ export async function checkAndCloseTableSession(
 }
 
 export async function updateOrderStatus(restaurantId: string, id: string, status: string, tableNumber?: string) {
+  if (status === 'PAID') {
+    throw new Error("Order status 'PAID' has been replaced by 'CLOSED'. Use status 'CLOSED' with payment fields instead.");
+  }
+
   let timestampSet = '';
   if (status === 'PENDING') timestampSet = ', pending_at = COALESCE(pending_at, CURRENT_TIMESTAMP)';
   else if (status === 'PREPARING') timestampSet = ', preparing_at = COALESCE(preparing_at, CURRENT_TIMESTAMP)';
   else if (status === 'READY') timestampSet = ', ready_at = COALESCE(ready_at, CURRENT_TIMESTAMP)';
-  else if (status === 'PAID') timestampSet = ', paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP), is_paid = true';
+  else if (status === 'SERVED') timestampSet = ', served_at = COALESCE(served_at, CURRENT_TIMESTAMP)';
+  else if (status === 'CLOSED') timestampSet = ', closed_at = COALESCE(closed_at, CURRENT_TIMESTAMP), served_at = COALESCE(served_at, CURRENT_TIMESTAMP)';
   else if (status === 'CANCELLED' || status === 'EXPIRED') timestampSet = ', is_paid = false, paid_at = NULL';
 
   // Check if tableNumber is assigned or updated
@@ -1760,7 +1776,7 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
 
   const queryText = `
     UPDATE orders
-    SET status = $1,
+    SET status = $1::varchar,
         updated_at = CURRENT_TIMESTAMP
         ${setTableFields}
         ${timestampSet}
@@ -1771,9 +1787,9 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   const res = await pool.query(queryText, [status, tableNumber ?? null, restaurantId, id]);
   const updatedOrder = res.rows[0] || null;
 
-  // Re-evaluate table occupancy and close session if order is PAID, CANCELLED, or EXPIRED
+  // Re-evaluate table occupancy and close session if order is CLOSED, CANCELLED, or EXPIRED
   const activeTableNum = tableNumber || updatedOrder?.table_number;
-  if (activeTableNum && (status === 'PAID' || status === 'CANCELLED' || status === 'EXPIRED')) {
+  if (activeTableNum && (status === 'CLOSED' || status === 'CANCELLED' || status === 'EXPIRED')) {
     try {
       await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
     } catch (tblErr) {
@@ -1784,11 +1800,13 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   // Sync item status if master order status changed
   if (status === 'CANCELLED') {
     try { await pool.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]); } catch (_) {}
-  } else if (status === 'READY' || status === 'SERVED' || status === 'COMPLETED' || status === 'PAID') {
+  } else if (status === 'READY') {
     try { await pool.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]); } catch (_) {}
+  } else if (status === 'SERVED' || status === 'CLOSED' || status === 'COMPLETED') {
+    try { await pool.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]); } catch (_) {}
   }
   // Trigger Loyalty Points processing
-  if (status === 'PAID' || status === 'COMPLETED' || updatedOrder?.is_paid) {
+  if (status === 'CLOSED' || status === 'COMPLETED' || updatedOrder?.is_paid) {
     processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
   } else if (status === 'CANCELLED' || status === 'REFUNDED') {
     processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
@@ -1797,7 +1815,7 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   return updatedOrder;
 }
 
-export async function completeOrderAndBill(restaurantId: string, id: string, status: string | undefined, isPaid: boolean | undefined, tableNumber?: string, paymentMethod?: string) {
+export async function completeOrderAndBill(restaurantId: string, id: string, status: string | undefined, isPaid: boolean | undefined, tableNumber?: string, paymentMethod?: string, paymentSplit?: any) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1812,13 +1830,13 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     }
     
     const existing = orderRes.rows[0];
-    const nextStatus = status || existing.status;
+    const nextStatus = status === 'PAID' ? 'CLOSED' : (status || existing.status);
     let nextIsPaid: boolean;
     if (nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED') {
       nextIsPaid = false;
     } else if (typeof isPaid === 'boolean') {
       nextIsPaid = isPaid;
-    } else if (nextStatus === 'PAID') {
+    } else if (nextStatus === 'CLOSED') {
       nextIsPaid = true;
     } else {
       nextIsPaid = existing.is_paid;
@@ -1844,29 +1862,36 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
         }
       }
     }
+
+    const splitJson = paymentSplit ? (typeof paymentSplit === 'string' ? paymentSplit : JSON.stringify(paymentSplit)) : null;
     
     // Update order
     const updateRes = await client.query(`
       UPDATE orders
-      SET status = $1,
+      SET status = $1::varchar,
           is_paid = $2,
           table_number = $3,
           table_id = $4,
           table_session_id = $5,
           payment_method = COALESCE($6, payment_method),
+          payment_split = CASE WHEN $9::jsonb IS NOT NULL THEN $9::jsonb ELSE payment_split END,
           paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() WHEN $2 = false THEN NULL ELSE paid_at END,
+          closed_at = CASE WHEN $1::varchar = 'CLOSED' AND closed_at IS NULL THEN NOW() ELSE closed_at END,
+          served_at = CASE WHEN ($1::varchar = 'SERVED' OR $1::varchar = 'CLOSED') AND served_at IS NULL THEN NOW() ELSE served_at END,
           updated_at = NOW()
       WHERE restaurant_id = $7 AND id = $8
-      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, paid_at
-    `, [nextStatus, nextIsPaid, nextTableNumber, nextTableId, nextTableSessionId, paymentMethod || null, restaurantId, id]);
+      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, payment_split, paid_at, served_at, closed_at
+    `, [nextStatus, nextIsPaid, nextTableNumber, nextTableId, nextTableSessionId, paymentMethod || null, restaurantId, id, splitJson]);
     
     const updatedOrder = updateRes.rows[0];
 
     // Sync item status if master order status changed
     if (nextStatus === 'CANCELLED') {
       await client.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]);
-    } else if (nextStatus === 'READY' || nextStatus === 'SERVED' || nextStatus === 'COMPLETED' || nextStatus === 'PAID') {
+    } else if (nextStatus === 'READY') {
       await client.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]);
+    } else if (nextStatus === 'SERVED' || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
+      await client.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]);
     }
     
     // Process billing if order is now paid/completed (and wasn't paid before)
@@ -1877,7 +1902,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     
     await client.query('COMMIT');
 
-    // Re-evaluate table occupancy and close session if table changed or order is PAID, CANCELLED, or EXPIRED
+    // Re-evaluate table occupancy and close session if table changed or order is CLOSED, CANCELLED, or EXPIRED
     if (previousTable && (nextTableNumber !== previousTable)) {
       try {
         await checkAndCloseTableSession(pool, restaurantId, previousTable);
@@ -1887,7 +1912,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     }
 
     const activeTableNum = nextTableNumber || previousTable;
-    if (activeTableNum && (nextStatus === 'PAID' || nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED')) {
+    if (activeTableNum && (nextStatus === 'CLOSED' || nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED')) {
       try {
         await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
       } catch (tblErr) {
@@ -1896,7 +1921,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     }
 
     // Trigger Loyalty Points processing
-    if (nextIsPaid || nextStatus === 'PAID' || nextStatus === 'COMPLETED') {
+    if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
       processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
     } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
       processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
@@ -1910,6 +1935,8 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     client.release();
   }
 }
+
+export const closeOrder = completeOrderAndBill;
 
 export async function updateOrderItemStatus(
   restaurantId: string,
@@ -1940,7 +1967,7 @@ export async function updateOrderItemStatus(
   try {
     await client.query('BEGIN');
 
-    const effectiveStatus = upperStatus === 'SERVED' ? 'READY' : upperStatus;
+    const effectiveStatus = upperStatus;
     let query = `
       UPDATE order_items
       SET status = $1::varchar
@@ -1949,6 +1976,8 @@ export async function updateOrderItemStatus(
       query += `, prepared_at = COALESCE(prepared_at, NOW())`;
     } else if (effectiveStatus === 'READY') {
       query += `, ready_at = COALESCE(ready_at, NOW())`;
+    } else if (effectiveStatus === 'SERVED') {
+      query += `, served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW())`;
     }
     query += ` WHERE order_id = $2::uuid`;
 
@@ -1968,7 +1997,10 @@ export async function updateOrderItemStatus(
 
     await client.query(query, params);
 
-    // Auto-sync master order status and timestamps based on item statuses
+    // Auto-sync master order status and timestamps based on item statuses and kitchen mode
+    const restRes = await client.query(`SELECT kitchen_mode FROM restaurants WHERE id = $1`, [restaurantId]);
+    const kitchenMode = restRes.rows[0]?.kitchen_mode || 'KOT';
+
     const itemsCheck = await client.query(`
       SELECT status FROM order_items 
       WHERE order_id = $1::uuid AND status NOT IN ('CANCELLED', 'REJECTED')
@@ -1976,28 +2008,29 @@ export async function updateOrderItemStatus(
 
     const activeItems = itemsCheck.rows;
     if (activeItems.length > 0) {
-      const allReadyOrServed = activeItems.every((i: any) => ['READY', 'SERVED'].includes((i.status || '').toUpperCase()));
-      const anyPreparing = activeItems.some((i: any) => (i.status || '').toUpperCase() === 'PREPARING');
-      const anyReady = activeItems.some((i: any) => (i.status || '').toUpperCase() === 'READY');
+      const orderRes = await client.query(`SELECT status FROM orders WHERE id = $1`, [orderId]);
+      const currentOrderStatus = orderRes.rows[0]?.status;
 
-      if (allReadyOrServed) {
-        // Automatically advance order to READY if it is still PENDING or PREPARING
+      const { resolveOrderStatusFromItems } = await import('@/lib/kitchen-workflow');
+      const resolvedStatus = resolveOrderStatusFromItems(activeItems, kitchenMode, currentOrderStatus);
+
+      if (resolvedStatus !== currentOrderStatus && !['CLOSED', 'CANCELLED', 'EXPIRED'].includes(currentOrderStatus)) {
+        let tsClause = '';
+        if (resolvedStatus === 'PREPARING') {
+          tsClause = ', preparing_at = COALESCE(preparing_at, NOW())';
+        } else if (resolvedStatus === 'READY') {
+          tsClause = ', ready_at = COALESCE(ready_at, NOW())';
+        } else if (resolvedStatus === 'SERVED') {
+          tsClause = ', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW())';
+        }
+
         await client.query(`
           UPDATE orders
-          SET status = 'READY',
-              ready_at = COALESCE(ready_at, NOW()),
+          SET status = $1::varchar,
               updated_at = NOW()
-          WHERE id = $1::uuid AND status IN ('PENDING', 'PREPARING')
-        `, [orderId]);
-      } else if (anyPreparing || anyReady) {
-        // Advance to PREPARING if currently PENDING
-        await client.query(`
-          UPDATE orders
-          SET status = 'PREPARING',
-              preparing_at = COALESCE(preparing_at, NOW()),
-              updated_at = NOW()
-          WHERE id = $1::uuid AND status = 'PENDING'
-        `, [orderId]);
+              ${tsClause}
+          WHERE id = $2
+        `, [resolvedStatus, orderId]);
       }
     }
 
@@ -2539,18 +2572,109 @@ export async function getTopProducts(restaurantId: string, dateFrom: string, dat
 }
 
 export async function getPaymentMethodAnalytics(restaurantId: string, dateFrom: string, dateTo: string) {
-  const rows = await sql`
+  const orders = await sql`
     SELECT 
       COALESCE(NULLIF(UPPER(TRIM(payment_method)), ''), 'PENDING / OTHER') as payment_method,
-      COUNT(*)::int as order_count,
-      COALESCE(SUM(total_price), 0)::float as total_revenue
-    FROM orders WHERE restaurant_id = ${restaurantId}
+      payment_split,
+      total_price
+    FROM orders 
+    WHERE restaurant_id = ${restaurantId}
       AND business_date BETWEEN ${dateFrom} AND ${dateTo}
       AND is_paid = true AND status != 'CANCELLED'
-    GROUP BY payment_method
-    ORDER BY total_revenue DESC
   `;
-  return rows;
+
+  const breakdown: Record<string, { order_count: number; total_revenue: number }> = {
+    CASH: { order_count: 0, total_revenue: 0 },
+    UPI: { order_count: 0, total_revenue: 0 },
+    CARD: { order_count: 0, total_revenue: 0 },
+  };
+  const otherBreakdown: Record<string, { order_count: number; total_revenue: number }> = {};
+
+  for (const o of orders) {
+    const rawMethod = (o.payment_method || '').trim();
+    const totalPrice = Number(o.total_price || 0);
+
+    let split = o.payment_split;
+    if (typeof split === 'string') {
+      try {
+        split = JSON.parse(split);
+      } catch {
+        split = null;
+      }
+    }
+
+    if ((!split || typeof split !== 'object') && rawMethod.toUpperCase().startsWith('SPLIT')) {
+      const splitObj = { CASH: 0, UPI: 0, CARD: 0 };
+      const cashMatch = rawMethod.match(/Cash:\s*₹?([\d.]+)/i);
+      if (cashMatch) splitObj.CASH = parseFloat(cashMatch[1]) || 0;
+      const upiMatch = rawMethod.match(/UPI:\s*₹?([\d.]+)/i);
+      if (upiMatch) splitObj.UPI = parseFloat(upiMatch[1]) || 0;
+      const cardMatch = rawMethod.match(/Card:\s*₹?([\d.]+)/i);
+      if (cardMatch) splitObj.CARD = parseFloat(cardMatch[1]) || 0;
+      if (splitObj.CASH > 0 || splitObj.UPI > 0 || splitObj.CARD > 0) {
+        split = splitObj;
+      }
+    }
+
+    if (split && typeof split === 'object') {
+      let allocatedTotal = 0;
+      for (const [key, val] of Object.entries(split)) {
+        const amt = Number(val) || 0;
+        if (amt > 0) {
+          allocatedTotal += amt;
+          const upperKey = key.toUpperCase();
+          if (breakdown[upperKey]) {
+            breakdown[upperKey].order_count += 1;
+            breakdown[upperKey].total_revenue += amt;
+          } else {
+            if (!otherBreakdown[upperKey]) {
+              otherBreakdown[upperKey] = { order_count: 0, total_revenue: 0 };
+            }
+            otherBreakdown[upperKey].order_count += 1;
+            otherBreakdown[upperKey].total_revenue += amt;
+          }
+        }
+      }
+      if (allocatedTotal === 0 && totalPrice > 0) {
+        breakdown.CASH.order_count += 1;
+        breakdown.CASH.total_revenue += totalPrice;
+      }
+    } else {
+      const upperMethod = rawMethod.toUpperCase();
+      if (upperMethod === 'CASH') {
+        breakdown.CASH.order_count += 1;
+        breakdown.CASH.total_revenue += totalPrice;
+      } else if (upperMethod === 'UPI' || upperMethod.includes('QR')) {
+        breakdown.UPI.order_count += 1;
+        breakdown.UPI.total_revenue += totalPrice;
+      } else if (upperMethod === 'CARD') {
+        breakdown.CARD.order_count += 1;
+        breakdown.CARD.total_revenue += totalPrice;
+      } else {
+        const key = upperMethod || 'PENDING / OTHER';
+        if (!otherBreakdown[key]) {
+          otherBreakdown[key] = { order_count: 0, total_revenue: 0 };
+        }
+        otherBreakdown[key].order_count += 1;
+        otherBreakdown[key].total_revenue += totalPrice;
+      }
+    }
+  }
+
+  const results = [
+    { payment_method: 'CASH', order_count: breakdown.CASH.order_count, total_revenue: breakdown.CASH.total_revenue },
+    { payment_method: 'UPI', order_count: breakdown.UPI.order_count, total_revenue: breakdown.UPI.total_revenue },
+    { payment_method: 'CARD', order_count: breakdown.CARD.order_count, total_revenue: breakdown.CARD.total_revenue },
+    ...Object.entries(otherBreakdown).map(([method, data]) => ({
+      payment_method: method,
+      order_count: data.order_count,
+      total_revenue: data.total_revenue,
+    })),
+  ]
+    .filter((r) => r.total_revenue > 0 || r.order_count > 0)
+    .sort((a, b) => b.total_revenue - a.total_revenue);
+
+  return results;
 }
 
 export async function getDashboardStats(restaurantId: string) {
@@ -2820,8 +2944,7 @@ export async function getCategories(restaurantId?: string) {
       `;
       return rows;
     } else {
-      const rows = await sql`SELECT * FROM categories ORDER BY sort_order ASC, name ASC`;
-      return rows;
+      return [];
     }
   } catch (err) {
     console.warn('⚠️ categories table fetch failed, falling back to products table categories:', err);
@@ -3283,12 +3406,14 @@ export async function updateStaff(restaurantId: string, id: string, data: Partia
     }
   }
 
+  const safePassword = (data.password && typeof data.password === 'string' && data.password.trim()) ? data.password.trim() : null;
+
   const rows = await sql`
     UPDATE staffs SET
       name = COALESCE(${data.name ?? null}, name),
       email = COALESCE(${data.email ?? null}, email),
       phone = COALESCE(${data.phone ?? null}, phone),
-      password = COALESCE(${data.password ?? null}, password),
+      password = COALESCE(${safePassword}, password),
       role = COALESCE(${roleName ?? null}, role),
       role_id = COALESCE(${data.role_id ?? null}, role_id),
       is_active = COALESCE(${data.is_active ?? null}, is_active),
@@ -4012,7 +4137,7 @@ export async function syncAllCompletedOrdersToLoyalty(restaurantId: string) {
       SELECT id, customer_name, phone, user_id, total_price, status, is_paid
       FROM orders
       WHERE restaurant_id = ${restaurantId}
-        AND (is_paid = true OR status IN ('PAID', 'COMPLETED'))
+        AND (is_paid = true OR status IN ('CLOSED', 'COMPLETED'))
     `;
 
     for (const ord of orders) {

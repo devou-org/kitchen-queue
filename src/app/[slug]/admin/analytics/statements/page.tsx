@@ -618,6 +618,7 @@ export default function AdminAnalyticsStatementsPage() {
                     { value: 'UPI', label: 'UPI' },
                     { value: 'CASH', label: 'Cash' },
                     { value: 'CARD', label: 'Card' },
+                    { value: 'SPLIT', label: 'Split' },
                   ]}
                   buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px', width: '100%' }}
                   style={{ width: '100%' }}
@@ -854,7 +855,7 @@ export default function AdminAnalyticsStatementsPage() {
                       <td style={{ textAlign: 'center' }}>
                         <span
                           className={`badge ${
-                            order.status === 'PAID'
+                            order.status === 'CLOSED' || order.status === 'PAID'
                               ? 'badge-available'
                               : order.status === 'CANCELLED'
                               ? 'badge-out-of-stock'
@@ -952,7 +953,7 @@ export default function AdminAnalyticsStatementsPage() {
                 </h2>
                 <span
                   className={`badge ${
-                    selectedOrder.status === 'PAID'
+                    selectedOrder.status === 'CLOSED' || selectedOrder.status === 'PAID'
                       ? 'badge-available'
                       : selectedOrder.status === 'CANCELLED'
                       ? 'badge-out-of-stock'
@@ -1040,11 +1041,11 @@ export default function AdminAnalyticsStatementsPage() {
                     style={{
                       fontWeight: 600,
                       fontSize: '14px',
-                      color: (selectedOrder.status === 'PAID' || selectedOrder.is_paid) ? '#059669' : 'var(--primary, #EA580C)',
+                      color: (selectedOrder.status === 'CLOSED' || selectedOrder.status === 'PAID' || selectedOrder.is_paid) ? '#059669' : 'var(--primary, #EA580C)',
                       margin: 0,
                     }}
                   >
-                    {(selectedOrder.status === 'PAID' || selectedOrder.is_paid)
+                    {(selectedOrder.status === 'CLOSED' || selectedOrder.status === 'PAID' || selectedOrder.is_paid)
                       ? (selectedOrder.payment_method ? `PAID (${selectedOrder.payment_method})` : 'PAID')
                       : 'PENDING'}
                   </p>
@@ -1106,7 +1107,7 @@ export default function AdminAnalyticsStatementsPage() {
 
             {/* Bottom Action Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {(selectedOrder.status === 'PAID' || selectedOrder.is_paid) && (
+              {(selectedOrder.status === 'CLOSED' || selectedOrder.status === 'PAID' || selectedOrder.is_paid) && (
                 <button
                   type="button"
                   onClick={() => setShowBill(true)}
