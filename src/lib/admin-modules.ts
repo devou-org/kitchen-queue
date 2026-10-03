@@ -43,6 +43,13 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     iconName: 'Boxes',
   },
   {
+    key: 'loyalty',
+    name: 'Loyalty',
+    description: 'Customer loyalty program, rewards catalog, and points audit log',
+    pathSegment: 'loyalty',
+    iconName: 'Gift',
+  },
+  {
     key: 'analytics',
     name: 'Analytics',
     description: 'Daily sales, period statements, and payment analytics',
@@ -90,8 +97,8 @@ export const DEFAULT_ROLE_TEMPLATES = [
   },
   {
     name: 'Manager',
-    description: 'General manager overseeing operations, menu items, inventory, analytics, and staff',
-    permissions: ['pos', 'orders', 'tables', 'products', 'inventory', 'analytics', 'staff'],
+    description: 'General manager overseeing operations, menu items, inventory, loyalty, analytics, and staff',
+    permissions: ['pos', 'orders', 'tables', 'products', 'inventory', 'loyalty', 'analytics', 'staff'],
   },
 ];
 

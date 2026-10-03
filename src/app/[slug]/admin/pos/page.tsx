@@ -450,6 +450,8 @@ export default function AdminPosPage() {
       const phoneToUse = orderForm.phone || `+910000000000`;
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
+      const discountAmount = Math.max(0, Number(orderForm.discount_amount) || 0);
+
       const res = await orderService.createOrder({
         customer_name: nameToUse,
         phone: phoneToUse,
@@ -462,10 +464,30 @@ export default function AdminPosPage() {
         is_paid: Boolean(orderForm.is_paid),
         payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
         payment_split: orderForm.is_paid ? orderForm.payment_split : undefined,
+        discount_amount: discountAmount,
       });
 
       if (res.success && res.data) {
         const createdOrder = res.data;
+
+        // If a loyalty reward was selected, trigger redemption API
+        if (orderForm.selected_reward_id && orderForm.phone) {
+          try {
+            const slugStr = Array.isArray(slug) ? slug[0] : slug;
+            await fetch('/api/admin/loyalty/redeem', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                slug: slugStr,
+                phone: orderForm.phone.trim(),
+                reward_id: orderForm.selected_reward_id,
+              }),
+            });
+          } catch (err) {
+            console.error('Loyalty reward redemption call error:', err);
+          }
+        }
+
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
 
         // Check if Print Bill button was clicked
@@ -486,6 +508,8 @@ export default function AdminPosPage() {
           order_type: 'DINE_IN',
           is_paid: false,
           payment_method: 'CASH',
+          discount_amount: 0,
+          selected_reward_id: undefined,
           auto_print_bill: willPrintBill,
         });
         await fetchTables();
