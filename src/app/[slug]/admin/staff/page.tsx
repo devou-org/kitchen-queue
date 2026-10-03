@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { 
   Plus, Trash2, Edit2, ShieldAlert, Key, UserCheck, UserX, 
   Smartphone, Mail, Shield, CheckSquare, Square, Store, ClipboardList, 
-  LayoutGrid, UtensilsCrossed, Boxes, BarChart3, Users, Receipt, Settings,
+  LayoutGrid, UtensilsCrossed, Boxes, Gift, BarChart3, Users, Receipt, Settings,
   CheckCircle2, Info, Search, X
 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
@@ -19,6 +19,7 @@ const MODULE_ICONS: Record<string, any> = {
   tables: LayoutGrid,
   products: UtensilsCrossed,
   inventory: Boxes,
+  loyalty: Gift,
   analytics: BarChart3,
   staff: Users,
   billing: Receipt,
