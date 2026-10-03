@@ -112,9 +112,10 @@ export function generateBillTemplateContentHTML(order: Order, restaurant?: BillR
     const name = escapeHtml(String(item.product_name || item.name || 'Item').trim().toUpperCase());
     const qty = Number(item.quantity) || 1;
     const price = Number(item.price_at_purchase ?? item.price ?? 0);
+    const isFree = price === 0;
     return `
       <div style="display:grid;grid-template-columns:${cols};gap:4px;font-weight:700;padding:2px 0;">
-        <span style="overflow-wrap:anywhere;">${name}</span>
+        <span style="overflow-wrap:anywhere;">${name}${isFree ? ' <span style="font-size:10px;font-weight:800;">[FREE]</span>' : ''}</span>
         <span style="text-align:right;">${qty}</span>
         <span style="text-align:right;">${num(price)}</span>
         <span style="text-align:right;">${num(price * qty)}</span>

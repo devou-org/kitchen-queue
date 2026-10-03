@@ -355,9 +355,17 @@ async function runAutoMigration(sqlConnection: any) {
         visit_milestone_count INT DEFAULT 5,
         visit_reward_type VARCHAR(50) DEFAULT 'DISCOUNT_AMOUNT',
         visit_reward_value VARCHAR(255) DEFAULT '100',
+        loyalty_mode VARCHAR(50) DEFAULT 'POINTS',
+        punch_card_reward_type VARCHAR(50) DEFAULT 'FREE_ITEM',
+        punch_card_reward_value VARCHAR(255) DEFAULT '100',
+        punch_card_product_id UUID,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+      ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS loyalty_mode VARCHAR(50) DEFAULT 'POINTS';
+      ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS punch_card_reward_type VARCHAR(50) DEFAULT 'FREE_ITEM';
+      ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS punch_card_reward_value VARCHAR(255) DEFAULT '100';
+      ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS punch_card_product_id UUID;
 
       CREATE TABLE IF NOT EXISTS loyalty_rewards (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2985,14 +2993,56 @@ export async function deleteCategory(restaurantId: string, categoryId: string) {
 // USER QUERIES
 // ============================================
 
+export function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+  let cleaned = phone.trim().replace(/[^\d]/g, '');
+  if (cleaned.length === 12 && cleaned.startsWith('91')) {
+    cleaned = cleaned.slice(2);
+  } else if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    cleaned = cleaned.slice(1);
+  }
+  return cleaned;
+}
+
 export async function getUserByPhone(phone: string) {
-  const rows = await sql`SELECT * FROM users WHERE phone = ${phone} LIMIT 1`;
+  if (!phone) return null;
+  const norm = normalizePhoneNumber(phone);
+  const rawClean = phone.trim();
+  const rows = await sql`
+    SELECT * FROM users 
+    WHERE phone = ${rawClean}
+       OR phone = ${norm}
+       OR phone = ${'+91' + norm}
+       OR phone = ${'91' + norm}
+       OR REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') LIKE ${'%' + (norm || rawClean)}
+    ORDER BY created_at ASC 
+    LIMIT 1
+  `;
   return rows[0] || null;
 }
 
 export async function createUser(phone: string, name?: string) {
+  if (!phone) return null;
+  const norm = normalizePhoneNumber(phone);
+  const phoneToStore = norm.length === 10 ? norm : phone.trim();
+  
+  const existing = await getUserByPhone(phone);
+  if (existing) {
+    if (name && name.trim()) {
+      const updated = await sql`
+        UPDATE users 
+        SET name = COALESCE(${name.trim()}, name),
+            phone = ${phoneToStore}
+        WHERE id = ${existing.id}
+        RETURNING *
+      `;
+      return updated[0] || existing;
+    }
+    return existing;
+  }
+
   const rows = await sql`
-    INSERT INTO users (phone, name) VALUES (${phone}, ${name || null})
+    INSERT INTO users (phone, name) VALUES (${phoneToStore}, ${name?.trim() || null})
     ON CONFLICT (phone) DO UPDATE SET name = COALESCE(EXCLUDED.name, users.name)
     RETURNING *
   `;
@@ -3527,8 +3577,9 @@ export async function getLoyaltySettings(restaurantId: string) {
         INSERT INTO loyalty_settings (
           restaurant_id, is_enabled, points_earning_rate, points_redemption_rate_points,
           points_redemption_rate_amount, points_expiry_type, points_expiry_days,
-          min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value
-        ) VALUES (${restaurantId}, true, 0.1000, 100, 50.00, 'NEVER', 365, 0.00, 5, 'DISCOUNT_AMOUNT', '100')
+          min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value,
+          loyalty_mode, punch_card_reward_type, punch_card_reward_value
+        ) VALUES (${restaurantId}, true, 0.1000, 100, 50.00, 'NEVER', 365, 0.00, 5, 'DISCOUNT_AMOUNT', '100', 'POINTS', 'FREE_ITEM', '100')
         ON CONFLICT (restaurant_id) DO NOTHING
         RETURNING *
       `;
@@ -3538,7 +3589,7 @@ export async function getLoyaltySettings(restaurantId: string) {
     }
     return rows[0] || null;
   } catch (err: any) {
-    if (err.message?.includes('does not exist')) {
+    if (err.message?.includes('does not exist') || err.message?.includes('column')) {
       await runAutoMigration(sql);
       return null;
     }
@@ -3557,13 +3608,18 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
   visit_milestone_count?: number;
   visit_reward_type?: string;
   visit_reward_value?: string;
+  loyalty_mode?: string;
+  punch_card_reward_type?: string;
+  punch_card_reward_value?: string;
+  punch_card_product_id?: string | null;
 }) {
   try {
     const rows = await sql`
       INSERT INTO loyalty_settings (
         restaurant_id, is_enabled, points_earning_rate, points_redemption_rate_points,
         points_redemption_rate_amount, points_expiry_type, points_expiry_days,
-        min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value, updated_at
+        min_order_amount, visit_milestone_count, visit_reward_type, visit_reward_value,
+        loyalty_mode, punch_card_reward_type, punch_card_reward_value, punch_card_product_id, updated_at
       ) VALUES (
         ${restaurantId},
         COALESCE(${data.is_enabled ?? true}, true),
@@ -3576,6 +3632,10 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
         COALESCE(${data.visit_milestone_count ?? 5}, 5),
         COALESCE(${data.visit_reward_type ?? 'DISCOUNT_AMOUNT'}, 'DISCOUNT_AMOUNT'),
         COALESCE(${data.visit_reward_value ?? '100'}, '100'),
+        COALESCE(${data.loyalty_mode ?? 'POINTS'}, 'POINTS'),
+        COALESCE(${data.punch_card_reward_type ?? 'FREE_ITEM'}, 'FREE_ITEM'),
+        COALESCE(${data.punch_card_reward_value ?? '100'}, '100'),
+        ${data.punch_card_product_id || null},
         NOW()
       )
       ON CONFLICT (restaurant_id) DO UPDATE SET
@@ -3589,12 +3649,16 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
         visit_milestone_count = EXCLUDED.visit_milestone_count,
         visit_reward_type = EXCLUDED.visit_reward_type,
         visit_reward_value = EXCLUDED.visit_reward_value,
+        loyalty_mode = EXCLUDED.loyalty_mode,
+        punch_card_reward_type = EXCLUDED.punch_card_reward_type,
+        punch_card_reward_value = EXCLUDED.punch_card_reward_value,
+        punch_card_product_id = EXCLUDED.punch_card_product_id,
         updated_at = NOW()
       RETURNING *
     `;
     return rows[0];
   } catch (err: any) {
-    if (err.message?.includes('does not exist')) {
+    if (err.message?.includes('does not exist') || err.message?.includes('column')) {
       await runAutoMigration(sql);
       return null;
     }
@@ -3602,9 +3666,93 @@ export async function updateLoyaltySettings(restaurantId: string, data: {
   }
 }
 
+export async function mergeDuplicateCustomerLoyalty(restaurantId: string) {
+  try {
+    const records = await sql`
+      SELECT cl.*, u.phone, u.name
+      FROM customer_loyalty cl
+      JOIN users u ON u.id = cl.user_id
+      WHERE cl.restaurant_id = ${restaurantId}
+      ORDER BY cl.created_at ASC
+    `;
+
+    const groups = new Map<string, any[]>();
+    for (const rec of records) {
+      const norm = normalizePhoneNumber(rec.phone || '');
+      if (!norm) continue;
+      if (!groups.has(norm)) {
+        groups.set(norm, []);
+      }
+      groups.get(norm)!.push(rec);
+    }
+
+    for (const [norm, items] of groups.entries()) {
+      if (items.length <= 1) continue;
+
+      const primary = items[0];
+      let sumBalance = Number(primary.points_balance || 0);
+      let sumEarned = Number(primary.total_points_earned || 0);
+      let sumRedeemed = Number(primary.total_points_redeemed || 0);
+      let sumVisits = Number(primary.total_visits || 0);
+      let sumSpent = Number(primary.total_spent || 0);
+      let bestName = (primary.name && primary.name !== 'System Admin') ? primary.name : '';
+
+      for (let i = 1; i < items.length; i++) {
+        const dup = items[i];
+        sumBalance += Number(dup.points_balance || 0);
+        sumEarned += Number(dup.total_points_earned || 0);
+        sumRedeemed += Number(dup.total_points_redeemed || 0);
+        sumVisits += Number(dup.total_visits || 0);
+        sumSpent += Number(dup.total_spent || 0);
+        if (dup.name && dup.name !== 'System Admin' && (!bestName || dup.name.length > bestName.length)) {
+          bestName = dup.name;
+        }
+
+        // Re-point transactions and orders
+        await sql`UPDATE loyalty_transactions SET customer_loyalty_id = ${primary.id}, user_id = ${primary.user_id} WHERE customer_loyalty_id = ${dup.id} OR user_id = ${dup.user_id}`;
+        await sql`UPDATE orders SET user_id = ${primary.user_id} WHERE user_id = ${dup.user_id}`;
+
+        // Delete duplicate customer loyalty record & duplicate user
+        await sql`DELETE FROM customer_loyalty WHERE id = ${dup.id}`;
+        if (dup.user_id !== primary.user_id) {
+          await sql`DELETE FROM users WHERE id = ${dup.user_id}`;
+        }
+      }
+
+      // Update primary user & loyalty totals
+      const cleanPhone = norm.length === 10 ? norm : primary.phone;
+      if (bestName) {
+        await sql`UPDATE users SET phone = ${cleanPhone}, name = ${bestName} WHERE id = ${primary.user_id}`;
+      } else {
+        await sql`UPDATE users SET phone = ${cleanPhone} WHERE id = ${primary.user_id}`;
+      }
+
+      const milestoneCount = 5;
+      const progress = sumVisits % milestoneCount;
+      const unlocked = Math.floor(sumVisits / milestoneCount);
+
+      await sql`
+        UPDATE customer_loyalty
+        SET points_balance = ${sumBalance},
+            total_points_earned = ${sumEarned},
+            total_points_redeemed = ${sumRedeemed},
+            total_visits = ${sumVisits},
+            visit_progress = ${progress},
+            rewards_unlocked = ${unlocked},
+            total_spent = ${sumSpent},
+            updated_at = NOW()
+        WHERE id = ${primary.id}
+      `;
+    }
+  } catch (err) {
+    console.error('Error merging duplicate customer loyalty records:', err);
+  }
+}
+
 export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
   try {
-    // Auto-sync any completed/paid orders to loyalty customers & points
+    // Merge duplicate customer accounts and sync completed/paid orders
+    await mergeDuplicateCustomerLoyalty(restaurantId);
     await syncAllCompletedOrdersToLoyalty(restaurantId);
 
     let query;

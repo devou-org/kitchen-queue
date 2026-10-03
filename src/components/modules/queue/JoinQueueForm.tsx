@@ -1,24 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { authService } from '@/app/services/auth.api';
 import toast from 'react-hot-toast';
 import { User, BadgeCheck } from 'lucide-react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-
-const COUNTRY_CODES = [
-  { code: '+91', label: 'IN +91', country: 'India' },
-];
+import { COUNTRY_CODES, getDefaultCallingCode } from '@/lib/constants';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function JoinQueueForm({ restaurantId }: { restaurantId: string }) {
   const params = useParams();
   const slug = params?.slug as string;
   const router = useRouter();
 
+  const { restaurant } = useRestaurant();
+  const defaultCallingCode = useMemo(() => {
+    return getDefaultCallingCode(restaurant?.country_code, restaurant?.country);
+  }, [restaurant?.country_code, restaurant?.country]);
+
   // Join form state
   const [name, setName] = useState('');
-  const [countryCode, setCountryCode] = useState('+91');
+  const [countryCode, setCountryCode] = useState(defaultCallingCode);
   const [phone, setPhone] = useState('');
   const [partySize, setPartySize] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
@@ -59,19 +62,22 @@ export default function JoinQueueForm({ restaurantId }: { restaurantId: string }
 
     const user = authService.getUser();
     if (user && user.phone) {
-      if (user.phone.startsWith('+91')) {
-        setCountryCode('+91');
-        setPhone(user.phone.replace('+91', ''));
+      const matched = COUNTRY_CODES.find((c) => user.phone.startsWith(c.code));
+      if (matched) {
+        setCountryCode(matched.code);
+        setPhone(user.phone.replace(matched.code, ''));
       } else {
-        setPhone(user.phone);
+        setCountryCode(defaultCallingCode);
+        setPhone(user.phone.replace(/\D/g, ''));
       }
       if (user.name) setName(user.name);
       setIsVerified(true);
       checkActiveQueue(user.phone);
     } else {
+      setCountryCode(defaultCallingCode);
       setCheckingActive(false);
     }
-  }, [restaurantId, slug, router]);
+  }, [restaurantId, slug, router, defaultCallingCode]);
 
   const handleSendOTP = async () => {
     const cleanedPhone = phone.replace(/\D/g, '');
