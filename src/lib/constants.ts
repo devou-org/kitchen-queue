@@ -6,9 +6,27 @@ export const ORDER_STATUSES = {
   PENDING: 'PENDING',
   PREPARING: 'PREPARING',
   READY: 'READY',
-  PAID: 'PAID',
+  SERVED: 'SERVED',
+  CLOSED: 'CLOSED',
   CANCELLED: 'CANCELLED',
   EXPIRED: 'EXPIRED',
+} as const;
+
+export const ORDER_ITEM_STATUSES = {
+  PENDING: 'PENDING',
+  PREPARING: 'PREPARING',
+  READY: 'READY',
+  SERVED: 'SERVED',
+  CANCELLED: 'CANCELLED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export const PAYMENT_STATUSES = {
+  UNPAID: 'UNPAID',
+  PARTIAL: 'PARTIAL',
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+  REFUNDED: 'REFUNDED',
 } as const;
 
 export const PRODUCT_STATUSES = {
@@ -18,10 +36,11 @@ export const PRODUCT_STATUSES = {
 } as const;
 
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
-  PENDING: ['PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED'],
-  PREPARING: ['READY', 'PAID', 'CANCELLED', 'PENDING', 'EXPIRED'],
-  READY: ['PAID', 'CANCELLED', 'PENDING', 'PREPARING', 'EXPIRED'],
-  PAID: ['PENDING', 'CANCELLED', 'PREPARING', 'READY', 'EXPIRED'],
+  PENDING: ['PREPARING', 'CANCELLED', 'EXPIRED'],
+  PREPARING: ['READY', 'SERVED', 'CANCELLED', 'EXPIRED'],
+  READY: ['SERVED', 'CANCELLED', 'EXPIRED'],
+  SERVED: ['CLOSED'],
+  CLOSED: [],
   CANCELLED: ['PENDING'],
   EXPIRED: ['PENDING'],
 };
@@ -41,11 +60,12 @@ export const JWT_ADMIN_EXPIRY = '8h';
 export const CURRENCY_SYMBOL = '₹';
 
 export const STATUS_COLORS: Record<string, string> = {
-  PENDING: '#FFA500',
+  PENDING: '#F59E0B',
   PREPARING: '#3B82F6',
-  READY: '#06A77D',
-  PAID: '#6B7280',
-  CANCELLED: '#C1272D',
+  READY: '#10B981',
+  SERVED: '#8B5CF6',
+  CLOSED: '#059669',
+  CANCELLED: '#EF4444',
   EXPIRED: '#6B7280',
   AVAILABLE: '#06A77D',
   LOW_STOCK: '#FFA500',
@@ -53,10 +73,11 @@ export const STATUS_COLORS: Record<string, string> = {
 };
 
 export const STATUS_BG: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-800',
+  PENDING: 'bg-amber-100 text-amber-800',
   PREPARING: 'bg-blue-100 text-blue-800',
-  READY: 'bg-green-100 text-green-800',
-  PAID: 'bg-gray-100 text-gray-600',
+  READY: 'bg-emerald-100 text-emerald-800',
+  SERVED: 'bg-purple-100 text-purple-800',
+  CLOSED: 'bg-emerald-100 text-emerald-900',
   CANCELLED: 'bg-red-100 text-red-800',
-  EXPIRED: 'bg-gray-100 text-gray-600',
+  EXPIRED: 'bg-gray-100 text-gray-800',
 };

@@ -5,7 +5,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power } from 'lucide-react';
+import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power, ChefHat, Monitor, CheckCircle2 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
@@ -104,7 +104,7 @@ export default function AdminSettings() {
   const [autoPrintKot, setAutoPrintKot] = useState(true);
   const [isServiceOnline, setIsServiceOnline] = useState(true);
 
-  const SECTION_KEYS = ['service_status', 'profile', 'menu', 'hours', 'autoprint', 'gst', 'preview', 'qrcode'];
+  const SECTION_KEYS = ['service_status', 'profile', 'menu', 'kitchen_workflow', 'hours', 'autoprint', 'gst', 'preview', 'qrcode'];
 
   // Collapsible Sections State (all collapsed by default)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -161,6 +161,7 @@ export default function AdminSettings() {
   const [primaryColor, setPrimaryColor] = useState('#971345');
   const [secondaryColor, setSecondaryColor] = useState('#ffffff');
   const [menuLayout, setMenuLayout] = useState<'LIST' | 'GRID'>('LIST');
+  const [kitchenMode, setKitchenMode] = useState<'KOT' | 'KDS'>('KOT');
   const [menuTitle, setMenuTitle] = useState("Today's Specials");
   const [menuDescription, setMenuDescription] = useState("Hand-curated coastal delicacies prepared with traditional recipes.");
 
@@ -268,6 +269,7 @@ export default function AdminSettings() {
       setPrimaryColor(restaurant.primary_color || '#971345');
       setSecondaryColor(restaurant.secondary_color || '#ffffff');
       setMenuLayout((restaurant as any).menu_layout || 'LIST');
+      setKitchenMode(((restaurant as any).kitchen_mode || 'KOT').toUpperCase() === 'KDS' ? 'KDS' : 'KOT');
       setMenuTitle(restaurant.menu_title || "Today's Specials");
       setMenuDescription(restaurant.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes.");
       const tzVal = restaurant.timezone || 'Asia/Kolkata';
@@ -380,6 +382,7 @@ export default function AdminSettings() {
           primary_color: primaryColor,
           secondary_color: secondaryColor,
           menu_layout: menuLayout,
+          kitchen_mode: kitchenMode,
           menu_title: menuTitle || null,
           menu_description: menuDescription || null,
           timezone,
@@ -746,7 +749,134 @@ export default function AdminSettings() {
               </div>
             </CollapsibleCard>
 
-            {/* 3. Location & Operating Hours Card */}
+            {/* Kitchen Operations & Workflow Card */}
+            <CollapsibleCard
+              id="kitchen_workflow"
+              title="Kitchen Workflow"
+              icon={<ChefHat size={18} style={{ color: 'var(--primary, #971345)' }} />}
+              badge={
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    backgroundColor: kitchenMode === 'KDS' ? '#EFF6FF' : '#F0FDF4',
+                    color: kitchenMode === 'KDS' ? '#1D4ED8' : '#15803D',
+                    border: kitchenMode === 'KDS' ? '1px solid #BFDBFE' : '1px solid #BBF7D0',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  {kitchenMode === 'KDS' ? 'KDS MODE' : 'KOT MODE'}
+                </span>
+              }
+              isCollapsed={!!collapsedSections['kitchen_workflow']}
+              onToggle={() => toggleSection('kitchen_workflow')}
+            >
+              <p style={{ ...S.cardDesc, marginBottom: '14px' }}>
+                Choose the workflow your kitchen uses to process orders.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                {/* KOT Mode Card */}
+                <button
+                  type="button"
+                  onClick={() => setKitchenMode('KOT')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '8px',
+                    border: kitchenMode === 'KOT' ? '2px solid #10B981' : '1px solid #CBD5E1',
+                    backgroundColor: kitchenMode === 'KOT' ? '#F0FDF4' : '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '6px',
+                        backgroundColor: kitchenMode === 'KOT' ? '#DCFCE7' : '#F1F5F9',
+                        color: kitchenMode === 'KOT' ? '#15803D' : '#64748B',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Printer size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '13px', color: kitchenMode === 'KOT' ? '#15803D' : '#0F172A' }}>
+                        KOT Mode
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748B', marginTop: '1px' }}>
+                        Printed Kitchen Tickets
+                      </div>
+                    </div>
+                  </div>
+                  {kitchenMode === 'KOT' && <CheckCircle2 size={16} color="#10B981" />}
+                </button>
+
+                {/* KDS Mode Card */}
+                <button
+                  type="button"
+                  onClick={() => setKitchenMode('KDS')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '8px',
+                    border: kitchenMode === 'KDS' ? '2px solid #3B82F6' : '1px solid #CBD5E1',
+                    backgroundColor: kitchenMode === 'KDS' ? '#EFF6FF' : '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '6px',
+                        backgroundColor: kitchenMode === 'KDS' ? '#DBEAFE' : '#F1F5F9',
+                        color: kitchenMode === 'KDS' ? '#1D4ED8' : '#64748B',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Monitor size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '13px', color: kitchenMode === 'KDS' ? '#1D4ED8' : '#0F172A' }}>
+                        KDS Mode
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748B', marginTop: '1px' }}>
+                        Digital Kitchen Display
+                      </div>
+                    </div>
+                  </div>
+                  {kitchenMode === 'KDS' && <CheckCircle2 size={16} color="#3B82F6" />}
+                </button>
+              </div>
+            </CollapsibleCard>
+
+            {/* 4. Location & Operating Hours Card */}
             <CollapsibleCard
               id="hours"
               title="Location & Operating Hours"

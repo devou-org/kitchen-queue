@@ -19,6 +19,7 @@ import {
   Banknote,
   QrCode,
   CheckCircle2,
+  Split,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
@@ -26,6 +27,7 @@ import { formatPrice, formatDateTime } from '@/lib/format';
 import OrderStatusBadge from '@/components/modules/orders/OrderStatusBadge';
 import OrderTypeBadge from '@/components/modules/orders/OrderTypeBadge';
 import { printBillFromBrowser } from '@/lib/client-print';
+import SplitPaymentBreakdown, { SplitAmounts, formatSplitSummary, parseSplitFromSummary } from '@/components/modules/orders/SplitPaymentBreakdown';
 
 interface TableOrdersDrawerProps {
   table: RestaurantTable | null;
@@ -50,7 +52,8 @@ export function TableOrdersDrawer({
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [closingOrderId, setClosingOrderId] = useState<string | null>(null);
   const [paymentModalOrder, setPaymentModalOrder] = useState<any | null>(null);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'CASH' | 'UPI' | 'CARD'>('CASH');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'CASH' | 'UPI' | 'CARD' | 'SPLIT'>('CASH');
+  const [tableSplit, setTableSplit] = useState<SplitAmounts>({ CASH: 0, UPI: 0, CARD: 0 });
   const [submittingPayment, setSubmittingPayment] = useState(false);
 
   useEffect(() => {
@@ -167,17 +170,39 @@ export function TableOrdersDrawer({
       executeCloseTicket(order, order.payment_method || 'CASH');
     } else {
       setSelectedPaymentMethod('CASH');
+      if (order.payment_split) {
+        setTableSplit(order.payment_split as SplitAmounts);
+      } else {
+        const half = Math.round((Number(order.total_price || 0) / 2) * 100) / 100;
+        const other = Math.round((Number(order.total_price || 0) - half) * 100) / 100;
+        setTableSplit({ CASH: half, UPI: other, CARD: 0 });
+      }
       setPaymentModalOrder(order);
     }
   };
 
-  // Execute closing single ticket and setting status = PAID & is_paid = true
-  const executeCloseTicket = async (order: any, paymentMethod: string) => {
+  // Execute closing single ticket and setting status = CLOSED & is_paid = true
+  const executeCloseTicket = async (order: any, paymentMethod: string, paymentSplit?: any) => {
     if (closingOrderId) return;
     setClosingOrderId(order.id);
     setSubmittingPayment(true);
     const ticketNum = String(order.ticket_number).padStart(3, '0');
     const toastId = toast.loading(`Closing Ticket #${ticketNum}...`);
+
+    let pMethod = paymentMethod;
+    let pSplit = paymentSplit;
+
+    if (paymentMethod === 'SPLIT' || paymentMethod.startsWith('SPLIT')) {
+      const totalSplit = (tableSplit.CASH || 0) + (tableSplit.UPI || 0) + (tableSplit.CARD || 0);
+      if (totalSplit <= 0) {
+        toast.error('Please enter the split amounts for payment', { id: toastId });
+        setClosingOrderId(null);
+        setSubmittingPayment(false);
+        return;
+      }
+      pMethod = formatSplitSummary(tableSplit);
+      pSplit = tableSplit;
+    }
 
     try {
       const res = await fetch(`/api/orders/${order.id}`, {
@@ -187,16 +212,17 @@ export function TableOrdersDrawer({
           'x-restaurant-slug': slug,
         },
         body: JSON.stringify({
-          status: 'PAID',
+          status: 'CLOSED',
           is_paid: true,
-          payment_method: paymentMethod || 'CASH',
+          payment_method: pMethod || 'CASH',
+          payment_split: pSplit || null,
           table_number: table.table_number,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`Ticket #${ticketNum} marked Paid via ${paymentMethod} & closed!`, { id: toastId });
+        toast.success(`Ticket #${ticketNum} marked Paid via ${pMethod} & closed!`, { id: toastId });
         setPaymentModalOrder(null);
         onRefresh?.();
       } else {
@@ -804,11 +830,12 @@ export function TableOrdersDrawer({
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
                 Select Payment Method
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: selectedPaymentMethod === 'SPLIT' ? '12px' : '20px' }}>
                 {[
                   { id: 'CASH', label: 'Cash', icon: Banknote },
                   { id: 'UPI', label: 'UPI / QR', icon: QrCode },
                   { id: 'CARD', label: 'Card', icon: CreditCard },
+                  { id: 'SPLIT', label: 'Split', icon: Split },
                 ].map((m) => {
                   const Icon = m.icon;
                   const isSelected = selectedPaymentMethod === m.id;
@@ -816,31 +843,51 @@ export function TableOrdersDrawer({
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => setSelectedPaymentMethod(m.id as any)}
+                      onClick={() => {
+                        setSelectedPaymentMethod(m.id as any);
+                        if (m.id === 'SPLIT') {
+                          if (tableSplit.CASH === 0 && tableSplit.UPI === 0 && tableSplit.CARD === 0) {
+                            const half = Math.round((Number(paymentModalOrder.total_price || 0) / 2) * 100) / 100;
+                            const rest = Math.round((Number(paymentModalOrder.total_price || 0) - half) * 100) / 100;
+                            setTableSplit({ CASH: half, UPI: rest, CARD: 0 });
+                          }
+                        }
+                      }}
                       style={{
-                        padding: '10px 6px',
+                        padding: '10px 4px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px',
+                        gap: '5px',
                         borderRadius: '10px',
                         border: isSelected ? '2px solid #059669' : '1px solid #CBD5E1',
                         background: isSelected ? '#ECFDF5' : '#FFFFFF',
                         color: isSelected ? '#065F46' : '#475569',
                         fontWeight: isSelected ? 800 : 600,
-                        fontSize: '12px',
+                        fontSize: '11.5px',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                         boxShadow: isSelected ? '0 2px 4px rgba(5, 150, 105, 0.15)' : 'none',
                       }}
                     >
-                      <Icon size={18} color={isSelected ? '#059669' : '#64748B'} />
+                      <Icon size={17} color={isSelected ? '#059669' : '#64748B'} />
                       <span>{m.label}</span>
                     </button>
                   );
                 })}
               </div>
+
+              {selectedPaymentMethod === 'SPLIT' && (
+                <div style={{ marginBottom: '18px' }}>
+                  <SplitPaymentBreakdown
+                    totalAmount={Number(paymentModalOrder.total_price || 0)}
+                    split={tableSplit}
+                    onChange={(newSplit) => setTableSplit(newSplit)}
+                    theme="emerald"
+                  />
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -864,7 +911,7 @@ export function TableOrdersDrawer({
                 </button>
                 <button
                   type="button"
-                  onClick={() => executeCloseTicket(paymentModalOrder, selectedPaymentMethod)}
+                  onClick={() => executeCloseTicket(paymentModalOrder, selectedPaymentMethod, tableSplit)}
                   disabled={submittingPayment || closingOrderId === paymentModalOrder.id}
                   style={{
                     flex: 2,
@@ -888,7 +935,7 @@ export function TableOrdersDrawer({
                   ) : (
                     <CheckCircle2 size={15} />
                   )}
-                  <span>Make Paid &amp; Close</span>
+                  <span>Make Paid &amp; Close · {selectedPaymentMethod === 'SPLIT' ? 'Split' : selectedPaymentMethod}</span>
                 </button>
               </div>
             </div>

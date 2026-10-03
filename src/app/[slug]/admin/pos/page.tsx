@@ -461,6 +461,7 @@ export default function AdminPosPage() {
         is_pos: true,
         is_paid: Boolean(orderForm.is_paid),
         payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
+        payment_split: orderForm.is_paid ? orderForm.payment_split : undefined,
       });
 
       if (res.success && res.data) {

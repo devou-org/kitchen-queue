@@ -31,6 +31,7 @@ export type RestaurantContext = {
   city?: string;
   latitude?: number | null;
   longitude?: number | null;
+  kitchen_mode?: 'KOT' | 'KDS';
 };
 
 let cached: RestaurantContext | null = null;

@@ -65,24 +65,98 @@ export async function getSalesSummary(restaurantId: string, params: DateFilter =
   // Payment methods breakdown for paid orders
   const paymentRes = await pool.query(
     `SELECT 
-       COALESCE(payment_method, 'UNKNOWN') as method,
-       COUNT(*)::int as count,
-       COALESCE(SUM(total_price), 0)::numeric as total_amount
+       payment_method,
+       payment_split,
+       total_price
      FROM orders
      WHERE restaurant_id = $1
        AND business_date >= $2::date
        AND business_date <= $3::date
-       AND is_paid = true AND status != 'CANCELLED'
-     GROUP BY COALESCE(payment_method, 'UNKNOWN')
-     ORDER BY total_amount DESC`,
+       AND is_paid = true AND status != 'CANCELLED'`,
     [restaurantId, dateFrom, dateTo]
   );
 
-  const paymentBreakdown = paymentRes.rows.map(r => ({
-    method: r.method,
-    count: Number(r.count || 0),
-    total_amount: Math.round(Number(r.total_amount) * 100) / 100
-  }));
+  const aiPaymentMap: Record<string, { count: number; total_amount: number }> = {
+    Cash: { count: 0, total_amount: 0 },
+    UPI: { count: 0, total_amount: 0 },
+    Card: { count: 0, total_amount: 0 },
+  };
+  const aiOtherPaymentMap: Record<string, { count: number; total_amount: number }> = {};
+
+  for (const r of paymentRes.rows) {
+    const rawMethod = (r.payment_method || '').trim();
+    const upperMethod = rawMethod.toUpperCase();
+    const amount = Number(r.total_price || 0);
+
+    let split = r.payment_split;
+    if (typeof split === 'string') {
+      try { split = JSON.parse(split); } catch { split = null; }
+    }
+    if ((!split || typeof split !== 'object') && upperMethod.startsWith('SPLIT')) {
+      const splitObj = { CASH: 0, UPI: 0, CARD: 0 };
+      const cashMatch = rawMethod.match(/Cash:\s*₹?([\d.]+)/i);
+      if (cashMatch) splitObj.CASH = parseFloat(cashMatch[1]) || 0;
+      const upiMatch = rawMethod.match(/UPI:\s*₹?([\d.]+)/i);
+      if (upiMatch) splitObj.UPI = parseFloat(upiMatch[1]) || 0;
+      const cardMatch = rawMethod.match(/Card:\s*₹?([\d.]+)/i);
+      if (cardMatch) splitObj.CARD = parseFloat(cardMatch[1]) || 0;
+      if (splitObj.CASH > 0 || splitObj.UPI > 0 || splitObj.CARD > 0) {
+        split = splitObj;
+      }
+    }
+
+    if (split && typeof split === 'object') {
+      let allocated = 0;
+      if (Number(split.CASH) > 0) {
+        aiPaymentMap.Cash.total_amount += Number(split.CASH);
+        aiPaymentMap.Cash.count += 1;
+        allocated += Number(split.CASH);
+      }
+      if (Number(split.UPI) > 0) {
+        aiPaymentMap.UPI.total_amount += Number(split.UPI);
+        aiPaymentMap.UPI.count += 1;
+        allocated += Number(split.UPI);
+      }
+      if (Number(split.CARD) > 0) {
+        aiPaymentMap.Card.total_amount += Number(split.CARD);
+        aiPaymentMap.Card.count += 1;
+        allocated += Number(split.CARD);
+      }
+      if (allocated === 0 && amount > 0) {
+        aiPaymentMap.Cash.total_amount += amount;
+        aiPaymentMap.Cash.count += 1;
+      }
+    } else if (upperMethod === 'CASH') {
+      aiPaymentMap.Cash.total_amount += amount;
+      aiPaymentMap.Cash.count += 1;
+    } else if (upperMethod === 'UPI' || upperMethod.includes('QR')) {
+      aiPaymentMap.UPI.total_amount += amount;
+      aiPaymentMap.UPI.count += 1;
+    } else if (upperMethod === 'CARD') {
+      aiPaymentMap.Card.total_amount += amount;
+      aiPaymentMap.Card.count += 1;
+    } else {
+      const key = rawMethod || 'Unknown';
+      if (!aiOtherPaymentMap[key]) {
+        aiOtherPaymentMap[key] = { count: 0, total_amount: 0 };
+      }
+      aiOtherPaymentMap[key].total_amount += amount;
+      aiOtherPaymentMap[key].count += 1;
+    }
+  }
+
+  const paymentBreakdown = [
+    { method: 'Cash', count: aiPaymentMap.Cash.count, total_amount: Math.round(aiPaymentMap.Cash.total_amount * 100) / 100 },
+    { method: 'UPI', count: aiPaymentMap.UPI.count, total_amount: Math.round(aiPaymentMap.UPI.total_amount * 100) / 100 },
+    { method: 'Card', count: aiPaymentMap.Card.count, total_amount: Math.round(aiPaymentMap.Card.total_amount * 100) / 100 },
+    ...Object.entries(aiOtherPaymentMap).map(([method, data]) => ({
+      method,
+      count: data.count,
+      total_amount: Math.round(data.total_amount * 100) / 100,
+    })),
+  ]
+    .filter((p) => p.count > 0 || p.total_amount > 0)
+    .sort((a, b) => b.total_amount - a.total_amount);
 
   return {
     date_from: dateFrom,
@@ -594,7 +668,7 @@ export async function getTableOccupancy(restaurantId: string, params: DateFilter
            SELECT 1 FROM orders o
            WHERE o.restaurant_id = $1
              AND (o.table_id = t.id OR o.table_number = t.table_number)
-             AND o.status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
+             AND o.status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
              AND o.business_date >= $2::date
              AND o.business_date <= $3::date
          )
