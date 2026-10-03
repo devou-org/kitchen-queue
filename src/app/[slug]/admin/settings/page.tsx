@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast, Toaster } from 'react-hot-toast';
-import { useRestaurant } from '@/hooks/useRestaurant';
+import { useRestaurant, invalidateRestaurantCache } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power, ChefHat, Monitor, CheckCircle2 } from 'lucide-react';
@@ -400,6 +400,7 @@ export default function AdminSettings() {
       const data = await res.json();
       if (data.success) {
         toast.success('Settings updated successfully!');
+        invalidateRestaurantCache();
         if (refresh) await refresh();
       } else {
         toast.error(data.error || 'Failed to update settings');

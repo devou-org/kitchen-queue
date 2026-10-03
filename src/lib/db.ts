@@ -451,17 +451,17 @@ async function runAutoMigration(sqlConnection: any) {
 
 export async function getRestaurantBySlug(slug: string) {
   try {
-    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+    const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, timezone, opening_time, closing_time, rollover_time, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude, kitchen_mode FROM restaurants WHERE slug = ${slug} LIMIT 1`;
     return rows[0] || null;
   } catch (error: any) {
     if (error.message?.includes('column') || error.message?.includes('does not exist')) {
       console.log("Missing menu columns detected in getRestaurantBySlug. Attempting auto-migration...");
       await runAutoMigration(sql);
       try {
-        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, menu_title, menu_description, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, kitchen_mode FROM restaurants WHERE slug = ${slug} LIMIT 1`;
         return rows[0] || null;
       } catch (retryError) {
-        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date FROM restaurants WHERE slug = ${slug} LIMIT 1`;
+        const rows = await sql`SELECT id, name, slug, logo_url, phone, address, primary_color, secondary_color, menu_layout, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, kitchen_mode FROM restaurants WHERE slug = ${slug} LIMIT 1`;
         if (rows[0]) {
           rows[0].menu_title = "Today's Specials";
           rows[0].menu_description = "Hand-curated coastal delicacies prepared with traditional recipes.";
@@ -493,14 +493,14 @@ export async function getAllRestaurants() {
   try {
     const rows = await sql`
       SELECT 
-        r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at,
+        r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.kitchen_mode, r.created_at,
         r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date, r.gst_type, r.gst_number, r.gst_rate, r.custom_subscription_charge, r.custom_otp_charge,
         COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
         COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
       FROM restaurants r
       LEFT JOIN orders o ON o.restaurant_id = r.id
       LEFT JOIN products p ON p.restaurant_id = r.id
-      GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date, r.gst_type, r.gst_number, r.gst_rate, r.custom_subscription_charge, r.custom_otp_charge
+      GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.kitchen_mode, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date, r.gst_type, r.gst_number, r.gst_rate, r.custom_subscription_charge, r.custom_otp_charge
       ORDER BY r.created_at DESC
     `;
     return rows;
@@ -511,28 +511,28 @@ export async function getAllRestaurants() {
       try {
         const rows = await sql`
           SELECT 
-            r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at,
+            r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.kitchen_mode, r.created_at,
             r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date,
             COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
             COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
           FROM restaurants r
           LEFT JOIN orders o ON o.restaurant_id = r.id
           LEFT JOIN products p ON p.restaurant_id = r.id
-          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date
+          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.menu_title, r.menu_description, r.kitchen_mode, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date
           ORDER BY r.created_at DESC
         `;
         return rows;
       } catch (retryError) {
         const rows = await sql`
           SELECT 
-            r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.created_at,
+            r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.kitchen_mode, r.created_at,
             r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date,
             COUNT(DISTINCT o.id) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') as orders_30d,
             COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true) as active_products
           FROM restaurants r
           LEFT JOIN orders o ON o.restaurant_id = r.id
           LEFT JOIN products p ON p.restaurant_id = r.id
-          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date
+          GROUP BY r.id, r.name, r.slug, r.phone, r.address, r.logo_url, r.primary_color, r.secondary_color, r.menu_layout, r.kitchen_mode, r.created_at, r.billing_tier, r.billing_model, r.billing_status, r.billing_start_date, r.billing_end_date
           ORDER BY r.created_at DESC
         `;
         return rows.map((r: any) => ({
@@ -550,7 +550,7 @@ export async function getAllRestaurants() {
 export async function getRestaurantById(id: string) {
   try {
     const rows = await sql`
-      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude, timezone, opening_time, closing_time, rollover_time
+      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude, timezone, opening_time, closing_time, rollover_time, kitchen_mode
       FROM restaurants WHERE id = ${id} LIMIT 1
     `;
     return rows[0] || null;
@@ -560,13 +560,13 @@ export async function getRestaurantById(id: string) {
       await runAutoMigration(sql);
       try {
         const rows = await sql`
-          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period
+          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, kitchen_mode
           FROM restaurants WHERE id = ${id} LIMIT 1
         `;
         return rows[0] || null;
       } catch (retryError) {
         const rows = await sql`
-          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date
+          SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, kitchen_mode
           FROM restaurants WHERE id = ${id} LIMIT 1
         `;
         if (rows[0]) {
@@ -699,6 +699,7 @@ export async function updateRestaurant(id: string, data: {
   city?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  kitchen_mode?: 'KOT' | 'KDS' | string | null;
 }) {
   try {
     const rows = await sql`
@@ -737,6 +738,7 @@ export async function updateRestaurant(id: string, data: {
         city = COALESCE(${data.city ?? null}, city),
         latitude = CASE WHEN ${data.latitude !== undefined} THEN ${data.latitude ?? null} ELSE latitude END,
         longitude = CASE WHEN ${data.longitude !== undefined} THEN ${data.longitude ?? null} ELSE longitude END,
+        kitchen_mode = COALESCE(${data.kitchen_mode ?? null}, kitchen_mode),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

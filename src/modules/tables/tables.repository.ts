@@ -46,6 +46,9 @@ export class TablesRepository {
                'notes', o.notes,
                'is_paid', o.is_paid,
                'payment_method', o.payment_method,
+                'payment_split', o.payment_split,
+                'table_number', o.table_number,
+                'discount_amount', o.discount_amount,
                'pending_at', o.pending_at,
                'preparing_at', o.preparing_at,
                'ready_at', o.ready_at,
@@ -63,7 +66,8 @@ export class TablesRepository {
                'quantity', oi.quantity,
                'price_at_purchase', oi.price_at_purchase,
                'product_name', p.name,
-               'counter', p.counter
+               'counter', p.counter,
+                'status', oi.status
              ) ORDER BY oi.id ASC
            ) as items_json
            FROM order_items oi

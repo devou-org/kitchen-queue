@@ -7,6 +7,7 @@ async function ensureColumnExists() {
   try {
     await sql`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS is_service_active BOOLEAN DEFAULT TRUE`;
     await sql`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS service_message TEXT`;
+    await sql`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS kitchen_mode VARCHAR(10) DEFAULT 'KOT'`;
   } catch (err) {
     console.error('Migration error:', err);
   }

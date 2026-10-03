@@ -47,6 +47,8 @@ interface OrderDetailsViewProps {
   onStatusChange: (orderId: string, newStatus: string, tableNumber?: string, paymentMethod?: string) => Promise<void> | void;
   loading?: boolean;
   onOrderUpdated?: (updatedOrder: Order) => void;
+  tableOrders?: any[];
+  onSelectTableOrder?: (order: any) => void;
 }
 
 export function OrderDetailsView({
@@ -60,6 +62,8 @@ export function OrderDetailsView({
   onStatusChange,
   loading = false,
   onOrderUpdated,
+  tableOrders,
+  onSelectTableOrder,
 }: OrderDetailsViewProps) {
   const { restaurant } = useRestaurant();
   const primaryColor = restaurant?.primary_color || '#4F46E5';
@@ -714,6 +718,69 @@ export function OrderDetailsView({
             <Calendar size={13} style={{ color: '#94A3B8', flexShrink: 0 }} />
             <span>{formatDateTime(order.created_at)}</span>
           </div>
+
+          {/* Multi-Order Table Switcher */}
+          {tableOrders && tableOrders.length > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                overflowX: 'auto',
+                padding: '8px 10px',
+                background: '#F8FAFC',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0',
+                marginTop: '10px',
+                scrollbarWidth: 'none',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  color: '#64748B',
+                  whiteSpace: 'nowrap',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Utensils size={12} color={primaryColor} /> Table Orders ({tableOrders.length}):
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto' }}>
+                {tableOrders.map((to: any) => {
+                  const isSelected = to.id === order.id;
+                  const ticketNum = String(to.ticket_number || '').padStart(3, '0');
+                  const toStatus = to.status || 'PENDING';
+                  return (
+                    <button
+                      key={to.id}
+                      type="button"
+                      onClick={() => onSelectTableOrder?.(to)}
+                      style={{
+                        padding: '4px 9px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: isSelected ? `1.5px solid ${primaryColor}` : '1px solid #CBD5E1',
+                        background: isSelected ? primarySoftBg : '#FFFFFF',
+                        color: isSelected ? primaryColor : '#475569',
+                        whiteSpace: 'nowrap',
+                        boxShadow: isSelected ? `0 1px 3px ${primaryColor}25` : 'none',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      #{ticketNum} ({toStatus})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Actions Toolbar Row */}
           <div
