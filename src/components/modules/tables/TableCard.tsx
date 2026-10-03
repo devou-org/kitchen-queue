@@ -5,7 +5,7 @@ import { formatPrice } from '@/lib/format';
 
 interface TableCardProps {
   table: RestaurantTable;
-  onSelect?: (table: RestaurantTable) => void;
+  onSelect?: (table: RestaurantTable, order?: any) => void;
   onViewQR: (table: RestaurantTable) => void;
   onEdit: (table: RestaurantTable) => void;
   onDelete: (table: RestaurantTable) => void;
@@ -137,13 +137,13 @@ export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primary
 
   return (
     <div
-      onClick={() => onSelect?.(table)}
+      onClick={() => onSelect?.(table, activeOrders[0])}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onSelect?.(table);
+          onSelect?.(table, activeOrders[0]);
         }
       }}
       style={{
@@ -294,8 +294,13 @@ export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primary
                 const ticketNum = String(o.ticket_number || '').padStart(3, '0');
                 const status = o.status || 'PENDING';
                 return (
-                  <div
+                  <button
                     key={o.id || idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect?.(table, o);
+                    }}
                     style={{
                       background: '#FFFFFF',
                       border: '1px solid #FEF08A',
@@ -306,11 +311,22 @@ export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primary
                       color: '#854D0E',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#EAB308';
+                      e.currentTarget.style.background = '#FEF9C3';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#FEF08A';
+                      e.currentTarget.style.background = '#FFFFFF';
+                    }}
+                    title={`Click to view Order #${ticketNum}`}
                   >
                     #{ticketNum} ({status})
-                  </div>
+                  </button>
                 );
               })}
             </div>
