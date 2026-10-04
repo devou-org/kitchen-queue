@@ -1071,7 +1071,7 @@ export function POSCheckoutDrawer({
                     marginBottom: '5px',
                   }}
                 >
-                  Phone Number *
+                  Phone Number (Optional)
                 </label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <CountryCodeSelect

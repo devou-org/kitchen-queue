@@ -434,6 +434,8 @@ async function runAutoMigration(sqlConnection: any) {
       ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS discount_amount NUMERIC DEFAULT 0;
     `;
+    await pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+    await pool.query('ALTER TABLE orders ALTER COLUMN phone DROP NOT NULL').catch(() => {});
     console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, admins, and loyalty schema successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
@@ -1423,6 +1425,10 @@ export async function createOrder(data: {
   const finalSubtotal = data.subtotal ?? computedTotal;
   const discountVal = Number(data.discount_amount) || 0;
 
+  // Ensure phone columns in users and orders tables are nullable for phone-less guest checkouts
+  await pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+  await pool.query('ALTER TABLE orders ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1497,12 +1503,23 @@ export async function createOrder(data: {
     }
 
     // 1. Ensure user exists
-    const userRes = await client.query(`
-      INSERT INTO users (name, phone, role)
-      VALUES ($1, $2, 'USER')
-      ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id
-    `, [data.customer_name || 'Guest', data.phone || '0000000000']);
+    const cleanPhone = (data.phone && data.phone.trim() !== '' && !data.phone.includes('0000000')) ? data.phone.trim() : null;
+
+    let userRes;
+    if (cleanPhone) {
+      userRes = await client.query(`
+        INSERT INTO users (name, phone, role)
+        VALUES ($1, $2, 'USER')
+        ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name
+        RETURNING id
+      `, [data.customer_name || 'Guest', cleanPhone]);
+    } else {
+      userRes = await client.query(`
+        INSERT INTO users (name, phone, role)
+        VALUES ($1, NULL, 'USER')
+        RETURNING id
+      `, [data.customer_name || 'Guest']);
+    }
     const userId = userRes.rows[0].id;
 
     // 2. Check if order is placed via table QR (table_number exists) or POS -> Set PREPARING, else PENDING
@@ -1573,7 +1590,7 @@ export async function createOrder(data: {
         RETURNING id
       `,
       [
-        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
+        data.restaurant_id, queueId, userId, data.customer_name, cleanPhone, data.total_price, defaultStatus, 
         isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, discountVal
@@ -3785,7 +3802,14 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
     }
 
     const rows = await query;
-    return rows;
+    return rows.map((r: any) => {
+      const p = r.phone || '';
+      const isDummy = !p || p.replace(/\D/g, '').includes('0000000') || p.replace(/\D/g, '') === '0000000000' || p.startsWith('990000');
+      return {
+        ...r,
+        phone: isDummy ? null : r.phone
+      };
+    });
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
@@ -4056,10 +4080,9 @@ export async function processLoyaltyForCompletedOrder(restaurantId: string, orde
       customerName = orderRes[0].customer_name || null;
     }
 
-    if (!phone && !userId && customerName) {
-      // Deterministically generate phone key for guest customers registered by name
-      const nameHash = Math.abs(customerName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 12345).toString().slice(0, 8);
-      phone = `99${nameHash.padStart(8, '0')}`;
+    // Clean phone input and ignore dummy phone numbers
+    if (phone && (phone.includes('0000000') || phone.startsWith('990000'))) {
+      phone = undefined;
     }
 
     if (!phone && !userId) return;
