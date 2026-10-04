@@ -876,8 +876,8 @@ export default function AdminLoyaltyPage() {
                           </div>
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px', color: c.phone && !c.phone.includes('0000000') ? '#475569' : '#94a3b8', fontFamily: 'monospace', fontWeight: 600 }}>
-                        {c.phone && !c.phone.includes('0000000') ? c.phone : '-'}
+                      <td style={{ padding: '14px 16px', color: '#475569', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {c.phone || '-'}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
                         <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '16px', fontWeight: 700, fontSize: '12px' }}>
@@ -946,7 +946,7 @@ export default function AdminLoyaltyPage() {
                   </span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>
-                  Phone: {c.phone && !c.phone.includes('0000000') ? c.phone : '-'}
+                  Phone: {c.phone || '-'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#334155', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
                   <span>Visits: <strong>{c.visit_progress || 0}/{settings.visit_milestone_count || 5}</strong></span>
