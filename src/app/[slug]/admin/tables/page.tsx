@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Plus, LayoutGrid, Users, RefreshCw, QrCode, Search, X } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
@@ -40,14 +40,17 @@ export default function AdminTablesPage() {
   const [tableToDelete, setTableToDelete] = useState<RestaurantTable | null>(null);
   const [deletingTable, setDeletingTable] = useState(false);
 
+  const router = useRouter();
   const selectedTable = selectedTableId ? (tables.find(t => t.id === selectedTableId) || null) : null;
+
+  const handleTakeOrder = (table: RestaurantTable) => {
+    if (!slugStr) return;
+    router.push(`/${slugStr}/admin/pos?table=${encodeURIComponent(table.table_number)}`);
+  };
 
   const handleSelectTable = (table: RestaurantTable, specificOrder?: any) => {
     const activeOrds = table.active_orders || [];
-    if (activeOrds.length === 0) {
-      toast(`Table #${table.table_number} has no active orders.`, { icon: '🪑' });
-      return;
-    }
+    if (activeOrds.length === 0) return;
     setSelectedTableId(table.id);
     setSelectedOrder(specificOrder || activeOrds[0]);
   };
@@ -62,7 +65,7 @@ export default function AdminTablesPage() {
         payment_method: pMethod || undefined,
       });
       if (res.success) {
-        toast.success(`Order updated to ${newStatus}`);
+        toast.success(`Order updated to ${newStatus}`, { id: `order-status-${id}` });
         await fetchTables();
         setSelectedOrder((prev: any) => prev ? {
           ...prev,
@@ -565,6 +568,7 @@ export default function AdminTablesPage() {
               key={table.id}
               table={table}
               onSelect={(t, ord) => handleSelectTable(t, ord)}
+              onTakeOrder={(t) => handleTakeOrder(t)}
               onEdit={(t) => setSelectedEditTable(t)}
               onViewQR={(t) => setSelectedQRTable(t)}
               onDelete={(t) => setTableToDelete(t)}

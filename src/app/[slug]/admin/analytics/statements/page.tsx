@@ -618,7 +618,6 @@ export default function AdminAnalyticsStatementsPage() {
                     { value: 'UPI', label: 'UPI' },
                     { value: 'CASH', label: 'Cash' },
                     { value: 'CARD', label: 'Card' },
-                    { value: 'SPLIT', label: 'Split' },
                   ]}
                   buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 10px', width: '100%' }}
                   style={{ width: '100%' }}

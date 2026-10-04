@@ -178,7 +178,6 @@ export function OrderDetailsView({
         payment_method: statusToApply === 'CLOSED' ? (prev.payment_method || pMethod) : prev.payment_method,
         payment_split: statusToApply === 'CLOSED' ? (pSplit || prev.payment_split) : prev.payment_split,
       }));
-      toast.success(`Order status updated to ${statusToApply}`);
     } finally {
       setIsStatusUpdating(false);
     }
@@ -192,7 +191,6 @@ export function OrderDetailsView({
     try {
       await onStatusChange(order.id, 'CANCELLED', tempTableNumber || order.table_number, paymentMethod);
       setOrder((prev) => ({ ...prev, status: 'CANCELLED', is_paid: false }));
-      toast.success('Order cancelled');
     } catch {
       toast.error('Failed to cancel order');
     } finally {
