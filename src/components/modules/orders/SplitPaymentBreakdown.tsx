@@ -9,11 +9,16 @@ export interface SplitAmounts {
   CARD: number;
 }
 
+export function formatSplitAmount(val: number): string {
+  const num = Math.round(Number(val || 0) * 100) / 100;
+  return Number.isInteger(num) ? num.toString() : num.toFixed(2);
+}
+
 export function formatSplitSummary(split: SplitAmounts): string {
   const parts: string[] = [];
-  if (split.CASH > 0) parts.push(`Cash: ₹${Math.round(split.CASH)}`);
-  if (split.UPI > 0) parts.push(`UPI: ₹${Math.round(split.UPI)}`);
-  if (split.CARD > 0) parts.push(`Card: ₹${Math.round(split.CARD)}`);
+  if (split.CASH > 0) parts.push(`Cash: ₹${formatSplitAmount(split.CASH)}`);
+  if (split.UPI > 0) parts.push(`UPI: ₹${formatSplitAmount(split.UPI)}`);
+  if (split.CARD > 0) parts.push(`Card: ₹${formatSplitAmount(split.CARD)}`);
   
   if (parts.length === 0) return 'SPLIT';
   return `SPLIT (${parts.join(', ')})`;
