@@ -9,8 +9,8 @@ import { productService } from '@/app/services/products.api';
 import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { useParams } from 'next/navigation';
-import { Search, X } from 'lucide-react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { Search, X, MapPin } from 'lucide-react';
 import { OrderType } from '@/types';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
@@ -104,7 +104,9 @@ function ProductCard({ product, quantity, onUpdate }: {
 export default function AdminPosPage() {
   const { restaurant } = useRestaurant();
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = (params?.slug as string) || restaurant?.slug || '';
+  const tableParam = searchParams?.get('table') || searchParams?.get('table_number') || '';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
@@ -124,7 +126,7 @@ export default function AdminPosPage() {
   const [orderForm, setOrderForm] = useState<POSOrderFormData>({
     customer_name: '',
     phone: '',
-    table_number: '',
+    table_number: tableParam || '',
     party_size: 1,
     notes: '',
     order_type: 'DINE_IN',
@@ -134,6 +136,18 @@ export default function AdminPosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<any>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState<number>(0);
+
+  useEffect(() => {
+    if (tableParam) {
+      setOrderForm(prev => ({
+        ...prev,
+        table_number: tableParam,
+        order_type: 'DINE_IN',
+        is_paid: false,
+      }));
+      toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+    }
+  }, [tableParam]);
 
   useEffect(() => {
     if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
@@ -683,8 +697,43 @@ export default function AdminPosPage() {
               )}
             </div>
 
-            {/* Right: Maximize Toggle should be last */}
+            {/* Right: Selected Table Badge & Maximize Toggle */}
             <div className="pos-actions">
+              {orderForm.table_number && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    background: '#FEF3C7',
+                    border: '1px solid #FDE68A',
+                    color: '#92400E',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}
+                >
+                  <MapPin size={13} style={{ color: '#D97706' }} />
+                  <span>Table #{orderForm.table_number}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrderForm((prev) => ({ ...prev, table_number: '' }))}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#B45309',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                    title="Clear selected table"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
               <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                 <LayoutMaximizeToggle />
               </div>

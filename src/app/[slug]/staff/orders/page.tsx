@@ -288,7 +288,7 @@ export default function StaffOrders() {
           payment_method: pMethod ?? prev.payment_method,
           is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
-        toast.success(`Order updated to ${newStatus}`);
+        toast.success(`Order updated to ${newStatus}`, { id: `order-status-${id}` });
       } else {
         toast.error(data.error || 'Failed to update');
       }

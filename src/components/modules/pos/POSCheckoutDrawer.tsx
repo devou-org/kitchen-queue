@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import {
@@ -98,6 +98,30 @@ export function POSCheckoutDrawer({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Set default payment mode based on order type (Dine-in: Pay Later, Takeaway: Pay Now)
+  const prevIsOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (isOpen && !prevIsOpenRef.current) {
+      if (orderForm.order_type === 'TAKEAWAY') {
+        if (!orderForm.is_paid) {
+          setOrderForm((prev) => ({
+            ...prev,
+            is_paid: true,
+            payment_method: prev.payment_method || 'CASH',
+          }));
+        }
+      } else {
+        if (orderForm.is_paid) {
+          setOrderForm((prev) => ({
+            ...prev,
+            is_paid: false,
+          }));
+        }
+      }
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, orderForm.order_type, orderForm.is_paid, setOrderForm]);
 
   // Sync phoneDigits with orderForm.phone
   useEffect(() => {
@@ -877,7 +901,15 @@ export function POSCheckoutDrawer({
               </label>
               <OrderTypeSelector
                 value={(orderForm.order_type as OrderType) || 'DINE_IN'}
-                onChange={(val) => setOrderForm((prev) => ({ ...prev, order_type: val }))}
+                onChange={(val) => {
+                  const isTakeaway = val === 'TAKEAWAY';
+                  setOrderForm((prev) => ({
+                    ...prev,
+                    order_type: val,
+                    is_paid: isTakeaway ? true : false,
+                    payment_method: isTakeaway ? (prev.payment_method || 'CASH') : prev.payment_method,
+                  }));
+                }}
               />
             </div>
 

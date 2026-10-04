@@ -551,7 +551,15 @@ export default function StaffMenuPage() {
             <form onSubmit={submitOrder} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <OrderTypeSelector
                 value={(orderForm.order_type as OrderType) || 'DINE_IN'}
-                onChange={(val) => setOrderForm({ ...orderForm, order_type: val })}
+                onChange={(val) => {
+                  const isTakeaway = val === 'TAKEAWAY';
+                  setOrderForm((prev) => ({
+                    ...prev,
+                    order_type: val,
+                    is_paid: isTakeaway ? true : false,
+                    payment_method: isTakeaway ? (prev.payment_method || 'CASH') : prev.payment_method,
+                  }));
+                }}
               />
 
               {orderForm.order_type !== 'TAKEAWAY' && (
