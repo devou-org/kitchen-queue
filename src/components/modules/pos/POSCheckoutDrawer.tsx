@@ -98,14 +98,6 @@ export function POSCheckoutDrawer({
   const [selectedReward, setSelectedReward] = useState<any>(null);
   const [loadingLoyalty, setLoadingLoyalty] = useState(false);
 
-  // Phone Verification & OTP State
-  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
-  const [showOtpInput, setShowOtpInput] = useState(false);
-  const [otpValue, setOtpValue] = useState('');
-  const [otpToken, setOtpToken] = useState('');
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
-
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -131,14 +123,12 @@ export function POSCheckoutDrawer({
     }
   }, [orderForm.phone, defaultCallingCode]);
 
-  // Reset verification state when phone changes
+  // Reset loyalty profile when phone is cleared
   useEffect(() => {
-    setIsPhoneVerified(false);
-    setShowOtpInput(false);
-    setOtpValue('');
-    setOtpToken('');
-    setLoyaltyProfile(null);
-    setSelectedReward(null);
+    if (!orderForm.phone) {
+      setLoyaltyProfile(null);
+      setSelectedReward(null);
+    }
   }, [orderForm.phone]);
 
   // Fetch restaurant loyalty settings and active rewards
@@ -178,13 +168,13 @@ export function POSCheckoutDrawer({
     };
   }, [restaurant?.slug]);
 
-  // Fetch customer loyalty profile ONLY AFTER phone is verified
+  // Fetch customer loyalty profile automatically when phone number is entered
   useEffect(() => {
     const rawPhone = orderForm.phone || '';
     const cleaned = rawPhone.replace(/\D/g, '');
     const slugStr = restaurant?.slug || '';
 
-    if (!isPhoneVerified || !cleaned || cleaned.length < 7 || !slugStr) {
+    if (!cleaned || cleaned.length < 7 || !slugStr) {
       setLoyaltyProfile(null);
       return;
     }
@@ -220,7 +210,7 @@ export function POSCheckoutDrawer({
               setOrderForm((prev) => ({ ...prev, customer_name: match.name }));
             }
           } else {
-            // Verified customer with 0 prior transactions
+            // Customer with 0 prior transactions
             setLoyaltyProfile({
               id: '',
               points_balance: 0,
@@ -228,7 +218,7 @@ export function POSCheckoutDrawer({
               total_spent: 0,
               visit_progress: 0,
               rewards_unlocked: 0,
-              name: orderForm.customer_name || 'Verified Customer',
+              name: orderForm.customer_name || 'Customer',
             });
           }
         }
@@ -243,60 +233,7 @@ export function POSCheckoutDrawer({
     return () => {
       isSubscribed = false;
     };
-  }, [isPhoneVerified, orderForm.phone, restaurant?.slug]);
-
-  // OTP Verification Handlers
-  const handleSendOtp = async () => {
-    const rawPhone = orderForm.phone || '';
-    const cleaned = rawPhone.replace(/\D/g, '');
-    if (!cleaned || cleaned.length < 10) {
-      toast.error('Please enter a valid 10-digit phone number');
-      return;
-    }
-    setSendingOtp(true);
-    try {
-      const data = await authService.sendOtp(rawPhone);
-      if (data.success && data.otp_token) {
-        setOtpToken(data.otp_token);
-        setShowOtpInput(true);
-        toast.success('OTP sent to customer phone');
-      } else {
-        toast.error(data.error || 'Failed to send OTP');
-      }
-    } catch {
-      toast.error('Failed to send OTP');
-    } finally {
-      setSendingOtp(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otpValue || otpValue.length !== 4) {
-      toast.error('Please enter a valid 4-digit OTP');
-      return;
-    }
-    setVerifyingOtp(true);
-    try {
-      const data = await authService.verifyOtp(otpValue, otpToken);
-      if (data.success) {
-        toast.success('Phone verified successfully!');
-        setIsPhoneVerified(true);
-        setShowOtpInput(false);
-      } else {
-        toast.error(data.error || 'Invalid OTP code');
-      }
-    } catch {
-      toast.error('Error verifying OTP');
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
-
-  const handleQuickVerifyStaff = () => {
-    setIsPhoneVerified(true);
-    setShowOtpInput(false);
-    toast.success('Phone verified for order!');
-  };
+  }, [orderForm.phone, restaurant?.slug]);
 
   const handlePrintCurrentBill = async () => {
     if (printingBill || cart.size === 0) {
@@ -1226,7 +1163,7 @@ export function POSCheckoutDrawer({
                       boxSizing: 'border-box',
                     }}
                   />
-                  {loadingLoyalty ? (
+                  {loadingLoyalty && (
                     <span
                       style={{
                         height: '42px',
@@ -1246,51 +1183,7 @@ export function POSCheckoutDrawer({
                       <Loader2 size={14} className="animate-spin" />
                       Checking...
                     </span>
-                  ) : isPhoneVerified ? (
-                    <span
-                      style={{
-                        height: '42px',
-                        padding: '0 12px',
-                        borderRadius: '8px',
-                        background: '#ECFDF5',
-                        color: '#10B981',
-                        border: '1px solid #A7F3D0',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <BadgeCheck size={16} /> Verified
-                    </span>
-                  ) : phoneDigits.length >= 10 ? (
-                    <button
-                      type="button"
-                      disabled={sendingOtp}
-                      onClick={handleSendOtp}
-                      style={{
-                        height: '42px',
-                        padding: '0 12px',
-                        borderRadius: '8px',
-                        background: 'var(--primary, #971345)',
-                        color: '#FFFFFF',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {sendingOtp ? <Loader2 size={13} className="animate-spin" /> : 'Verify OTP'}
-                    </button>
-                  ) : null}
+                  )}
                 </div>
               </div>
 
@@ -1340,71 +1233,6 @@ export function POSCheckoutDrawer({
                 }}
               >
                 💡 Guest Order (No phone number). Customer loyalty points & CRM profile will not be recorded for this order.
-              </div>
-            ) : !isPhoneVerified ? (
-              <div
-                style={{
-                  background: '#FEF3C7',
-                  border: '1px solid #FCD34D',
-                  borderRadius: '8px',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                }}
-              >
-                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#92400E', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ShieldCheck size={16} color="#D97706" />
-                  <span>Phone Verification Required</span>
-                </div>
-                <div style={{ fontSize: '11.5px', color: '#78350F' }}>
-                  Verify customer phone number via OTP to check member points, visit punch cards, or redeem active rewards.
-                </div>
-                {showOtpInput ? (
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px' }}>
-                    <input
-                      type="text"
-                      maxLength={4}
-                      placeholder="4-digit OTP"
-                      value={otpValue}
-                      onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ''))}
-                      style={{ width: '110px', height: '36px', padding: '0 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 700 }}
-                    />
-                    <button
-                      type="button"
-                      disabled={verifyingOtp}
-                      onClick={handleVerifyOtp}
-                      style={{ height: '36px', padding: '0 14px', borderRadius: '6px', background: '#16A34A', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', border: 'none', cursor: 'pointer' }}
-                    >
-                      {verifyingOtp ? <Loader2 size={13} className="animate-spin" /> : 'Confirm OTP'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleQuickVerifyStaff}
-                      style={{ height: '36px', padding: '0 10px', borderRadius: '6px', background: '#FFFFFF', color: '#475569', fontWeight: 600, fontSize: '11.5px', border: '1px solid #CBD5E1', cursor: 'pointer' }}
-                    >
-                      Staff Verify
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                    <button
-                      type="button"
-                      disabled={sendingOtp}
-                      onClick={handleSendOtp}
-                      style={{ height: '36px', padding: '0 14px', borderRadius: '6px', background: 'var(--primary, #971345)', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                    >
-                      {sendingOtp ? <Loader2 size={13} className="animate-spin" /> : 'Send OTP'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleQuickVerifyStaff}
-                      style={{ height: '36px', padding: '0 14px', borderRadius: '6px', background: '#10B981', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', border: 'none', cursor: 'pointer' }}
-                    >
-                      Instant Staff Verify
-                    </button>
-                  </div>
-                )}
               </div>
             ) : (
               <div
