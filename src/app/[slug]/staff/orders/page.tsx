@@ -215,6 +215,16 @@ export default function StaffOrders() {
         return;
       }
 
+      const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
+
+      // If server already printed directly via Wi-Fi TCP or Windows spooler
+      if (data.server_printed) {
+        toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (Wi-Fi)`, {
+          id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
+        });
+        return;
+      }
+
       toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
         icon: '🖨️',
         duration: 3000,

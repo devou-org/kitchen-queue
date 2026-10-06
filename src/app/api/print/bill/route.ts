@@ -9,6 +9,7 @@ import { requireAdmin } from '@/lib/auth';
 import {
   buildBillEscposBuffer,
   sendRawPrintToWindowsPrinter,
+  sendRawPrintToNetworkPrinter,
   BillPrintData,
 } from '@/lib/escpos';
 import { generateBillTemplateHTML } from '@/lib/bill-template-html';
@@ -34,7 +35,7 @@ async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, printerName, orderData, slug } = body;
+    const { orderId, printerName, printerAddress, orderData, slug } = body;
 
     const restaurant = await resolveRestaurant(request, slug);
     if (!restaurant) {
@@ -106,7 +107,24 @@ export async function POST(request: NextRequest) {
     // Also generate HTML representation for client preview/dialog
     const billHtml = generateBillTemplateHTML(order, restaurantInfo);
 
-    // 1. Direct hardware print on Windows (Local dev / Cashier PC) — exactly like KOT!
+    // 1. Direct hardware print on Wi-Fi / LAN Network printer FIRST
+    if (printerAddress && printerAddress.includes('.')) {
+      const netRes = await sendRawPrintToNetworkPrinter(printerAddress, buffer);
+      if (netRes.success) {
+        console.log(`🖨️ [Wi-Fi/LAN] Printed Bill #${order.ticket_number} -> ${printerAddress}`);
+        return NextResponse.json({
+          success: true,
+          mode: 'network',
+          message: `Bill #${String(order.ticket_number).padStart(3, '0')} printed over Wi-Fi (${printerAddress})!`,
+          printer: targetPrinter,
+          base64Bytes,
+          billHtml,
+        });
+      }
+      console.warn(`[Wi-Fi/LAN] Direct bill print to "${printerAddress}" failed:`, netRes.error);
+    }
+
+    // 2. Direct hardware print on Windows (Local dev / Cashier PC Spooler)
     if (isWindows) {
       const printResult = await sendRawPrintToWindowsPrinter(
         targetPrinter,
