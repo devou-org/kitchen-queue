@@ -117,7 +117,7 @@ export default function StaffOrders() {
         sort: 'ASC',
         date_from: bDate,
         date_to: bDate,
-        status: statusFilter || 'PREPARING'
+        status: (statusFilter && statusFilter !== 'ALL') ? statusFilter : undefined
       });
 
       if (data.success && data.data) {
@@ -186,7 +186,7 @@ export default function StaffOrders() {
           }
           return o;
         }).filter(o => {
-          if (statusFilter !== 'ALL') {
+          if (statusFilter && statusFilter !== 'ALL') {
              return o.status === statusFilter;
           }
           return true;
@@ -272,7 +272,7 @@ export default function StaffOrders() {
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
-        is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : undefined,
+        is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
         payment_method: pMethod || undefined
       });
@@ -284,11 +284,11 @@ export default function StaffOrders() {
             status: newStatus as Order['status'],
             table_number: tableNumber ?? o.table_number,
             payment_method: pMethod ?? o.payment_method,
-            is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
+            is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
           } : o)
             .filter(o => {
-              if (statusFilter) return o.status === statusFilter;
-              return o.status === 'PENDING';
+              if (statusFilter && statusFilter !== 'ALL') return o.status === statusFilter;
+              return true;
             });
         });
         setSelectedOrder((prev): Order | null => prev ? {
@@ -296,9 +296,9 @@ export default function StaffOrders() {
           status: newStatus as Order['status'],
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
-          is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
+          is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
-        toast.success(`Order updated to ${newStatus}`);
+        toast.success(`Order updated to ${newStatus}`, { id: `order-status-${id}` });
       } else {
         toast.error(data.error || 'Failed to update');
       }
@@ -310,7 +310,14 @@ export default function StaffOrders() {
   };
 
   const [searchQuery, setSearchQuery] = useState('');
-  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
+  const isKotMode = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+  const allStatuses = isKotMode
+    ? ['PENDING', 'PREPARING', 'SERVED', 'CLOSED', 'CANCELLED']
+    : ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CLOSED', 'CANCELLED'];
+  const statusOptions = [
+    { value: 'ALL', label: 'All Statuses' },
+    ...allStatuses.map((s) => ({ value: s, label: s })),
+  ];
 
   const queryTerm = searchQuery.trim().toLowerCase();
   
@@ -496,12 +503,12 @@ export default function StaffOrders() {
             {/* Status Dropdown */}
             <div className="staff-orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <CustomSelect
-                value={statusFilter}
+                value={statusFilter || 'ALL'}
                 onChange={(val) => {
-                  setStatusFilter(val);
+                  setStatusFilter(val === 'ALL' ? '' : val);
                   setPage(1);
                 }}
-                options={allStatuses.map((s) => ({ value: s, label: s }))}
+                options={statusOptions}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
                 className="staff-orders-select"
                 style={{ width: '130px' }}

@@ -131,13 +131,19 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     } else if (selectedReward.reward_type === 'DISCOUNT_PERCENTAGE') {
       discountAmount = Math.min(total, Math.round((subtotal * Number(selectedReward.discount_value || 0)) / 100));
     } else if (selectedReward.reward_type === 'FREE_ITEM') {
-      discountAmount = Math.min(total, Number(selectedReward.discount_value || 0));
+      discountAmount = 0; // Discount is applied directly via 0-price line item
     }
   }
 
   const finalTotal = Math.max(0, total - discountAmount);
 
-  const isVerified = currentUser && currentUser.phone === form.phone;
+  const normalizeDigits = (p?: string) => (p ? p.replace(/\D/g, '').slice(-10) : '');
+  const isVerified = Boolean(
+    currentUser &&
+    currentUser.phone &&
+    form.phone &&
+    normalizeDigits(currentUser.phone) === normalizeDigits(form.phone)
+  );
 
 
   // ── PLACE NEW ORDER ──────────────────────────────────────────────
@@ -175,7 +181,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     }
 
     // Dynamic verification check (user may have changed phone number)
-    const verified = user && user.phone === form.phone;
+    const verified = Boolean(
+      user &&
+      user.phone &&
+      form.phone &&
+      normalizeDigits(user.phone) === normalizeDigits(form.phone)
+    );
     if (!verified) {
       toast.error('Please verify your phone number first.');
       return;
@@ -189,9 +200,50 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         price_at_purchase: i.price,
       }));
 
+      // Handle FREE_ITEM loyalty reward line item
+      if (selectedReward && selectedReward.reward_type === 'FREE_ITEM') {
+        let freeProductId: string | undefined = undefined;
+        if (Array.isArray(selectedReward.selected_product_ids) && selectedReward.selected_product_ids.length > 0) {
+          freeProductId = selectedReward.selected_product_ids[0];
+        }
+
+        if (freeProductId) {
+          const existingIdx = orderItems.findIndex(i => i.product_id === freeProductId);
+          if (existingIdx >= 0) {
+            if (orderItems[existingIdx].quantity > 1) {
+              orderItems[existingIdx].quantity -= 1;
+              orderItems.push({
+                product_id: freeProductId,
+                quantity: 1,
+                price_at_purchase: 0,
+              });
+            } else {
+              orderItems[existingIdx].price_at_purchase = 0;
+            }
+          } else {
+            orderItems.push({
+              product_id: freeProductId,
+              quantity: 1,
+              price_at_purchase: 0,
+            });
+          }
+        } else if (orderItems.length > 0) {
+          // If no specific product is linked to reward, set first item as free reward
+          if (orderItems[0].quantity > 1) {
+            orderItems[0].quantity -= 1;
+            orderItems.push({
+              product_id: orderItems[0].product_id,
+              quantity: 1,
+              price_at_purchase: 0,
+            });
+          } else {
+            orderItems[0].price_at_purchase = 0;
+          }
+        }
+      }
+
       const storedTable = typeof window !== 'undefined' ? localStorage.getItem(`table_number_${slug}`) || undefined : undefined;
-      const rewardNote = selectedReward ? `[Loyalty Reward: ${selectedReward.name}]` : '';
-      const combinedNotes = [form.notes.trim(), rewardNote].filter(Boolean).join(' ');
+      const combinedNotes = form.notes.trim();
 
       const data = await orderService.createOrder({
         customer_name: form.customer_name.trim(),

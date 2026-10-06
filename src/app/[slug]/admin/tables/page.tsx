@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Plus, LayoutGrid, Users, RefreshCw, QrCode, Search, X } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
@@ -9,7 +9,9 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
 import { TableCard } from '@/components/modules/tables/TableCard';
-import { TableOrdersDrawer } from '@/components/modules/tables/TableOrdersDrawer';
+import { OrderDetailsView } from '@/components/modules/orders/OrderDetailsView';
+import { orderService } from '@/app/services/orders.api';
+import { Order } from '@/types';
 import { CreateTableModal } from '@/components/modules/tables/CreateTableModal';
 import { EditTableModal } from '@/components/modules/tables/EditTableModal';
 import { TableQRModal } from '@/components/modules/tables/TableQRModal';
@@ -28,13 +30,64 @@ export default function AdminTablesPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals & Drawers
-  const [selectedDrawerTable, setSelectedDrawerTable] = useState<RestaurantTable | null>(null);
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orderModalLoading, setOrderModalLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addingTable, setAddingTable] = useState(false);
   const [selectedEditTable, setSelectedEditTable] = useState<RestaurantTable | null>(null);
   const [selectedQRTable, setSelectedQRTable] = useState<RestaurantTable | null>(null);
   const [tableToDelete, setTableToDelete] = useState<RestaurantTable | null>(null);
   const [deletingTable, setDeletingTable] = useState(false);
+
+  const router = useRouter();
+  const selectedTable = selectedTableId ? (tables.find(t => t.id === selectedTableId) || null) : null;
+
+  const handleTakeOrder = (table: RestaurantTable) => {
+    if (!slugStr) return;
+    router.push(`/${slugStr}/admin/pos?table=${encodeURIComponent(table.table_number)}`);
+  };
+
+  const handleSelectTable = (table: RestaurantTable, specificOrder?: any) => {
+    const activeOrds = table.active_orders || [];
+    if (activeOrds.length === 0) return;
+    setSelectedTableId(table.id);
+    setSelectedOrder(specificOrder || activeOrds[0]);
+  };
+
+  const handleOrderStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string) => {
+    setOrderModalLoading(true);
+    try {
+      const res = await orderService.updateOrder(id, {
+        status: newStatus,
+        is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : undefined,
+        table_number: tableNumber,
+        payment_method: pMethod || undefined,
+      });
+      if (res.success) {
+        toast.success(`Order updated to ${newStatus}`, { id: `order-status-${id}` });
+        await fetchTables();
+        setSelectedOrder((prev: any) => prev ? {
+          ...prev,
+          status: newStatus,
+          table_number: tableNumber ?? prev.table_number,
+          payment_method: pMethod ?? prev.payment_method,
+          is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid,
+        } : null);
+      } else {
+        toast.error(res.error || 'Failed to update order');
+      }
+    } catch {
+      toast.error('Network error updating order');
+    } finally {
+      setOrderModalLoading(false);
+    }
+  };
+
+  const handleOrderUpdated = (updatedOrder: Order) => {
+    setSelectedOrder(updatedOrder);
+    fetchTables();
+  };
 
   const fetchTables = async () => {
     setLoading(true);
@@ -514,7 +567,8 @@ export default function AdminTablesPage() {
             <TableCard
               key={table.id}
               table={table}
-              onSelect={(t) => setSelectedDrawerTable(t)}
+              onSelect={(t, ord) => handleSelectTable(t, ord)}
+              onTakeOrder={(t) => handleTakeOrder(t)}
               onEdit={(t) => setSelectedEditTable(t)}
               onViewQR={(t) => setSelectedQRTable(t)}
               onDelete={(t) => setTableToDelete(t)}
@@ -525,15 +579,23 @@ export default function AdminTablesPage() {
       )}
       </div>
 
-      {/* Slide-over Table Orders Drawer */}
-      <TableOrdersDrawer
-        table={selectedDrawerTable ? (tables.find(t => t.id === selectedDrawerTable.id) || selectedDrawerTable) : null}
-        slug={slugStr || ''}
-        isOpen={!!selectedDrawerTable}
-        onClose={() => setSelectedDrawerTable(null)}
-        onRefresh={fetchTables}
-        primaryColor={primaryColor}
-      />
+      {/* Slide-over Order Details Drawer */}
+      {selectedOrder && (
+        <OrderDetailsView
+          order={selectedOrder}
+          slug={slugStr || ''}
+          tables={tables}
+          onClose={() => {
+            setSelectedOrder(null);
+            setSelectedTableId(null);
+          }}
+          onStatusChange={handleOrderStatusChange}
+          loading={orderModalLoading}
+          onOrderUpdated={handleOrderUpdated}
+          tableOrders={selectedTable?.active_orders || []}
+          onSelectTableOrder={(ord) => setSelectedOrder(ord)}
+        />
+      )}
 
       {/* Modals */}
       <CreateTableModal

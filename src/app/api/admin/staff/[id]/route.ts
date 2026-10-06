@@ -21,8 +21,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const body = await request.json();
     
-    if (body.password) {
-      body.password = await hashPassword(body.password);
+    if (body.password && typeof body.password === 'string' && body.password.trim()) {
+      body.password = await hashPassword(body.password.trim());
+    } else {
+      delete body.password;
     }
 
     const updated = await updateStaff(restaurant.id, id, body);

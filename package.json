@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:socket": "node socket-server/server.js",
+    "printer:sim": "node printer_simulator.js",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"

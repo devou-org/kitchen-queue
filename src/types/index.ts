@@ -3,7 +3,24 @@
 // ============================================
 
 export type ProductStatus = 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK';
-export type OrderStatus = string;
+export type KitchenMode = 'KOT' | 'KDS';
+export type OrderStatus =
+  | 'PENDING'
+  | 'PREPARING'
+  | 'READY'
+  | 'SERVED'
+  | 'CLOSED'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | string;
+export type OrderItemStatus =
+  | 'PENDING'
+  | 'PREPARING'
+  | 'READY'
+  | 'SERVED'
+  | 'CANCELLED'
+  | 'REJECTED'
+  | string;
 export type OrderType = 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY';
 
 export interface User {
@@ -44,6 +61,7 @@ export interface OrderItem {
   status?: string;
   prepared_at?: string;
   ready_at?: string;
+  served_at?: string;
 }
 
 export interface Order {
@@ -64,8 +82,15 @@ export interface Order {
   table_number?: string;
   order_type?: OrderType | string;
   payment_method?: string;
+  payment_split?: Record<string, number> | null;
   created_at: string;
-  completed_at: string | null;
+  completed_at?: string | null;
+  pending_at?: string | null;
+  preparing_at?: string | null;
+  ready_at?: string | null;
+  served_at?: string | null;
+  closed_at?: string | null;
+  paid_at?: string | null;
   updated_at: string;
   items?: OrderItem[];
   queue_position?: number;

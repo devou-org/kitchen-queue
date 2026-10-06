@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { 
   Plus, Trash2, Edit2, ShieldAlert, Key, UserCheck, UserX, 
   Smartphone, Mail, Shield, CheckSquare, Square, Store, ClipboardList, 
-  LayoutGrid, UtensilsCrossed, Boxes, BarChart3, Users, Receipt, Settings,
+  LayoutGrid, UtensilsCrossed, Boxes, Gift, BarChart3, Users, Receipt, Settings,
   CheckCircle2, Info, Search, X
 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
@@ -19,6 +19,7 @@ const MODULE_ICONS: Record<string, any> = {
   tables: LayoutGrid,
   products: UtensilsCrossed,
   inventory: Boxes,
+  loyalty: Gift,
   analytics: BarChart3,
   staff: Users,
   billing: Receipt,
@@ -98,6 +99,11 @@ export default function StaffAdminPage() {
     const url = isEdit ? `/api/admin/staff/${editingStaff.id}` : '/api/admin/staff';
     const method = isEdit ? 'PUT' : 'POST';
 
+    const payload = { ...staffFormData };
+    if (isEdit && !payload.password?.trim()) {
+      delete (payload as any).password;
+    }
+
     try {
       const res = await fetch(url, {
         method,
@@ -105,7 +111,7 @@ export default function StaffAdminPage() {
           'Content-Type': 'application/json',
           'x-restaurant-slug': slug as string
         },
-        body: JSON.stringify(staffFormData)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
 
