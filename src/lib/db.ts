@@ -3763,7 +3763,12 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
 
     let query;
     if (search && search.trim() !== '') {
-      const searchPattern = `%${search.trim().toLowerCase()}%`;
+      const searchTrimmed = search.trim().toLowerCase();
+      const rawDigits = search.replace(/\D/g, '');
+      const last10Digits = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+      const searchPattern = `%${searchTrimmed}%`;
+      const digitsPattern = last10Digits ? `%${last10Digits}%` : searchPattern;
+
       query = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
@@ -3773,7 +3778,12 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
         FROM customer_loyalty cl
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
-          AND (LOWER(u.name) LIKE ${searchPattern} OR LOWER(u.phone) LIKE ${searchPattern})
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
       `;
     } else {

@@ -148,17 +148,20 @@ export function POSCheckoutDrawer({
       return;
     }
 
+    const cleanSearch = cleaned.slice(-10);
+
     setLoadingLoyalty(true);
-    fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(cleaned)}`)
+    fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(cleanSearch)}`)
       .then((r) => r.json())
       .then((custJson) => {
         if (!isSubscribed) return;
 
         if (custJson.success && Array.isArray(custJson.data)) {
           const match = custJson.data.find(
-            (c: any) =>
-              (c.phone || '').replace(/\D/g, '').endsWith(cleaned) ||
-              cleaned.endsWith((c.phone || '').replace(/\D/g, ''))
+            (c: any) => {
+              const cClean = (c.phone || '').replace(/\D/g, '').slice(-10);
+              return cClean === cleanSearch || cleanSearch.endsWith(cClean) || cClean.endsWith(cleanSearch);
+            }
           );
           if (match) {
             setLoyaltyProfile({
