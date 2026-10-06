@@ -25,6 +25,10 @@ import {
   Award,
   Printer,
   BadgeCheck,
+  ShieldCheck,
+  Lock,
+  KeyRound,
+  Smartphone,
 } from 'lucide-react';
 import { CartItem, OrderType } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -33,6 +37,7 @@ import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { COUNTRY_CODES, getDefaultCallingCode } from '@/lib/constants';
 import { CountryCodeSelect } from '@/components/ui/CountryCodeSelect';
+import { authService } from '@/app/services/auth.api';
 
 export interface POSOrderFormData {
   customer_name: string;
@@ -87,10 +92,19 @@ export function POSCheckoutDrawer({
   const [phoneDigits, setPhoneDigits] = useState('');
 
   // Loyalty & Rewards State
+  const [loyaltySettings, setLoyaltySettings] = useState<any>(null);
   const [loyaltyProfile, setLoyaltyProfile] = useState<any>(null);
   const [activeRewards, setActiveRewards] = useState<any[]>([]);
   const [selectedReward, setSelectedReward] = useState<any>(null);
   const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+
+  // Phone Verification & OTP State
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [showOtpInput, setShowOtpInput] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -117,21 +131,38 @@ export function POSCheckoutDrawer({
     }
   }, [orderForm.phone, defaultCallingCode]);
 
-  // Fetch loyalty data and active rewards
+  // Reset verification state when phone changes
   useEffect(() => {
-    const rawPhone = orderForm.phone || '';
-    const cleaned = rawPhone.replace(/\D/g, '');
+    setIsPhoneVerified(false);
+    setShowOtpInput(false);
+    setOtpValue('');
+    setOtpToken('');
+    setLoyaltyProfile(null);
+    setSelectedReward(null);
+  }, [orderForm.phone]);
+
+  // Fetch restaurant loyalty settings and active rewards
+  useEffect(() => {
     const slugStr = restaurant?.slug || '';
     if (!slugStr) {
-      setLoyaltyProfile(null);
+      setLoyaltySettings(null);
       setActiveRewards([]);
-      setSelectedReward(null);
       return;
     }
 
     let isSubscribed = true;
 
-    // 1. Fetch active rewards for the restaurant
+    // 1. Fetch loyalty settings (to know loyalty_mode: 'POINTS' vs 'PUNCH_CARD')
+    fetch(`/api/admin/loyalty/settings?slug=${slugStr}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (isSubscribed && json.success && json.data) {
+          setLoyaltySettings(json.data);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Fetch active rewards for the restaurant
     fetch(`/api/admin/loyalty/rewards?slug=${slugStr}`)
       .then((r) => r.json())
       .then((rewJson) => {
@@ -142,15 +173,26 @@ export function POSCheckoutDrawer({
       })
       .catch(() => {});
 
-    // 2. Fetch customer loyalty profile if phone digits exist
-    if (!cleaned || cleaned.length < 7) {
+    return () => {
+      isSubscribed = false;
+    };
+  }, [restaurant?.slug]);
+
+  // Fetch customer loyalty profile ONLY AFTER phone is verified
+  useEffect(() => {
+    const rawPhone = orderForm.phone || '';
+    const cleaned = rawPhone.replace(/\D/g, '');
+    const slugStr = restaurant?.slug || '';
+
+    if (!isPhoneVerified || !cleaned || cleaned.length < 7 || !slugStr) {
       setLoyaltyProfile(null);
       return;
     }
 
     const cleanSearch = cleaned.slice(-10);
-
+    let isSubscribed = true;
     setLoadingLoyalty(true);
+
     fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(cleanSearch)}`)
       .then((r) => r.json())
       .then((custJson) => {
@@ -169,6 +211,8 @@ export function POSCheckoutDrawer({
               points_balance: Number(match.points_balance || 0),
               total_visits: Number(match.total_visits || 0),
               total_spent: Number(match.total_spent || 0),
+              visit_progress: Number(match.visit_progress || 0),
+              rewards_unlocked: Number(match.rewards_unlocked || 0),
               phone: match.phone,
               name: match.name,
             });
@@ -176,7 +220,16 @@ export function POSCheckoutDrawer({
               setOrderForm((prev) => ({ ...prev, customer_name: match.name }));
             }
           } else {
-            setLoyaltyProfile(null);
+            // Verified customer with 0 prior transactions
+            setLoyaltyProfile({
+              id: '',
+              points_balance: 0,
+              total_visits: 0,
+              total_spent: 0,
+              visit_progress: 0,
+              rewards_unlocked: 0,
+              name: orderForm.customer_name || 'Verified Customer',
+            });
           }
         }
       })
@@ -190,7 +243,60 @@ export function POSCheckoutDrawer({
     return () => {
       isSubscribed = false;
     };
-  }, [orderForm.phone, restaurant?.slug]);
+  }, [isPhoneVerified, orderForm.phone, restaurant?.slug]);
+
+  // OTP Verification Handlers
+  const handleSendOtp = async () => {
+    const rawPhone = orderForm.phone || '';
+    const cleaned = rawPhone.replace(/\D/g, '');
+    if (!cleaned || cleaned.length < 10) {
+      toast.error('Please enter a valid 10-digit phone number');
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      const data = await authService.sendOtp(rawPhone);
+      if (data.success && data.otp_token) {
+        setOtpToken(data.otp_token);
+        setShowOtpInput(true);
+        toast.success('OTP sent to customer phone');
+      } else {
+        toast.error(data.error || 'Failed to send OTP');
+      }
+    } catch {
+      toast.error('Failed to send OTP');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpValue || otpValue.length !== 4) {
+      toast.error('Please enter a valid 4-digit OTP');
+      return;
+    }
+    setVerifyingOtp(true);
+    try {
+      const data = await authService.verifyOtp(otpValue, otpToken);
+      if (data.success) {
+        toast.success('Phone verified successfully!');
+        setIsPhoneVerified(true);
+        setShowOtpInput(false);
+      } else {
+        toast.error(data.error || 'Invalid OTP code');
+      }
+    } catch {
+      toast.error('Error verifying OTP');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleQuickVerifyStaff = () => {
+    setIsPhoneVerified(true);
+    setShowOtpInput(false);
+    toast.success('Phone verified for order!');
+  };
 
   const handlePrintCurrentBill = async () => {
     if (printingBill || cart.size === 0) {
@@ -1140,7 +1246,7 @@ export function POSCheckoutDrawer({
                       <Loader2 size={14} className="animate-spin" />
                       Checking...
                     </span>
-                  ) : loyaltyProfile ? (
+                  ) : isPhoneVerified ? (
                     <span
                       style={{
                         height: '42px',
@@ -1160,6 +1266,30 @@ export function POSCheckoutDrawer({
                     >
                       <BadgeCheck size={16} /> Verified
                     </span>
+                  ) : phoneDigits.length >= 10 ? (
+                    <button
+                      type="button"
+                      disabled={sendingOtp}
+                      onClick={handleSendOtp}
+                      style={{
+                        height: '42px',
+                        padding: '0 12px',
+                        borderRadius: '8px',
+                        background: 'var(--primary, #971345)',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {sendingOtp ? <Loader2 size={13} className="animate-spin" /> : 'Verify OTP'}
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -1197,8 +1327,86 @@ export function POSCheckoutDrawer({
               </div>
             </div>
 
-            {/* Section: Customer Loyalty Profile & Rewards */}
-            {orderForm.phone && orderForm.phone.trim().length >= 7 && (
+            {/* Section: Customer Loyalty Profile & Rewards / Punch Card */}
+            {!orderForm.phone || phoneDigits.length < 10 ? (
+              <div
+                style={{
+                  background: '#F8FAFC',
+                  border: '1px dashed #CBD5E1',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  fontSize: '12px',
+                  color: '#64748B',
+                }}
+              >
+                💡 Guest Order (No phone number). Customer loyalty points & CRM profile will not be recorded for this order.
+              </div>
+            ) : !isPhoneVerified ? (
+              <div
+                style={{
+                  background: '#FEF3C7',
+                  border: '1px solid #FCD34D',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#92400E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheck size={16} color="#D97706" />
+                  <span>Phone Verification Required</span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#78350F' }}>
+                  Verify customer phone number via OTP to check member points, visit punch cards, or redeem active rewards.
+                </div>
+                {showOtpInput ? (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px' }}>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      placeholder="4-digit OTP"
+                      value={otpValue}
+                      onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ''))}
+                      style={{ width: '110px', height: '36px', padding: '0 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 700 }}
+                    />
+                    <button
+                      type="button"
+                      disabled={verifyingOtp}
+                      onClick={handleVerifyOtp}
+                      style={{ height: '36px', padding: '0 14px', borderRadius: '6px', background: '#16A34A', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', border: 'none', cursor: 'pointer' }}
+                    >
+                      {verifyingOtp ? <Loader2 size={13} className="animate-spin" /> : 'Confirm OTP'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickVerifyStaff}
+                      style={{ height: '36px', padding: '0 10px', borderRadius: '6px', background: '#FFFFFF', color: '#475569', fontWeight: 600, fontSize: '11.5px', border: '1px solid #CBD5E1', cursor: 'pointer' }}
+                    >
+                      Staff Verify
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      disabled={sendingOtp}
+                      onClick={handleSendOtp}
+                      style={{ height: '36px', padding: '0 14px', borderRadius: '6px', background: 'var(--primary, #971345)', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      {sendingOtp ? <Loader2 size={13} className="animate-spin" /> : 'Send OTP'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickVerifyStaff}
+                      style={{ height: '36px', padding: '0 14px', borderRadius: '6px', background: '#10B981', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', border: 'none', cursor: 'pointer' }}
+                    >
+                      Instant Staff Verify
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
               <div
                 style={{
                   background: '#FFFFFF',
@@ -1210,211 +1418,283 @@ export function POSCheckoutDrawer({
                   gap: '10px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Gift size={15} color="var(--primary, #971345)" />
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
-                      Customer Loyalty & Rewards
-                    </span>
-                  </div>
-                  {loadingLoyalty && <Loader2 size={13} className="animate-spin" color="var(--primary, #971345)" />}
-                </div>
-
-                {loyaltyProfile ? (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: '#F8FAFC',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: '6px',
-                      padding: '8px 12px',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
-                        {loyaltyProfile.name || orderForm.customer_name || 'Loyalty Member'}
+                {loyaltySettings?.loyalty_mode === 'PUNCH_CARD' ? (
+                  /* Mode 1: Visit Punch Card Mode */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Award size={16} color="var(--primary, #971345)" />
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                          Customer Loyalty — Visit Punch Card
+                        </span>
                       </div>
-                      <div style={{ fontSize: '11px', color: '#64748B' }}>
-                        {loyaltyProfile.total_visits || 0} visits recorded
-                      </div>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: 800,
-                        padding: '3px 10px',
-                        borderRadius: '999px',
-                        background: 'rgba(151, 19, 69, 0.08)',
-                        color: 'var(--primary, #971345)',
-                      }}
-                    >
-                      {loyaltyProfile.points_balance.toLocaleString()} pts
-                    </span>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Loyalty profile active. Member points will automatically accumulate on this order.
-                  </div>
-                )}
-
-                {activeRewards.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                        Redeem Reward
-                      </label>
-                      {selectedReward ? (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedReward(null)}
-                          style={{
-                            fontSize: '11px',
-                            color: '#EF4444',
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: 0,
-                            fontWeight: 600,
-                          }}
-                        >
-                          ✕ Clear Reward
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '11px', color: '#94A3B8' }}>Scroll for more →</span>
-                      )}
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px', background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>
+                        Punch Card Mode
+                      </span>
                     </div>
 
-                    {/* Rewards Carousel Container */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '10px',
-                        overflowX: 'auto',
-                        paddingBottom: '8px',
-                        paddingTop: '2px',
-                        scrollSnapType: 'x mandatory',
-                        WebkitOverflowScrolling: 'touch',
-                      }}
-                    >
-                      {activeRewards.map((reward) => {
-                        const reqPts = Number(reward.points_required || 0);
-                        const minAmount = Number(reward.min_purchase_amount || 0);
-                        const userPts = Number(loyaltyProfile?.points_balance || 0);
-                        const hasPts = reqPts === 0 || userPts >= reqPts;
-                        const meetsMin = subtotal >= minAmount;
-                        const isEligible = hasPts && meetsMin;
-                        const isSelected = selectedReward?.id === reward.id;
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                            {loyaltyProfile?.name || orderForm.customer_name || 'Verified Customer'}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748B' }}>
+                            {loyaltyProfile?.total_visits || 0} Total Visits Recorded
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: 800, padding: '3px 10px', borderRadius: '999px', background: 'rgba(151, 19, 69, 0.08)', color: 'var(--primary, #971345)' }}>
+                          Visit {(loyaltyProfile?.total_visits || 0) + 1} Today
+                        </span>
+                      </div>
 
-                        let benefitText = '';
-                        if (reward.reward_type === 'DISCOUNT_AMOUNT') {
-                          benefitText = `₹${reward.discount_value} Flat Off`;
-                        } else if (reward.reward_type === 'DISCOUNT_PERCENTAGE') {
-                          benefitText = `${reward.discount_value}% Off Order`;
-                        } else {
-                          benefitText = `Free Item Voucher`;
-                        }
-
+                      {/* Visual Punch Circles */}
+                      {(() => {
+                        const target = Number(loyaltySettings?.visit_milestone_count || 5);
+                        const currentProgress = (loyaltyProfile?.total_visits || 0) % target;
                         return (
-                          <div
-                            key={reward.id}
-                            style={{
-                              flex: '0 0 210px',
-                              minWidth: '210px',
-                              scrollSnapAlign: 'start',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              padding: '10px 12px',
-                              borderRadius: '10px',
-                              border: isSelected
-                                ? '1.5px solid #16A34A'
-                                : isEligible
-                                ? '1px solid #CBD5E1'
-                                : '1px dashed #CBD5E1',
-                              background: isSelected
-                                ? '#F0FDF4'
-                                : isEligible
-                                ? '#FFFFFF'
-                                : '#F8FAFC',
-                              boxShadow: isSelected ? '0 3px 10px rgba(22, 163, 74, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
-                              gap: '8px',
-                            }}
-                          >
-                            <div>
-                              <div style={{ fontSize: '12.5px', fontWeight: 700, color: isSelected ? '#15803D' : '#0F172A', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
-                                <Tag size={13} style={{ color: isSelected ? '#16A34A' : 'var(--primary, #971345)', flexShrink: 0 }} />
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reward.name}</span>
-                              </div>
-                              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16A34A', marginBottom: '2px' }}>
-                                {benefitText}
-                              </div>
-                              <div style={{ fontSize: '11px', color: '#D97706', fontWeight: 700 }}>
-                                {reqPts} pts required
-                              </div>
-                              {minAmount > 0 && (
-                                <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '1px' }}>
-                                  Min spend: ₹{minAmount}
-                                </div>
-                              )}
+                          <div style={{ marginTop: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>
+                                Milestone Progress: {currentProgress} / {target} Punches
+                              </span>
+                              <span style={{ fontSize: '10.5px', color: '#64748B' }}>
+                                Reward every {target}th visit
+                              </span>
                             </div>
-
-                            <button
-                              type="button"
-                              disabled={!isEligible}
-                              onClick={() => {
-                                if (isSelected) {
-                                  setSelectedReward(null);
-                                } else {
-                                  setSelectedReward(reward);
-                                }
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '6px 10px',
-                                borderRadius: '6px',
-                                border: isSelected
-                                  ? 'none'
-                                  : isEligible
-                                  ? '1px solid var(--primary, #971345)'
-                                  : 'none',
-                                background: isSelected
-                                  ? '#16A34A'
-                                  : isEligible
-                                  ? '#FFFFFF'
-                                  : '#E2E8F0',
-                                color: isSelected
-                                  ? '#FFFFFF'
-                                  : isEligible
-                                  ? 'var(--primary, #971345)'
-                                  : '#94A3B8',
-                                cursor: isEligible ? 'pointer' : 'not-allowed',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '4px',
-                                fontSize: '11.5px',
-                                fontWeight: 700,
-                                transition: 'all 0.15s ease',
-                              }}
-                            >
-                              {isSelected ? (
-                                <>
-                                  <Check size={13} /> Applied
-                                </>
-                              ) : isEligible ? (
-                                'Redeem'
-                              ) : !meetsMin ? (
-                                `Min spend ₹${minAmount}`
-                              ) : (
-                                `Needs ${reqPts - userPts} pts`
-                              )}
-                            </button>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              {Array.from({ length: target }).map((_, idx) => {
+                                const isPunched = idx < currentProgress;
+                                return (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      flex: 1,
+                                      height: '28px',
+                                      borderRadius: '6px',
+                                      background: isPunched ? '#10B981' : '#E2E8F0',
+                                      color: isPunched ? '#FFFFFF' : '#94A3B8',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {isPunched ? '✓' : idx + 1}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         );
-                      })}
+                      })()}
+
+                      {Number(loyaltyProfile?.rewards_unlocked || 0) > 0 && (
+                        <div style={{ marginTop: '8px', padding: '6px 10px', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, color: '#92400E' }}>
+                          🎉 Milestone Reward Unlocked! Customer has {loyaltyProfile.rewards_unlocked} visit reward(s) available.
+                        </div>
+                      )}
                     </div>
+                  </div>
+                ) : (
+                  /* Mode 2: Points & Rewards Catalog Mode */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Gift size={15} color="var(--primary, #971345)" />
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                          Customer Loyalty & Rewards
+                        </span>
+                      </div>
+                      {loadingLoyalty && <Loader2 size={13} className="animate-spin" color="var(--primary, #971345)" />}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '8px 12px' }}>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                          {loyaltyProfile?.name || orderForm.customer_name || 'Verified Loyalty Member'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B' }}>
+                          {loyaltyProfile?.total_visits || 0} visits recorded
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 800,
+                          padding: '3px 10px',
+                          borderRadius: '999px',
+                          background: 'rgba(151, 19, 69, 0.08)',
+                          color: 'var(--primary, #971345)',
+                        }}
+                      >
+                        {(loyaltyProfile?.points_balance || 0).toLocaleString()} pts available
+                      </span>
+                    </div>
+
+                    {activeRewards.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                            Redeem Reward
+                          </label>
+                          {selectedReward ? (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReward(null)}
+                              style={{
+                                fontSize: '11px',
+                                color: '#EF4444',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontWeight: 600,
+                              }}
+                            >
+                              ✕ Clear Reward
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: '#94A3B8' }}>Scroll for more →</span>
+                          )}
+                        </div>
+
+                        {/* Rewards Carousel Container */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '10px',
+                            overflowX: 'auto',
+                            paddingBottom: '8px',
+                            paddingTop: '2px',
+                            scrollSnapType: 'x mandatory',
+                            WebkitOverflowScrolling: 'touch',
+                          }}
+                        >
+                          {activeRewards.map((reward) => {
+                            const reqPts = Number(reward.points_required || 0);
+                            const minAmount = Number(reward.min_purchase_amount || 0);
+                            const userPts = Number(loyaltyProfile?.points_balance || 0);
+                            const hasPts = reqPts === 0 || userPts >= reqPts;
+                            const meetsMin = subtotal >= minAmount;
+                            const isEligible = hasPts && meetsMin;
+                            const isSelected = selectedReward?.id === reward.id;
+
+                            let benefitText = '';
+                            if (reward.reward_type === 'DISCOUNT_AMOUNT') {
+                              benefitText = `₹${reward.discount_value} Flat Off`;
+                            } else if (reward.reward_type === 'DISCOUNT_PERCENTAGE') {
+                              benefitText = `${reward.discount_value}% Off Order`;
+                            } else {
+                              benefitText = `Free Item Voucher`;
+                            }
+
+                            return (
+                              <div
+                                key={reward.id}
+                                style={{
+                                  flex: '0 0 210px',
+                                  minWidth: '210px',
+                                  scrollSnapAlign: 'start',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 12px',
+                                  borderRadius: '10px',
+                                  border: isSelected
+                                    ? '1.5px solid #16A34A'
+                                    : isEligible
+                                    ? '1px solid #CBD5E1'
+                                    : '1px dashed #CBD5E1',
+                                  background: isSelected
+                                    ? '#F0FDF4'
+                                    : isEligible
+                                    ? '#FFFFFF'
+                                    : '#F8FAFC',
+                                  boxShadow: isSelected ? '0 3px 10px rgba(22, 163, 74, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
+                                  gap: '8px',
+                                }}
+                              >
+                                <div>
+                                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: isSelected ? '#15803D' : '#0F172A', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
+                                    <Tag size={13} style={{ color: isSelected ? '#16A34A' : 'var(--primary, #971345)', flexShrink: 0 }} />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reward.name}</span>
+                                  </div>
+                                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16A34A', marginBottom: '2px' }}>
+                                    {benefitText}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#D97706', fontWeight: 700 }}>
+                                    {reqPts} pts required
+                                  </div>
+                                  {minAmount > 0 && (
+                                    <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '1px' }}>
+                                      Min spend: ₹{minAmount}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={!isEligible}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedReward(null);
+                                    } else {
+                                      setSelectedReward(reward);
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    border: isSelected
+                                      ? 'none'
+                                      : isEligible
+                                      ? '1px solid var(--primary, #971345)'
+                                      : 'none',
+                                    background: isSelected
+                                      ? '#16A34A'
+                                      : isEligible
+                                      ? '#FFFFFF'
+                                      : '#E2E8F0',
+                                    color: isSelected
+                                      ? '#FFFFFF'
+                                      : isEligible
+                                      ? 'var(--primary, #971345)'
+                                      : '#94A3B8',
+                                    cursor: isEligible ? 'pointer' : 'not-allowed',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px',
+                                    fontSize: '11.5px',
+                                    fontWeight: 700,
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                >
+                                  {isSelected ? (
+                                    <>
+                                      <Check size={13} /> Applied
+                                    </>
+                                  ) : isEligible ? (
+                                    'Redeem'
+                                  ) : !meetsMin ? (
+                                    `Min spend ₹${minAmount}`
+                                  ) : (
+                                    `Needs ${reqPts - userPts} pts`
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>
+                        No active rewards configured currently for this restaurant.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

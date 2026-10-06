@@ -4072,13 +4072,11 @@ export async function processLoyaltyForCompletedOrder(restaurantId: string, orde
       customerName = orderRes[0].customer_name || null;
     }
 
-    if (!phone && !userId && customerName) {
-      // Deterministically generate phone key for guest customers registered by name
-      const nameHash = Math.abs(customerName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 12345).toString().slice(0, 8);
-      phone = `99${nameHash.padStart(8, '0')}`;
+    // Do not create loyalty CRM entries for guest orders without a phone number or default dummy phones
+    const cleanPhoneDigits = (phone || '').replace(/\D/g, '');
+    if (!phone || cleanPhoneDigits.length < 7 || cleanPhoneDigits.endsWith('0000000000')) {
+      return;
     }
-
-    if (!phone && !userId) return;
 
     let customerLoyalty;
     if (phone) {
