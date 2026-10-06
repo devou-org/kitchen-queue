@@ -3880,6 +3880,35 @@ export async function adjustCustomerPoints(restaurantId: string, customerLoyalty
   }
 }
 
+export async function deleteCustomerLoyaltyProfile(restaurantId: string, customerLoyaltyId: string) {
+  try {
+    const rec = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (rec.length === 0) return false;
+
+    const userId = rec[0].user_id;
+
+    await sql`DELETE FROM loyalty_transactions WHERE customer_loyalty_id = ${customerLoyaltyId}`;
+    await sql`DELETE FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId}`;
+
+    if (userId) {
+      const orders = await sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`;
+      if (orders.length === 0) {
+        await sql`DELETE FROM users WHERE id = ${userId}`;
+      }
+    }
+
+    return true;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return false;
+    }
+    throw err;
+  }
+}
+
 export async function getLoyaltyRewards(restaurantId: string) {
   try {
     const rows = await sql`

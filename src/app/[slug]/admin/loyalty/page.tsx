@@ -266,6 +266,26 @@ export default function AdminLoyaltyPage() {
     }
   };
 
+  const handleDeleteCustomer = async (customerLoyaltyId: string, customerName: string) => {
+    if (!confirm(`Are you sure you want to delete the loyalty profile for "${customerName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&customer_loyalty_id=${customerLoyaltyId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Customer loyalty profile deleted successfully');
+        fetchData();
+      } else {
+        toast.error(json.error || 'Failed to delete customer profile');
+      }
+    } catch {
+      toast.error('Network error. Failed to delete customer profile');
+    }
+  };
+
   // Handle Reward Save (Create / Edit)
   const handleSaveReward = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -908,25 +928,47 @@ export default function AdminLoyaltyPage() {
                         ₹{Number(c.total_spent || 0).toLocaleString()}
                       </td>
                       <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => {
-                            setSelectedCustomer(c);
-                            setAdjustPointsDelta(0);
-                            setAdjustReason('');
-                          }}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid #cbd5e1',
-                            background: 'white',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#0f172a',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Adjust Points
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <button
+                            onClick={() => {
+                              setSelectedCustomer(c);
+                              setAdjustPointsDelta(0);
+                              setAdjustReason('');
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              background: 'white',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#0f172a',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Adjust Points
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCustomer(c.id, c.name || c.phone || 'Customer')}
+                            title="Delete Customer Profile"
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #fee2e2',
+                              background: '#fef2f2',
+                              color: '#ef4444',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -952,26 +994,46 @@ export default function AdminLoyaltyPage() {
                   <span>Visits: <strong>{c.visit_progress || 0}/{settings.visit_milestone_count || 5}</strong></span>
                   <span>Total Spent: <strong>₹{Number(c.total_spent || 0).toLocaleString()}</strong></span>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedCustomer(c);
-                    setAdjustPointsDelta(0);
-                    setAdjustReason('');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Adjust Points
-                </button>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                  <button
+                    onClick={() => {
+                      setSelectedCustomer(c);
+                      setAdjustPointsDelta(0);
+                      setAdjustReason('');
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Adjust Points
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCustomer(c.id, c.name || c.phone || 'Customer')}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #fee2e2',
+                      background: '#fef2f2',
+                      color: '#ef4444',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
