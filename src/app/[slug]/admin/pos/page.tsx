@@ -296,16 +296,18 @@ export default function AdminPosPage() {
         continue;
       }
 
+      const expectedPrice = item.is_free_reward ? 0 : product.price;
       if (
         item.status !== product.status ||
-        item.price !== product.price ||
+        item.price !== expectedPrice ||
         item.name !== product.name ||
         item.image_url !== product.image_url
       ) {
         newCart.set(id, {
           ...item,
           status: product.status,
-          price: product.price,
+          price: expectedPrice,
+          original_price: product.price,
           name: product.name,
           image_url: product.image_url,
         });
@@ -322,7 +324,7 @@ export default function AdminPosPage() {
     }
   }, [products, cart]);
 
-  const handleUpdate = (id: string, delta: number) => {
+  const handleUpdate = (id: string, delta: number, isFreeReward?: boolean) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
 
@@ -336,6 +338,7 @@ export default function AdminPosPage() {
     const newCart = new Map(cart);
     const existing = newCart.get(id);
     const newQty = (existing?.quantity || 0) + delta;
+    const isFree = isFreeReward !== undefined ? isFreeReward : Boolean(existing?.is_free_reward);
 
     if (delta > 0 && currentStock !== null && newQty > currentStock) {
       toast.error(`"${product.name}" only has ${currentStock} available`);
@@ -348,7 +351,9 @@ export default function AdminPosPage() {
       newCart.set(id, {
         product_id: id,
         name: product.name,
-        price: product.price,
+        price: isFree ? 0 : product.price,
+        original_price: product.price,
+        is_free_reward: isFree,
         quantity: Math.min(newQty, 50), // allow staff/admin to order more
         image_url: product.image_url,
         status: product.status,
@@ -440,11 +445,30 @@ export default function AdminPosPage() {
 
     setSubmitting(true);
     try {
-      const items = Array.from(cart.values()).map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price_at_purchase: item.price
-      }));
+      const items: { product_id: string; quantity: number; price_at_purchase: number }[] = [];
+      for (const item of cart.values()) {
+        if (item.is_free_reward) {
+          const orig = item.original_price ?? item.price;
+          items.push({
+            product_id: item.product_id,
+            quantity: 1,
+            price_at_purchase: 0,
+          });
+          if (item.quantity > 1) {
+            items.push({
+              product_id: item.product_id,
+              quantity: item.quantity - 1,
+              price_at_purchase: orig,
+            });
+          }
+        } else {
+          items.push({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            price_at_purchase: item.price,
+          });
+        }
+      }
 
       // Generate a mock phone if not provided for admin/staff orders
       const phoneToUse = orderForm.phone || '+910000000000';
@@ -523,7 +547,13 @@ export default function AdminPosPage() {
   };
 
   const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
-  let subtotal = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
+  let subtotal = Array.from(cart.values()).reduce((s, i) => {
+    if (i.is_free_reward) {
+      const orig = i.original_price ?? i.price;
+      return s + Math.max(0, i.quantity - 1) * orig;
+    }
+    return s + i.price * i.quantity;
+  }, 0);
   
   let gstAmount = 0;
   let totalPrice = subtotal;
