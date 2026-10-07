@@ -26,6 +26,10 @@ import {
   Printer,
   Split,
   BadgeCheck,
+  ShieldCheck,
+  Lock,
+  KeyRound,
+  Smartphone,
 } from 'lucide-react';
 import { CartItem, OrderType } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -35,6 +39,7 @@ import { checkTableAssignment } from '@/lib/table-capacity';
 import SplitPaymentBreakdown, { SplitAmounts, formatSplitSummary, parseSplitFromSummary } from '@/components/modules/orders/SplitPaymentBreakdown';
 import { COUNTRY_CODES, getDefaultCallingCode } from '@/lib/constants';
 import { CountryCodeSelect } from '@/components/ui/CountryCodeSelect';
+import { authService } from '@/app/services/auth.api';
 
 export interface POSOrderFormData {
   customer_name: string;
@@ -90,6 +95,7 @@ export function POSCheckoutDrawer({
   const [phoneDigits, setPhoneDigits] = useState('');
 
   // Loyalty & Rewards State
+  const [loyaltySettings, setLoyaltySettings] = useState<any>(null);
   const [loyaltyProfile, setLoyaltyProfile] = useState<any>(null);
   const [activeRewards, setActiveRewards] = useState<any[]>([]);
   const [selectedReward, setSelectedReward] = useState<any>(null);
@@ -144,33 +150,77 @@ export function POSCheckoutDrawer({
     }
   }, [orderForm.phone, defaultCallingCode]);
 
-  // Fetch loyalty data on phone change
+  // Reset loyalty profile when phone is cleared
   useEffect(() => {
-    const rawPhone = orderForm.phone || '';
-    const cleaned = rawPhone.replace(/\D/g, '');
-    const slugStr = restaurant?.slug || '';
-    if (!cleaned || cleaned.length < 7 || !slugStr) {
+    if (!orderForm.phone) {
       setLoyaltyProfile(null);
-      setActiveRewards([]);
       setSelectedReward(null);
+    }
+  }, [orderForm.phone]);
+
+  // Fetch restaurant loyalty settings and active rewards
+  useEffect(() => {
+    const slugStr = restaurant?.slug || '';
+    if (!slugStr) {
+      setLoyaltySettings(null);
+      setActiveRewards([]);
       return;
     }
 
     let isSubscribed = true;
+
+    // 1. Fetch loyalty settings (to know loyalty_mode: 'POINTS' vs 'PUNCH_CARD')
+    fetch(`/api/admin/loyalty/settings?slug=${slugStr}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (isSubscribed && json.success && json.data) {
+          setLoyaltySettings(json.data);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Fetch active rewards for the restaurant
+    fetch(`/api/admin/loyalty/rewards?slug=${slugStr}`)
+      .then((r) => r.json())
+      .then((rewJson) => {
+        if (isSubscribed && rewJson.success && Array.isArray(rewJson.data)) {
+          const activeList = rewJson.data.filter((r: any) => r.is_active !== false);
+          setActiveRewards(activeList);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [restaurant?.slug]);
+
+  // Fetch customer loyalty profile automatically when phone number is entered
+  useEffect(() => {
+    const rawPhone = orderForm.phone || '';
+    const cleaned = rawPhone.replace(/\D/g, '');
+    const slugStr = restaurant?.slug || '';
+
+    if (!cleaned || cleaned.length < 7 || !slugStr) {
+      setLoyaltyProfile(null);
+      return;
+    }
+
+    const cleanSearch = cleaned.slice(-10);
+    let isSubscribed = true;
     setLoadingLoyalty(true);
 
-    Promise.all([
-      fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(cleaned)}`).then((r) => r.json()),
-      fetch(`/api/admin/loyalty/rewards?slug=${slugStr}`).then((r) => r.json()),
-    ])
-      .then(([custJson, rewJson]) => {
+    fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(cleanSearch)}`)
+      .then((r) => r.json())
+      .then((custJson) => {
         if (!isSubscribed) return;
 
         if (custJson.success && Array.isArray(custJson.data)) {
           const match = custJson.data.find(
-            (c: any) =>
-              (c.phone || '').replace(/\D/g, '').endsWith(cleaned) ||
-              cleaned.endsWith((c.phone || '').replace(/\D/g, ''))
+            (c: any) => {
+              const cClean = (c.phone || '').replace(/\D/g, '').slice(-10);
+              return cClean === cleanSearch || cleanSearch.endsWith(cClean) || cClean.endsWith(cleanSearch);
+            }
           );
           if (match) {
             setLoyaltyProfile({
@@ -178,6 +228,8 @@ export function POSCheckoutDrawer({
               points_balance: Number(match.points_balance || 0),
               total_visits: Number(match.total_visits || 0),
               total_spent: Number(match.total_spent || 0),
+              visit_progress: Number(match.visit_progress || 0),
+              rewards_unlocked: Number(match.rewards_unlocked || 0),
               phone: match.phone,
               name: match.name,
             });
@@ -185,13 +237,17 @@ export function POSCheckoutDrawer({
               setOrderForm((prev) => ({ ...prev, customer_name: match.name }));
             }
           } else {
-            setLoyaltyProfile(null);
+            // Customer with 0 prior transactions
+            setLoyaltyProfile({
+              id: '',
+              points_balance: 0,
+              total_visits: 0,
+              total_spent: 0,
+              visit_progress: 0,
+              rewards_unlocked: 0,
+              name: orderForm.customer_name || 'Customer',
+            });
           }
-        }
-
-        if (rewJson.success && Array.isArray(rewJson.data)) {
-          const activeList = rewJson.data.filter((r: any) => r.is_active !== false);
-          setActiveRewards(activeList);
         }
       })
       .catch(() => {
@@ -1119,7 +1175,7 @@ export function POSCheckoutDrawer({
                     marginBottom: '5px',
                   }}
                 >
-                  Phone Number *
+                  Phone Number (Optional)
                 </label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <CountryCodeSelect
@@ -1155,7 +1211,7 @@ export function POSCheckoutDrawer({
                       boxSizing: 'border-box',
                     }}
                   />
-                  {loadingLoyalty ? (
+                  {loadingLoyalty && (
                     <span
                       style={{
                         height: '42px',
@@ -1175,27 +1231,7 @@ export function POSCheckoutDrawer({
                       <Loader2 size={14} className="animate-spin" />
                       Checking...
                     </span>
-                  ) : loyaltyProfile ? (
-                    <span
-                      style={{
-                        height: '42px',
-                        padding: '0 12px',
-                        borderRadius: '8px',
-                        background: '#ECFDF5',
-                        color: '#10B981',
-                        border: '1px solid #A7F3D0',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <BadgeCheck size={16} /> Verified
-                    </span>
-                  ) : null}
+                  )}
                 </div>
               </div>
 
@@ -1232,8 +1268,21 @@ export function POSCheckoutDrawer({
               </div>
             </div>
 
-            {/* Section: Customer Loyalty Profile & Rewards */}
-            {orderForm.phone && orderForm.phone.trim().length >= 7 && (
+            {/* Section: Customer Loyalty Profile & Rewards / Punch Card */}
+            {!orderForm.phone || phoneDigits.length < 10 ? (
+              <div
+                style={{
+                  background: '#F8FAFC',
+                  border: '1px dashed #CBD5E1',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  fontSize: '12px',
+                  color: '#64748B',
+                }}
+              >
+                💡 Guest Order (No phone number). Customer loyalty points & CRM profile will not be recorded for this order.
+              </div>
+            ) : (
               <div
                 style={{
                   background: '#FFFFFF',
@@ -1245,35 +1294,105 @@ export function POSCheckoutDrawer({
                   gap: '10px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Gift size={15} color="var(--primary, #971345)" />
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
-                      Customer Loyalty & Rewards
-                    </span>
-                  </div>
-                  {loadingLoyalty && <Loader2 size={13} className="animate-spin" color="var(--primary, #971345)" />}
-                </div>
+                {loyaltySettings?.loyalty_mode === 'PUNCH_CARD' ? (
+                  /* Mode 1: Visit Punch Card Mode */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Award size={16} color="var(--primary, #971345)" />
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                          Customer Loyalty — Visit Punch Card
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px', background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>
+                        Punch Card Mode
+                      </span>
+                    </div>
 
-                {loyaltyProfile ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: '6px',
-                        padding: '8px 12px',
-                      }}
-                    >
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                            {loyaltyProfile?.name || orderForm.customer_name || 'Verified Customer'}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748B' }}>
+                            {loyaltyProfile?.total_visits || 0} Total Visits Recorded
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: 800, padding: '3px 10px', borderRadius: '999px', background: 'rgba(151, 19, 69, 0.08)', color: 'var(--primary, #971345)' }}>
+                          Visit {(loyaltyProfile?.total_visits || 0) + 1} Today
+                        </span>
+                      </div>
+
+                      {/* Visual Punch Circles */}
+                      {(() => {
+                        const target = Number(loyaltySettings?.visit_milestone_count || 5);
+                        const currentProgress = (loyaltyProfile?.total_visits || 0) % target;
+                        return (
+                          <div style={{ marginTop: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>
+                                Milestone Progress: {currentProgress} / {target} Punches
+                              </span>
+                              <span style={{ fontSize: '10.5px', color: '#64748B' }}>
+                                Reward every {target}th visit
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              {Array.from({ length: target }).map((_, idx) => {
+                                const isPunched = idx < currentProgress;
+                                return (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      flex: 1,
+                                      height: '28px',
+                                      borderRadius: '6px',
+                                      background: isPunched ? '#10B981' : '#E2E8F0',
+                                      color: isPunched ? '#FFFFFF' : '#94A3B8',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {isPunched ? '✓' : idx + 1}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {Number(loyaltyProfile?.rewards_unlocked || 0) > 0 && (
+                        <div style={{ marginTop: '8px', padding: '6px 10px', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, color: '#92400E' }}>
+                          🎉 Milestone Reward Unlocked! Customer has {loyaltyProfile.rewards_unlocked} visit reward(s) available.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* Mode 2: Points & Rewards Catalog Mode */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Gift size={15} color="var(--primary, #971345)" />
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                          Customer Loyalty & Rewards
+                        </span>
+                      </div>
+                      {loadingLoyalty && <Loader2 size={13} className="animate-spin" color="var(--primary, #971345)" />}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '8px 12px' }}>
                       <div>
                         <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
-                          {loyaltyProfile.name || orderForm.customer_name || 'Loyalty Member'}
+                          {loyaltyProfile?.name || orderForm.customer_name || 'Verified Loyalty Member'}
                         </div>
                         <div style={{ fontSize: '11px', color: '#64748B' }}>
-                          {loyaltyProfile.total_visits || 0} visits recorded
+                          {loyaltyProfile?.total_visits || 0} visits recorded
                         </div>
                       </div>
                       <span
@@ -1286,7 +1405,7 @@ export function POSCheckoutDrawer({
                           color: 'var(--primary, #971345)',
                         }}
                       >
-                        {loyaltyProfile.points_balance.toLocaleString()} pts
+                        {(loyaltyProfile?.points_balance || 0).toLocaleString()} pts available
                       </span>
                     </div>
 
@@ -1332,7 +1451,8 @@ export function POSCheckoutDrawer({
                           {activeRewards.map((reward) => {
                             const reqPts = Number(reward.points_required || 0);
                             const minAmount = Number(reward.min_purchase_amount || 0);
-                            const hasPts = loyaltyProfile.points_balance >= reqPts;
+                            const userPts = Number(loyaltyProfile?.points_balance || 0);
+                            const hasPts = reqPts === 0 || userPts >= reqPts;
                             const meetsMin = subtotal >= minAmount;
                             const isEligible = hasPts && meetsMin;
                             const isSelected = selectedReward?.id === reward.id;
@@ -1438,7 +1558,7 @@ export function POSCheckoutDrawer({
                                   ) : !meetsMin ? (
                                     `Min spend ₹${minAmount}`
                                   ) : (
-                                    `Needs ${reqPts - loyaltyProfile.points_balance} pts`
+                                    `Needs ${reqPts - userPts} pts`
                                   )}
                                 </button>
                               </div>
@@ -1448,13 +1568,9 @@ export function POSCheckoutDrawer({
                       </div>
                     ) : (
                       <div style={{ fontSize: '11px', color: '#64748B' }}>
-                        No active rewards configured currently.
+                        No active rewards configured currently for this restaurant.
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Loyalty profile active. Member points will automatically accumulate on this order.
                   </div>
                 )}
               </div>

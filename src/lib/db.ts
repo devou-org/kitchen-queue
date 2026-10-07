@@ -443,6 +443,8 @@ async function runAutoMigration(sqlConnection: any) {
       ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_name_key;
       DROP INDEX IF EXISTS categories_name_key;
     `;
+    await pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+    await pool.query('ALTER TABLE orders ALTER COLUMN phone DROP NOT NULL').catch(() => {});
     console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, admins, and loyalty schema successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
@@ -1435,6 +1437,10 @@ export async function createOrder(data: {
   const finalSubtotal = data.subtotal ?? computedTotal;
   const discountVal = Number(data.discount_amount) || 0;
 
+  // Ensure phone columns in users and orders tables are nullable for phone-less guest checkouts
+  await pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+  await pool.query('ALTER TABLE orders ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1586,7 +1592,7 @@ export async function createOrder(data: {
         RETURNING id
       `,
       [
-        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
+        data.restaurant_id, queueId, userId, data.customer_name, data.phone || '0000000000', data.total_price, defaultStatus, 
         isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, paymentSplit, discountVal
@@ -3884,7 +3890,12 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
 
     let query;
     if (search && search.trim() !== '') {
-      const searchPattern = `%${search.trim().toLowerCase()}%`;
+      const searchTrimmed = search.trim().toLowerCase();
+      const rawDigits = search.replace(/\D/g, '');
+      const last10Digits = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+      const searchPattern = `%${searchTrimmed}%`;
+      const digitsPattern = last10Digits ? `%${last10Digits}%` : searchPattern;
+
       query = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
@@ -3894,7 +3905,12 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
         FROM customer_loyalty cl
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
-          AND (LOWER(u.name) LIKE ${searchPattern} OR LOWER(u.phone) LIKE ${searchPattern})
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
       `;
     } else {
@@ -3986,6 +4002,35 @@ export async function adjustCustomerPoints(restaurantId: string, customerLoyalty
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
       return null;
+    }
+    throw err;
+  }
+}
+
+export async function deleteCustomerLoyaltyProfile(restaurantId: string, customerLoyaltyId: string) {
+  try {
+    const rec = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (rec.length === 0) return false;
+
+    const userId = rec[0].user_id;
+
+    await sql`DELETE FROM loyalty_transactions WHERE customer_loyalty_id = ${customerLoyaltyId}`;
+    await sql`DELETE FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId}`;
+
+    if (userId) {
+      const orders = await sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`;
+      if (orders.length === 0) {
+        await sql`DELETE FROM users WHERE id = ${userId}`;
+      }
+    }
+
+    return true;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return false;
     }
     throw err;
   }
@@ -4183,13 +4228,11 @@ export async function processLoyaltyForCompletedOrder(restaurantId: string, orde
       customerName = orderRes[0].customer_name || null;
     }
 
-    if (!phone && !userId && customerName) {
-      // Deterministically generate phone key for guest customers registered by name
-      const nameHash = Math.abs(customerName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 12345).toString().slice(0, 8);
-      phone = `99${nameHash.padStart(8, '0')}`;
+    // Do not create loyalty CRM entries for guest orders without a phone number or default dummy phones
+    const cleanPhoneDigits = (phone || '').replace(/\D/g, '');
+    if (!phone || cleanPhoneDigits.length < 7 || cleanPhoneDigits.endsWith('0000000000')) {
+      return;
     }
-
-    if (!phone && !userId) return;
 
     let customerLoyalty;
     if (phone) {

@@ -471,7 +471,7 @@ export default function AdminPosPage() {
       }));
 
       // Generate a mock phone if not provided for admin/staff orders
-      const phoneToUse = orderForm.phone || `+910000000000`;
+      const phoneToUse = orderForm.phone || '+910000000000';
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
       const discountAmount = Math.max(0, Number(orderForm.discount_amount) || 0);
