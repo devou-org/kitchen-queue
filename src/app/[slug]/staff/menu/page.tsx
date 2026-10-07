@@ -9,7 +9,7 @@ import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { useParams } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, Banknote, CreditCard, QrCode, Check, Printer } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
@@ -246,9 +246,10 @@ export default function StaffMenuPage() {
           counterName: data.counter_name,
           isAutoPrint: true,
         });
+        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${data.counter_name || 'KOT'} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
-            id: `kot-auto-${data.ticket_number}-${data.counter_name}`,
+          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
           });
         }
       } catch (err: any) {
@@ -317,14 +318,21 @@ export default function StaffMenuPage() {
     const product = products.find(p => p.id === id);
     if (!product) return;
 
-    if (delta > 0 && product.status === 'OUT_OF_STOCK') {
-      toast.error('This item is out of stock');
+    const currentStock = typeof product.stock_quantity === 'number' ? product.stock_quantity : null;
+
+    if (delta > 0 && (product.status === 'OUT_OF_STOCK' || (currentStock !== null && currentStock <= 0))) {
+      toast.error(`"${product.name}" is out of stock (0 available)`);
       return;
     }
 
     const newCart = new Map(cart);
     const existing = newCart.get(id);
     const newQty = (existing?.quantity || 0) + delta;
+
+    if (delta > 0 && currentStock !== null && newQty > currentStock) {
+      toast.error(`"${product.name}" only has ${currentStock} available`);
+      return;
+    }
 
     if (newQty <= 0) {
       newCart.delete(id);
@@ -349,6 +357,24 @@ export default function StaffMenuPage() {
       return toast.error('Please provide a Customer Name or Table Number');
     }
 
+    // Pre-validate cart items against current product stock
+    const stockErrors: string[] = [];
+    for (const [productId, cartItem] of cart.entries()) {
+      const prod = products.find(p => p.id === productId);
+      if (prod) {
+        const avail = typeof prod.stock_quantity === 'number' ? prod.stock_quantity : null;
+        if (prod.status === 'OUT_OF_STOCK' || (avail !== null && avail <= 0)) {
+          stockErrors.push(`"${prod.name}" is out of stock (0 available)`);
+        } else if (avail !== null && cartItem.quantity > avail) {
+          stockErrors.push(`"${prod.name}" only has ${avail} available (${cartItem.quantity} selected)`);
+        }
+      }
+    }
+    if (stockErrors.length > 0) {
+      toast.error(stockErrors.join(' • '));
+      return;
+    }
+
     setSubmitting(true);
     try {
       const items = Array.from(cart.values()).map(item => ({
@@ -358,7 +384,7 @@ export default function StaffMenuPage() {
       }));
 
       // Generate a mock phone if not provided for staff orders
-      const phoneToUse = orderForm.phone || `+910000000000`;
+      const phoneToUse = orderForm.phone || '+910000000000';
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
       const res = await orderService.createOrder({
@@ -532,19 +558,23 @@ export default function StaffMenuPage() {
                         value={orderForm.table_number}
                         onChange={e => {
                           const selectedNum = e.target.value;
-                          const matchedTable = tables.find((t: any) => t.table_number === selectedNum);
+                          const matchedTable = tables.find((t: any) => String(t.table_number) === String(selectedNum));
+                          const check = matchedTable ? checkTableAssignment(matchedTable, 1, {
+                            phone: orderForm.phone,
+                            customerName: orderForm.customer_name,
+                          }) : null;
+                          const maxFree = matchedTable ? Math.max(1, (Number(matchedTable.capacity) || 1) - (check?.occupiedSeats || 0)) : 1;
                           setOrderForm({
                             ...orderForm,
                             table_number: selectedNum,
-                            party_size: matchedTable?.capacity ? Number(matchedTable.capacity) : orderForm.party_size
+                            party_size: maxFree
                           });
                         }}
                       >
                         <option value="">-- Select Table --</option>
                         {tables
                           .filter((t: any) => {
-                            const partySize = Number(orderForm.party_size) || 1;
-                            const check = checkTableAssignment(t, partySize, {
+                            const check = checkTableAssignment(t, 1, {
                               phone: orderForm.phone,
                               customerName: orderForm.customer_name,
                             });
@@ -552,8 +582,7 @@ export default function StaffMenuPage() {
                             return check.allowed || isCurrent;
                           })
                           .map((t: any) => {
-                            const partySize = Number(orderForm.party_size) || 1;
-                            const check = checkTableAssignment(t, partySize, {
+                            const check = checkTableAssignment(t, 1, {
                               phone: orderForm.phone,
                               customerName: orderForm.customer_name,
                             });
@@ -603,9 +632,17 @@ export default function StaffMenuPage() {
                       onChange={e => setOrderForm({ ...orderForm, party_size: parseInt(e.target.value) || 1 })}
                       style={{ paddingRight: '30px' }}
                     >
-                      {[...Array(10)].map((_, i) => (
-                        <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
-                      ))}
+                      {(() => {
+                        const currentTable = tables.find((t: any) => String(t.table_number) === String(orderForm.table_number));
+                        const check = currentTable ? checkTableAssignment(currentTable, 1, {
+                          phone: orderForm.phone,
+                          customerName: orderForm.customer_name,
+                        }) : null;
+                        const maxCount = currentTable ? Math.max(1, (Number(currentTable.capacity) || 1) - (check?.occupiedSeats || 0)) : 10;
+                        return [...Array(maxCount)].map((_, i) => (
+                          <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Person' : 'Persons'}</option>
+                        ));
+                      })()}
                     </select>
                   </div>
                 </div>
@@ -626,48 +663,98 @@ export default function StaffMenuPage() {
                 <input type="text" className="input" placeholder="Less spicy, extra napkins..." value={orderForm.notes} onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} />
               </div>
 
-              <div style={{ background: orderForm.is_paid ? '#F0FDF4' : '#F8FAFC', border: orderForm.is_paid ? '1px solid #BBF7D0' : '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', marginTop: '6px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: orderForm.is_paid ? '#15803D' : '#334155' }}>Mark as Paid (Optional)</div>
-                    <div style={{ fontSize: '11px', color: '#64748B' }}>Order stays in kitchen queue</div>
+              {/* Payment Selection */}
+              <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px 14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PAYMENT</span>
+                  {orderForm.is_paid ? (
+                    <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#15803D', background: '#DCFCE7', padding: '2px 7px', borderRadius: '4px' }}>Pay Now</span>
+                  ) : (
+                    <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748B', background: '#F1F5F9', padding: '2px 7px', borderRadius: '4px' }}>Pay Later (Unpaid)</span>
+                  )}
+                </div>
+
+                {/* Pay Later / Pay Now Radios */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '28px', padding: '2px 0' }}>
+                  <label
+                    onClick={() => setOrderForm({ ...orderForm, is_paid: false })}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px', fontWeight: !orderForm.is_paid ? 700 : 500, color: !orderForm.is_paid ? '#0F172A' : '#64748B' }}
+                  >
+                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: !orderForm.is_paid ? '2px solid var(--primary, #059669)' : '2px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', flexShrink: 0 }}>
+                      {!orderForm.is_paid && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary, #059669)' }} />}
+                    </div>
+                    <span>Pay Later</span>
+                  </label>
+
+                  <label
+                    onClick={() => setOrderForm({ ...orderForm, is_paid: true, payment_method: orderForm.payment_method || 'CASH' })}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px', fontWeight: orderForm.is_paid ? 700 : 500, color: orderForm.is_paid ? '#0F172A' : '#64748B' }}
+                  >
+                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: orderForm.is_paid ? '2px solid var(--primary, #059669)' : '2px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', flexShrink: 0 }}>
+                      {orderForm.is_paid && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary, #059669)' }} />}
+                    </div>
+                    <span>Pay Now</span>
+                  </label>
+                </div>
+
+                {/* Payment Method Sub-selection */}
+                {orderForm.is_paid ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', letterSpacing: '0.02em' }}>Payment Method</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {[
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
+                        { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CARD', label: 'Card', icon: CreditCard },
+                      ].map((m) => {
+                        const Icon = m.icon;
+                        const selected = (orderForm.payment_method || 'CASH') === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setOrderForm({ ...orderForm, payment_method: m.id })}
+                            style={{
+                              height: '36px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '5px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: selected ? '1.5px solid var(--primary, #059669)' : '1px solid #CBD5E1',
+                              background: selected ? '#FFFFFF' : '#F8FAFC',
+                              color: selected ? 'var(--primary, #059669)' : '#475569',
+                              boxShadow: selected ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            {selected ? <Check size={14} strokeWidth={2.5} /> : <Icon size={13} />}
+                            <span>{m.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(orderForm.is_paid)}
-                    onChange={e => setOrderForm({ ...orderForm, is_paid: e.target.checked, payment_method: e.target.checked ? (orderForm.payment_method || 'CASH') : orderForm.payment_method })}
-                    style={{ width: '18px', height: '18px', accentColor: '#16A34A', cursor: 'pointer' }}
-                  />
-                </label>
-                {orderForm.is_paid && (
-                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #DCFCE7', display: 'flex', gap: '6px' }}>
-                    {['CASH', 'UPI', 'CARD'].map(m => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setOrderForm({ ...orderForm, payment_method: m })}
-                        style={{
-                          flex: 1,
-                          height: '32px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          border: (orderForm.payment_method || 'CASH') === m ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
-                          background: (orderForm.payment_method || 'CASH') === m ? '#FFFFFF' : '#F8FAFC',
-                          color: (orderForm.payment_method || 'CASH') === m ? '#15803D' : '#475569',
-                        }}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                ) : (
+                  <div style={{ fontSize: '11.5px', color: '#64748B', paddingTop: '6px', borderTop: '1px solid #F1F5F9' }}>
+                    Order will be placed as <strong>Unpaid</strong>. Settle payment upon customer departure.
                   </div>
                 )}
               </div>
 
-              <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: '8px' }} disabled={submitting}>
-                {submitting ? 'Placing Order...' : 'Place Order Now'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-lg"
+                  style={{ height: '46px', fontSize: '15px', fontWeight: 700 }}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Placing Order...' : `Place Order · ${formatPrice(totalPrice)}`}
+                </button>
+              </div>
             </form>
           </div>
         </div>

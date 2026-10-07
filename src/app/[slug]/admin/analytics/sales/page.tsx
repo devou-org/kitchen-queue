@@ -10,7 +10,7 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AnalyticsNav } from '@/components/modules/analytics/AnalyticsNav';
 import { SalesAnalyticsChart } from '@/components/modules/analytics/SalesAnalyticsChart';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { Search } from 'lucide-react';
+import { Search, Utensils, MoveHorizontal } from 'lucide-react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
@@ -41,18 +41,54 @@ const getCategoryStyle = (cat: string) => {
   return CATEGORY_COLORS[norm] || { bg: 'rgba(107,114,128,0.1)', color: '#6B7280' };
 };
 
-const CATEGORY_ICON: Record<string, string> = {
-  'MAIN COURSE': '🍴',
-  'SEAFOOD': '🦐',
-  'BREADS': '🫓',
-  'BEVERAGES': '☕',
-  'STARTERS': '🥗',
-  'DESSERTS': '🍮',
-};
-const getIcon = (cat: string) => {
-  const norm = (cat || '').toUpperCase();
-  return CATEGORY_ICON[norm] || '🍽️';
-};
+function ProductThumbnail({ src, alt }: { src?: string; alt: string }) {
+  const [error, setError] = useState(false);
+
+  if (!src || error) {
+    return (
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 8,
+          background: '#F1F5F9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          border: '1px solid #E2E8F0',
+          color: '#64748B',
+        }}
+      >
+        <Utensils size={16} strokeWidth={2} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        overflow: 'hidden',
+        border: '1px solid var(--border)',
+        background: '#FFFFFF',
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        onError={() => setError(true)}
+      />
+    </div>
+  );
+}
 
 const PAGE_SIZE = 10;
 
@@ -183,16 +219,7 @@ export default function AdminSalesAnalyticsPage() {
           width: 100% !important;
         }
 
-        .analytics-page-header .admin-header-left {
-          height: 68px !important;
-          display: flex !important;
-          align-items: stretch !important;
-          flex-wrap: nowrap !important;
-          width: 100% !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
-
+        .analytics-page-header .admin-header-left,
         .analytics-page-header .admin-header-search {
           height: 68px !important;
           display: flex !important;
@@ -238,6 +265,12 @@ export default function AdminSalesAnalyticsPage() {
           min-width: 0 !important;
         }
 
+        .analytics-dates-row {
+          display: flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+        }
+
         .analytics-actions {
           display: flex !important;
           flex-wrap: nowrap !important;
@@ -248,48 +281,168 @@ export default function AdminSalesAnalyticsPage() {
           height: 68px !important;
         }
 
+        .sales-scroll-hint {
+          display: none !important;
+        }
+
         @media (max-width: 768px) {
-          .analytics-page-header {
+          .analytics-page-header,
+          .analytics-page-header.admin-page-header-container {
             height: auto !important;
             min-height: auto !important;
-            padding: 8px 16px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            border-bottom: 1px solid var(--border) !important;
+            background: #FFFFFF !important;
           }
 
           .analytics-page-header .admin-page-header-container,
           .analytics-page-header .admin-header-left,
           .analytics-page-header .admin-header-search {
             height: auto !important;
+            min-height: auto !important;
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
 
           .analytics-toolbar {
             flex-direction: column !important;
             align-items: stretch !important;
-            gap: 10px !important;
+            gap: 0 !important;
             height: auto !important;
+            min-height: auto !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
 
           .analytics-tabs-wrapper {
             width: 100% !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            padding: 0 !important;
             border-bottom: 1px solid var(--border) !important;
-            padding-bottom: 2px !important;
-          }
-
-          .analytics-filters {
-            flex-wrap: wrap !important;
-            width: 100% !important;
+            box-sizing: border-box !important;
+            background: #FFFFFF !important;
           }
 
           .analytics-actions {
             width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
             margin-left: 0 !important;
-            justify-content: space-between !important;
-            flex-wrap: wrap !important;
+            padding: 10px 14px !important;
+            background: #F8FAFC !important;
+            border-bottom: 1px solid var(--border) !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+          }
+
+          .analytics-filters {
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+          }
+
+          .analytics-dates-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+            width: 100% !important;
+          }
+
+          .analytics-date-field {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .analytics-date-input {
+            width: 100% !important;
+            min-width: 0 !important;
+            height: 36px !important;
+            box-sizing: border-box !important;
+            padding: 0 8px !important;
+            font-size: 12px !important;
+          }
+
+          .sales-apply-button {
+            width: 100% !important;
+            height: 36px !important;
+            justify-content: center !important;
+          }
+
+          .analytics-maximize-wrapper {
+            display: none !important;
+          }
+
+          /* Sales Graph Container on Mobile */
+          .sales-graph-container {
+            padding: 14px 12px 18px 12px !important;
+          }
+
+          /* Secondary Filter Bar on Mobile */
+          .sales-filter-bar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            padding: 12px 14px !important;
+          }
+
+          .sales-search-wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .sales-category-wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+          }
+
+          .sales-category-wrapper > div,
+          .sales-category-wrapper button {
+            width: 100% !important;
+          }
+
+          .sales-scroll-hint {
+            display: flex !important;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            font-size: 11px;
+            color: #64748B;
+            background: #F8FAFC;
+            border-bottom: 1px solid var(--border);
+          }
+
+          .sales-table {
+            min-width: 580px !important;
+          }
+
+          .sales-table th,
+          .sales-table td {
+            padding-left: 14px !important;
+            padding-right: 14px !important;
           }
         }
       `}</style>
       <AdminPageHeader
         className="analytics-page-header"
-        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
+        style={{ paddingTop: 0, marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="analytics-toolbar">
@@ -301,49 +454,53 @@ export default function AdminSalesAnalyticsPage() {
             {/* Right Side: Date Filters (From, To, Apply) and Maximize button */}
             <div className="analytics-actions">
               <div className="analytics-filters">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>From</span>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    max={dateTo}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    style={{
-                      height: '38px',
-                      width: '135px',
-                      padding: '0 8px',
-                      fontSize: '12px',
-                      borderRadius: '8px',
-                      background: 'white',
-                      border: '1px solid var(--border)',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                      outline: 'none',
-                      color: 'var(--text-primary)',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>To</span>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    min={dateFrom}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    style={{
-                      height: '38px',
-                      width: '135px',
-                      padding: '0 8px',
-                      fontSize: '12px',
-                      borderRadius: '8px',
-                      background: 'white',
-                      border: '1px solid var(--border)',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                      outline: 'none',
-                      color: 'var(--text-primary)',
-                      boxSizing: 'border-box',
-                    }}
-                  />
+                <div className="analytics-dates-row">
+                  <div className="analytics-date-field">
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>From</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      max={dateTo}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="analytics-date-input"
+                      style={{
+                        height: '38px',
+                        width: '135px',
+                        padding: '0 8px',
+                        fontSize: '12px',
+                        borderRadius: '8px',
+                        background: 'white',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                        outline: 'none',
+                        color: 'var(--text-primary)',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div className="analytics-date-field">
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>To</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="analytics-date-input"
+                      style={{
+                        height: '38px',
+                        width: '135px',
+                        padding: '0 8px',
+                        fontSize: '12px',
+                        borderRadius: '8px',
+                        background: 'white',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                        outline: 'none',
+                        color: 'var(--text-primary)',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -351,6 +508,7 @@ export default function AdminSalesAnalyticsPage() {
                     fetchData();
                     setPage(1);
                   }}
+                  className="sales-apply-button"
                   style={{
                     height: '38px',
                     padding: '0 16px',
@@ -373,7 +531,7 @@ export default function AdminSalesAnalyticsPage() {
               </div>
 
               {/* Left Border Separator */}
-              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+              <div className="analytics-maximize-wrapper" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                 <LayoutMaximizeToggle />
               </div>
             </div>
@@ -384,7 +542,7 @@ export default function AdminSalesAnalyticsPage() {
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
 
       {/* Sales Graph */}
-      <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', padding: '20px 24px 24px 24px', boxSizing: 'border-box' }}>
+      <div className="sales-graph-container" style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', padding: '20px 24px 24px 24px', boxSizing: 'border-box' }}>
         <SalesAnalyticsChart
           dailyData={dailyData}
           topProducts={items}
@@ -398,8 +556,8 @@ export default function AdminSalesAnalyticsPage() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: '12px', padding: '16px 24px', margin: 0, background: '#FFFFFF', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+      <div className="sales-filter-bar" style={{ display: 'flex', gap: '12px', padding: '16px 24px', margin: 0, background: '#FFFFFF', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="sales-search-wrapper" style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
           <Search
             size={18}
             color="var(--text-secondary)"
@@ -423,26 +581,32 @@ export default function AdminSalesAnalyticsPage() {
             style={{ width: '100%', paddingLeft: '40px' }}
           />
         </div>
-        <CustomSelect
-          style={{ width: '200px' }}
-          value={categoryFilter}
-          onChange={(val) => {
-            setCategoryFilter(val);
-            setPage(1);
-          }}
-          options={categories.map((c) => ({ value: c, label: c }))}
-        />
+        <div className="sales-category-wrapper" style={{ width: '200px' }}>
+          <CustomSelect
+            style={{ width: '100%' }}
+            value={categoryFilter}
+            onChange={(val) => {
+              setCategoryFilter(val);
+              setPage(1);
+            }}
+            options={categories.map((c) => ({ value: c, label: c }))}
+          />
+        </div>
       </div>
 
       {/* Table */}
       <div style={{ width: '100%', padding: 0, overflow: 'hidden', borderRadius: 0, border: 'none', boxShadow: 'none', margin: 0, background: '#FFFFFF' }}>
+        <div className="sales-scroll-hint" aria-hidden="true">
+          <MoveHorizontal size={13} style={{ flexShrink: 0 }} />
+          <span>Swipe horizontally to view full sales details</span>
+        </div>
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%', margin: 0 }}>
           {loading ? (
             <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}>
               <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
+            <table className="sales-table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
               <thead>
                 <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
                   <th style={{ paddingLeft: '24px' }}>Item Name</th>
@@ -459,36 +623,7 @@ export default function AdminSalesAnalyticsPage() {
                     <tr key={`${item.product_id || item.id}-${idx}`} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ paddingLeft: '24px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: 8,
-                              background: item.image_url ? 'transparent' : catStyle.bg,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 18,
-                              flexShrink: 0,
-                              overflow: 'hidden',
-                              border: item.image_url ? '1px solid var(--border)' : 'none',
-                            }}
-                          >
-                            {item.image_url ? (
-                              <img
-                                src={item.image_url}
-                                alt={item.product_name}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                  (e.target as HTMLImageElement).parentElement!.style.background = catStyle.bg;
-                                  (e.target as HTMLImageElement).parentElement!.innerText = getIcon(item.category);
-                                }}
-                              />
-                            ) : (
-                              getIcon(item.category)
-                            )}
-                          </div>
+                          <ProductThumbnail src={item.image_url} alt={item.product_name} />
                           <div>
                             <span style={{ fontWeight: 600, display: 'block' }}>{item.product_name}</span>
                           </div>
@@ -499,7 +634,6 @@ export default function AdminSalesAnalyticsPage() {
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px',
                             padding: '3px 8px',
                             borderRadius: '6px',
                             fontSize: '11px',
@@ -508,7 +642,7 @@ export default function AdminSalesAnalyticsPage() {
                             color: catStyle.color,
                           }}
                         >
-                          {getIcon(item.category)} {item.category || 'General'}
+                          {item.category || 'General'}
                         </span>
                       </td>
                       <td style={{ textAlign: 'center', fontWeight: 700 }}>

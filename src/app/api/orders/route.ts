@@ -87,12 +87,20 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method } = body;
 
-    if (!customer_name || !phone || !items || !items.length) {
+    if (!items || !items.length) {
       return NextResponse.json({
         success: false,
-        error: 'Customer name, phone, and items are required'
+        error: 'Order items are required'
       }, { status: 400 });
     }
+
+    const nameToUse = (customer_name && customer_name.trim() !== '') 
+      ? customer_name.trim() 
+      : (order_type === 'TAKEAWAY' ? 'Takeaway Customer' : (table_number ? `Table ${table_number}` : 'Guest Customer'));
+
+    const phoneToUse = (phone && phone.trim() !== '' && !phone.includes('0000000')) 
+      ? phone.trim() 
+      : undefined;
 
     if (order_type !== 'TAKEAWAY' && table_number) {
       const { TablesRepository } = await import('@/modules/tables/tables.repository');
@@ -101,8 +109,8 @@ export async function POST(request: NextRequest) {
       const targetTable = tables.find(t => String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase());
       if (targetTable) {
         const check = checkTableAssignment(targetTable, party_size || 1, {
-          phone,
-          customerName: customer_name
+          phone: phoneToUse,
+          customerName: nameToUse
         });
         if (!check.allowed) {
           return NextResponse.json({
@@ -136,10 +144,10 @@ export async function POST(request: NextRequest) {
 
     const admin = await requireAdmin(request);
     const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
-    // Only trust is_pos if the user is verified staff/admin. Prevents token leakage into customer UI.
-    const isPos = hasAdminRights && body.is_pos === true;
-    const isPaid = hasAdminRights && Boolean(is_paid);
-    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : (hasAdminRights && payment_method ? String(payment_method) : undefined);
+    // Explicit is_pos from POS terminal or authenticated staff/admin placing an order
+    const isPos = body.is_pos === true || hasAdminRights;
+    const isPaid = (hasAdminRights || body.is_pos === true) && Boolean(is_paid);
+    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : ((hasAdminRights || body.is_pos === true) && payment_method ? String(payment_method) : undefined);
 
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
@@ -147,10 +155,14 @@ export async function POST(request: NextRequest) {
     const isUuid = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
     const staffId = (isPos && admin?.isStaff && isUuid(admin?.userId)) ? admin.userId : undefined;
 
+    const isTableOrder = Boolean(table_number && String(table_number).trim() !== '');
+    // Orders from POS or table QR scans must always go directly to PREPARING state
+    const determinedStatus = (isPos || isTableOrder || body.status === 'PREPARING') ? 'PREPARING' : (body.status || 'PENDING');
+
     const order = await createOrder({
       restaurant_id: restaurant.id,
-      customer_name: customer_name.trim(),
-      phone,
+      customer_name: nameToUse,
+      phone: phoneToUse,
       total_price,
       subtotal,
       discount_amount,
@@ -163,6 +175,7 @@ export async function POST(request: NextRequest) {
       order_type: order_type || 'DINE_IN',
       is_pos: isPos,
       is_paid: isPaid,
+      status: determinedStatus,
       payment_method: paymentMethod,
       staff_id: staffId,
       business_date,

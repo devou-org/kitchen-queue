@@ -300,6 +300,18 @@ class InventoryService {
     }
   }
 
+  async deleteCategory(id: string): Promise<ApiResponse<InventoryCategory>> {
+    try {
+      const res = await fetch(`/api/inventory/categories?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+      return await res.json();
+    } catch {
+      return { success: false, error: 'Failed to delete category' };
+    }
+  }
+
   async getUnits(): Promise<ApiResponse<InventoryUnit[]>> {
     try {
       const res = await fetch('/api/inventory/units', {

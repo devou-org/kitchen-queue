@@ -32,16 +32,24 @@ export async function POST(request: NextRequest) {
           tokenVersion: 1,
         }, '90d');
 
+        const restaurant = admin.restaurant_id ? await getRestaurantById(admin.restaurant_id) : null;
+        const slug = restaurant?.slug || 'demo';
+
         const response = NextResponse.json({
           success: true,
           token,
+          slug,
+          redirect_url: `/${slug}/admin/orders`,
           user: {
             id: admin.id || 'admin-system',
             email: userEmail,
-            name: 'System Admin',
+            name: restaurant?.name ? `${restaurant.name} Admin` : 'System Admin',
             role: 'ADMIN',
             permissions: ['*'],
             is_admin: true,
+            restaurant_id: admin.restaurant_id,
+            restaurant_slug: slug,
+            restaurant_name: restaurant?.name,
           },
         });
 
@@ -115,9 +123,16 @@ export async function POST(request: NextRequest) {
           tokenVersion: 1,
         }, '90d');
 
+        const slug = restaurant?.slug || 'demo';
+        const isKitchen = roleName.toUpperCase().includes('KITCHEN') || roleName.toUpperCase() === 'CHEF';
+        const isManager = roleName.toUpperCase().includes('MANAGER') || permissions.includes('*');
+        const redirectUrl = (isKitchen || isManager) ? `/${slug}/admin/orders` : `/${slug}/staff/menu`;
+
         const response = NextResponse.json({
           success: true,
           token,
+          slug,
+          redirect_url: redirectUrl,
           user: {
             id: staff.id,
             email: staff.email,
@@ -128,7 +143,7 @@ export async function POST(request: NextRequest) {
             is_admin: false,
             is_staff: true,
             restaurant_id: staff.restaurant_id,
-            restaurant_slug: restaurant?.slug,
+            restaurant_slug: slug,
             restaurant_name: restaurant?.name,
           },
         });

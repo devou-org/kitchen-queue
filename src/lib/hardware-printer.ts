@@ -701,7 +701,8 @@ export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise
   message?: string;
 }> {
   const ticketNo = options.kotData?.ticketNumber;
-  if (ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName)) {
+  const isAddOn = Boolean(options.kotData?.isAddOn);
+  if (!isAddOn && ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName)) {
     console.warn(`[HardwarePrinter] Duplicate print suppressed for Ticket #${ticketNo} (${options.counterName || options.counterId || 'ALL'})`);
     return Promise.resolve({
       success: true,
@@ -1083,10 +1084,12 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
   let htmlToPrint = billHtml;
   if (!htmlToPrint && orderData) {
     htmlToPrint = generateBillTemplateHTML(orderData, {
-      name: orderData.restaurant_name || 'Restaurant',
-      address: orderData.restaurant_address,
-      phone: orderData.restaurant_phone,
-      gst_number: orderData.restaurant_gst,
+      name: billData?.restaurantName || orderData.restaurant_name || 'Restaurant',
+      logo_url: billData?.logoUrl || orderData.logo_url || orderData.restaurant_logo,
+      address: billData?.address || orderData.restaurant_address,
+      phone: billData?.phone || billData?.restaurantPhone || orderData.restaurant_phone,
+      gst_number: billData?.gstNumber || orderData.restaurant_gst || orderData.gst_number,
+      primary_color: billData?.primaryColor || orderData.primary_color,
     });
   }
 

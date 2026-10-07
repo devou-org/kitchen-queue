@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { 
   Plus, Trash2, Edit2, ShieldAlert, Key, UserCheck, UserX, 
   Smartphone, Mail, Shield, CheckSquare, Square, Store, ClipboardList, 
-  LayoutGrid, UtensilsCrossed, Boxes, BarChart3, Users, Receipt, Settings,
+  LayoutGrid, UtensilsCrossed, Boxes, Gift, BarChart3, Users, Receipt, Settings,
   CheckCircle2, Info, Search, X
 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
@@ -19,6 +19,7 @@ const MODULE_ICONS: Record<string, any> = {
   tables: LayoutGrid,
   products: UtensilsCrossed,
   inventory: Boxes,
+  loyalty: Gift,
   analytics: BarChart3,
   staff: Users,
   billing: Receipt,
@@ -465,45 +466,145 @@ export default function StaffAdminPage() {
             height: 68px !important;
           }
 
+          .staff-search-control {
+            position: relative;
+            width: 220px;
+            min-width: 140px;
+            max-width: 280px;
+            flex-shrink: 0;
+          }
+
+          .staff-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 680px;
+          }
+
+          .roles-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 640px;
+          }
+
           @media (max-width: 768px) {
-            .staff-page-header {
+            .staff-page-header,
+            .staff-page-header.admin-page-header-container {
               height: auto !important;
               min-height: auto !important;
-              padding: 8px 16px !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: stretch !important;
+              border-bottom: 1px solid var(--border) !important;
+              background: #FFFFFF !important;
             }
 
             .staff-page-header .admin-page-header-container,
             .staff-page-header .admin-header-left,
             .staff-page-header .admin-header-search {
               height: auto !important;
+              min-height: auto !important;
+              width: 100% !important;
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: stretch !important;
+              padding: 0 !important;
+              margin: 0 !important;
             }
 
             .staff-toolbar {
               flex-direction: column !important;
               align-items: stretch !important;
-              gap: 10px !important;
+              gap: 0 !important;
               height: auto !important;
+              min-height: auto !important;
+              width: 100% !important;
+              padding: 0 !important;
+              margin: 0 !important;
             }
 
             .staff-tabs-wrapper {
               width: 100% !important;
-              height: auto !important;
+              height: 44px !important;
+              min-height: 44px !important;
+              padding: 0 !important;
               border-bottom: 1px solid var(--border) !important;
-              padding-bottom: 2px !important;
+              box-sizing: border-box !important;
+              background: #FFFFFF !important;
+              overflow-x: auto !important;
+            }
+
+            .staff-nav-scroll {
+              height: 44px !important;
+              min-height: 44px !important;
+              width: 100% !important;
+            }
+
+            .staff-nav-item {
+              height: 44px !important;
+              min-height: 44px !important;
+              padding: 0 16px !important;
+              font-size: 13px !important;
             }
 
             .staff-actions {
               width: 100% !important;
-              margin-left: 0 !important;
-              justify-content: space-between !important;
-              flex-wrap: wrap !important;
               height: auto !important;
+              min-height: auto !important;
+              margin-left: 0 !important;
+              padding: 10px 14px !important;
+              background: #F8FAFC !important;
+              border-bottom: 1px solid var(--border) !important;
+              box-sizing: border-box !important;
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 8px !important;
+            }
+
+            .staff-search-control {
+              width: 100% !important;
+              max-width: 100% !important;
+              min-width: 0 !important;
+            }
+
+            .staff-actions button[type="button"] {
+              width: 100% !important;
+              justify-content: center !important;
+              height: 38px !important;
+            }
+
+            .staff-maximize-wrapper {
+              display: none !important;
+            }
+
+            .staff-table {
+              min-width: 600px !important;
+            }
+
+            .roles-table {
+              min-width: 580px !important;
+            }
+
+            .staff-table th,
+            .staff-table td,
+            .roles-table th,
+            .roles-table td {
+              padding: 12px 12px !important;
+            }
+
+            .table-wrapper {
+              overflow-x: auto !important;
+              -webkit-overflow-scrolling: touch !important;
+              width: 100% !important;
+              max-width: 100% !important;
             }
           }
         `}</style>
         <AdminPageHeader
           className="staff-page-header"
-          style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
+          style={{ paddingTop: 0, marginBottom: 0 }}
           hideMaximize={true}
           search={
             <div className="staff-toolbar">
@@ -532,7 +633,7 @@ export default function StaffAdminPage() {
 
               {/* Right Side: Search + Add Action + Maximize Toggle */}
               <div className="staff-actions">
-                <div style={{ position: 'relative', width: '220px', minWidth: '140px', maxWidth: '280px', flexShrink: 0 }}>
+                <div className="staff-search-control">
                   <Search
                     size={14}
                     style={{
@@ -643,7 +744,7 @@ export default function StaffAdminPage() {
                   </button>
                 )}
 
-                <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+                <div className="staff-maximize-wrapper" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                   <LayoutMaximizeToggle />
                 </div>
               </div>
@@ -660,9 +761,9 @@ export default function StaffAdminPage() {
             /* ============================================
                STAFF MEMBERS TAB
                ============================================ */
-            <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflow: 'hidden', borderRadius: 0, margin: 0, padding: 0 }}>
+            <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflowX: 'auto', borderRadius: 0, margin: 0, padding: 0 }}>
               <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="staff-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ paddingLeft: '20px' }}>Member Name</th>
@@ -829,9 +930,9 @@ export default function StaffAdminPage() {
             /* ============================================
                ROLES & PERMISSIONS TAB (TABLE FORMAT)
                ============================================ */
-            <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflow: 'hidden', borderRadius: 0, margin: 0, padding: 0 }}>
+            <div style={{ width: '100%', background: '#FFFFFF', borderBottom: '1px solid var(--border)', overflowX: 'auto', borderRadius: 0, margin: 0, padding: 0 }}>
               <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="roles-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ width: '22%', paddingLeft: '20px' }}>Role</th>
@@ -995,7 +1096,7 @@ export default function StaffAdminPage() {
       </AdminContentWrapper>
 
       {/* ============================================
-         ADD / EDIT STAFF MODAL
+         ADD / EDIT STAFF MODAL (COMPACT)
          ============================================ */}
       {isStaffModalOpen && (
         <div style={{
@@ -1004,60 +1105,69 @@ export default function StaffAdminPage() {
           backdropFilter: 'blur(4px)',
           overflowY: 'auto'
         }}>
-          <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-            <div className="card" style={{ width: '100%', maxWidth: '520px', padding: '26px', borderRadius: '18px', background: 'white', border: '1px solid var(--border)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)' }}>
-                {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
-              </h2>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '18px' }}>
-                Staff members can log directly into this Admin Portal and will only see the tabs permitted by their assigned role.
+          <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+            <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '18px 20px', borderRadius: '14px', background: 'white', border: '1px solid var(--border)', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setIsStaffModalOpen(false)}
+                  style={{ background: 'transparent', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1, padding: '4px' }}
+                >
+                  ✕
+                </button>
+              </div>
+              <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: 1.35 }}>
+                Staff members can log directly into this Admin Portal with their assigned role permissions.
               </p>
 
               {staffErrorMsg && (
-                <div style={{ background: '#ef444415', color: '#ef4444', padding: '12px', borderRadius: '10px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '14px' }}>
-                  <ShieldAlert size={18} /> {staffErrorMsg}
+                <div style={{ background: '#ef444415', color: '#ef4444', padding: '8px 10px', borderRadius: '8px', marginBottom: '10px', display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px' }}>
+                  <ShieldAlert size={15} /> {staffErrorMsg}
                 </div>
               )}
 
-              <form onSubmit={handleStaffSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <form onSubmit={handleStaffSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Full Name</label>
+                  <label style={{ display: 'block', marginBottom: '3px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>Full Name</label>
                   <input
                     type="text" required
                     value={staffFormData.name} 
                     onChange={e => setStaffFormData({ ...staffFormData, name: e.target.value })}
                     className="input"
                     placeholder="e.g. Rahul Sharma"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '12.5px', boxSizing: 'border-box' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Email Address (Login Username)</label>
+                  <label style={{ display: 'block', marginBottom: '3px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>Email Address (Login Username)</label>
                   <input
                     type="email" required
                     value={staffFormData.email} 
                     onChange={e => setStaffFormData({ ...staffFormData, email: e.target.value })}
                     className="input"
                     placeholder="e.g. rahul@restaurant.com"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '12.5px', boxSizing: 'border-box' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Phone Number (Optional)</label>
+                  <label style={{ display: 'block', marginBottom: '3px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>Phone Number (Optional)</label>
                   <input
                     type="text"
                     value={staffFormData.phone} 
                     onChange={e => setStaffFormData({ ...staffFormData, phone: e.target.value })}
                     className="input"
                     placeholder="e.g. +919876543210"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '12.5px', boxSizing: 'border-box' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <label style={{ display: 'block', marginBottom: '3px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
                     Password {editingStaff ? '(Leave blank to keep current)' : ''}
                   </label>
                   <div style={{ position: 'relative' }}>
@@ -1067,15 +1177,15 @@ export default function StaffAdminPage() {
                       onChange={e => setStaffFormData({ ...staffFormData, password: e.target.value })}
                       className="input"
                       placeholder={editingStaff ? '••••••••' : 'Enter login password'}
-                      style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: '10px', border: '1px solid var(--border)' }}
+                      style={{ width: '100%', height: '34px', padding: '0 10px 0 28px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '12.5px', boxSizing: 'border-box' }}
                     />
-                    <Key size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                    <Key size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                   </div>
                 </div>
 
                 {/* Role Selector Dropdown */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <label style={{ display: 'block', marginBottom: '3px', fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
                     Assign Role & Module Permissions
                   </label>
                   <select
@@ -1089,7 +1199,7 @@ export default function StaffAdminPage() {
                         role: selRole ? selRole.name : 'STAFF'
                       });
                     }}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'white' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', fontSize: '12.5px', boxSizing: 'border-box' }}
                   >
                     {roles.map(r => (
                       <option key={r.id} value={r.id}>
@@ -1101,23 +1211,23 @@ export default function StaffAdminPage() {
                   {/* Interactive Preview of Granted Modules */}
                   {selectedRolePermissions.length > 0 && (
                     <div style={{
-                      marginTop: '10px',
-                      padding: '10px 12px',
-                      borderRadius: '10px',
+                      marginTop: '6px',
+                      padding: '7px 9px',
+                      borderRadius: '8px',
                       background: '#F8FAFC',
                       border: '1px solid #E2E8F0'
                     }}>
-                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Info size={13} /> Modules accessible by this role:
+                      <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#475569', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Info size={12} /> Modules accessible:
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
                         {selectedRolePermissions.map(key => {
                           const mod = ADMIN_MODULES.find(m => m.key === key);
                           return (
                             <span key={key} style={{
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderRadius: '6px',
+                              fontSize: '10px',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
                               background: '#E2E8F0',
                               color: '#1E293B',
                               fontWeight: 500
@@ -1131,24 +1241,24 @@ export default function StaffAdminPage() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginTop: '2px' }}>
                   <input
                     type="checkbox"
                     id="staff_is_active"
                     checked={staffFormData.is_active}
                     onChange={e => setStaffFormData({ ...staffFormData, is_active: e.target.checked })}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    style={{ width: '15px', height: '15px', cursor: 'pointer' }}
                   />
-                  <label htmlFor="staff_is_active" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  <label htmlFor="staff_is_active" style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', cursor: 'pointer' }}>
                     Active Account (Allows logging in)
                   </label>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '14px' }}>
-                  <button type="button" className="btn btn-ghost" onClick={() => setIsStaffModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                  <button type="button" className="btn btn-ghost" onClick={() => setIsStaffModalOpen(false)} style={{ height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '12.5px' }}>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', borderRadius: '10px', fontWeight: 600 }}>
+                  <button type="submit" className="btn btn-primary" style={{ height: '34px', padding: '0 16px', borderRadius: '8px', fontWeight: 600, fontSize: '12.5px' }}>
                     {editingStaff ? 'Save Changes' : 'Create Staff Member'}
                   </button>
                 </div>

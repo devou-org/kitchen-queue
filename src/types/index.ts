@@ -41,6 +41,9 @@ export interface OrderItem {
   product_name?: string;
   product_image?: string;
   counter?: string;
+  status?: string;
+  prepared_at?: string;
+  ready_at?: string;
 }
 
 export interface Order {
@@ -103,6 +106,8 @@ export interface CartItem {
   quantity: number;
   image_url: string;
   status: ProductStatus;
+  original_price?: number;
+  is_free_reward?: boolean;
 }
 
 // API Response types
