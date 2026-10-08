@@ -443,6 +443,8 @@ async function runAutoMigration(sqlConnection: any) {
       ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_name_key;
       DROP INDEX IF EXISTS categories_name_key;
     `;
+    await pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+    await pool.query('ALTER TABLE orders ALTER COLUMN phone DROP NOT NULL').catch(() => {});
     console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, admins, and loyalty schema successfully!");
   } catch (err) {
     console.error("Auto-migration failed:", err);
@@ -1435,6 +1437,10 @@ export async function createOrder(data: {
   const finalSubtotal = data.subtotal ?? computedTotal;
   const discountVal = Number(data.discount_amount) || 0;
 
+  // Ensure phone columns in users and orders tables are nullable for phone-less guest checkouts
+  await pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+  await pool.query('ALTER TABLE orders ALTER COLUMN phone DROP NOT NULL').catch(() => {});
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1586,7 +1592,7 @@ export async function createOrder(data: {
         RETURNING id
       `,
       [
-        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
+        data.restaurant_id, queueId, userId, data.customer_name, data.phone || '0000000000', data.total_price, defaultStatus, 
         isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, paymentSplit, discountVal
@@ -2408,28 +2414,35 @@ export async function setOrderPaymentStatus(restaurantId: string, id: string, is
 export async function expireOldOrders() {
   // 1. Get IDs of orders to expire based on restaurant-specific business date
   const toExpire = await sql`
-    SELECT o.id, o.restaurant_id 
+    SELECT o.id, o.restaurant_id, o.is_paid 
     FROM orders o
     JOIN restaurants r ON r.id = o.restaurant_id
     WHERE o.status IN ('PENDING', 'PREPARING', 'READY')
       AND o.business_date < DATE((CURRENT_TIMESTAMP AT TIME ZONE COALESCE(r.timezone, 'Asia/Kolkata')) - COALESCE(r.rollover_time, '00:00:00')::interval)
   `;
 
-  if (toExpire.length === 0) return { expiredCount: 0 };
+  if (toExpire.length === 0) return { expiredCount: 0, closedCount: 0, totalProcessed: 0 };
 
-  // 2. Cancel them and restore stock
+  // 2. If is_paid == true -> mark 'CLOSED'; otherwise mark 'EXPIRED' and restore stock
   let expiredCount = 0;
+  let closedCount = 0;
   for (const row of toExpire) {
     try {
-      await updateOrderStatus(row.restaurant_id, row.id, 'EXPIRED');
-      await restoreOrderStock(row.id);
-      expiredCount++;
+      const isPaid = row.is_paid === true || row.is_paid === 'true' || Boolean(row.is_paid);
+      if (isPaid) {
+        await updateOrderStatus(row.restaurant_id, row.id, 'CLOSED');
+        closedCount++;
+      } else {
+        await updateOrderStatus(row.restaurant_id, row.id, 'EXPIRED');
+        await restoreOrderStock(row.id);
+        expiredCount++;
+      }
     } catch (err) {
-      console.error(`Failed to expire order ${row.id}:`, err);
+      console.error(`Failed to process old order ${row.id}:`, err);
     }
   }
 
-  return { expiredCount };
+  return { expiredCount, closedCount, totalProcessed: expiredCount + closedCount };
 }
 
 // ============================================
@@ -3878,13 +3891,17 @@ export async function mergeDuplicateCustomerLoyalty(restaurantId: string) {
 
 export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
   try {
-    // Merge duplicate customer accounts and sync completed/paid orders
+    // Merge duplicate customer accounts
     await mergeDuplicateCustomerLoyalty(restaurantId);
-    await syncAllCompletedOrdersToLoyalty(restaurantId);
 
     let query;
     if (search && search.trim() !== '') {
-      const searchPattern = `%${search.trim().toLowerCase()}%`;
+      const searchTrimmed = search.trim().toLowerCase();
+      const rawDigits = search.replace(/\D/g, '');
+      const last10Digits = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+      const searchPattern = `%${searchTrimmed}%`;
+      const digitsPattern = last10Digits ? `%${last10Digits}%` : searchPattern;
+
       query = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
@@ -3894,7 +3911,12 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
         FROM customer_loyalty cl
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
-          AND (LOWER(u.name) LIKE ${searchPattern} OR LOWER(u.phone) LIKE ${searchPattern})
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
       `;
     } else {
@@ -3986,6 +4008,35 @@ export async function adjustCustomerPoints(restaurantId: string, customerLoyalty
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
       return null;
+    }
+    throw err;
+  }
+}
+
+export async function deleteCustomerLoyaltyProfile(restaurantId: string, customerLoyaltyId: string) {
+  try {
+    const rec = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId} LIMIT 1
+    `;
+    if (rec.length === 0) return false;
+
+    const userId = rec[0].user_id;
+
+    await sql`DELETE FROM loyalty_transactions WHERE customer_loyalty_id = ${customerLoyaltyId}`;
+    await sql`DELETE FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId}`;
+
+    if (userId) {
+      const orders = await sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`;
+      if (orders.length === 0) {
+        await sql`DELETE FROM users WHERE id = ${userId}`;
+      }
+    }
+
+    return true;
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return false;
     }
     throw err;
   }
@@ -4183,13 +4234,11 @@ export async function processLoyaltyForCompletedOrder(restaurantId: string, orde
       customerName = orderRes[0].customer_name || null;
     }
 
-    if (!phone && !userId && customerName) {
-      // Deterministically generate phone key for guest customers registered by name
-      const nameHash = Math.abs(customerName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 12345).toString().slice(0, 8);
-      phone = `99${nameHash.padStart(8, '0')}`;
+    // Do not create loyalty CRM entries for guest orders without a phone number or default dummy phones
+    const cleanPhoneDigits = (phone || '').replace(/\D/g, '');
+    if (!phone || cleanPhoneDigits.length < 7 || cleanPhoneDigits.endsWith('0000000000')) {
+      return;
     }
-
-    if (!phone && !userId) return;
 
     let customerLoyalty;
     if (phone) {
@@ -4353,5 +4402,48 @@ export async function redeemLoyaltyReward(restaurantId: string, phone: string, r
     throw err;
   }
 }
+
+export async function redeemPunchCardReward(restaurantId: string, phone: string) {
+  try {
+    const customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone);
+    if (!customerLoyalty) {
+      throw new Error('Customer profile not found');
+    }
+
+    const currentUnlocked = Number(customerLoyalty.rewards_unlocked || 0);
+    if (currentUnlocked <= 0) {
+      throw new Error('No unlocked punch card rewards available');
+    }
+
+    const newUnlocked = Math.max(0, currentUnlocked - 1);
+
+    await sql`
+      UPDATE customer_loyalty
+      SET rewards_unlocked = ${newUnlocked},
+          updated_at = NOW()
+      WHERE id = ${customerLoyalty.id} AND restaurant_id = ${restaurantId}
+    `;
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${customerLoyalty.id}, ${customerLoyalty.user_id}, 'REDEEM_POINTS', 0, 0, ${'Redeemed Punch Card Milestone Reward'})
+    `;
+
+    return {
+      success: true,
+      rewards_unlocked: newUnlocked,
+      customer: {
+        id: customerLoyalty.id,
+        name: customerLoyalty.name,
+        phone: customerLoyalty.phone,
+        rewards_unlocked: newUnlocked,
+      }
+    };
+  } catch (err: any) {
+    throw err;
+  }
+}
+
+
 
 

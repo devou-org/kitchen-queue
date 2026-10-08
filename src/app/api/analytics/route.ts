@@ -5,9 +5,8 @@ import { requireAdmin } from '@/lib/auth';
 const getDateRange = (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const today = new Date().toISOString().split('T')[0];
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   return {
-    date_from: searchParams.get('date_from') || sevenDaysAgo,
+    date_from: searchParams.get('date_from') || today,
     date_to: searchParams.get('date_to') || today,
   };
 };

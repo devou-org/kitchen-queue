@@ -13,6 +13,7 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { CustomMultiSelect } from '@/components/ui/CustomSelect';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 type CustomerLoyalty = {
   id: string;
@@ -81,6 +82,8 @@ type ProductOption = {
 export default function AdminLoyaltyPage() {
   const { slug } = useParams();
   const slugStr = Array.isArray(slug) ? slug[0] : slug;
+  const { restaurant } = useRestaurant();
+  const primaryColor = restaurant?.primary_color || 'var(--primary, #971345)';
 
   const [activeTab, setActiveTab] = useState<'customers' | 'settings' | 'rewards' | 'transactions'>('customers');
   const [loading, setLoading] = useState(true);
@@ -263,6 +266,26 @@ export default function AdminLoyaltyPage() {
     }
   };
 
+  const handleDeleteCustomer = async (customerLoyaltyId: string, customerName: string) => {
+    if (!confirm(`Are you sure you want to delete the loyalty profile for "${customerName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&customer_loyalty_id=${customerLoyaltyId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Customer loyalty profile deleted successfully');
+        fetchData();
+      } else {
+        toast.error(json.error || 'Failed to delete customer profile');
+      }
+    } catch {
+      toast.error('Network error. Failed to delete customer profile');
+    }
+  };
+
   // Handle Reward Save (Create / Edit)
   const handleSaveReward = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -359,7 +382,7 @@ export default function AdminLoyaltyPage() {
           align-items: stretch !important;
           margin: 0 !important;
           padding: 0 20px 0 0 !important;
-          border-bottom: 1px solid var(--border, #e2e8f0) !important;
+          border-bottom: 1px solid var(--border) !important;
           background: #FFFFFF !important;
           box-sizing: border-box !important;
           position: relative !important;
@@ -454,7 +477,7 @@ export default function AdminLoyaltyPage() {
           justify-content: center;
           height: 100%;
           box-sizing: border-box;
-          padding: 0 20px;
+          padding: 0 18px;
           border-radius: 0;
           font-size: 13.5px;
           font-weight: 500;
@@ -489,14 +512,27 @@ export default function AdminLoyaltyPage() {
           font-weight: 700;
           margin-left: 6px;
         }
-        .loyalty-actions {
-          display: flex !important;
-          flex-wrap: nowrap !important;
-          align-items: center !important;
-          gap: 8px !important;
-          margin-left: auto !important;
-          flex-shrink: 0 !important;
-          height: 68px !important;
+
+        .loyalty-content-container {
+          padding: 20px !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
+        }
+
+        .loyalty-card-box {
+          background: #FFFFFF !important;
+          border-radius: 12px !important;
+          border: 1px solid var(--border, #e2e8f0) !important;
+          padding: 20px !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+          box-sizing: border-box !important;
+        }
+
+        .loyalty-search-wrapper {
+          position: relative !important;
+          width: 320px !important;
+          max-width: 100% !important;
         }
 
         @media (max-width: 768px) {
@@ -542,58 +578,54 @@ export default function AdminLoyaltyPage() {
             height: 44px !important;
             min-height: 44px !important;
             padding: 0 !important;
-            border-bottom: 1px solid var(--border, #e2e8f0) !important;
-            box-sizing: border-box !important;
+            border-bottom: 1px solid var(--border) !important;
             background: #FFFFFF !important;
             overflow-x: auto !important;
           }
-          .loyalty-toolbar {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 10px !important;
-            height: auto !important;
-          }
-          .loyalty-tabs-wrapper {
-            width: 100% !important;
-            height: auto !important;
-          }
+
           .loyalty-actions {
             width: 100% !important;
-            margin-left: 0 !important;
-            justify-content: flex-start !important;
-            flex-wrap: wrap !important;
             height: auto !important;
+            min-height: auto !important;
+            margin-left: 0 !important;
+            padding: 10px 14px !important;
+            background: #F8FAFC !important;
+            border-bottom: 1px solid var(--border) !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
           }
 
-          .loyalty-actions button {
-            flex: 1 !important;
-            justify-content: center !important;
+          .loyalty-nav-item {
+            padding: 0 12px !important;
+            font-size: 12.5px !important;
           }
 
-          .loyalty-maximize-wrapper {
-            display: none !important;
+          .loyalty-refresh-border {
+            border-left: none !important;
+            padding-left: 0 !important;
           }
 
           .loyalty-content-container {
-            padding: 14px 16px !important;
+            padding: 12px !important;
           }
 
-          .loyalty-metrics-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            gap: 8px !important;
+          .loyalty-card-box {
+            padding: 14px !important;
+            border-radius: 10px !important;
           }
-          .loyalty-metric-card {
-            padding: 10px 12px !important;
+
+          .loyalty-search-wrapper {
+            width: 100% !important;
           }
-          .loyalty-metric-title {
-            font-size: 11px !important;
+
+          .loyalty-cust-header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
           }
-          .loyalty-metric-value {
-            font-size: 16px !important;
-          }
-          .loyalty-metric-subtext {
-            font-size: 10px !important;
-          }
+
           .loyalty-grid-2col {
             grid-template-columns: 1fr !important;
           }
@@ -625,10 +657,11 @@ export default function AdminLoyaltyPage() {
       {/* Header Toolbar with Inline Navigation Tabs */}
       <AdminPageHeader
         className="loyalty-page-header"
-        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
+        style={{ paddingTop: 0, marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="loyalty-toolbar">
+            {/* Left Side: Loyalty Navigation Tabs embedded in 68px toolbar */}
             <div className="loyalty-tabs-wrapper">
               <div className="loyalty-nav-scroll">
                 <button
@@ -638,7 +671,7 @@ export default function AdminLoyaltyPage() {
                 >
                   <Users size={15} style={{ marginRight: '6px' }} />
                   <span>Customers</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {customers.length}
                   </span>
                 </button>
@@ -659,7 +692,7 @@ export default function AdminLoyaltyPage() {
                 >
                   <Gift size={15} style={{ marginRight: '6px' }} />
                   <span>Rewards</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {rewards.length}
                   </span>
                 </button>
@@ -671,13 +704,14 @@ export default function AdminLoyaltyPage() {
                 >
                   <History size={15} style={{ marginRight: '6px' }} />
                   <span>Audit Log</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {transactions.length}
                   </span>
                 </button>
               </div>
             </div>
 
+            {/* Right Side Actions */}
             <div className="loyalty-actions">
               {activeTab === 'settings' && (
                 <button
@@ -688,7 +722,7 @@ export default function AdminLoyaltyPage() {
                     height: '38px',
                     padding: '0 14px',
                     borderRadius: '8px',
-                    background: 'var(--primary, #971345)',
+                    background: primaryColor,
                     color: '#FFFFFF',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -727,7 +761,7 @@ export default function AdminLoyaltyPage() {
                     height: '38px',
                     padding: '0 14px',
                     borderRadius: '8px',
-                    background: 'var(--primary, #971345)',
+                    background: primaryColor,
                     color: '#FFFFFF',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -741,16 +775,16 @@ export default function AdminLoyaltyPage() {
                   }}
                 >
                   <Plus size={15} />
-                  <span>Add New Reward</span>
+                  <span>Add Reward</span>
                 </button>
               )}
 
-              {/* Refresh Button with Left Border Separator, matching Inventory */}
-              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+              {/* Refresh Button */}
+              <div className="loyalty-refresh-border" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                 <button
                   type="button"
                   onClick={() => fetchData()}
-                  title="Refresh Loyalty Data"
+                  disabled={loading}
                   style={{
                     width: '38px',
                     height: '38px',
@@ -759,37 +793,41 @@ export default function AdminLoyaltyPage() {
                     border: '1px solid var(--border, #E2E8F0)',
                     background: '#FFFFFF',
                     color: '#475569',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
                     transition: 'all 0.15s ease',
                     flexShrink: 0,
                   }}
+                  title="Refresh Loyalty Data"
+                  aria-label="Refresh Loyalty Data"
                 >
                   <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                 </button>
               </div>
 
               {/* Maximize Layout Toggle */}
-              <LayoutMaximizeToggle />
+              <div className="loyalty-maximize-wrapper">
+                <LayoutMaximizeToggle />
+              </div>
             </div>
           </div>
         }
       />
 
-      <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+      <div className="loyalty-content-container">
 
       {/* TAB 1: CUSTOMERS DIRECTORY */}
       {activeTab === 'customers' && (
-        <div style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
+        <div className="loyalty-card-box">
+          <div className="loyalty-cust-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+            <div className="loyalty-search-wrapper">
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               <input
                 type="text"
-                placeholder="Search by name or phone number..."
+                placeholder="Search by name or phone..."
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
                 style={{
@@ -852,7 +890,7 @@ export default function AdminLoyaltyPage() {
                         </div>
                       </td>
                       <td style={{ padding: '14px 16px', color: '#475569', fontFamily: 'monospace', fontWeight: 600 }}>
-                        {c.phone}
+                        {c.phone || '-'}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
                         <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '16px', fontWeight: 700, fontSize: '12px' }}>
@@ -883,25 +921,47 @@ export default function AdminLoyaltyPage() {
                         ₹{Number(c.total_spent || 0).toLocaleString()}
                       </td>
                       <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => {
-                            setSelectedCustomer(c);
-                            setAdjustPointsDelta(0);
-                            setAdjustReason('');
-                          }}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid #cbd5e1',
-                            background: 'white',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#0f172a',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Adjust Points
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <button
+                            onClick={() => {
+                              setSelectedCustomer(c);
+                              setAdjustPointsDelta(0);
+                              setAdjustReason('');
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              background: 'white',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#0f172a',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Adjust Points
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCustomer(c.id, c.name || c.phone || 'Customer')}
+                            title="Delete Customer Profile"
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #fee2e2',
+                              background: '#fef2f2',
+                              color: '#ef4444',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -921,32 +981,52 @@ export default function AdminLoyaltyPage() {
                   </span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>
-                  Phone: {c.phone}
+                  Phone: {c.phone || '-'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#334155', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
                   <span>Visits: <strong>{c.visit_progress || 0}/{settings.visit_milestone_count || 5}</strong></span>
                   <span>Total Spent: <strong>₹{Number(c.total_spent || 0).toLocaleString()}</strong></span>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedCustomer(c);
-                    setAdjustPointsDelta(0);
-                    setAdjustReason('');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Adjust Points
-                </button>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                  <button
+                    onClick={() => {
+                      setSelectedCustomer(c);
+                      setAdjustPointsDelta(0);
+                      setAdjustReason('');
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Adjust Points
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCustomer(c.id, c.name || c.phone || 'Customer')}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #fee2e2',
+                      background: '#fef2f2',
+                      color: '#ef4444',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -955,7 +1035,7 @@ export default function AdminLoyaltyPage() {
 
       {/* TAB 2: PROGRAM SETTINGS */}
       {activeTab === 'settings' && (
-        <form noValidate onSubmit={handleSaveSettings} style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '24px', width: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <form noValidate onSubmit={handleSaveSettings} className="loyalty-card-box" style={{ width: '100%' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Settings size={18} color="#475569" /> Program Rules & Loyalty System Mode
           </h3>
@@ -988,10 +1068,10 @@ export default function AdminLoyaltyPage() {
               <div
                 onClick={() => setSettings({ ...settings, loyalty_mode: 'POINTS' })}
                 style={{
-                  border: `2px solid ${settings.loyalty_mode === 'POINTS' ? '#971345' : '#e2e8f0'}`,
+                  border: `2px solid ${settings.loyalty_mode === 'POINTS' ? primaryColor : '#e2e8f0'}`,
                   borderRadius: '10px',
                   padding: '16px',
-                  background: settings.loyalty_mode === 'POINTS' ? '#fdf2f6' : '#ffffff',
+                  background: settings.loyalty_mode === 'POINTS' ? `${primaryColor}0f` : '#ffffff',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   position: 'relative'
@@ -999,7 +1079,7 @@ export default function AdminLoyaltyPage() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: settings.loyalty_mode === 'POINTS' ? '#971345' : '#f1f5f9', color: settings.loyalty_mode === 'POINTS' ? '#fff' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: settings.loyalty_mode === 'POINTS' ? primaryColor : '#f1f5f9', color: settings.loyalty_mode === 'POINTS' ? '#fff' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Award size={18} />
                     </div>
                     <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Redeem Points System</span>
@@ -1009,7 +1089,7 @@ export default function AdminLoyaltyPage() {
                     name="loyalty_mode"
                     checked={settings.loyalty_mode === 'POINTS'}
                     onChange={() => setSettings({ ...settings, loyalty_mode: 'POINTS' })}
-                    style={{ accentColor: '#971345', cursor: 'pointer' }}
+                    style={{ accentColor: primaryColor, cursor: 'pointer' }}
                   />
                 </div>
                 <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.4 }}>
@@ -1021,10 +1101,10 @@ export default function AdminLoyaltyPage() {
               <div
                 onClick={() => setSettings({ ...settings, loyalty_mode: 'PUNCH_CARD' })}
                 style={{
-                  border: `2px solid ${settings.loyalty_mode === 'PUNCH_CARD' ? '#971345' : '#e2e8f0'}`,
+                  border: `2px solid ${settings.loyalty_mode === 'PUNCH_CARD' ? primaryColor : '#e2e8f0'}`,
                   borderRadius: '10px',
                   padding: '16px',
-                  background: settings.loyalty_mode === 'PUNCH_CARD' ? '#fdf2f6' : '#ffffff',
+                  background: settings.loyalty_mode === 'PUNCH_CARD' ? `${primaryColor}0f` : '#ffffff',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   position: 'relative'
@@ -1032,7 +1112,7 @@ export default function AdminLoyaltyPage() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: settings.loyalty_mode === 'PUNCH_CARD' ? '#971345' : '#f1f5f9', color: settings.loyalty_mode === 'PUNCH_CARD' ? '#fff' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: settings.loyalty_mode === 'PUNCH_CARD' ? primaryColor : '#f1f5f9', color: settings.loyalty_mode === 'PUNCH_CARD' ? '#fff' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Gift size={18} />
                     </div>
                     <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Digital Punch Card System</span>
@@ -1042,7 +1122,7 @@ export default function AdminLoyaltyPage() {
                     name="loyalty_mode"
                     checked={settings.loyalty_mode === 'PUNCH_CARD'}
                     onChange={() => setSettings({ ...settings, loyalty_mode: 'PUNCH_CARD' })}
-                    style={{ accentColor: '#971345', cursor: 'pointer' }}
+                    style={{ accentColor: primaryColor, cursor: 'pointer' }}
                   />
                 </div>
                 <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.4 }}>
@@ -1056,7 +1136,7 @@ export default function AdminLoyaltyPage() {
           {settings.loyalty_mode === 'PUNCH_CARD' && (
             <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '18px', marginBottom: '24px' }}>
               <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={16} color="#971345" /> Punch Card Reward Configuration
+                <Sparkles size={16} color={primaryColor} /> Punch Card Reward Configuration
               </div>
 
               <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -1237,54 +1317,18 @@ export default function AdminLoyaltyPage() {
               </div>
             </div>
           </div>
-
-          {/* Save Settings Submit Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
-            <button
-              type="submit"
-              disabled={isSavingSettings}
-              style={{
-                height: '42px',
-                padding: '0 24px',
-                borderRadius: '8px',
-                background: '#971345',
-                color: '#FFFFFF',
-                fontSize: '14px',
-                fontWeight: 700,
-                border: 'none',
-                cursor: isSavingSettings ? 'not-allowed' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                opacity: isSavingSettings ? 0.7 : 1,
-              }}
-            >
-              {isSavingSettings ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Saving Settings...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={16} />
-                  <span>Save Program Settings</span>
-                </>
-              )}
-            </button>
-          </div>
         </form>
       )}
 
       {/* TAB 3: REWARDS CATALOG */}
       {activeTab === 'rewards' && (
-        <div style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div className="loyalty-card-box">
           <div style={{ marginBottom: '20px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Rewards Catalog</h3>
             <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', margin: 0 }}>Configure special rewards selectable by cashier during POS billing.</p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
             {rewards.length === 0 ? (
               <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
                 No custom rewards created yet. Click <strong>Add New Reward</strong> to create your first reward.
@@ -1380,7 +1424,7 @@ export default function AdminLoyaltyPage() {
 
       {/* TAB 4: TRANSACTIONS AUDIT LOG */}
       {activeTab === 'transactions' && (
-        <div style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div className="loyalty-card-box">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
             <div>
               <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Transaction Audit Log</h3>

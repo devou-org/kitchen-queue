@@ -12,7 +12,7 @@
  */
 
 import sql, { getOrderById, getRestaurantById, getCounters, createPrintJob } from '@/lib/db';
-import { buildKotEscposBuffer, KotPrintData, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
+import { buildKotEscposBuffer, KotPrintData, sendRawPrintToWindowsPrinter, sendRawPrintToNetworkPrinter } from '@/lib/escpos';
 import { pusherServer } from '@/lib/pusher';
 
 export interface AutoKotOptions {
@@ -120,9 +120,25 @@ export async function autoQueueAndBroadcastKot(
 
       const buffer = buildKotEscposBuffer(kotData);
       const base64Bytes = buffer.toString('base64');
+      let printedDirectly = false;
 
-      // 1. Direct hardware print if running on Windows (Cashier / Counter PC)
-      if (isWindows) {
+      // 1. Direct hardware print: Wi-Fi / LAN Network printer FIRST
+      if (conf.printerAddress && (conf.printerType === 'NETWORK' || conf.printerAddress.includes('.'))) {
+        try {
+          const netRes = await sendRawPrintToNetworkPrinter(conf.printerAddress, buffer);
+          if (netRes.success) {
+            printedDirectly = true;
+            console.log(`🖨️ [Wi-Fi/LAN] Auto-printed KOT #${order.ticket_number} [${cName}] -> ${conf.printerAddress}`);
+          } else {
+            console.warn(`⚠️ [Wi-Fi/LAN] Print failed for ${cName} on ${conf.printerAddress}: ${netRes.error}`);
+          }
+        } catch (netErr) {
+          console.error('Network print error:', netErr);
+        }
+      }
+
+      // 2. Direct hardware print on Windows (Local Spooler / USB) if not already printed via network
+      if (!printedDirectly && isWindows) {
         try {
           const slipTitle = options.isAddOn
             ? `RUNNING KOT #${order.ticket_number} - ${cName} (ADD-ON)`
@@ -133,6 +149,7 @@ export async function autoQueueAndBroadcastKot(
             slipTitle
           );
           if (winRes.success) {
+            printedDirectly = true;
             console.log(`🖨️ [Windows] Printed ${slipTitle} to "${conf.printerName}"`);
           } else {
             console.warn(`⚠️ [Windows] Print failed for ${cName} on "${conf.printerName}": ${winRes.error}`);
@@ -142,7 +159,7 @@ export async function autoQueueAndBroadcastKot(
         }
       }
 
-      // 2. Queue into database print_jobs
+      // 3. Queue into database print_jobs
       await createPrintJob(restaurantId, {
         order_id: order.id,
         ticket_number: Number(order.ticket_number) || undefined,
@@ -151,7 +168,7 @@ export async function autoQueueAndBroadcastKot(
         raw_base64: base64Bytes,
       });
 
-      // 3. Broadcast realtime Pusher event for Android Phones / Tablets / Browser
+      // 4. Broadcast realtime Pusher event for Android Phones / Tablets / Browser
       try {
         await pusherServer.trigger(`queue-channel-${restaurantId}`, 'kot_auto_print', {
           order_id: order.id,
@@ -161,6 +178,7 @@ export async function autoQueueAndBroadcastKot(
           printer_name: conf.printerName,
           printer_type: conf.printerType,
           printer_address: conf.printerAddress,
+          server_printed: Boolean(printedDirectly),
           is_add_on: Boolean(options.isAddOn),
           kotData,
           base64Bytes,

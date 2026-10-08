@@ -388,7 +388,7 @@ export default function StaffMenuPage() {
       }));
 
       // Generate a mock phone if not provided for staff orders
-      const phoneToUse = orderForm.phone || `+910000000000`;
+      const phoneToUse = orderForm.phone || '+910000000000';
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
       const res = await orderService.createOrder({
