@@ -2414,28 +2414,35 @@ export async function setOrderPaymentStatus(restaurantId: string, id: string, is
 export async function expireOldOrders() {
   // 1. Get IDs of orders to expire based on restaurant-specific business date
   const toExpire = await sql`
-    SELECT o.id, o.restaurant_id 
+    SELECT o.id, o.restaurant_id, o.is_paid 
     FROM orders o
     JOIN restaurants r ON r.id = o.restaurant_id
     WHERE o.status IN ('PENDING', 'PREPARING', 'READY')
       AND o.business_date < DATE((CURRENT_TIMESTAMP AT TIME ZONE COALESCE(r.timezone, 'Asia/Kolkata')) - COALESCE(r.rollover_time, '00:00:00')::interval)
   `;
 
-  if (toExpire.length === 0) return { expiredCount: 0 };
+  if (toExpire.length === 0) return { expiredCount: 0, closedCount: 0, totalProcessed: 0 };
 
-  // 2. Cancel them and restore stock
+  // 2. If is_paid == true -> mark 'CLOSED'; otherwise mark 'EXPIRED' and restore stock
   let expiredCount = 0;
+  let closedCount = 0;
   for (const row of toExpire) {
     try {
-      await updateOrderStatus(row.restaurant_id, row.id, 'EXPIRED');
-      await restoreOrderStock(row.id);
-      expiredCount++;
+      const isPaid = row.is_paid === true || row.is_paid === 'true' || Boolean(row.is_paid);
+      if (isPaid) {
+        await updateOrderStatus(row.restaurant_id, row.id, 'CLOSED');
+        closedCount++;
+      } else {
+        await updateOrderStatus(row.restaurant_id, row.id, 'EXPIRED');
+        await restoreOrderStock(row.id);
+        expiredCount++;
+      }
     } catch (err) {
-      console.error(`Failed to expire order ${row.id}:`, err);
+      console.error(`Failed to process old order ${row.id}:`, err);
     }
   }
 
-  return { expiredCount };
+  return { expiredCount, closedCount, totalProcessed: expiredCount + closedCount };
 }
 
 // ============================================

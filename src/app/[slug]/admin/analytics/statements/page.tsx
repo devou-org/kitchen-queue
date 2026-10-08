@@ -125,7 +125,7 @@ export default function AdminAnalyticsStatementsPage() {
   const handleExpireOldOrders = async () => {
     if (
       !window.confirm(
-        'Are you sure you want to expire all unfulfilled orders from PREVIOUS days? This will restore their stock items back to inventory.'
+        'Are you sure you want to process unfulfilled orders from PREVIOUS days? Paid orders will be marked CLOSED, and unpaid orders will be marked EXPIRED (restoring their stock items back to inventory).'
       )
     )
       return;
