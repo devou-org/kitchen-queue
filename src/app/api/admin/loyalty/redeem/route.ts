@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth';
-import { getRestaurantBySlug, redeemLoyaltyReward } from '@/lib/db';
+import { getRestaurantBySlug, redeemLoyaltyReward, redeemPunchCardReward } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +16,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    const result = await redeemLoyaltyReward(restaurant.id, phone, reward_id);
+    let result;
+    if (reward_id === 'PUNCH_CARD_MILESTONE') {
+      result = await redeemPunchCardReward(restaurant.id, phone);
+    } else {
+      result = await redeemLoyaltyReward(restaurant.id, phone, reward_id);
+    }
+
     return NextResponse.json({ success: true, data: result });
   } catch (error: any) {
     console.error('Error redeeming loyalty reward:', error);

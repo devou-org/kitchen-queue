@@ -3884,9 +3884,8 @@ export async function mergeDuplicateCustomerLoyalty(restaurantId: string) {
 
 export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
   try {
-    // Merge duplicate customer accounts and sync completed/paid orders
+    // Merge duplicate customer accounts
     await mergeDuplicateCustomerLoyalty(restaurantId);
-    await syncAllCompletedOrdersToLoyalty(restaurantId);
 
     let query;
     if (search && search.trim() !== '') {
@@ -4396,5 +4395,48 @@ export async function redeemLoyaltyReward(restaurantId: string, phone: string, r
     throw err;
   }
 }
+
+export async function redeemPunchCardReward(restaurantId: string, phone: string) {
+  try {
+    const customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone);
+    if (!customerLoyalty) {
+      throw new Error('Customer profile not found');
+    }
+
+    const currentUnlocked = Number(customerLoyalty.rewards_unlocked || 0);
+    if (currentUnlocked <= 0) {
+      throw new Error('No unlocked punch card rewards available');
+    }
+
+    const newUnlocked = Math.max(0, currentUnlocked - 1);
+
+    await sql`
+      UPDATE customer_loyalty
+      SET rewards_unlocked = ${newUnlocked},
+          updated_at = NOW()
+      WHERE id = ${customerLoyalty.id} AND restaurant_id = ${restaurantId}
+    `;
+
+    await sql`
+      INSERT INTO loyalty_transactions (restaurant_id, customer_loyalty_id, user_id, transaction_type, points_delta, visit_delta, notes)
+      VALUES (${restaurantId}, ${customerLoyalty.id}, ${customerLoyalty.user_id}, 'REDEEM_POINTS', 0, 0, ${'Redeemed Punch Card Milestone Reward'})
+    `;
+
+    return {
+      success: true,
+      rewards_unlocked: newUnlocked,
+      customer: {
+        id: customerLoyalty.id,
+        name: customerLoyalty.name,
+        phone: customerLoyalty.phone,
+        rewards_unlocked: newUnlocked,
+      }
+    };
+  } catch (err: any) {
+    throw err;
+  }
+}
+
+
 
 
