@@ -40,6 +40,8 @@ interface Transaction {
   reference_id: string;
   description: string;
   created_at: string;
+  customer_name?: string | null;
+  ticket_number?: number | string | null;
 }
 
 interface Summary {
@@ -715,8 +717,20 @@ export default function SuperAdminRestaurantBilling() {
                               {t.transaction_type}
                             </span>
                           </td>
-                          <td style={{ ...styles.td, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {t.description}
+                          <td style={{ ...styles.td, maxWidth: '280px' }}>
+                            {t.customer_name ? (
+                              <span style={{ fontWeight: 600, color: '#0f172a' }}>
+                                {t.transaction_type === 'OTP'
+                                  ? `OTP SMS charge for ${t.customer_name}`
+                                  : t.transaction_type === 'PER_ORDER'
+                                  ? `Per Order Charge for ${t.customer_name}`
+                                  : `${t.description} (${t.customer_name})`}
+                              </span>
+                            ) : (
+                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {t.description}
+                              </div>
+                            )}
                           </td>
                           <td style={styles.tdAlignRight}>₹{parseFloat(t.amount || '0').toFixed(2)}</td>
                         </tr>

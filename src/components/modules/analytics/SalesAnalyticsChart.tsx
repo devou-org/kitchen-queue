@@ -303,7 +303,7 @@ export function SalesAnalyticsChart({
                 Sales & Performance Graph
               </h3>
               <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0 0', fontWeight: 400 }}>
-                {dateFrom && dateTo ? `${dateFrom} to ${dateTo}` : 'Daily sales volume & revenue analysis'}
+                {dateFrom && dateTo ? (dateFrom === dateTo ? dateFrom : `${dateFrom} to ${dateTo}`) : 'Daily sales volume & revenue analysis'}
               </p>
             </div>
           </div>

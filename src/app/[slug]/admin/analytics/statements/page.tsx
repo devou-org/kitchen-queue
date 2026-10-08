@@ -35,12 +35,7 @@ export default function AdminAnalyticsStatementsPage() {
   useEffect(() => {
     if (restaurant && !dateFrom && !dateTo) {
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
-      const [year, month, day] = bDate.split('-').map(Number);
-      const d = new Date(year, month - 1, day - 7);
-      const fromYear = d.getFullYear();
-      const fromMonth = String(d.getMonth() + 1).padStart(2, '0');
-      const fromDay = String(d.getDate()).padStart(2, '0');
-      setDateFrom(`${fromYear}-${fromMonth}-${fromDay}`);
+      setDateFrom(bDate);
       setDateTo(bDate);
     }
   }, [restaurant, dateFrom, dateTo]);
