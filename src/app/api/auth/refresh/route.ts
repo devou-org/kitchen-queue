@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Handle Staff Member Refresh
     const staffRows = await sql`
-      SELECT s.*, r.name as role_name, r.permissions as role_permissions, res.slug as restaurant_slug, res.name as restaurant_name
+      SELECT s.*, r.name as role_name, r.permissions as role_permissions, r.default_order_status as role_default_order_status, res.slug as restaurant_slug, res.name as restaurant_name
       FROM staffs s
       LEFT JOIN roles r ON r.id = s.role_id
       LEFT JOIN restaurants res ON res.id = s.restaurant_id
@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
           name: staff.name,
           role: roleName,
           role_id: staff.role_id,
+          default_order_status: staff.role_default_order_status || 'PREPARING',
           permissions: permissions,
           is_admin: false,
           is_staff: true,

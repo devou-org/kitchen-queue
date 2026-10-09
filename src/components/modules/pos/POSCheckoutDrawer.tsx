@@ -27,6 +27,7 @@ import {
   Split,
   BadgeCheck,
 } from 'lucide-react';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { CartItem, OrderType } from '@/types';
 import { formatPrice } from '@/lib/format';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -62,6 +63,7 @@ export interface POSCheckoutDrawerProps {
   setOrderForm: React.Dispatch<React.SetStateAction<POSOrderFormData>>;
   onSubmitOrder: (e: React.FormEvent) => void | Promise<any>;
   submitting: boolean;
+  hideOrderType?: boolean;
 }
 
 export function POSCheckoutDrawer({
@@ -75,10 +77,19 @@ export function POSCheckoutDrawer({
   setOrderForm,
   onSubmitOrder,
   submitting,
+  hideOrderType = false,
 }: POSCheckoutDrawerProps) {
   const [mounted, setMounted] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [printingBill, setPrintingBill] = useState(false);
+
+  const isTableDirected = Boolean(
+    hideOrderType ||
+      (typeof window !== 'undefined' &&
+        (new URLSearchParams(window.location.search).get('table') ||
+          new URLSearchParams(window.location.search).get('table_number')) &&
+        orderForm.table_number)
+  );
 
   // Compute default country code based on restaurant location
   const defaultCallingCode = useMemo(() => {
@@ -108,7 +119,7 @@ export function POSCheckoutDrawer({
           setOrderForm((prev) => ({
             ...prev,
             is_paid: true,
-            payment_method: prev.payment_method || 'CASH',
+            payment_method: prev.payment_method || 'UPI',
           }));
         }
       } else {
@@ -241,12 +252,14 @@ export function POSCheckoutDrawer({
       gst_amount: gstAmount,
       total_price: totalPrice,
       is_paid: Boolean(orderForm.is_paid),
-      payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
+      payment_method: orderForm.is_paid ? (orderForm.payment_method || 'UPI') : undefined,
       notes: orderForm.notes || '',
       created_at: new Date().toISOString(),
     };
 
-    const toastId = toast.loading('🖨️ Printing Bill...');
+    const toastId = toast.loading('Printing Bill...', {
+      icon: <PrinterIllustration size={20} status="printing" />,
+    });
 
     try {
       const res = await fetch('/api/print/bill', {
@@ -421,7 +434,9 @@ export function POSCheckoutDrawer({
     }));
   }, [tables, orderForm.table_number, orderForm.phone, orderForm.customer_name]);
 
-  // Ensure party_size is always clamped to max free seats on the selected table
+  const lastTableRef = useRef<string | null>(null);
+
+  // Ensure party_size defaults to max free seats on table selection/change, and is clamped to max free seats
   useEffect(() => {
     if (orderForm.table_number && tables.length > 0) {
       const selectedTable = tables.find(
@@ -432,10 +447,15 @@ export function POSCheckoutDrawer({
           phone: orderForm.phone,
           customerName: orderForm.customer_name,
         });
-        if (!orderForm.party_size || orderForm.party_size > maxFree) {
+        if (lastTableRef.current !== String(orderForm.table_number)) {
+          lastTableRef.current = String(orderForm.table_number);
+          setOrderForm((prev) => ({ ...prev, party_size: maxFree }));
+        } else if (orderForm.party_size && orderForm.party_size > maxFree) {
           setOrderForm((prev) => ({ ...prev, party_size: maxFree }));
         }
       }
+    } else if (!orderForm.table_number) {
+      lastTableRef.current = null;
     }
   }, [orderForm.table_number, tables, orderForm.party_size, orderForm.phone, orderForm.customer_name, setOrderForm]);
 
@@ -885,33 +905,35 @@ export function POSCheckoutDrawer({
             </div>
 
             {/* Section B: Order Type Selection */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: '#64748B',
-                  marginBottom: '6px',
-                }}
-              >
-                Order Type
-              </label>
-              <OrderTypeSelector
-                value={(orderForm.order_type as OrderType) || 'DINE_IN'}
-                onChange={(val) => {
-                  const isTakeaway = val === 'TAKEAWAY';
-                  setOrderForm((prev) => ({
-                    ...prev,
-                    order_type: val,
-                    is_paid: isTakeaway ? true : false,
-                    payment_method: isTakeaway ? (prev.payment_method || 'CASH') : prev.payment_method,
-                  }));
-                }}
-              />
-            </div>
+            {!isTableDirected && (
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: '#64748B',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Order Type
+                </label>
+                <OrderTypeSelector
+                  value={(orderForm.order_type as OrderType) || 'DINE_IN'}
+                  onChange={(val) => {
+                    const isTakeaway = val === 'TAKEAWAY';
+                    setOrderForm((prev) => ({
+                      ...prev,
+                      order_type: val,
+                      is_paid: isTakeaway ? true : false,
+                      payment_method: isTakeaway ? (prev.payment_method || 'UPI') : prev.payment_method,
+                    }));
+                  }}
+                />
+              </div>
+            )}
 
             {/* Section C: Table and Persons with CustomSelect (CRITICAL) */}
             {orderForm.order_type !== 'TAKEAWAY' && (
@@ -969,6 +991,7 @@ export function POSCheckoutDrawer({
                                 customerName: orderForm.customer_name,
                               })
                             : 1;
+                          lastTableRef.current = selectedNum;
                           setOrderForm((prev) => ({
                             ...prev,
                             table_number: selectedNum,
@@ -1565,7 +1588,7 @@ export function POSCheckoutDrawer({
                     setOrderForm((prev) => ({
                       ...prev,
                       is_paid: true,
-                      payment_method: prev.payment_method || 'CASH',
+                      payment_method: prev.payment_method || 'UPI',
                     }))
                   }
                   style={{
@@ -1639,7 +1662,7 @@ export function POSCheckoutDrawer({
                       const Icon = m.icon;
                       const selected = m.id === 'SPLIT'
                         ? (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))
-                        : (orderForm.payment_method || 'CASH') === m.id;
+                        : (orderForm.payment_method || 'UPI') === m.id;
                       return (
                         <button
                           key={m.id}

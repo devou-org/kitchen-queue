@@ -27,6 +27,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import SplitPaymentBreakdown, { SplitAmounts, formatSplitSummary, parseSplitFromSummary, normalizeSplitAmounts } from './SplitPaymentBreakdown';
 import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
@@ -94,7 +95,7 @@ export function OrderDetailsView({
   const [mounted, setMounted] = useState(false);
   const [tempStatus, setTempStatus] = useState(initialOrder.status);
   const [tempTableNumber, setTempTableNumber] = useState(initialOrder.table_number || '');
-  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'CASH');
+  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'UPI');
   const [splitAmounts, setSplitAmounts] = useState<SplitAmounts>(() => {
     return normalizeSplitAmounts(initialOrder.payment_split, initialOrder.payment_method);
   });
@@ -147,7 +148,7 @@ export function OrderDetailsView({
   React.useEffect(() => {
     setTempStatus(order.status);
     setTempTableNumber(order.table_number || '');
-    setPaymentMethod(order.payment_method || 'CASH');
+    setPaymentMethod(order.payment_method || 'UPI');
     setSplitAmounts(normalizeSplitAmounts(order.payment_split, order.payment_method));
     setIsClosing(false);
   }, [order.id, order.status, order.table_number, order.payment_method, order.payment_split]);
@@ -155,7 +156,7 @@ export function OrderDetailsView({
   const handleUpdateStatus = async (statusToApply: string) => {
     setIsStatusUpdating(true);
     try {
-      let pMethod = statusToApply === 'CLOSED' ? (order.payment_method || paymentMethod || 'CASH') : paymentMethod;
+      let pMethod = statusToApply === 'CLOSED' ? (order.payment_method || paymentMethod || 'UPI') : paymentMethod;
       let pSplit: any = null;
 
       if (statusToApply === 'CLOSED' && (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT'))) {
@@ -201,7 +202,7 @@ export function OrderDetailsView({
   const handleMarkAsPaid = async (methodToUse?: string) => {
     setIsPaymentUpdating(true);
     try {
-      let pMethod = methodToUse || paymentMethod || order.payment_method || 'CASH';
+      let pMethod = methodToUse || paymentMethod || order.payment_method || 'UPI';
       let pSplit: any = null;
 
       if (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT')) {
@@ -430,7 +431,9 @@ export function OrderDetailsView({
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
 
-    const toastId = toast.loading(`🖨️ Printing Bill #${String(order.ticket_number).padStart(3, '0')} to ${savedPrinter}...`);
+    const toastId = toast.loading(`Printing Bill #${String(order.ticket_number).padStart(3, '0')} to ${savedPrinter}...`, {
+      icon: <PrinterIllustration size={20} status="printing" />,
+    });
 
     try {
       // Send print job directly to POS-80C thermal printer (1-click instant silent print)
@@ -1478,7 +1481,7 @@ export function OrderDetailsView({
                         const Icon = m.icon;
                         const selected = m.id === 'SPLIT'
                           ? (paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT'))
-                          : (paymentMethod || 'CASH') === m.id;
+                          : (paymentMethod || 'UPI') === m.id;
                         return (
                           <button
                             key={m.id}
@@ -1568,7 +1571,7 @@ export function OrderDetailsView({
                       ) : (
                         <>
                           <Check size={14} />
-                          <span>Confirm as Paid · {paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split Payment' : (paymentMethod || 'CASH')}</span>
+                          <span>Confirm as Paid · {paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split Payment' : (paymentMethod || 'UPI')}</span>
                         </>
                       )}
                     </button>
