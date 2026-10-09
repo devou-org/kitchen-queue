@@ -46,6 +46,9 @@ export class TablesRepository {
                'notes', o.notes,
                'is_paid', o.is_paid,
                'payment_method', o.payment_method,
+                'payment_split', o.payment_split,
+                'table_number', o.table_number,
+                'discount_amount', o.discount_amount,
                'pending_at', o.pending_at,
                'preparing_at', o.preparing_at,
                'ready_at', o.ready_at,
@@ -63,7 +66,8 @@ export class TablesRepository {
                'quantity', oi.quantity,
                'price_at_purchase', oi.price_at_purchase,
                'product_name', p.name,
-               'counter', p.counter
+               'counter', p.counter,
+                'status', oi.status
              ) ORDER BY oi.id ASC
            ) as items_json
            FROM order_items oi
@@ -71,7 +75,7 @@ export class TablesRepository {
            WHERE oi.order_id = o.id
          ) items_sub ON true
          WHERE o.restaurant_id = $1
-           AND o.status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
+           AND o.status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
            AND o.table_number IS NOT NULL AND o.table_number != ''
            AND (o.order_type IS NULL OR o.order_type NOT IN ('TAKEAWAY', 'DELIVERY'))
          GROUP BY o.restaurant_id, o.table_number
@@ -210,7 +214,7 @@ export class TablesRepository {
       await pool.query(
         `UPDATE orders
          SET table_number = $1
-         WHERE restaurant_id = $2 AND table_number = $3 AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')`,
+         WHERE restaurant_id = $2 AND table_number = $3 AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')`,
         [data.table_number, restaurantId, data.old_table_number]
       ).catch(err => console.error('Failed to update orders table_number:', err));
     }
@@ -240,7 +244,7 @@ export class TablesRepository {
        FROM orders
        WHERE restaurant_id = $1
          AND table_number = $2
-         AND status NOT IN ('PAID', 'CANCELLED', 'EXPIRED')
+         AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
          AND (order_type IS NULL OR order_type != 'TAKEAWAY')`,
       [restaurantId, tableNumber]
     );

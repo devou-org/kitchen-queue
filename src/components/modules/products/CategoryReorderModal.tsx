@@ -130,7 +130,7 @@ export function CategoryReorderModal({ isOpen, onClose, slug, onReordered }: Cat
 
     setAddingCat(true);
     try {
-      const res = await fetch('/api/categories', {
+      const res = await fetch(`/api/categories?slug=${encodeURIComponent(cleanSlug)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

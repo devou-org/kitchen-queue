@@ -9,7 +9,7 @@ import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { useParams } from 'next/navigation';
-import { Search, Banknote, CreditCard, QrCode, Check, Printer } from 'lucide-react';
+import { Search, Banknote, CreditCard, QrCode, Check, Printer, Split } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
@@ -17,6 +17,7 @@ import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { printKotFromBrowser } from '@/lib/client-print';
 import { sortCategoriesByConfig } from '@/lib/category-order';
+import SplitPaymentBreakdown, { SplitAmounts, formatSplitSummary, parseSplitFromSummary } from '@/components/modules/orders/SplitPaymentBreakdown';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -129,6 +130,7 @@ export default function StaffMenuPage() {
     order_type: OrderType | string;
     is_paid?: boolean;
     payment_method?: string;
+    payment_split?: any;
   }>({
     customer_name: '',
     phone: '',
@@ -138,7 +140,9 @@ export default function StaffMenuPage() {
     order_type: 'DINE_IN',
     is_paid: false,
     payment_method: 'CASH',
+    payment_split: null,
   });
+  const [menuSplit, setMenuSplit] = useState<SplitAmounts>({ CASH: 0, UPI: 0, CARD: 0 });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchTables = useCallback(async () => {
@@ -224,7 +228,7 @@ export default function StaffMenuPage() {
     });
 
     const handleKotAutoPrint = async (data: any) => {
-      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
+      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
       if (!autoPrint) return;
 
       const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
@@ -398,6 +402,7 @@ export default function StaffMenuPage() {
         is_pos: true,
         is_paid: Boolean(orderForm.is_paid),
         payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
+        payment_split: orderForm.is_paid ? orderForm.payment_split : undefined,
       });
 
       if (res.success && res.data) {
@@ -405,7 +410,8 @@ export default function StaffMenuPage() {
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH' });
+        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH', payment_split: null });
+        setMenuSplit({ CASH: 0, UPI: 0, CARD: 0 });
         await fetchTables();
       } else {
         toast.error(res.error || 'Failed to place order');
@@ -545,7 +551,15 @@ export default function StaffMenuPage() {
             <form onSubmit={submitOrder} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <OrderTypeSelector
                 value={(orderForm.order_type as OrderType) || 'DINE_IN'}
-                onChange={(val) => setOrderForm({ ...orderForm, order_type: val })}
+                onChange={(val) => {
+                  const isTakeaway = val === 'TAKEAWAY';
+                  setOrderForm((prev) => ({
+                    ...prev,
+                    order_type: val,
+                    is_paid: isTakeaway ? true : false,
+                    payment_method: isTakeaway ? (prev.payment_method || 'CASH') : prev.payment_method,
+                  }));
+                }}
               />
 
               {orderForm.order_type !== 'TAKEAWAY' && (
@@ -701,27 +715,44 @@ export default function StaffMenuPage() {
                 {orderForm.is_paid ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
                     <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', letterSpacing: '0.02em' }}>Payment Method</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                       {[
                         { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'UPI', label: 'UPI / QR', icon: QrCode },
                         { id: 'CARD', label: 'Card', icon: CreditCard },
+                        { id: 'SPLIT', label: 'Split', icon: Split },
                       ].map((m) => {
                         const Icon = m.icon;
-                        const selected = (orderForm.payment_method || 'CASH') === m.id;
+                        const selected = m.id === 'SPLIT'
+                          ? (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))
+                          : (orderForm.payment_method || 'CASH') === m.id;
                         return (
                           <button
                             key={m.id}
                             type="button"
-                            onClick={() => setOrderForm({ ...orderForm, payment_method: m.id })}
+                            onClick={() => {
+                              if (m.id === 'SPLIT') {
+                                if (menuSplit.CASH === 0 && menuSplit.UPI === 0 && menuSplit.CARD === 0) {
+                                  const half = Math.round((totalPrice / 2) * 100) / 100;
+                                  const other = Math.round((totalPrice - half) * 100) / 100;
+                                  const init = { CASH: half, UPI: other, CARD: 0 };
+                                  setMenuSplit(init);
+                                  setOrderForm({ ...orderForm, payment_method: formatSplitSummary(init), payment_split: init });
+                                } else {
+                                  setOrderForm({ ...orderForm, payment_method: formatSplitSummary(menuSplit), payment_split: menuSplit });
+                                }
+                              } else {
+                                setOrderForm({ ...orderForm, payment_method: m.id, payment_split: null });
+                              }
+                            }}
                             style={{
                               height: '36px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '5px',
+                              gap: '4px',
                               borderRadius: '6px',
-                              fontSize: '12px',
+                              fontSize: '11.5px',
                               fontWeight: 600,
                               cursor: 'pointer',
                               border: selected ? '1.5px solid var(--primary, #059669)' : '1px solid #CBD5E1',
@@ -731,12 +762,28 @@ export default function StaffMenuPage() {
                               transition: 'all 0.15s ease',
                             }}
                           >
-                            {selected ? <Check size={14} strokeWidth={2.5} /> : <Icon size={13} />}
+                            {selected ? <Check size={13} strokeWidth={2.5} /> : <Icon size={13} />}
                             <span>{m.label}</span>
                           </button>
                         );
                       })}
                     </div>
+
+                    {(orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT')) && (
+                      <SplitPaymentBreakdown
+                        totalAmount={totalPrice}
+                        split={menuSplit}
+                        onChange={(newSplit, summary) => {
+                          setMenuSplit(newSplit);
+                          setOrderForm((prev) => ({
+                            ...prev,
+                            payment_method: summary,
+                            payment_split: newSplit,
+                          }));
+                        }}
+                        theme="emerald"
+                      />
+                    )}
                   </div>
                 ) : (
                   <div style={{ fontSize: '11.5px', color: '#64748B', paddingTop: '6px', borderTop: '1px solid #F1F5F9' }}>

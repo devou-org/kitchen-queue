@@ -9,8 +9,8 @@ import { productService } from '@/app/services/products.api';
 import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { useParams } from 'next/navigation';
-import { Search, X } from 'lucide-react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { Search, X, MapPin } from 'lucide-react';
 import { OrderType } from '@/types';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
@@ -104,7 +104,9 @@ function ProductCard({ product, quantity, onUpdate }: {
 export default function AdminPosPage() {
   const { restaurant } = useRestaurant();
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = (params?.slug as string) || restaurant?.slug || '';
+  const tableParam = searchParams?.get('table') || searchParams?.get('table_number') || '';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
@@ -124,7 +126,7 @@ export default function AdminPosPage() {
   const [orderForm, setOrderForm] = useState<POSOrderFormData>({
     customer_name: '',
     phone: '',
-    table_number: '',
+    table_number: tableParam || '',
     party_size: 1,
     notes: '',
     order_type: 'DINE_IN',
@@ -134,6 +136,18 @@ export default function AdminPosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<any>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState<number>(0);
+
+  useEffect(() => {
+    if (tableParam) {
+      setOrderForm(prev => ({
+        ...prev,
+        table_number: tableParam,
+        order_type: 'DINE_IN',
+        is_paid: false,
+      }));
+      toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+    }
+  }, [tableParam]);
 
   useEffect(() => {
     if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
@@ -232,7 +246,7 @@ export default function AdminPosPage() {
     });
 
     const handleKotAutoPrint = async (data: any) => {
-      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
+      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
       if (!autoPrint) return;
 
       const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
@@ -450,6 +464,8 @@ export default function AdminPosPage() {
       const phoneToUse = orderForm.phone || `+910000000000`;
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
+      const discountAmount = Math.max(0, Number(orderForm.discount_amount) || 0);
+
       const res = await orderService.createOrder({
         customer_name: nameToUse,
         phone: phoneToUse,
@@ -461,10 +477,31 @@ export default function AdminPosPage() {
         is_pos: true,
         is_paid: Boolean(orderForm.is_paid),
         payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
+        payment_split: orderForm.is_paid ? orderForm.payment_split : undefined,
+        discount_amount: discountAmount,
       });
 
       if (res.success && res.data) {
         const createdOrder = res.data;
+
+        // If a loyalty reward was selected, trigger redemption API
+        if (orderForm.selected_reward_id && orderForm.phone) {
+          try {
+            const slugStr = Array.isArray(slug) ? slug[0] : slug;
+            await fetch('/api/admin/loyalty/redeem', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                slug: slugStr,
+                phone: orderForm.phone.trim(),
+                reward_id: orderForm.selected_reward_id,
+              }),
+            });
+          } catch (err) {
+            console.error('Loyalty reward redemption call error:', err);
+          }
+        }
+
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
 
         // Check if Print Bill button was clicked
@@ -485,6 +522,8 @@ export default function AdminPosPage() {
           order_type: 'DINE_IN',
           is_paid: false,
           payment_method: 'CASH',
+          discount_amount: 0,
+          selected_reward_id: undefined,
           auto_print_bill: willPrintBill,
         });
         await fetchTables();
@@ -658,8 +697,43 @@ export default function AdminPosPage() {
               )}
             </div>
 
-            {/* Right: Maximize Toggle should be last */}
+            {/* Right: Selected Table Badge & Maximize Toggle */}
             <div className="pos-actions">
+              {orderForm.table_number && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    background: '#FEF3C7',
+                    border: '1px solid #FDE68A',
+                    color: '#92400E',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}
+                >
+                  <MapPin size={13} style={{ color: '#D97706' }} />
+                  <span>Table #{orderForm.table_number}</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrderForm((prev) => ({ ...prev, table_number: '' }))}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#B45309',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                    title="Clear selected table"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
               <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                 <LayoutMaximizeToggle />
               </div>

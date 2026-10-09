@@ -39,8 +39,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
-    if (!admin && customer?.phone !== order.phone) {
-      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+    if (!admin) {
+      const normCust = customer?.phone?.replace(/\D/g, '').slice(-10);
+      const normOrder = order.phone?.replace(/\D/g, '').slice(-10);
+      if (!normCust || !normOrder || normCust !== normOrder) {
+        return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+      }
     }
 
     return NextResponse.json({ success: true, data: order });
@@ -60,7 +64,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items, payment_method, order_type } = body;
+    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items, payment_method, payment_split, order_type } = body;
 
     const existing = await getOrderById(restaurant.id, id);
     if (!existing) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
@@ -134,8 +138,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       // Verify the order belongs to this customer (by phone)
-      if (customer.phone && existing.phone !== customer.phone) {
-        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      if (customer.phone) {
+        const normCust = customer.phone.replace(/\D/g, '').slice(-10);
+        const normOrder = existing.phone?.replace(/\D/g, '').slice(-10);
+        if (!normCust || !normOrder || normCust !== normOrder) {
+          return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+        }
       }
     }
 
@@ -245,8 +253,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
               quantity: d.quantity,
             }));
 
-            // 🖨️ AUTO-PRINT RUNNING KOT: If and only if items were added to an already active/preparing order
-            if (existing.status !== 'PENDING' && kotAddOnItems.length > 0) {
+            // 🖨️ AUTO-PRINT RUNNING KOT: If and only if items were added to an already active/preparing order and mode is KOT
+            const isKotMode = ((restaurant as any).kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+            if (existing.status !== 'PENDING' && kotAddOnItems.length > 0 && isKotMode) {
               try {
                 await autoQueueAndBroadcastKot(restaurant.id, id, {
                   isAddOn: true,
@@ -279,15 +288,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // ✅ UPDATE STATUS, TABLE NUMBER & PAYMENT STATUS ATOMICALLY
-    const shouldUpdateStatusOrPayment = Boolean(status || typeof is_paid === 'boolean' || payment_method || (!shouldUpdateDetails && table_number !== undefined));
+    const shouldUpdateStatusOrPayment = Boolean(status || typeof is_paid === 'boolean' || payment_method || payment_split !== undefined || (!shouldUpdateDetails && table_number !== undefined));
     if (shouldUpdateStatusOrPayment) {
       if (status && status !== existing.status) {
+        if (status === 'PAID') {
+          return NextResponse.json({
+            success: false,
+            error: "Order status 'PAID' has been replaced by 'CLOSED'. Use status 'CLOSED' with payment fields instead.",
+          }, { status: 400 });
+        }
+
         // Fetch queue statuses for the restaurant to validate the new status
         const allowedStatusesRes = await sql`SELECT possible_queue_status FROM queue_status WHERE restaurant_id = ${restaurant.id}` as {possible_queue_status: string}[];
-        const allowedStatuses = allowedStatusesRes.map(s => s.possible_queue_status);
+        const allowedStatuses = allowedStatusesRes.map(s => s.possible_queue_status).filter(s => s !== 'PAID');
         
         // Also allow base order statuses for backwards compatibility
-        const baseOrderStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED'];
+        const baseOrderStatuses = ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CLOSED', 'CANCELLED', 'EXPIRED'];
         const validStatuses = [...new Set([...allowedStatuses, ...baseOrderStatuses])];
         
         if (!validStatuses.includes(status)) {
@@ -311,12 +327,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       // Update order and trigger billing atomically inside db transaction
       const effectiveIsPaid = (status === 'CANCELLED' || status === 'EXPIRED') ? false : is_paid;
-      order = await completeOrderAndBill(restaurant.id, id, status, effectiveIsPaid, table_number, payment_method);
+      order = await completeOrderAndBill(restaurant.id, id, status, effectiveIsPaid, table_number, payment_method, payment_split);
 
       console.log(`✅ Order Updated: Order #${existing.ticket_number} → Status: ${order.status}, Table: ${order.table_number}, Paid: ${order.is_paid}`);
 
-      // 🖨️ AUTO-PRINT KOT PER COUNTER when transitioning to PREPARING
-      if (status === 'PREPARING' && existing.status !== 'PREPARING') {
+      // 🖨️ AUTO-PRINT KOT PER COUNTER when transitioning to PREPARING (only in KOT mode)
+      const isKotMode = ((restaurant as any).kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+      if (status === 'PREPARING' && existing.status !== 'PREPARING' && isKotMode) {
         try {
           await autoQueueAndBroadcastKot(restaurant.id, id, true);
         } catch (kotErr) {

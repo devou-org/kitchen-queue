@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         city: restaurant.city || 'Thalassery',
         latitude: restaurant.latitude ? Number(restaurant.latitude) : null,
         longitude: restaurant.longitude ? Number(restaurant.longitude) : null,
+        kitchen_mode: restaurant.kitchen_mode || 'KOT',
         // Derived channel name so clients don't have to construct it themselves
         pusher_channel: `queue-channel-${restaurant.id}`,
         modules,

@@ -4,11 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { authService } from '@/app/services/auth.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-
-const COUNTRY_CODES = [
-  { code: '+91', label: '🇮🇳 +91', country: 'India' },
-
-];
+import { COUNTRY_CODES } from '@/lib/constants';
 
 export default function LoginPage() {
   const router = useRouter();

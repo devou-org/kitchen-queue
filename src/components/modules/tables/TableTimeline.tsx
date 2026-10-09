@@ -6,16 +6,18 @@ interface TableTimelineProps {
   pendingAt?: string;
   preparingAt?: string;
   readyAt?: string;
+  servedAt?: string;
+  closedAt?: string;
   paidAt?: string;
   status: string;
 }
 
-export function TableTimeline({ pendingAt, preparingAt, readyAt, paidAt, status }: TableTimelineProps) {
+export function TableTimeline({ pendingAt, preparingAt, readyAt, servedAt, closedAt, paidAt, status }: TableTimelineProps) {
   const steps = [
     { label: 'Pending', time: pendingAt, active: Boolean(pendingAt) || status === 'PENDING' },
     { label: 'Preparing', time: preparingAt, active: Boolean(preparingAt) || status === 'PREPARING' },
-    { label: 'Ready', time: readyAt, active: Boolean(readyAt) || status === 'READY' },
-    { label: 'Paid', time: paidAt, active: Boolean(paidAt) || status === 'PAID' },
+    { label: 'Served', time: servedAt, active: Boolean(servedAt) || status === 'SERVED' },
+    { label: 'Closed', time: closedAt || paidAt, active: Boolean(closedAt || paidAt) || status === 'CLOSED' || status === 'PAID' },
   ];
 
   return (
