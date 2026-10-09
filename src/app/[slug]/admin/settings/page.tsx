@@ -11,6 +11,7 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { ServiceToggle, checkOperatingHours } from '@/components/ServiceToggle';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 
 interface CollapsibleCardProps {
   id: string;
@@ -131,7 +132,9 @@ export default function AdminSettings() {
       localStorage.setItem('qdine_auto_print_kot', String(nextVal));
       localStorage.setItem('qdine_auto_print_bill', String(nextVal));
     }
-    toast.success(nextVal ? '🖨️ Auto-Print (KOT & Bill): Enabled' : '⏸️ Auto-Print: Paused');
+    toast.success(nextVal ? 'Auto-Print (KOT & Bill): Enabled' : 'Auto-Print: Paused', {
+      icon: <PrinterIllustration size={20} status={nextVal ? 'success' : 'idle'} />,
+    });
   };
 
   const toggleSection = (key: string) => {

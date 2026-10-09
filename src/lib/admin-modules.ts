@@ -9,7 +9,7 @@ export interface AdminModuleDefinition {
 export const ADMIN_MODULES: AdminModuleDefinition[] = [
   {
     key: 'pos',
-    name: 'POS Terminal',
+    name: 'POS',
     description: 'Take dine-in & takeaway orders, bill generation',
     pathSegment: 'pos',
     iconName: 'Store',

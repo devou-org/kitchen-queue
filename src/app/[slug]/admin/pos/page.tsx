@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
@@ -17,6 +17,7 @@ import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { POSCheckoutDrawer, POSOrderFormData } from '@/components/modules/pos/POSCheckoutDrawer';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -131,23 +132,33 @@ export default function AdminPosPage() {
     notes: '',
     order_type: 'DINE_IN',
     is_paid: false,
-    payment_method: 'CASH',
+    payment_method: 'UPI',
   });
   const [submitting, setSubmitting] = useState(false);
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<any>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState<number>(0);
 
+  const toastedTableRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (tableParam) {
+      const matchedTable = tables.find(
+        (t: any) => String(t.table_number) === String(tableParam)
+      );
+      const cap = matchedTable ? (Number(matchedTable.capacity) || 1) : 1;
       setOrderForm(prev => ({
         ...prev,
         table_number: tableParam,
         order_type: 'DINE_IN',
+        party_size: cap > 1 ? cap : (prev.party_size || 1),
         is_paid: false,
       }));
-      toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+      if (toastedTableRef.current !== tableParam) {
+        toastedTableRef.current = tableParam;
+        toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+      }
     }
-  }, [tableParam]);
+  }, [tableParam, tables]);
 
   useEffect(() => {
     if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
@@ -254,8 +265,8 @@ export default function AdminPosPage() {
         return;
       }
 
-      toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: '🖨️',
+      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: <PrinterIllustration size={22} status="printing" />,
         duration: 3000,
       });
 
@@ -270,7 +281,8 @@ export default function AdminPosPage() {
         });
         const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            icon: <PrinterIllustration size={22} status="success" />,
             id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
           });
         }
@@ -398,7 +410,9 @@ export default function AdminPosPage() {
       }
 
       if (data.mode === 'server' || data.mode === 'agent') {
-        toast.success(`🖨️ Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`);
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, {
+          icon: <PrinterIllustration size={20} status="success" />,
+        });
         return;
       }
 
@@ -415,7 +429,9 @@ export default function AdminPosPage() {
       });
 
       if (clientRes.success) {
-        toast.success(`🖨️ Auto-printed Bill #${String(order.ticket_number).padStart(3, '0')}!`);
+        toast.success(`Auto-printed Bill #${String(order.ticket_number).padStart(3, '0')}!`, {
+          icon: <PrinterIllustration size={20} status="success" />,
+        });
       }
     } catch (err) {
       console.error('Auto-print bill execution error:', err);
@@ -521,7 +537,7 @@ export default function AdminPosPage() {
           notes: '',
           order_type: 'DINE_IN',
           is_paid: false,
-          payment_method: 'CASH',
+          payment_method: 'UPI',
           discount_amount: 0,
           selected_reward_id: undefined,
           auto_print_bill: willPrintBill,
@@ -856,6 +872,7 @@ export default function AdminPosPage() {
         setOrderForm={setOrderForm}
         onSubmitOrder={submitOrder}
         submitting={submitting}
+        hideOrderType={Boolean(tableParam)}
       />
       </div>
     </AdminContentWrapper>

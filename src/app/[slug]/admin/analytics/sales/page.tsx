@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, getCurrentBusinessDate } from '@/lib/format';
 import { productService } from '@/app/services/products.api';
 import { adminService } from '@/app/services/admin.api';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
@@ -104,15 +104,14 @@ export default function AdminSalesAnalyticsPage() {
   const [dateTo, setDateTo] = useState(() =>
     new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
   );
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
-  });
+  const [dateFrom, setDateFrom] = useState(() =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+  );
   const [orderCount, setOrderCount] = useState(0);
   const [overallRevenue, setOverallRevenue] = useState(0);
   const [dailyData, setDailyData] = useState<any[]>([]);
   const [paymentData, setPaymentData] = useState<any[]>([]);
+  const hasInitializedDateRef = useRef(false);
 
   const fetchData = useCallback(async (manualFrom?: string, manualTo?: string) => {
     setLoading(true);
@@ -169,6 +168,17 @@ export default function AdminSalesAnalyticsPage() {
       setLoading(false);
     }
   }, [dateFrom, dateTo]);
+
+  // Sync with restaurant business date if available
+  useEffect(() => {
+    if (restaurant && !hasInitializedDateRef.current) {
+      hasInitializedDateRef.current = true;
+      const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
+      setDateFrom(bDate);
+      setDateTo(bDate);
+      fetchData(bDate, bDate);
+    }
+  }, [restaurant, fetchData]);
 
   // Initial fetch on mount
   useEffect(() => {
