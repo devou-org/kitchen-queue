@@ -87,20 +87,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method, payment_split } = body;
 
-    if (!items || !items.length) {
+    if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
         success: false,
-        error: 'Order items are required'
+        error: 'Customer name, phone, and items are required'
       }, { status: 400 });
     }
-
-    const nameToUse = (customer_name && customer_name.trim() !== '') 
-      ? customer_name.trim() 
-      : (order_type === 'TAKEAWAY' ? 'Takeaway Customer' : (table_number ? `Table ${table_number}` : 'Guest Customer'));
-
-    const phoneToUse = (phone && phone.trim() !== '' && !phone.includes('0000000')) 
-      ? phone.trim() 
-      : undefined;
 
     if (order_type !== 'TAKEAWAY' && table_number) {
       const { TablesRepository } = await import('@/modules/tables/tables.repository');
@@ -109,8 +101,8 @@ export async function POST(request: NextRequest) {
       const targetTable = tables.find(t => String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase());
       if (targetTable) {
         const check = checkTableAssignment(targetTable, party_size || 1, {
-          phone: phoneToUse,
-          customerName: nameToUse
+          phone,
+          customerName: customer_name
         });
         if (!check.allowed) {
           return NextResponse.json({
@@ -161,8 +153,8 @@ export async function POST(request: NextRequest) {
 
     const order = await createOrder({
       restaurant_id: restaurant.id,
-      customer_name: nameToUse,
-      phone: phoneToUse,
+      customer_name: customer_name.trim(),
+      phone,
       total_price,
       subtotal,
       discount_amount,

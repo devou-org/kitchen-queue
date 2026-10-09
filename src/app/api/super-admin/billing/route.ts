@@ -64,21 +64,9 @@ export async function GET(request: NextRequest) {
       SELECT 
         t.*,
         r.name AS restaurant_name,
-        r.slug AS restaurant_slug,
-        COALESCE(
-          o.customer_name,
-          (SELECT o2.customer_name FROM orders o2 WHERE o2.id::text = t.reference_id LIMIT 1),
-          (SELECT o3.customer_name FROM otp_logs ol JOIN orders o3 ON o3.phone = ol.phone WHERE ol.id::text = t.reference_id AND o3.restaurant_id = t.restaurant_id ORDER BY o3.created_at DESC LIMIT 1),
-          (SELECT u.name FROM otp_logs ol2 JOIN users u ON u.phone = ol2.phone WHERE ol2.id::text = t.reference_id LIMIT 1)
-        ) AS customer_name,
-        COALESCE(
-          o.ticket_number,
-          (SELECT o2.ticket_number FROM orders o2 WHERE o2.id::text = t.reference_id LIMIT 1),
-          (SELECT o3.ticket_number FROM otp_logs ol JOIN orders o3 ON o3.phone = ol.phone WHERE ol.id::text = t.reference_id AND o3.restaurant_id = t.restaurant_id ORDER BY o3.created_at DESC LIMIT 1)
-        ) AS ticket_number
+        r.slug AS restaurant_slug
       FROM billing_transactions t
       JOIN restaurants r ON t.restaurant_id = r.id
-      LEFT JOIN orders o ON o.id::text = t.reference_id
       WHERE 1=1
     `;
     const txParams: any[] = [];

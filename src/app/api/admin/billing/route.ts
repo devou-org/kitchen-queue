@@ -19,28 +19,10 @@ export async function GET(request: NextRequest) {
 
     // 1. Fetch transactions (latest 50)
     const transactions = await sql`
-      SELECT 
-        bt.id, 
-        bt.transaction_type, 
-        bt.amount, 
-        bt.reference_id, 
-        bt.description, 
-        bt.created_at,
-        COALESCE(
-          o.customer_name,
-          (SELECT o2.customer_name FROM orders o2 WHERE o2.id::text = bt.reference_id LIMIT 1),
-          (SELECT o3.customer_name FROM otp_logs ol JOIN orders o3 ON o3.phone = ol.phone WHERE ol.id::text = bt.reference_id AND o3.restaurant_id = bt.restaurant_id ORDER BY o3.created_at DESC LIMIT 1),
-          (SELECT u.name FROM otp_logs ol2 JOIN users u ON u.phone = ol2.phone WHERE ol2.id::text = bt.reference_id LIMIT 1)
-        ) AS customer_name,
-        COALESCE(
-          o.ticket_number,
-          (SELECT o2.ticket_number FROM orders o2 WHERE o2.id::text = bt.reference_id LIMIT 1),
-          (SELECT o3.ticket_number FROM otp_logs ol JOIN orders o3 ON o3.phone = ol.phone WHERE ol.id::text = bt.reference_id AND o3.restaurant_id = bt.restaurant_id ORDER BY o3.created_at DESC LIMIT 1)
-        ) AS ticket_number
-      FROM billing_transactions bt
-      LEFT JOIN orders o ON o.id::text = bt.reference_id
-      WHERE bt.restaurant_id = ${restaurant.id}
-      ORDER BY bt.created_at DESC
+      SELECT id, transaction_type, amount, reference_id, description, created_at
+      FROM billing_transactions
+      WHERE restaurant_id = ${restaurant.id}
+      ORDER BY created_at DESC
       LIMIT 50
     `;
 
