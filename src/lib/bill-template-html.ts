@@ -59,9 +59,9 @@ export function generateBillTemplateContentHTML(order: Order, restaurant?: BillR
     ? 'Dine-in'
     : orderTypeRaw
       ? (() => {
-        const t = String(orderTypeRaw).toLowerCase().replace(/_/g, '-');
-        return t.charAt(0).toUpperCase() + t.slice(1);
-      })()
+          const t = String(orderTypeRaw).toLowerCase().replace(/_/g, '-');
+          return t.charAt(0).toUpperCase() + t.slice(1);
+        })()
       : 'Takeaway';
 
   const customerDisplay = order.customer_name || 'Guest';
@@ -126,13 +126,13 @@ export function generateBillTemplateContentHTML(order: Order, restaurant?: BillR
   // ---- totals ----
   const gstHtml = gstType === 'REGULAR' && (gstRate || gstAmount)
     ? (() => {
-      const half = gstRate / 2;
-      const halfAmt = Math.round((gstAmount / 2) * 100) / 100;
-      return `
+        const half = gstRate / 2;
+        const halfAmt = Math.round((gstAmount / 2) * 100) / 100;
+        return `
           ${row(`CGST ${half}%`, `Rs.${num(halfAmt)}`)}
           ${row(`SGST ${half}%`, `Rs.${num(halfAmt)}`)}
           ${row(`Total GST ${gstRate}%`, `Rs.${num(gstAmount)}`)}`;
-    })()
+      })()
     : '';
 
   const discountHtml = discount > 0 ? row('Discount', `-Rs.${num(discount)}`) : '';
@@ -259,7 +259,7 @@ export function printBillTemplateDirectly(order: Order, restaurant?: BillRestaur
     const iframeId = 'bill-print-direct-iframe';
     let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
     if (iframe) {
-      try { iframe.remove(); } catch { }
+      try { iframe.remove(); } catch {}
     }
 
     iframe = document.createElement('iframe');
@@ -293,7 +293,7 @@ export function printBillTemplateDirectly(order: Order, restaurant?: BillRestaur
         console.error('Direct bill print error:', err);
       } finally {
         setTimeout(() => {
-          try { iframe?.remove(); } catch { }
+          try { iframe?.remove(); } catch {}
         }, 60000);
       }
     };

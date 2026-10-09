@@ -1,7 +1,6 @@
 import React from 'react';
 import { TrendingUp } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Pagination } from '@/components/ui/Pagination';
 
 interface Transaction {
   id: string;
@@ -10,9 +9,6 @@ interface Transaction {
   reference_id: string;
   description: string;
   created_at: string;
-  customer_name?: string | null;
-  ticket_number?: number | string | null;
-  order_id?: string | null;
 }
 
 interface RecentBillingOperationsProps {
@@ -25,34 +21,6 @@ interface RecentBillingOperationsProps {
   txDateTo: string;
   setTxDateTo: (date: string) => void;
   txLoading: boolean;
-}
-
-function renderTransactionDescription(t: Transaction) {
-  if (t.customer_name) {
-    let mainText = t.description;
-
-    if (t.transaction_type === 'OTP') {
-      mainText = `OTP SMS charge for ${t.customer_name}`;
-    } else if (t.transaction_type === 'PER_ORDER') {
-      mainText = `Per Order Charge for ${t.customer_name}`;
-    } else if (t.reference_id && mainText.includes(t.reference_id)) {
-      mainText = mainText.replace(`#${t.reference_id}`, t.customer_name).replace(t.reference_id, t.customer_name);
-    } else {
-      mainText = `${mainText} (${t.customer_name})`;
-    }
-
-    return (
-      <span style={{ fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
-        {mainText}
-      </span>
-    );
-  }
-
-  return (
-    <span style={{ color: '#475569' }}>
-      {t.description}
-    </span>
-  );
 }
 
 export default function RecentBillingOperations({
@@ -168,8 +136,8 @@ export default function RecentBillingOperations({
                       {t.transaction_type}
                     </span>
                   </td>
-                  <td style={{ ...styles.td, maxWidth: '380px' }}>
-                    {renderTransactionDescription(t)}
+                  <td style={{ ...styles.td, maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {t.description}
                   </td>
                   <td style={styles.tdAlignRight}>₹{parseFloat(t.amount || '0').toFixed(2)}</td>
                 </tr>
@@ -180,14 +148,28 @@ export default function RecentBillingOperations({
       </div>
       
       {/* Pagination Controls */}
-      {totalTxs > 0 && (
-        <Pagination
-          currentPage={txPage}
-          totalPages={Math.max(1, Math.ceil(totalTxs / 10))}
-          onPageChange={(p) => setTxPage(p)}
-          pageSize={10}
-          totalRecords={totalTxs}
-        />
+      {totalTxs > 10 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff', flexWrap: 'wrap', gap: '12px' }}>
+          <span style={{ fontSize: '12px', color: '#64748b' }}>
+            Showing {(txPage - 1) * 10 + 1} to {Math.min(txPage * 10, totalTxs)} of {totalTxs}
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={() => setTxPage(p => Math.max(1, p - 1))}
+              disabled={txPage === 1}
+              style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: txPage === 1 ? '#e2e8f0' : '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: txPage === 1 ? 'not-allowed' : 'pointer' }}
+            >
+              Prev
+            </button>
+            <button 
+              onClick={() => setTxPage(p => Math.min(Math.ceil(totalTxs / 10), p + 1))}
+              disabled={txPage >= Math.ceil(totalTxs / 10)}
+              style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: txPage >= Math.ceil(totalTxs / 10) ? '#e2e8f0' : '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: txPage >= Math.ceil(totalTxs / 10) ? 'not-allowed' : 'pointer' }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { formatPrice, getCurrentBusinessDate } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { productService } from '@/app/services/products.api';
 import { adminService } from '@/app/services/admin.api';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
@@ -101,13 +101,14 @@ export default function AdminSalesAnalyticsPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [page, setPage] = useState(1);
-  const initialSyncDone = useRef(false);
   const [dateTo, setDateTo] = useState(() =>
-    getCurrentBusinessDate(restaurant?.timezone, restaurant?.rollover_time)
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
   );
-  const [dateFrom, setDateFrom] = useState(() =>
-    getCurrentBusinessDate(restaurant?.timezone, restaurant?.rollover_time)
-  );
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  });
   const [orderCount, setOrderCount] = useState(0);
   const [overallRevenue, setOverallRevenue] = useState(0);
   const [dailyData, setDailyData] = useState<any[]>([]);
@@ -169,21 +170,9 @@ export default function AdminSalesAnalyticsPage() {
     }
   }, [dateFrom, dateTo]);
 
-  // Initial fetch and restaurant sync
+  // Initial fetch on mount
   useEffect(() => {
-    if (restaurant && !initialSyncDone.current) {
-      initialSyncDone.current = true;
-      const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
-      setDateFrom(bDate);
-      setDateTo(bDate);
-      fetchData(bDate, bDate);
-    }
-  }, [restaurant, fetchData]);
-
-  useEffect(() => {
-    if (!restaurant) {
-      fetchData();
-    }
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
