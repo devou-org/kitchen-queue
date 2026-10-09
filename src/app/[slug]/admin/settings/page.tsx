@@ -101,7 +101,7 @@ export default function AdminSettings() {
   const [saving, setSaving] = useState(false);
 
   // Auto-Print State (synced with orders and pos)
-  const [autoPrintKot, setAutoPrintKot] = useState(true);
+  const [autoPrintKot, setAutoPrintKot] = useState(false);
   const [isServiceOnline, setIsServiceOnline] = useState(true);
 
   const SECTION_KEYS = ['service_status', 'profile', 'menu', 'kitchen_workflow', 'hours', 'autoprint', 'gst', 'preview', 'qrcode'];
@@ -119,7 +119,7 @@ export default function AdminSettings() {
     if (typeof window !== 'undefined') {
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
       if (savedAutoPrint !== null) {
-        setAutoPrintKot(savedAutoPrint !== 'false');
+        setAutoPrintKot(savedAutoPrint === 'true');
       }
     }
   }, []);
