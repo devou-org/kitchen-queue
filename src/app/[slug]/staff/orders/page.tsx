@@ -36,7 +36,7 @@ export default function StaffOrders() {
   const [tables, setTables] = useState<any[]>([]);
   const [counters, setCounters] = useState<any[]>([]);
   const [showKitchenSnapshot, setShowKitchenSnapshot] = useState(false);
-  const [autoPrintKot, setAutoPrintKot] = useState(true);
+  const [autoPrintKot, setAutoPrintKot] = useState(false);
   const [counterDrawerOpen, setCounterDrawerOpen] = useState(false);
   const ordersRef = useRef<Order[]>([]);
 
@@ -45,7 +45,7 @@ export default function StaffOrders() {
       const savedCounter = localStorage.getItem('qdine_orders_counter_filter');
       if (savedCounter !== null) setCounterFilter(savedCounter);
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
-      if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint !== 'false');
+      if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint === 'true');
 
       tryAutoConnectBluetooth();
     }
@@ -205,7 +205,7 @@ export default function StaffOrders() {
 
     const handleKotAutoPrint = async (data: any) => {
       // Check if auto-print is enabled on this device
-      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
+      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
       if (!autoPrint) return;
 
       // Only filter if this station is an explicitly locked dedicated KDS station
