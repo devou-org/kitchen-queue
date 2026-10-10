@@ -33,7 +33,7 @@ export default function OrderStatusPage() {
   const fetchOrders = async (pageNum = 1, silent = false) => {
     try {
       const userStr = localStorage.getItem('user');
-      if (!userStr) { 
+      if (!userStr) {
         if (restaurant?.id) {
           const queueTicket = localStorage.getItem(`queue_ticket_${restaurant.id}`);
           if (queueTicket) {
@@ -43,15 +43,15 @@ export default function OrderStatusPage() {
                 router.replace(`/${slug}/order-status/${parsed.tokenNumber}`);
                 return;
               }
-            } catch (e) {}
+            } catch (e) { }
           }
         }
-        if (!silent) setLoading(false); 
-        return; 
+        if (!silent) setLoading(false);
+        return;
       }
       const user = JSON.parse(userStr);
       const res = await orderService.getHistory(user.phone, pageNum, 20);
-      
+
       if (res.success && res.data) {
         if (pageNum === 1) {
           setOrders(res.data);
@@ -91,7 +91,7 @@ export default function OrderStatusPage() {
     channel.bind('pusher:subscription_succeeded', handleSubSuccess);
     channel.bind('pusher:subscription_error', handleSubError);
 
-    return () => { 
+    return () => {
       channel.unbind('order_update', handleOrderUpdate);
       channel.unbind('new_order', handleNewOrder);
       channel.unbind('pusher:subscription_succeeded', handleSubSuccess);
@@ -102,7 +102,8 @@ export default function OrderStatusPage() {
   const Header = () => (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'white', borderBottom: '1px solid rgba(0,0,0,0.05)', position: 'sticky', top: 0, zIndex: 10 }}>
       {restaurant?.primary_color && (
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{
+          __html: `
           :root {
             --primary: ${restaurant.primary_color};
             --primary-dark: ${restaurant.primary_color};
@@ -154,7 +155,7 @@ export default function OrderStatusPage() {
 
     orders.forEach(order => {
       const orderDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(order.created_at));
-      
+
       let label = orderDate;
       if (orderDate === today) label = 'Today';
       else if (orderDate === yesterday) label = 'Yesterday';
@@ -216,7 +217,7 @@ export default function OrderStatusPage() {
                   {dateLabel}
                 </h3>
               </div>
-              
+
               {dateOrders.map(order => (
                 <Link prefetch={false} key={order.id} href={`/${slug}/order-status/${order.id}`} style={{
                   display: 'flex', flexDirection: 'column',
@@ -237,7 +238,7 @@ export default function OrderStatusPage() {
                         {new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).format(new Date(order.created_at))}
                       </p>
                     </div>
-                    <span style={{ 
+                    <span style={{
                       fontSize: '11px', fontWeight: 800, padding: '4px 8px', borderRadius: '4px', letterSpacing: '0.05em',
                       backgroundColor: order.status === 'READY' ? '#ecfdf5' : order.status === 'PENDING' ? '#fffbeb' : '#f8fafc',
                       color: order.status === 'READY' ? '#059669' : order.status === 'PENDING' ? '#d97706' : 'var(--text-secondary)',
@@ -247,7 +248,7 @@ export default function OrderStatusPage() {
                       {order.status}
                     </span>
                   </div>
-                  
+
                   {order.total_price != null && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -266,7 +267,7 @@ export default function OrderStatusPage() {
         )}
 
         {page < totalPages && (
-          <button 
+          <button
             onClick={() => fetchOrders(page + 1)}
             style={{
               width: '100%',

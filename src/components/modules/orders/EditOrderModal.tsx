@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Plus, Minus, Trash2, Loader2, Utensils, User, Phone, MapPin, Users, Check, ShoppingBag } from 'lucide-react';
+import { X, Search, Plus, Minus, Trash2, Loader2, Utensils, User, Phone, Users, Check, ShoppingBag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Order, Product } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -536,11 +536,10 @@ export function EditOrderModal({
                 >
                   Order Type
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                   {[
                     { id: 'DINE_IN', label: 'Dine-in', icon: Utensils },
                     { id: 'TAKEAWAY', label: 'Takeaway', icon: ShoppingBag },
-                    { id: 'DELIVERY', label: 'Delivery', icon: MapPin },
                   ].map((t) => {
                     const Icon = t.icon;
                     const isSelected = orderType === t.id;
@@ -550,7 +549,7 @@ export function EditOrderModal({
                         type="button"
                         onClick={() => {
                           setOrderType(t.id);
-                          if (t.id === 'TAKEAWAY' || t.id === 'DELIVERY') {
+                          if (t.id === 'TAKEAWAY') {
                             setTableNumber('');
                           }
                         }}
@@ -662,7 +661,7 @@ export function EditOrderModal({
                     </label>
                     {orderType !== 'DINE_IN' && (
                       <span style={{ fontSize: '11px', color: '#64748B', fontStyle: 'italic' }}>
-                        Disabled for {orderType === 'TAKEAWAY' ? 'Takeaway' : 'Delivery'}
+                        Disabled for Takeaway
                       </span>
                     )}
                   </div>
