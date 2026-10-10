@@ -881,7 +881,7 @@ export async function createProduct(data: {
         VALUES (${data.restaurant_id}, ${data.category.trim()}, COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = ${data.restaurant_id}), 0) + 10)
         ON CONFLICT (restaurant_id, name) DO NOTHING
       `;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return rows[0];
@@ -944,7 +944,7 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
           VALUES ($1, $2, COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = $1), 0) + 10)
           ON CONFLICT (restaurant_id, name) DO NOTHING
         `, [restaurantId, data.category.trim()]);
-      } catch (_) {}
+      } catch (_) { }
     }
 
     await client.query('COMMIT');
@@ -1433,7 +1433,7 @@ export async function createOrder(data: {
   const computedTotal = Math.round(
     normalizedItems.reduce((sum, item) => sum + item.quantity * item.price_at_purchase, 0) * 100
   ) / 100;
-  
+
   // Use passed subtotal or computed total
   const finalSubtotal = data.subtotal ?? computedTotal;
   const discountVal = Number(data.discount_amount) || 0;
@@ -1524,9 +1524,9 @@ export async function createOrder(data: {
     const isTableOrder = Boolean(data.table_number && data.table_number.trim() !== '');
     const isPosOrder = Boolean(data.is_pos);
     const targetStatus = (data.status === 'PREPARING' || isPosOrder || isTableOrder) ? 'PREPARING' : (data.status || 'PENDING');
-    
+
     let statusRes = await client.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = $2 LIMIT 1`, [data.restaurant_id, targetStatus]);
-    
+
     if (statusRes.rows.length === 0) {
       // Fallback to any valid queue status id just to satisfy foreign key (if required), but force the string name
       statusRes = await client.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC LIMIT 1`, [data.restaurant_id]);
@@ -1589,8 +1589,8 @@ export async function createOrder(data: {
         RETURNING id
       `,
       [
-        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
-        isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
+        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus,
+        isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId,
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, paymentSplit, discountVal
       ]
@@ -1804,11 +1804,11 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
 
   // Sync item status if master order status changed
   if (status === 'CANCELLED') {
-    try { await pool.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]); } catch (_) {}
+    try { await pool.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]); } catch (_) { }
   } else if (status === 'READY') {
-    try { await pool.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]); } catch (_) {}
+    try { await pool.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]); } catch (_) { }
   } else if (status === 'SERVED' || status === 'CLOSED' || status === 'COMPLETED') {
-    try { await pool.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]); } catch (_) {}
+    try { await pool.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]); } catch (_) { }
   }
   // Trigger Loyalty Points processing
   if (status === 'CLOSED' || status === 'COMPLETED' || updatedOrder?.is_paid) {
@@ -1824,16 +1824,16 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     // Fetch existing order to verify values
     const orderRes = await client.query(`
       SELECT is_paid, status, total_price, ticket_number, table_number, table_id, table_session_id, party_size, order_type FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
     `, [restaurantId, id]);
-    
+
     if (orderRes.rows.length === 0) {
       throw new Error('Order not found');
     }
-    
+
     const existing = orderRes.rows[0];
     const nextStatus = status === 'PAID' ? 'CLOSED' : (status || existing.status);
     let nextIsPaid: boolean;
@@ -1869,7 +1869,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     }
 
     const splitJson = paymentSplit ? (typeof paymentSplit === 'string' ? paymentSplit : JSON.stringify(paymentSplit)) : null;
-    
+
     // Update order
     const updateRes = await client.query(`
       UPDATE orders
@@ -1887,7 +1887,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       WHERE restaurant_id = $7 AND id = $8
       RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, payment_split, paid_at, served_at, closed_at
     `, [nextStatus, nextIsPaid, nextTableNumber, nextTableId, nextTableSessionId, paymentMethod || null, restaurantId, id, splitJson]);
-    
+
     const updatedOrder = updateRes.rows[0];
 
     // Sync item status if master order status changed
@@ -1898,13 +1898,13 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     } else if (nextStatus === 'SERVED' || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
       await client.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]);
     }
-    
+
     // Process billing if order is now paid/completed (and wasn't paid before)
     if (nextIsPaid && !existing.is_paid) {
       const { BillingService } = await import('@/modules/billing/billing.service');
       await BillingService.processOrderBilling(client, restaurantId, id, Number(existing.total_price));
     }
-    
+
     await client.query('COMMIT');
 
     // Re-evaluate table occupancy and close session if table changed or order is CLOSED, CANCELLED, or EXPIRED
@@ -3153,7 +3153,7 @@ export async function createUser(phone: string, name?: string) {
   if (!phone) return null;
   const norm = normalizePhoneNumber(phone);
   const phoneToStore = norm.length === 10 ? norm : phone.trim();
-  
+
   const existing = await getUserByPhone(phone);
   if (existing) {
     if (name && name.trim()) {
@@ -3460,7 +3460,7 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
     `);
 
     await client.query(`ALTER TABLE otp_logs ADD COLUMN IF NOT EXISTS business_date DATE DEFAULT CURRENT_DATE`);
-    
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS daily_otp_stats (
         date DATE PRIMARY KEY,
@@ -3474,7 +3474,7 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
     await client.query(`ALTER TABLE daily_otp_stats DROP CONSTRAINT IF EXISTS daily_otp_stats_pkey CASCADE`);
     await client.query(`ALTER TABLE daily_otp_stats ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY`);
     await client.query(`ALTER TABLE daily_otp_stats ADD COLUMN IF NOT EXISTS restaurant_id UUID`);
-    
+
     // Add unique constraint if it doesn't exist
     await client.query(`
       DO $$
@@ -3555,7 +3555,7 @@ export async function autoCloseRestaurants() {
   const client = await pool.connect();
   try {
     await client.query(`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS last_auto_closed_date DATE`);
-    
+
     const result = await client.query(`
       UPDATE restaurants 
       SET is_service_active = false,
@@ -3568,7 +3568,7 @@ export async function autoCloseRestaurants() {
         )
       RETURNING id
     `);
-    
+
     return { closedCount: result.rowCount };
   } catch (err) {
     console.error('Failed to auto-close restaurants:', err);
@@ -4071,7 +4071,7 @@ export async function updateLoyaltyReward(restaurantId: string, rewardId: string
 
     const ex = existing[0];
     const selectedIdsJson = JSON.stringify(rewardData.selected_product_ids ?? ex.selected_product_ids ?? []);
-    const validUntilVal = rewardData.valid_until !== undefined 
+    const validUntilVal = rewardData.valid_until !== undefined
       ? (rewardData.valid_until ? new Date(rewardData.valid_until).toISOString() : null)
       : ex.valid_until;
 

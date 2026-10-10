@@ -65,7 +65,7 @@ export default function AdminTablesPage() {
         payment_method: pMethod || undefined,
       });
       if (res.success) {
-        toast.success(`Order updated to ${newStatus}`, { id: `order-status-${id}` });
+        toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
         await fetchTables();
         setSelectedOrder((prev: any) => prev ? {
           ...prev,

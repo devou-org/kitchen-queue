@@ -274,14 +274,22 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
           }
         }
 
-        // Update user name in local storage if changed
-        const existing = localStorage.getItem('user');
-        if (existing) {
-          try {
-            const u = JSON.parse(existing);
-            localStorage.setItem('user', JSON.stringify({ ...u, name: form.customer_name.trim() }));
-          } catch { }
+        // Always store customer profile in localStorage so /order-status can find their orders!
+        try {
+          const existing = localStorage.getItem('user');
+          const u = existing ? JSON.parse(existing) : {};
+          localStorage.setItem('user', JSON.stringify({
+            ...u,
+            name: form.customer_name.trim(),
+            phone: form.phone.trim(),
+          }));
+        } catch {
+          localStorage.setItem('user', JSON.stringify({
+            name: form.customer_name.trim(),
+            phone: form.phone.trim(),
+          }));
         }
+        localStorage.setItem(`customer_phone_${slug}`, form.phone.trim());
         localStorage.removeItem(`cart_${slug}`);
         localStorage.removeItem(`add_to_order_${slug}`);
         localStorage.removeItem(`table_number_${slug}`);
