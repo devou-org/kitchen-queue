@@ -1,19 +1,15 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { CartItem, Order, OrderType } from '@/types';
 import { authService } from '@/app/services/auth.api';
 import { orderService } from '@/app/services/orders.api';
 
-
 // Modular Components
 import OrderSummary from './components/OrderSummary';
 import CustomerDetails, { LoyaltyRewardOption } from './components/CustomerDetails';
 import CheckoutActions from './components/CheckoutActions';
-
-// Statuses where adding to an existing order is allowed
-const ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
 
 import { use } from 'react';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -31,6 +27,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   }, [restaurant, resLoading, router, slug]);
 
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [checkingActive, setCheckingActive] = useState(true);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [addToMode, setAddToMode] = useState(false); // true = adding to existing order
@@ -52,7 +49,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-
   // ── AUTH CHECK ──────────────────────────────────────────────────
   const checkAuth = useCallback(async () => {
     try {
@@ -63,6 +59,33 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       }
     } catch (e) {
       console.error('Auth check failed:', e);
+    }
+    return null;
+  }, []);
+
+  // ── CHECK ACTIVE ORDER HELPER ────────────────────────────────────
+  const checkActiveOrderForPhone = useCallback(async (phone?: string) => {
+    if (!phone) return null;
+    try {
+      const data = await orderService.getHistory(phone);
+      if (data.success && data.data) {
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+        const active = (data.data as Order[]).find(o => {
+          const orderDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(o.created_at));
+          const st = (o.status || '').toUpperCase();
+          return !['CLOSED', 'CANCELLED', 'EXPIRED'].includes(st) && orderDate === todayStr;
+        });
+        if (active) {
+          setActiveOrder(active);
+          setAddToMode(true);
+          return active;
+        } else {
+          setActiveOrder(null);
+          setAddToMode(false);
+        }
+      }
+    } catch (e) {
+      console.error('Active order check failed:', e);
     }
     return null;
   }, []);
@@ -92,25 +115,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         });
 
         // 3. Check for Active Order
-        try {
-          const data = await orderService.getHistory(user.phone);
-          if (data.success && data.data) {
-            const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-            const active = (data.data as Order[]).find(o => {
-              const orderDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(o.created_at));
-              return ADDABLE_STATUSES.includes(o.status) && orderDate === todayStr;
-            });
-            if (active) {
-              setActiveOrder(active);
-            }
-          }
-        } catch (e) {}
+        await checkActiveOrderForPhone(user.phone);
       }
       setCheckingActive(false);
     };
 
     init();
-  }, [checkAuth, slug]);
+  }, [checkAuth, checkActiveOrderForPhone, slug]);
 
   const items = Array.from(cart.values());
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -149,10 +160,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   // ── PLACE NEW ORDER ──────────────────────────────────────────────
   const handleNewOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (loading) return;
-    
-    // Always check auth before proceeding to ensure session is valid
-    const user = await checkAuth();
+    if (isSubmittingRef.current || loading) return;
+
+    if (activeOrder) {
+      toast.error(`You have an active order (#${activeOrder.ticket_number}). Adding items to active order instead.`);
+      setAddToMode(true);
+      return;
+    }
     
     if (!form.customer_name.trim() || form.customer_name.length < 2) {
       toast.error('Please enter your name (min 2 characters)');
@@ -180,20 +194,36 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       return;
     }
 
-    // Dynamic verification check (user may have changed phone number)
-    const verified = Boolean(
-      user &&
-      user.phone &&
-      form.phone &&
-      normalizeDigits(user.phone) === normalizeDigits(form.phone)
-    );
-    if (!verified) {
-      toast.error('Please verify your phone number first.');
-      return;
-    }
-
+    // Set synchronous locks immediately BEFORE any async work
+    isSubmittingRef.current = true;
     setLoading(true);
+
     try {
+      // Dynamic verification check (user may have changed phone number)
+      const user = await checkAuth();
+      const verified = Boolean(
+        user &&
+        user.phone &&
+        form.phone &&
+        normalizeDigits(user.phone) === normalizeDigits(form.phone)
+      );
+      if (!verified) {
+        toast.error('Please verify your phone number first.');
+        isSubmittingRef.current = false;
+        setLoading(false);
+        return;
+      }
+
+      // Re-verify if an active order exists for this phone before creating a new order
+      const foundActive = await checkActiveOrderForPhone(form.phone);
+      if (foundActive) {
+        toast.error(`You already have an active order (#${foundActive.ticket_number}). Adding to your existing order.`);
+        setAddToMode(true);
+        isSubmittingRef.current = false;
+        setLoading(false);
+        return;
+      }
+
       const orderItems = items.map(i => ({
         product_id: i.product_id,
         quantity: i.quantity,
@@ -297,33 +327,51 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         router.push(`/${slug}/order-status/${data.data.id}`);
       } else {
         toast.error(data.error || 'Failed to place order');
+        if (data.error && data.error.includes('active order')) {
+          await checkActiveOrderForPhone(form.phone);
+        }
       }
     } catch {
       toast.error('Network error. Please try again.');
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   };
 
   // ── ADD ITEMS TO EXISTING ORDER ──────────────────────────────────
   const handleAddToOrder = async () => {
-    if (loading) return;
+    if (isSubmittingRef.current || loading) return;
     if (!activeOrder) return;
     if (items.length === 0) {
       toast.error('Your cart is empty');
       return;
     }
 
-    // Always check auth before proceeding
-    const user = await checkAuth();
-    if (!user) {
-      toast.error('Session expired. Please verify again.');
-      return;
-    }
-
+    isSubmittingRef.current = true;
     setLoading(true);
+
     try {
-      const existingItems: { product_id: string; quantity: number }[] = (activeOrder.items || []).map(
+      // Always check auth before proceeding
+      const user = await checkAuth();
+      if (!user) {
+        toast.error('Session expired. Please verify again.');
+        isSubmittingRef.current = false;
+        setLoading(false);
+        return;
+      }
+
+      let existingItemsList = activeOrder.items || [];
+      if (!existingItemsList || existingItemsList.length === 0) {
+        try {
+          const fresh = await orderService.getOrderById(activeOrder.id);
+          if (fresh.success && fresh.data?.items) {
+            existingItemsList = fresh.data.items;
+          }
+        } catch { }
+      }
+
+      const existingItems: { product_id: string; quantity: number }[] = existingItemsList.map(
         (oi: any) => ({ product_id: oi.product_id, quantity: Number(oi.quantity) })
       );
 
@@ -345,7 +393,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       if (data.success) {
         localStorage.removeItem(`cart_${slug}`);
         localStorage.removeItem(`add_to_order_${slug}`);
-        toast.success('Items added to your order!');
+        toast.success(`Items added to Order #${String(activeOrder.ticket_number).padStart(3, '0')}!`);
         router.push(`/${slug}/order-status/${activeOrder.id}`);
       } else {
         toast.error(data.error || 'Failed to update order');
@@ -353,6 +401,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     } catch {
       toast.error('Network error. Please try again.');
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   };
@@ -378,16 +427,51 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       {activeOrder && (
         <div style={{ maxWidth: '480px', margin: '12px auto 0', padding: '0 16px' }}>
           <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: '10px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
             padding: '12px 14px',
             borderRadius: '12px',
-            background: '#fffbeb',
-            border: '1px solid #fde68a',
+            background: '#EFF6FF',
+            border: '1px solid #BFDBFE',
           }}>
-            <p style={{ fontSize: '13px', color: '#92400e', fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
-              You already have an active order (<span style={{ fontWeight: 800 }}>#{String(activeOrder.ticket_number).padStart(3, '0')}</span>). 
-              To add more items to your table, please contact the staff.
-            </p>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: '#1E3A8A' }}>
+                  Active Order #{String(activeOrder.ticket_number).padStart(3, '0')}
+                </span>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '1px 6px',
+                  borderRadius: '6px',
+                  background: '#DBEAFE',
+                  color: '#1D4ED8'
+                }}>
+                  {activeOrder.status}
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', color: '#2563EB', margin: '2px 0 0', fontWeight: 500 }}>
+                {addToMode 
+                  ? 'Adding items to your active table ticket' 
+                  : 'Active order in progress'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push(`/${slug}/order-status/${activeOrder.id}`)}
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#1D4ED8',
+                background: '#FFFFFF',
+                border: '1px solid #BFDBFE',
+                borderRadius: '6px',
+                padding: '5px 10px',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer'
+              }}
+            >
+              View Order
+            </button>
           </div>
         </div>
       )}
@@ -406,14 +490,49 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
           activeOrder={activeOrder}
         />
 
-        {!addToMode && (
+        {addToMode && activeOrder ? (
+          <div className="card" style={{ marginBottom: '16px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Adding to Active Ticket
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                #{String(activeOrder.ticket_number).padStart(3, '0')}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: '#334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748B' }}>Customer:</span>
+                <span style={{ fontWeight: 600 }}>{activeOrder.customer_name || form.customer_name || 'Customer'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748B' }}>Phone:</span>
+                <span style={{ fontWeight: 600 }}>{activeOrder.phone || form.phone}</span>
+              </div>
+              {activeOrder.table_number && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B' }}>Table:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--primary)' }}>Table {activeOrder.table_number}</span>
+                </div>
+              )}
+            </div>
+            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #CBD5E1', fontSize: '12px', color: '#64748B' }}>
+              💡 Items will be appended directly to this order and routed to the kitchen.
+            </div>
+          </div>
+        ) : (
           <CustomerDetails 
             slug={slug}
             subtotal={subtotal}
             form={form}
             setForm={setForm}
             isVerified={isVerified}
-            onVerified={(user) => setCurrentUser(user)}
+            onVerified={async (user) => {
+              setCurrentUser(user);
+              if (user?.phone) {
+                await checkActiveOrderForPhone(user.phone);
+              }
+            }}
             onSubmit={handleNewOrder}
             totalQty={items.reduce((s, i) => s + i.quantity, 0)}
             onOtpStepChange={setInOtpStep}

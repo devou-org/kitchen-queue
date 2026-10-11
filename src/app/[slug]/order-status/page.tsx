@@ -32,8 +32,21 @@ export default function OrderStatusPage() {
 
   const fetchOrders = async (pageNum = 1, silent = false) => {
     try {
+      let userPhone: string | undefined = undefined;
       const userStr = localStorage.getItem('user');
-      if (!userStr) {
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user?.phone) userPhone = user.phone;
+        } catch { }
+      }
+
+      if (!userPhone && slug) {
+        userPhone = localStorage.getItem(`customer_phone_${slug}`) || undefined;
+      }
+
+      const token = localStorage.getItem('auth_token');
+      if (!userPhone && !token) {
         if (restaurant?.id) {
           const queueTicket = localStorage.getItem(`queue_ticket_${restaurant.id}`);
           if (queueTicket) {
@@ -49,8 +62,8 @@ export default function OrderStatusPage() {
         if (!silent) setLoading(false);
         return;
       }
-      const user = JSON.parse(userStr);
-      const res = await orderService.getHistory(user.phone, pageNum, 20);
+
+      const res = await orderService.getHistory(userPhone, pageNum, 20);
 
       if (res.success && res.data) {
         if (pageNum === 1) {

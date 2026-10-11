@@ -42,21 +42,21 @@ export default function RootLayout({
           position="top-right"
           containerStyle={{ zIndex: 999999 }}
           toastOptions={{
-            duration: 1500,
+            duration: 1000,
             style: {
               fontFamily: 'Inter, sans-serif',
               fontSize: '14px',
               fontWeight: 500,
             },
             success: {
-              duration: 1500,
+              duration: 1000,
               style: {
                 background: '#065F46',
                 color: 'white',
               },
             },
             error: {
-              duration: 1500,
+              duration: 1200,
               style: {
                 background: '#991B1B',
                 color: 'white',

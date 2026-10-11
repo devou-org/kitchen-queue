@@ -1338,34 +1338,62 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
 
 export async function getOrdersByPhonePaginated(restaurantId: string, phone: string, page: number = 1, limit: number = 20) {
   const offset = (page - 1) * limit;
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
 
   const countRows = await sql`
     SELECT COUNT(*)::integer as total
-    FROM queues q
-    JOIN users u ON u.id = q.user_id
-    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone} AND q.queue_type = 'ORDER'
+    FROM orders o
+    WHERE o.restaurant_id = ${restaurantId}
+      AND (
+        o.phone = ${phone}
+        OR o.phone = ${'+91' + cleanPhone}
+        OR o.phone = ${cleanPhone}
+        OR RIGHT(REGEXP_REPLACE(COALESCE(o.phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+      )
   `;
   const total = countRows[0]?.total || 0;
 
   const rows = await sql`
     SELECT 
-      COALESCE(o.id, q.id) as id,
-      q.id as queue_id,
-      q.token_number as ticket_number, 
-      q.created_at, 
+      o.id,
+      o.queue_id,
+      o.ticket_number, 
+      o.created_at, 
       o.total_price,
-      COALESCE(o.status, qs.possible_queue_status) as status,
+      o.status,
+      o.table_number,
+      o.order_type,
+      o.customer_name,
+      o.phone,
       (
         SELECT COUNT(oi.id)
         FROM order_items oi 
         WHERE oi.order_id = o.id
-      )::integer as item_count
-    FROM queues q
-    JOIN users u ON u.id = q.user_id
-    JOIN queue_status qs ON qs.id = q.queue_status_id
-    LEFT JOIN orders o ON o.queue_id = q.id
-    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone} AND q.queue_type = 'ORDER'
-    ORDER BY q.created_at DESC
+      )::integer as item_count,
+      (
+        SELECT json_agg(
+          json_build_object(
+            'id', oi.id,
+            'product_id', oi.product_id,
+            'quantity', oi.quantity,
+            'price_at_purchase', oi.price_at_purchase,
+            'status', oi.status,
+            'product_name', p.name
+          )
+        )
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = o.id
+      ) as items
+    FROM orders o
+    WHERE o.restaurant_id = ${restaurantId}
+      AND (
+        o.phone = ${phone}
+        OR o.phone = ${'+91' + cleanPhone}
+        OR o.phone = ${cleanPhone}
+        OR RIGHT(REGEXP_REPLACE(COALESCE(o.phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+      )
+    ORDER BY o.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
   return { data: rows, total, page, totalPages: Math.ceil(total / limit) };
@@ -3489,15 +3517,18 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
 
     let businessDateQuery = 'CURRENT_DATE';
     if (restaurantId) {
-      businessDateQuery = '(SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = $3)';
+      businessDateQuery = '(SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = $2)';
     }
 
-    // 1. Log the specific OTP request
+    // 1. Log the specific OTP request (normalize phone)
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const normalizedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : phone;
+
     const logRes = await client.query(`
       INSERT INTO otp_logs (phone, sent_at, restaurant_id, business_date)
-      VALUES ($1, NOW() AT TIME ZONE $2, $3, ${businessDateQuery})
+      VALUES ($1, CURRENT_TIMESTAMP, $2, ${businessDateQuery})
       RETURNING id, business_date
-    `, [phone, localTimezone, restaurantId || null]);
+    `, [normalizedPhone, restaurantId || null]);
 
     const logId = logRes.rows[0].id;
     const businessDate = logRes.rows[0].business_date;

@@ -141,6 +141,62 @@ export async function POST(request: NextRequest) {
     const isPaid = (hasAdminRights || body.is_pos === true) && Boolean(is_paid);
     const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : ((hasAdminRights || body.is_pos === true) && payment_method ? String(payment_method) : undefined);
 
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+
+    // 🛡️ ANTI-DUPLICATE CHECK: Prevent identical rapid duplicate orders within 15s (e.g. swipe bounce)
+    const recentDuplicate = await sql`
+      SELECT id, ticket_number, status, total_price, created_at, customer_name, phone, table_number
+      FROM orders
+      WHERE restaurant_id = ${restaurant.id}
+        AND (
+          phone = ${phone}
+          OR phone = ${'+91' + cleanPhone}
+          OR phone = ${cleanPhone}
+          OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+        )
+        AND created_at > NOW() - INTERVAL '15 seconds'
+      ORDER BY created_at DESC
+      LIMIT 1
+    ` as any[];
+
+    if (recentDuplicate[0]) {
+      console.log(`⚠️ Prevented duplicate order for ticket #${recentDuplicate[0].ticket_number}`);
+      return NextResponse.json({
+        success: true,
+        data: recentDuplicate[0],
+        message: 'Order already placed',
+        duplicate_prevented: true,
+      });
+    }
+
+    // 🛡️ ACTIVE ORDER ENFORCEMENT: Customer cannot create a new order while an active order exists
+    if (!isPos) {
+      const activeExisting = await sql`
+        SELECT id, ticket_number, status, table_number, created_at
+        FROM orders
+        WHERE restaurant_id = ${restaurant.id}
+          AND (
+            phone = ${phone}
+            OR phone = ${'+91' + cleanPhone}
+            OR phone = ${cleanPhone}
+            OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+          )
+          AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
+        ORDER BY created_at DESC
+        LIMIT 1
+      ` as any[];
+
+      if (activeExisting[0]) {
+        return NextResponse.json({
+          success: false,
+          error: `You already have an active order (#${String(activeExisting[0].ticket_number).padStart(3, '0')}). Please add items to your existing order.`,
+          active_order: activeExisting[0],
+          active_order_id: activeExisting[0].id,
+          active_ticket_number: activeExisting[0].ticket_number,
+        }, { status: 409 });
+      }
+    }
+
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
