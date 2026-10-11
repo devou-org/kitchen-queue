@@ -9,7 +9,9 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { validatePhone } from '@/lib/validators';
 import { orderService } from '@/app/services/orders.api';
-import { Search } from 'lucide-react';
+import { Search, Activity, Check, Info } from 'lucide-react';
+import OrderStatusBadge, { getOrderStatusConfig } from '@/components/modules/orders/OrderStatusBadge';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 type EditableItem = {
   product_id: string;
@@ -24,6 +26,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [orderStatus, setOrderStatus] = useState<string>('PENDING');
   const [newProductId, setNewProductId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -57,6 +60,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
 
         const loadedOrder: Order = orderRes.data;
         setOrder(loadedOrder);
+        setOrderStatus(loadedOrder.status || 'PENDING');
         setForm({
           customer_name: loadedOrder.customer_name || '',
           phone: loadedOrder.phone || '',
@@ -82,6 +86,25 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
 
     fetchData();
   }, [id]);
+
+  const statusOptions = useMemo(() => {
+    const base = ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CLOSED', 'CANCELLED'];
+    const cur = (order?.status || '').toUpperCase();
+    if (cur && !base.includes(cur)) {
+      base.push(cur);
+    }
+    return base;
+  }, [order?.status]);
+
+  const statusSelectOptions = useMemo(() => {
+    return statusOptions.map((st) => {
+      const cfg = getOrderStatusConfig(st);
+      return {
+        value: st,
+        label: cfg.label,
+      };
+    });
+  }, [statusOptions]);
 
   const productById = useMemo(() => {
     const map = new Map<string, Product>();
@@ -159,6 +182,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
         phone,
         notes: form.notes.trim(),
         party_size: partySize,
+        status: orderStatus,
         items,
       });
 
@@ -280,6 +304,24 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
               onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
               placeholder="Kitchen notes, preferences, etc"
               style={{ resize: 'vertical', minHeight: '80px', borderRadius: '8px' }}
+            />
+          </div>
+
+          <div>
+            <label className="label">Order Status</label>
+            <CustomSelect
+              value={orderStatus}
+              onChange={(val) => setOrderStatus(val)}
+              options={statusSelectOptions}
+              buttonStyle={{
+                height: '40px',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                background: '#FFFFFF',
+              }}
+              dropdownStyle={{
+                borderRadius: '8px',
+              }}
             />
           </div>
 

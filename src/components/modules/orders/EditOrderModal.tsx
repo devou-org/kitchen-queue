@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Plus, Minus, Trash2, Loader2, Utensils, User, Phone, Users, Check, ShoppingBag } from 'lucide-react';
+import { X, Search, Plus, Minus, Trash2, Loader2, Utensils, User, Phone, Users, Check, ShoppingBag, Activity, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Order, Product } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -11,6 +11,7 @@ import { orderService } from '@/app/services/orders.api';
 import { productService } from '@/app/services/products.api';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { checkTableAssignment } from '@/lib/table-capacity';
+import OrderStatusBadge, { getOrderStatusConfig } from './OrderStatusBadge';
 
 export interface EditOrderModalProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export function EditOrderModal({
   const [saving, setSaving] = useState(false);
 
   // Form Fields
+  const [orderStatus, setOrderStatus] = useState<string>(order.status || 'PENDING');
   const [orderType, setOrderType] = useState<string>(order.order_type || 'DINE_IN');
   const [customerName, setCustomerName] = useState(order.customer_name || '');
   const [phone, setPhone] = useState(order.phone || '');
@@ -63,6 +65,7 @@ export function EditOrderModal({
   // Sync state whenever the order prop changes or modal opens
   useEffect(() => {
     if (isOpen && order) {
+      setOrderStatus(order.status || 'PENDING');
       setOrderType(order.order_type || 'DINE_IN');
       setCustomerName(order.customer_name || '');
       setPhone(order.phone || '');
@@ -151,6 +154,27 @@ export function EditOrderModal({
     }
     return map;
   }, [products]);
+
+  // Available status options
+  const statusOptions = useMemo(() => {
+    const base = ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CLOSED', 'CANCELLED'];
+    const cur = (order?.status || '').toUpperCase();
+    if (cur && !base.includes(cur)) {
+      base.push(cur);
+    }
+    return base;
+  }, [order?.status]);
+
+  // Options formatted for CustomSelect
+  const statusSelectOptions = useMemo(() => {
+    return statusOptions.map((st) => {
+      const cfg = getOrderStatusConfig(st);
+      return {
+        value: st,
+        label: cfg.label,
+      };
+    });
+  }, [statusOptions]);
 
   // Filtered products for search
   const filteredProducts = useMemo(() => {
@@ -264,7 +288,8 @@ export function EditOrderModal({
 
     setSaving(true);
     try {
-      const payload = {
+      const payload: any = {
+        status: orderStatus,
         order_type: orderType,
         customer_name: trimmedName,
         phone: trimmedPhone || undefined,
@@ -280,7 +305,11 @@ export function EditOrderModal({
       const res = await orderService.updateOrder(order.id, payload);
 
       if (res.success && res.data) {
-        toast.success(`Order #${String(order.ticket_number).padStart(3, '0')} updated!`);
+        if (orderStatus !== order.status) {
+          toast.success(`Order #${String(order.ticket_number).padStart(3, '0')} updated (Status: ${orderStatus})`);
+        } else {
+          toast.success(`Order #${String(order.ticket_number).padStart(3, '0')} updated!`);
+        }
         if (onOrderUpdated) {
           onOrderUpdated(res.data);
         }
@@ -749,6 +778,37 @@ export function EditOrderModal({
                   }}
                 />
               </div>
+            </div>
+
+            {/* Order Status */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#334155',
+                  marginBottom: '6px',
+                }}
+              >
+                Order Status
+              </label>
+              <CustomSelect
+                value={orderStatus}
+                onChange={(val) => setOrderStatus(val)}
+                options={statusSelectOptions}
+                buttonStyle={{
+                  height: '38px',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF',
+                  fontSize: '13px',
+                }}
+                dropdownStyle={{
+                  borderRadius: '8px',
+                  zIndex: 100010,
+                }}
+              />
             </div>
 
             {/* Order Items Section */}
