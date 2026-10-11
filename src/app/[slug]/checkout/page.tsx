@@ -68,24 +68,32 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     if (!phone) return null;
     try {
       const data = await orderService.getHistory(phone);
-      if (data.success && data.data) {
-        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-        const active = (data.data as Order[]).find(o => {
-          const orderDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(o.created_at));
-          const st = (o.status || '').toUpperCase();
-          return !['CLOSED', 'CANCELLED', 'EXPIRED'].includes(st) && orderDate === todayStr;
-        });
-        if (active) {
-          setActiveOrder(active);
-          setAddToMode(true);
-          return active;
-        } else {
-          setActiveOrder(null);
-          setAddToMode(false);
+      if (data.success && data.data && data.data.length > 0) {
+        // Look at previous (most recent) order
+        const previousOrder = (data.data as Order[])[0];
+        if (previousOrder) {
+          const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+          const orderDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(previousOrder.created_at));
+          const st = (previousOrder.status || '').toUpperCase().trim();
+
+          // RULES:
+          // PENDING / PREPARING / READY -> ❌ Don't create new order (Append it)
+          // CLOSED / EXPIRED / CANCELLED -> ✅ Create a new order
+          // No previous order -> ✅ Create a new order
+          const APPEND_STATUSES = ['PENDING', 'PREPARING', 'READY'];
+          if (APPEND_STATUSES.includes(st) && orderDate === todayStr) {
+            setActiveOrder(previousOrder);
+            setAddToMode(true);
+            return previousOrder;
+          }
         }
       }
+      setActiveOrder(null);
+      setAddToMode(false);
     } catch (e) {
       console.error('Active order check failed:', e);
+      setActiveOrder(null);
+      setAddToMode(false);
     }
     return null;
   }, []);
@@ -163,9 +171,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     if (isSubmittingRef.current || loading) return;
 
     if (activeOrder) {
-      toast.error(`You have an active order (#${activeOrder.ticket_number}). Adding items to active order instead.`);
-      setAddToMode(true);
-      return;
+      const st = (activeOrder.status || '').toUpperCase().trim();
+      const APPEND_STATUSES = ['PENDING', 'PREPARING', 'READY'];
+      if (APPEND_STATUSES.includes(st)) {
+        toast.error(`You have an active order (#${activeOrder.ticket_number}). Adding items to active order instead.`);
+        setAddToMode(true);
+        return;
+      } else {
+        setActiveOrder(null);
+        setAddToMode(false);
+      }
     }
     
     if (!form.customer_name.trim() || form.customer_name.length < 2) {
@@ -552,7 +567,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         ticketNumber={activeOrder?.ticket_number}
         onAddToOrder={handleAddToOrder}
         onSubmitNewOrder={handleNewOrder}
-        hasActiveOrder={!!activeOrder}
+        hasActiveOrder={Boolean(activeOrder && ['PENDING', 'PREPARING', 'READY'].includes((activeOrder.status || '').toUpperCase().trim()))}
       />
     </div>
   );
