@@ -87,20 +87,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method, payment_split } = body;
 
-    if (!items || !items.length) {
+    if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
         success: false,
-        error: 'Order items are required'
+        error: 'Customer name, phone, and items are required'
       }, { status: 400 });
     }
-
-    const nameToUse = (customer_name && customer_name.trim() !== '') 
-      ? customer_name.trim() 
-      : (order_type === 'TAKEAWAY' ? 'Takeaway Customer' : (table_number ? `Table ${table_number}` : 'Guest Customer'));
-
-    const phoneToUse = (phone && phone.trim() !== '' && !phone.includes('0000000')) 
-      ? phone.trim() 
-      : undefined;
 
     if (order_type !== 'TAKEAWAY' && table_number) {
       const { TablesRepository } = await import('@/modules/tables/tables.repository');
@@ -109,8 +101,8 @@ export async function POST(request: NextRequest) {
       const targetTable = tables.find(t => String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase());
       if (targetTable) {
         const check = checkTableAssignment(targetTable, party_size || 1, {
-          phone: phoneToUse,
-          customerName: nameToUse
+          phone,
+          customerName: customer_name
         });
         if (!check.allowed) {
           return NextResponse.json({
@@ -149,6 +141,62 @@ export async function POST(request: NextRequest) {
     const isPaid = (hasAdminRights || body.is_pos === true) && Boolean(is_paid);
     const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : ((hasAdminRights || body.is_pos === true) && payment_method ? String(payment_method) : undefined);
 
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+
+    // 🛡️ ANTI-DUPLICATE CHECK: Prevent identical rapid duplicate orders within 15s (e.g. swipe bounce)
+    const recentDuplicate = await sql`
+      SELECT id, ticket_number, status, total_price, created_at, customer_name, phone, table_number
+      FROM orders
+      WHERE restaurant_id = ${restaurant.id}
+        AND (
+          phone = ${phone}
+          OR phone = ${'+91' + cleanPhone}
+          OR phone = ${cleanPhone}
+          OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+        )
+        AND created_at > NOW() - INTERVAL '15 seconds'
+      ORDER BY created_at DESC
+      LIMIT 1
+    ` as any[];
+
+    if (recentDuplicate[0]) {
+      console.log(`⚠️ Prevented duplicate order for ticket #${recentDuplicate[0].ticket_number}`);
+      return NextResponse.json({
+        success: true,
+        data: recentDuplicate[0],
+        message: 'Order already placed',
+        duplicate_prevented: true,
+      });
+    }
+
+    // 🛡️ ACTIVE ORDER ENFORCEMENT: Customer cannot create a new order while an active order exists
+    if (!isPos) {
+      const activeExisting = await sql`
+        SELECT id, ticket_number, status, table_number, created_at
+        FROM orders
+        WHERE restaurant_id = ${restaurant.id}
+          AND (
+            phone = ${phone}
+            OR phone = ${'+91' + cleanPhone}
+            OR phone = ${cleanPhone}
+            OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+          )
+          AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
+        ORDER BY created_at DESC
+        LIMIT 1
+      ` as any[];
+
+      if (activeExisting[0]) {
+        return NextResponse.json({
+          success: false,
+          error: `You already have an active order (#${String(activeExisting[0].ticket_number).padStart(3, '0')}). Please add items to your existing order.`,
+          active_order: activeExisting[0],
+          active_order_id: activeExisting[0].id,
+          active_ticket_number: activeExisting[0].ticket_number,
+        }, { status: 409 });
+      }
+    }
+
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
@@ -161,8 +209,8 @@ export async function POST(request: NextRequest) {
 
     const order = await createOrder({
       restaurant_id: restaurant.id,
-      customer_name: nameToUse,
-      phone: phoneToUse,
+      customer_name: customer_name.trim(),
+      phone,
       total_price,
       subtotal,
       discount_amount,

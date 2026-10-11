@@ -8,7 +8,7 @@ import sql, {
   getCounters,
 } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { buildKotEscposBuffer, sendRawPrintToWindowsPrinter, sendRawPrintToNetworkPrinter, KotPrintData } from '@/lib/escpos';
+import { buildKotEscposBuffer, sendRawPrintToWindowsPrinter, KotPrintData } from '@/lib/escpos';
 
 async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
   const admin = await requireAdmin(request);
@@ -31,7 +31,7 @@ async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, counterName, printerName, printerAddress, orderData, separateSlips, slug } = body;
+    const { orderId, counterName, printerName, orderData, separateSlips, slug } = body;
 
     const restaurant = await resolveRestaurant(request, slug);
     if (!restaurant) {
@@ -92,14 +92,10 @@ export async function POST(request: NextRequest) {
 
       // Check if this counter has a dedicated configured printer
       let counterTargetPrinter = targetPrinter;
-      let counterTargetAddress: string | undefined = printerAddress?.trim() || undefined;
       try {
         const counterRecord = await getCounterByName(restaurant.id, counterName);
         if (counterRecord?.printer_name && counterRecord.printer_name.trim()) {
           counterTargetPrinter = counterRecord.printer_name.trim();
-        }
-        if (counterRecord?.printer_address && counterRecord.printer_address.trim()) {
-          counterTargetAddress = counterRecord.printer_address.trim();
         }
       } catch {}
 
@@ -120,24 +116,7 @@ export async function POST(request: NextRequest) {
       const buffer = buildKotEscposBuffer(kotData);
       const base64Bytes = buffer.toString('base64');
 
-      // 1. Direct hardware print: Wi-Fi / LAN Network printer FIRST
-      if (counterTargetAddress && counterTargetAddress.includes('.')) {
-        const netRes = await sendRawPrintToNetworkPrinter(counterTargetAddress, buffer);
-        if (netRes.success) {
-          console.log(`🖨️ [Wi-Fi/LAN] Printed KOT #${order.ticket_number} [${counterName}] -> ${counterTargetAddress}`);
-          return NextResponse.json({
-            success: true,
-            mode: 'network',
-            message: `KOT printed over Wi-Fi (${counterTargetAddress}) for ${counterName}!`,
-            printer: counterTargetPrinter,
-            itemCount: filteredItems.length,
-          });
-        } else {
-          console.warn(`⚠️ [Wi-Fi/LAN] Print failed for ${counterName} on ${counterTargetAddress}: ${netRes.error}`);
-        }
-      }
-
-      // 2. If Windows host (local server dev Spooler / USB)
+      // 1. If Windows host (local server dev)
       if (isWindows) {
         const printResult = await sendRawPrintToWindowsPrinter(
           counterTargetPrinter,
@@ -155,7 +134,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 3. Queue for Cloud Print Agent
+      // 2. Queue for Cloud Print Agent
       await createPrintJob(restaurant.id, {
         order_id: order.id,
         ticket_number: Number(order.ticket_number) || undefined,

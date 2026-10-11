@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
@@ -17,6 +17,7 @@ import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { POSCheckoutDrawer, POSOrderFormData } from '@/components/modules/pos/POSCheckoutDrawer';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -131,23 +132,33 @@ export default function AdminPosPage() {
     notes: '',
     order_type: 'DINE_IN',
     is_paid: false,
-    payment_method: 'CASH',
+    payment_method: 'UPI',
   });
   const [submitting, setSubmitting] = useState(false);
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<any>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState<number>(0);
 
+  const toastedTableRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (tableParam) {
+      const matchedTable = tables.find(
+        (t: any) => String(t.table_number) === String(tableParam)
+      );
+      const cap = matchedTable ? (Number(matchedTable.capacity) || 1) : 1;
       setOrderForm(prev => ({
         ...prev,
         table_number: tableParam,
         order_type: 'DINE_IN',
+        party_size: cap > 1 ? cap : (prev.party_size || 1),
         is_paid: false,
       }));
-      toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+      if (toastedTableRef.current !== tableParam) {
+        toastedTableRef.current = tableParam;
+        toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+      }
     }
-  }, [tableParam]);
+  }, [tableParam, tables]);
 
   useEffect(() => {
     if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
@@ -254,18 +265,8 @@ export default function AdminPosPage() {
         return;
       }
 
-      const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
-
-      // If server already printed directly via Wi-Fi TCP or Windows spooler
-      if (data.server_printed) {
-        toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (Wi-Fi)`, {
-          id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
-        });
-        return;
-      }
-
-      toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: '🖨️',
+      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: <PrinterIllustration size={22} status="printing" />,
         duration: 3000,
       });
 
@@ -280,7 +281,8 @@ export default function AdminPosPage() {
         });
         const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            icon: <PrinterIllustration size={22} status="success" />,
             id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
           });
         }
@@ -320,18 +322,16 @@ export default function AdminPosPage() {
         continue;
       }
 
-      const expectedPrice = item.is_free_reward ? 0 : product.price;
       if (
         item.status !== product.status ||
-        item.price !== expectedPrice ||
+        item.price !== product.price ||
         item.name !== product.name ||
         item.image_url !== product.image_url
       ) {
         newCart.set(id, {
           ...item,
           status: product.status,
-          price: expectedPrice,
-          original_price: product.price,
+          price: product.price,
           name: product.name,
           image_url: product.image_url,
         });
@@ -348,7 +348,7 @@ export default function AdminPosPage() {
     }
   }, [products, cart]);
 
-  const handleUpdate = (id: string, delta: number, isFreeReward?: boolean) => {
+  const handleUpdate = (id: string, delta: number) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
 
@@ -362,7 +362,6 @@ export default function AdminPosPage() {
     const newCart = new Map(cart);
     const existing = newCart.get(id);
     const newQty = (existing?.quantity || 0) + delta;
-    const isFree = isFreeReward !== undefined ? isFreeReward : Boolean(existing?.is_free_reward);
 
     if (delta > 0 && currentStock !== null && newQty > currentStock) {
       toast.error(`"${product.name}" only has ${currentStock} available`);
@@ -375,9 +374,7 @@ export default function AdminPosPage() {
       newCart.set(id, {
         product_id: id,
         name: product.name,
-        price: isFree ? 0 : product.price,
-        original_price: product.price,
-        is_free_reward: isFree,
+        price: product.price,
         quantity: Math.min(newQty, 50), // allow staff/admin to order more
         image_url: product.image_url,
         status: product.status,
@@ -413,7 +410,9 @@ export default function AdminPosPage() {
       }
 
       if (data.mode === 'server' || data.mode === 'agent') {
-        toast.success(`🖨️ Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`);
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, {
+          icon: <PrinterIllustration size={20} status="success" />,
+        });
         return;
       }
 
@@ -430,7 +429,9 @@ export default function AdminPosPage() {
       });
 
       if (clientRes.success) {
-        toast.success(`🖨️ Auto-printed Bill #${String(order.ticket_number).padStart(3, '0')}!`);
+        toast.success(`Auto-printed Bill #${String(order.ticket_number).padStart(3, '0')}!`, {
+          icon: <PrinterIllustration size={20} status="success" />,
+        });
       }
     } catch (err) {
       console.error('Auto-print bill execution error:', err);
@@ -469,33 +470,14 @@ export default function AdminPosPage() {
 
     setSubmitting(true);
     try {
-      const items: { product_id: string; quantity: number; price_at_purchase: number }[] = [];
-      for (const item of cart.values()) {
-        if (item.is_free_reward) {
-          const orig = item.original_price ?? item.price;
-          items.push({
-            product_id: item.product_id,
-            quantity: 1,
-            price_at_purchase: 0,
-          });
-          if (item.quantity > 1) {
-            items.push({
-              product_id: item.product_id,
-              quantity: item.quantity - 1,
-              price_at_purchase: orig,
-            });
-          }
-        } else {
-          items.push({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            price_at_purchase: item.price,
-          });
-        }
-      }
+      const items = Array.from(cart.values()).map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price_at_purchase: item.price
+      }));
 
       // Generate a mock phone if not provided for admin/staff orders
-      const phoneToUse = orderForm.phone || '+910000000000';
+      const phoneToUse = orderForm.phone || `+910000000000`;
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
       const discountAmount = Math.max(0, Number(orderForm.discount_amount) || 0);
@@ -555,7 +537,7 @@ export default function AdminPosPage() {
           notes: '',
           order_type: 'DINE_IN',
           is_paid: false,
-          payment_method: 'CASH',
+          payment_method: 'UPI',
           discount_amount: 0,
           selected_reward_id: undefined,
           auto_print_bill: willPrintBill,
@@ -572,13 +554,7 @@ export default function AdminPosPage() {
   };
 
   const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
-  let subtotal = Array.from(cart.values()).reduce((s, i) => {
-    if (i.is_free_reward) {
-      const orig = i.original_price ?? i.price;
-      return s + Math.max(0, i.quantity - 1) * orig;
-    }
-    return s + i.price * i.quantity;
-  }, 0);
+  let subtotal = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
   
   let gstAmount = 0;
   let totalPrice = subtotal;
@@ -896,6 +872,7 @@ export default function AdminPosPage() {
         setOrderForm={setOrderForm}
         onSubmitOrder={submitOrder}
         submitting={submitting}
+        hideOrderType={Boolean(tableParam)}
       />
       </div>
     </AdminContentWrapper>

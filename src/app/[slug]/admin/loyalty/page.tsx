@@ -13,7 +13,6 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { CustomMultiSelect } from '@/components/ui/CustomSelect';
-import { useRestaurant } from '@/hooks/useRestaurant';
 
 type CustomerLoyalty = {
   id: string;
@@ -82,8 +81,6 @@ type ProductOption = {
 export default function AdminLoyaltyPage() {
   const { slug } = useParams();
   const slugStr = Array.isArray(slug) ? slug[0] : slug;
-  const { restaurant } = useRestaurant();
-  const primaryColor = restaurant?.primary_color || 'var(--primary, #971345)';
 
   const [activeTab, setActiveTab] = useState<'customers' | 'settings' | 'rewards' | 'transactions'>('customers');
   const [loading, setLoading] = useState(true);
@@ -266,26 +263,6 @@ export default function AdminLoyaltyPage() {
     }
   };
 
-  const handleDeleteCustomer = async (customerLoyaltyId: string, customerName: string) => {
-    if (!confirm(`Are you sure you want to delete the loyalty profile for "${customerName}"? This action cannot be undone.`)) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&customer_loyalty_id=${customerLoyaltyId}`, {
-        method: 'DELETE',
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('Customer loyalty profile deleted successfully');
-        fetchData();
-      } else {
-        toast.error(json.error || 'Failed to delete customer profile');
-      }
-    } catch {
-      toast.error('Network error. Failed to delete customer profile');
-    }
-  };
-
   // Handle Reward Save (Create / Edit)
   const handleSaveReward = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -358,8 +335,8 @@ export default function AdminLoyaltyPage() {
 
   return (
     <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
-      <Toaster 
-        position="top-right" 
+      <Toaster
+        position="top-right"
         containerStyle={{
           position: 'fixed',
           top: 20,
@@ -382,7 +359,7 @@ export default function AdminLoyaltyPage() {
           align-items: stretch !important;
           margin: 0 !important;
           padding: 0 20px 0 0 !important;
-          border-bottom: 1px solid var(--border) !important;
+          border-bottom: 1px solid var(--border, #e2e8f0) !important;
           background: #FFFFFF !important;
           box-sizing: border-box !important;
           position: relative !important;
@@ -477,7 +454,7 @@ export default function AdminLoyaltyPage() {
           justify-content: center;
           height: 100%;
           box-sizing: border-box;
-          padding: 0 18px;
+          padding: 0 20px;
           border-radius: 0;
           font-size: 13.5px;
           font-weight: 500;
@@ -512,27 +489,14 @@ export default function AdminLoyaltyPage() {
           font-weight: 700;
           margin-left: 6px;
         }
-
-        .loyalty-content-container {
-          padding: 20px !important;
-          width: 100% !important;
-          max-width: 100% !important;
-          box-sizing: border-box !important;
-        }
-
-        .loyalty-card-box {
-          background: #FFFFFF !important;
-          border-radius: 12px !important;
-          border: 1px solid var(--border, #e2e8f0) !important;
-          padding: 20px !important;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
-          box-sizing: border-box !important;
-        }
-
-        .loyalty-search-wrapper {
-          position: relative !important;
-          width: 320px !important;
-          max-width: 100% !important;
+        .loyalty-actions {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: auto !important;
+          flex-shrink: 0 !important;
+          height: 68px !important;
         }
 
         @media (max-width: 768px) {
@@ -578,54 +542,58 @@ export default function AdminLoyaltyPage() {
             height: 44px !important;
             min-height: 44px !important;
             padding: 0 !important;
-            border-bottom: 1px solid var(--border) !important;
+            border-bottom: 1px solid var(--border, #e2e8f0) !important;
+            box-sizing: border-box !important;
             background: #FFFFFF !important;
             overflow-x: auto !important;
           }
-
-          .loyalty-actions {
-            width: 100% !important;
-            height: auto !important;
-            min-height: auto !important;
-            margin-left: 0 !important;
-            padding: 10px 14px !important;
-            background: #F8FAFC !important;
-            border-bottom: 1px solid var(--border) !important;
-            box-sizing: border-box !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 8px !important;
-          }
-
-          .loyalty-nav-item {
-            padding: 0 12px !important;
-            font-size: 12.5px !important;
-          }
-
-          .loyalty-refresh-border {
-            border-left: none !important;
-            padding-left: 0 !important;
-          }
-
-          .loyalty-content-container {
-            padding: 12px !important;
-          }
-
-          .loyalty-card-box {
-            padding: 14px !important;
-            border-radius: 10px !important;
-          }
-
-          .loyalty-search-wrapper {
-            width: 100% !important;
-          }
-
-          .loyalty-cust-header {
+          .loyalty-toolbar {
             flex-direction: column !important;
             align-items: stretch !important;
             gap: 10px !important;
+            height: auto !important;
+          }
+          .loyalty-tabs-wrapper {
+            width: 100% !important;
+            height: auto !important;
+          }
+          .loyalty-actions {
+            width: 100% !important;
+            margin-left: 0 !important;
+            justify-content: flex-start !important;
+            flex-wrap: wrap !important;
+            height: auto !important;
           }
 
+          .loyalty-actions button {
+            flex: 1 !important;
+            justify-content: center !important;
+          }
+
+          .loyalty-maximize-wrapper {
+            display: none !important;
+          }
+
+          .loyalty-content-container {
+            padding: 14px 16px !important;
+          }
+
+          .loyalty-metrics-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+          }
+          .loyalty-metric-card {
+            padding: 10px 12px !important;
+          }
+          .loyalty-metric-title {
+            font-size: 11px !important;
+          }
+          .loyalty-metric-value {
+            font-size: 16px !important;
+          }
+          .loyalty-metric-subtext {
+            font-size: 10px !important;
+          }
           .loyalty-grid-2col {
             grid-template-columns: 1fr !important;
           }
@@ -657,11 +625,10 @@ export default function AdminLoyaltyPage() {
       {/* Header Toolbar with Inline Navigation Tabs */}
       <AdminPageHeader
         className="loyalty-page-header"
-        style={{ paddingTop: 0, marginBottom: 0 }}
+        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="loyalty-toolbar">
-            {/* Left Side: Loyalty Navigation Tabs embedded in 68px toolbar */}
             <div className="loyalty-tabs-wrapper">
               <div className="loyalty-nav-scroll">
                 <button
@@ -671,7 +638,7 @@ export default function AdminLoyaltyPage() {
                 >
                   <Users size={15} style={{ marginRight: '6px' }} />
                   <span>Customers</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {customers.length}
                   </span>
                 </button>
@@ -692,7 +659,7 @@ export default function AdminLoyaltyPage() {
                 >
                   <Gift size={15} style={{ marginRight: '6px' }} />
                   <span>Rewards</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {rewards.length}
                   </span>
                 </button>
@@ -704,14 +671,13 @@ export default function AdminLoyaltyPage() {
                 >
                   <History size={15} style={{ marginRight: '6px' }} />
                   <span>Audit Log</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
+                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
                     {transactions.length}
                   </span>
                 </button>
               </div>
             </div>
 
-            {/* Right Side Actions */}
             <div className="loyalty-actions">
               {activeTab === 'settings' && (
                 <button
@@ -722,7 +688,7 @@ export default function AdminLoyaltyPage() {
                     height: '38px',
                     padding: '0 14px',
                     borderRadius: '8px',
-                    background: primaryColor,
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -761,7 +727,7 @@ export default function AdminLoyaltyPage() {
                     height: '38px',
                     padding: '0 14px',
                     borderRadius: '8px',
-                    background: primaryColor,
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '12px',
                     fontWeight: 700,
@@ -775,16 +741,16 @@ export default function AdminLoyaltyPage() {
                   }}
                 >
                   <Plus size={15} />
-                  <span>Add Reward</span>
+                  <span>Add New Reward</span>
                 </button>
               )}
 
-              {/* Refresh Button */}
-              <div className="loyalty-refresh-border" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+              {/* Refresh Button with Left Border Separator, matching Inventory */}
+              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                 <button
                   type="button"
                   onClick={() => fetchData()}
-                  disabled={loading}
+                  title="Refresh Loyalty Data"
                   style={{
                     width: '38px',
                     height: '38px',
@@ -793,135 +759,130 @@ export default function AdminLoyaltyPage() {
                     border: '1px solid var(--border, #E2E8F0)',
                     background: '#FFFFFF',
                     color: '#475569',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    display: 'flex',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
                     transition: 'all 0.15s ease',
                     flexShrink: 0,
                   }}
-                  title="Refresh Loyalty Data"
-                  aria-label="Refresh Loyalty Data"
                 >
                   <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                 </button>
               </div>
 
               {/* Maximize Layout Toggle */}
-              <div className="loyalty-maximize-wrapper">
-                <LayoutMaximizeToggle />
-              </div>
+              <LayoutMaximizeToggle />
             </div>
           </div>
         }
       />
 
-      <div className="loyalty-content-container">
+      <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
 
-      {/* TAB 1: CUSTOMERS DIRECTORY */}
-      {activeTab === 'customers' && (
-        <div className="loyalty-card-box">
-          <div className="loyalty-cust-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-            <div className="loyalty-search-wrapper">
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input
-                type="text"
-                placeholder="Search by name or phone..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px 9px 36px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '13px',
-                  outline: 'none',
-                }}
-              />
-              {customerSearch && (
-                <button
-                  onClick={() => setCustomerSearch('')}
-                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                >
-                  <X size={14} />
-                </button>
-              )}
+        {/* TAB 1: CUSTOMERS DIRECTORY */}
+        {activeTab === 'customers' && (
+          <div style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Search by name or phone number..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px 9px 36px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    outline: 'none',
+                  }}
+                />
+                {customerSearch && (
+                  <button
+                    onClick={() => setCustomerSearch('')}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
+                Showing <strong>{customers.length}</strong> customer profile(s)
+              </div>
             </div>
 
-            <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
-              Showing <strong>{customers.length}</strong> customer profile(s)
-            </div>
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="loyalty-table-desktop" style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Customer</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Phone</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Points Balance</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Punch Card (Visits)</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Rewards Unlocked</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Total Spent</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700, textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
-                      No registered loyalty customer records found.
-                    </td>
+            {/* Desktop Table View */}
+            <div className="loyalty-table-desktop" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Customer</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Phone</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Points Balance</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Punch Card (Visits)</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Rewards Unlocked</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Total Spent</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700, textAlign: 'right' }}>Actions</th>
                   </tr>
-                ) : (
-                  customers.map((c) => (
-                    <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px' }}>
-                            {(c.name || 'G').charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.name || 'Guest Customer'}</div>
-                            {c.email && <div style={{ fontSize: '11px', color: '#64748b' }}>{c.email}</div>}
-                          </div>
-                        </div>
+                </thead>
+                <tbody>
+                  {customers.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
+                        No registered loyalty customer records found.
                       </td>
-                      <td style={{ padding: '14px 16px', color: '#475569', fontFamily: 'monospace', fontWeight: 600 }}>
-                        {c.phone || '-'}
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '16px', fontWeight: 700, fontSize: '12px' }}>
-                          {Number(c.points_balance || 0).toLocaleString()} pts
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ flex: 1, height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', maxWidth: '100px' }}>
-                            <div
-                              style={{
-                                height: '100%',
-                                width: `${Math.min(100, ((c.visit_progress || 0) / (settings.visit_milestone_count || 5)) * 100)}%`,
-                                background: '#2563eb',
-                                borderRadius: '4px'
-                              }}
-                            />
+                    </tr>
+                  ) : (
+                    customers.map((c) => (
+                      <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px' }}>
+                              {(c.name || 'G').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.name || 'Guest Customer'}</div>
+                              {c.email && <div style={{ fontSize: '11px', color: '#64748b' }}>{c.email}</div>}
+                            </div>
                           </div>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
-                            {c.visit_progress || 0}/{settings.visit_milestone_count || 5}
+                        </td>
+                        <td style={{ padding: '14px 16px', color: '#475569', fontFamily: 'monospace', fontWeight: 600 }}>
+                          {c.phone}
+                        </td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '16px', fontWeight: 700, fontSize: '12px' }}>
+                            {Number(c.points_balance || 0).toLocaleString()} pts
                           </span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '14px 16px', color: '#059669', fontWeight: 700 }}>
-                        {c.rewards_unlocked || 0} claimed
-                      </td>
-                      <td style={{ padding: '14px 16px', fontWeight: 600, color: '#334155' }}>
-                        ₹{Number(c.total_spent || 0).toLocaleString()}
-                      </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        </td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ flex: 1, height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', maxWidth: '100px' }}>
+                              <div
+                                style={{
+                                  height: '100%',
+                                  width: `${Math.min(100, ((c.visit_progress || 0) / (settings.visit_milestone_count || 5)) * 100)}%`,
+                                  background: '#2563eb',
+                                  borderRadius: '4px'
+                                }}
+                              />
+                            </div>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                              {c.visit_progress || 0}/{settings.visit_milestone_count || 5}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 16px', color: '#059669', fontWeight: 700 }}>
+                          {c.rewards_unlocked || 0} claimed
+                        </td>
+                        <td style={{ padding: '14px 16px', fontWeight: 600, color: '#334155' }}>
+                          ₹{Number(c.total_spent || 0).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                           <button
                             onClick={() => {
                               setSelectedCustomer(c);
@@ -941,53 +902,31 @@ export default function AdminLoyaltyPage() {
                           >
                             Adjust Points
                           </button>
-                          <button
-                            onClick={() => handleDeleteCustomer(c.id, c.name || c.phone || 'Customer')}
-                            title="Delete Customer Profile"
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid #fee2e2',
-                              background: '#fef2f2',
-                              color: '#ef4444',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            <Trash2 size={13} />
-                            <span>Delete</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-          {/* Mobile Card View Fallback */}
-          <div className="loyalty-cards-mobile">
-            {customers.map((c) => (
-              <div key={c.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', background: 'white' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{c.name || 'Guest Customer'}</div>
-                  <span style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: '12px', fontWeight: 700, fontSize: '11px' }}>
-                    {c.points_balance} pts
-                  </span>
-                </div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>
-                  Phone: {c.phone || '-'}
-                </div>
-                <div style={{ fontSize: '12px', color: '#334155', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Visits: <strong>{c.visit_progress || 0}/{settings.visit_milestone_count || 5}</strong></span>
-                  <span>Total Spent: <strong>₹{Number(c.total_spent || 0).toLocaleString()}</strong></span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+            {/* Mobile Card View Fallback */}
+            <div className="loyalty-cards-mobile">
+              {customers.map((c) => (
+                <div key={c.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', background: 'white' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{c.name || 'Guest Customer'}</div>
+                    <span style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: '12px', fontWeight: 700, fontSize: '11px' }}>
+                      {c.points_balance} pts
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px', fontFamily: 'monospace' }}>
+                    Phone: {c.phone}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#334155', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Visits: <strong>{c.visit_progress || 0}/{settings.visit_milestone_count || 5}</strong></span>
+                    <span>Total Spent: <strong>₹{Number(c.total_spent || 0).toLocaleString()}</strong></span>
+                  </div>
                   <button
                     onClick={() => {
                       setSelectedCustomer(c);
@@ -995,7 +934,7 @@ export default function AdminLoyaltyPage() {
                       setAdjustReason('');
                     }}
                     style={{
-                      flex: 1,
+                      width: '100%',
                       padding: '8px',
                       borderRadius: '6px',
                       border: '1px solid #cbd5e1',
@@ -1008,540 +947,557 @@ export default function AdminLoyaltyPage() {
                   >
                     Adjust Points
                   </button>
-                  <button
-                    onClick={() => handleDeleteCustomer(c.id, c.name || c.phone || 'Customer')}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #fee2e2',
-                      background: '#fef2f2',
-                      color: '#ef4444',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    <Trash2 size={13} /> Delete
-                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: PROGRAM SETTINGS */}
-      {activeTab === 'settings' && (
-        <form noValidate onSubmit={handleSaveSettings} className="loyalty-card-box" style={{ width: '100%' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Settings size={18} color="#475569" /> Program Rules & Loyalty System Mode
-          </h3>
-
-          {/* Enable Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: '#f8fafc', borderRadius: '8px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
-            <div>
-              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>Enable Loyalty Program</div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>When turned off, customers cannot earn or redeem gifts. Balances stay preserved.</div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.is_enabled}
-              onChange={(e) => setSettings({ ...settings, is_enabled: e.target.checked })}
-              style={{ width: '20px', height: '20px', accentColor: '#059669', cursor: 'pointer' }}
-            />
-          </div>
-
-          {/* Loyalty Program System Mode Selection Cards */}
-          <div style={{ marginBottom: '28px' }}>
-            <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
-              Select Loyalty Reward System Type
-            </label>
-            <p style={{ fontSize: '12px', color: '#64748b', marginTop: 0, marginBottom: '14px' }}>
-              Choose whether customer gifts and rewards are driven by accumulated redeem points or digital punch card milestones.
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
-              {/* Option 1: Redeem Points Mode */}
-              <div
-                onClick={() => setSettings({ ...settings, loyalty_mode: 'POINTS' })}
-                style={{
-                  border: `2px solid ${settings.loyalty_mode === 'POINTS' ? primaryColor : '#e2e8f0'}`,
-                  borderRadius: '10px',
-                  padding: '16px',
-                  background: settings.loyalty_mode === 'POINTS' ? `${primaryColor}0f` : '#ffffff',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  position: 'relative'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: settings.loyalty_mode === 'POINTS' ? primaryColor : '#f1f5f9', color: settings.loyalty_mode === 'POINTS' ? '#fff' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Award size={18} />
-                    </div>
-                    <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Redeem Points System</span>
-                  </div>
-                  <input
-                    type="radio"
-                    name="loyalty_mode"
-                    checked={settings.loyalty_mode === 'POINTS'}
-                    onChange={() => setSettings({ ...settings, loyalty_mode: 'POINTS' })}
-                    style={{ accentColor: primaryColor, cursor: 'pointer' }}
-                  />
-                </div>
-                <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.4 }}>
-                  Customers earn points based on order spend and redeem accumulated points for catalog items or cash discounts.
-                </p>
-              </div>
-
-              {/* Option 2: Digital Punch Card Mode */}
-              <div
-                onClick={() => setSettings({ ...settings, loyalty_mode: 'PUNCH_CARD' })}
-                style={{
-                  border: `2px solid ${settings.loyalty_mode === 'PUNCH_CARD' ? primaryColor : '#e2e8f0'}`,
-                  borderRadius: '10px',
-                  padding: '16px',
-                  background: settings.loyalty_mode === 'PUNCH_CARD' ? `${primaryColor}0f` : '#ffffff',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  position: 'relative'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: settings.loyalty_mode === 'PUNCH_CARD' ? primaryColor : '#f1f5f9', color: settings.loyalty_mode === 'PUNCH_CARD' ? '#fff' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Gift size={18} />
-                    </div>
-                    <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Digital Punch Card System</span>
-                  </div>
-                  <input
-                    type="radio"
-                    name="loyalty_mode"
-                    checked={settings.loyalty_mode === 'PUNCH_CARD'}
-                    onChange={() => setSettings({ ...settings, loyalty_mode: 'PUNCH_CARD' })}
-                    style={{ accentColor: primaryColor, cursor: 'pointer' }}
-                  />
-                </div>
-                <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.4 }}>
-                  Customers get 1 punch stamp per visit. When milestone punches are completed, they unlock a designated reward.
-                </p>
-              </div>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* Punch Card Specific Reward Settings */}
-          {settings.loyalty_mode === 'PUNCH_CARD' && (
-            <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '18px', marginBottom: '24px' }}>
-              <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={16} color={primaryColor} /> Punch Card Reward Configuration
+        {/* TAB 2: PROGRAM SETTINGS */}
+        {activeTab === 'settings' && (
+          <form noValidate onSubmit={handleSaveSettings} style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '24px', width: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Settings size={18} color="#475569" /> Program Rules & Loyalty System Mode
+            </h3>
+
+            {/* Enable Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: '#f8fafc', borderRadius: '8px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>Enable Loyalty Program</div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>When turned off, customers cannot earn or redeem gifts. Balances stay preserved.</div>
               </div>
-
-              <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Milestone Punch Count (Visits required)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="1"
-                    value={settings.visit_milestone_count}
-                    onChange={(e) => setSettings({ ...settings, visit_milestone_count: parseInt(e.target.value) || 5 })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
-                  />
-                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                    e.g., 5 means customer gets reward after 5 visit punches.
-                  </span>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Punch Card Reward Type
-                  </label>
-                  <select
-                    value={settings.punch_card_reward_type}
-                    onChange={(e) => setSettings({ ...settings, punch_card_reward_type: e.target.value as 'FREE_ITEM' | 'POINTS' })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white', fontWeight: 600 }}
-                  >
-                    <option value="FREE_ITEM">Free Menu Item / Gift</option>
-                    <option value="POINTS">Bonus Redeem Points</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Dynamic Sub-option: Item Product Picker vs Points Input */}
-              {settings.punch_card_reward_type === 'FREE_ITEM' ? (
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Select Free Gift Item Awarded
-                  </label>
-                  <select
-                    value={settings.punch_card_product_id || ''}
-                    onChange={(e) => setSettings({ ...settings, punch_card_product_id: e.target.value || null })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
-                  >
-                    <option value="">-- Choose Free Item from Menu Catalog --</option>
-                    {productsList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (Worth ₹{p.price})
-                      </option>
-                    ))}
-                  </select>
-                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                    This item will be added to the customer's order bill at zero price (₹0) when redeemed.
-                  </span>
-                </div>
-              ) : (
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Bonus Points Amount Credited
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="1"
-                    value={settings.punch_card_reward_value}
-                    onChange={(e) => setSettings({ ...settings, punch_card_reward_value: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
-                    placeholder="e.g. 100"
-                  />
-                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                    Bonus points credited directly to customer balance upon punch card completion.
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Earning Rules */}
-          <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Points Earning Rate (Points per ₹1 Spent)
-              </label>
               <input
-                type="number"
-                step="any"
-                min="0"
-                value={settings.points_earning_rate}
-                onChange={(e) => setSettings({ ...settings, points_earning_rate: parseFloat(e.target.value) || 0 })}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-              />
-              <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                e.g., 0.10 means ₹100 spent = 10 points earned.
-              </span>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Minimum Order Amount to Earn Points (₹)
-              </label>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                value={settings.min_order_amount}
-                onChange={(e) => setSettings({ ...settings, min_order_amount: parseFloat(e.target.value) || 0 })}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                type="checkbox"
+                checked={settings.is_enabled}
+                onChange={(e) => setSettings({ ...settings, is_enabled: e.target.checked })}
+                style={{ width: '20px', height: '20px', accentColor: '#059669', cursor: 'pointer' }}
               />
             </div>
-          </div>
 
-          {/* Points Expiry Rule */}
-          <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Points Expiry Policy
+            {/* Loyalty Program System Mode Selection Cards */}
+            <div style={{ marginBottom: '28px' }}>
+              <label style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+                Select Loyalty Reward System Type
               </label>
-              <select
-                value={settings.points_expiry_type}
-                onChange={(e) => setSettings({ ...settings, points_expiry_type: e.target.value as any })}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
-              >
-                <option value="NEVER">Never Expire (Default)</option>
-                <option value="EXPIRE_AFTER_DAYS">Expire After Set Duration</option>
-              </select>
+              <p style={{ fontSize: '12px', color: '#64748b', marginTop: 0, marginBottom: '14px' }}>
+                Choose whether customer gifts and rewards are driven by accumulated redeem points or digital punch card milestones.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                {/* Option 1: Redeem Points Mode */}
+                <div
+                  onClick={() => setSettings({ ...settings, loyalty_mode: 'POINTS' })}
+                  style={{
+                    border: `2px solid ${settings.loyalty_mode === 'POINTS' ? '#971345' : '#e2e8f0'}`,
+                    borderRadius: '10px',
+                    padding: '16px',
+                    background: settings.loyalty_mode === 'POINTS' ? '#fdf2f6' : '#ffffff',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: settings.loyalty_mode === 'POINTS' ? '#971345' : '#f1f5f9', color: settings.loyalty_mode === 'POINTS' ? '#fff' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Award size={18} />
+                      </div>
+                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Redeem Points System</span>
+                    </div>
+                    <input
+                      type="radio"
+                      name="loyalty_mode"
+                      checked={settings.loyalty_mode === 'POINTS'}
+                      onChange={() => setSettings({ ...settings, loyalty_mode: 'POINTS' })}
+                      style={{ accentColor: '#971345', cursor: 'pointer' }}
+                    />
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.4 }}>
+                    Customers earn points based on order spend and redeem accumulated points for catalog items or cash discounts.
+                  </p>
+                </div>
+
+                {/* Option 2: Digital Punch Card Mode */}
+                <div
+                  onClick={() => setSettings({ ...settings, loyalty_mode: 'PUNCH_CARD' })}
+                  style={{
+                    border: `2px solid ${settings.loyalty_mode === 'PUNCH_CARD' ? '#971345' : '#e2e8f0'}`,
+                    borderRadius: '10px',
+                    padding: '16px',
+                    background: settings.loyalty_mode === 'PUNCH_CARD' ? '#fdf2f6' : '#ffffff',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: settings.loyalty_mode === 'PUNCH_CARD' ? '#971345' : '#f1f5f9', color: settings.loyalty_mode === 'PUNCH_CARD' ? '#fff' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Gift size={18} />
+                      </div>
+                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Digital Punch Card System</span>
+                    </div>
+                    <input
+                      type="radio"
+                      name="loyalty_mode"
+                      checked={settings.loyalty_mode === 'PUNCH_CARD'}
+                      onChange={() => setSettings({ ...settings, loyalty_mode: 'PUNCH_CARD' })}
+                      style={{ accentColor: '#971345', cursor: 'pointer' }}
+                    />
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.4 }}>
+                    Customers get 1 punch stamp per visit. When milestone punches are completed, they unlock a designated reward.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {settings.points_expiry_type === 'EXPIRE_AFTER_DAYS' && (
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Expiry Duration (Days)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  min="1"
-                  value={settings.points_expiry_days}
-                  onChange={(e) => setSettings({ ...settings, points_expiry_days: parseInt(e.target.value) || 365 })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-                />
-              </div>
-            )}
-          </div>
+            {/* Punch Card Specific Reward Settings */}
+            {settings.loyalty_mode === 'PUNCH_CARD' && (
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '18px', marginBottom: '24px' }}>
+                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} color="#971345" /> Punch Card Reward Configuration
+                </div>
 
-          {/* Redemption Conversion Rate */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
-            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '10px' }}>
-              Standard Points-to-Rupee Conversion Rate
-            </div>
-            <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                  Points Required
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  min="1"
-                  value={settings.points_redemption_rate_points}
-                  onChange={(e) => setSettings({ ...settings, points_redemption_rate_points: parseInt(e.target.value) || 100 })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                  Rupee Discount (₹)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  min="1"
-                  value={settings.points_redemption_rate_amount}
-                  onChange={(e) => setSettings({ ...settings, points_redemption_rate_amount: parseFloat(e.target.value) || 50 })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
-                />
-              </div>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* TAB 3: REWARDS CATALOG */}
-      {activeTab === 'rewards' && (
-        <div className="loyalty-card-box">
-          <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Rewards Catalog</h3>
-            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', margin: 0 }}>Configure special rewards selectable by cashier during POS billing.</p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
-            {rewards.length === 0 ? (
-              <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-                No custom rewards created yet. Click <strong>Add New Reward</strong> to create your first reward.
-              </div>
-            ) : (
-              rewards.map((r) => (
-                <div key={r.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px', background: r.is_active ? 'white' : '#f8fafc' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>{r.name}</div>
-                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: r.is_active ? '#dcfce7' : '#f1f5f9', color: r.is_active ? '#15803d' : '#64748b' }}>
-                      {r.is_active ? 'Active' : 'Inactive'}
+                <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Milestone Punch Count (Visits required)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="1"
+                      value={settings.visit_milestone_count}
+                      onChange={(e) => setSettings({ ...settings, visit_milestone_count: parseInt(e.target.value) || 5 })}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
+                    />
+                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      e.g., 5 means customer gets reward after 5 visit punches.
                     </span>
                   </div>
 
-                  <div style={{ fontSize: '13px', color: '#b45309', fontWeight: 700, marginBottom: '10px' }}>
-                    {r.points_required} Points Required
-                  </div>
-
-                  <div style={{ fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
-                    <strong>Type:</strong> {r.reward_type === 'FREE_ITEM' ? 'Free Item' : r.reward_type === 'DISCOUNT_PERCENTAGE' ? `${r.discount_value}% Off` : `₹${r.discount_value} Discount`}
-                  </div>
-
-                  {r.min_purchase_amount > 0 && (
-                    <div style={{ fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
-                      <strong>Min Purchase:</strong> ₹{r.min_purchase_amount}
-                    </div>
-                  )}
-
-                  {r.valid_until && (
-                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
-                      <strong>Valid Until:</strong> {new Date(r.valid_until).toLocaleDateString()}
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                    <button
-                      onClick={() => {
-                        setEditingReward(r);
-                        setRewardForm({
-                          name: r.name,
-                          points_required: r.points_required,
-                          reward_type: r.reward_type,
-                          discount_value: r.discount_value,
-                          selected_product_ids: r.selected_product_ids || [],
-                          min_purchase_amount: r.min_purchase_amount || 0,
-                          valid_until: r.valid_until ? r.valid_until.split('T')[0] : '',
-                        });
-                        setShowRewardModal(true);
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '6px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        background: 'white',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: '#334155',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px',
-                      }}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Punch Card Reward Type
+                    </label>
+                    <select
+                      value={settings.punch_card_reward_type}
+                      onChange={(e) => setSettings({ ...settings, punch_card_reward_type: e.target.value as 'FREE_ITEM' | 'POINTS' })}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white', fontWeight: 600 }}
                     >
-                      <Edit2 size={13} /> Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteReward(r.id)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #fecaca',
-                        background: '#fef2f2',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: '#dc2626',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <Trash2 size={13} /> Delete
-                    </button>
+                      <option value="FREE_ITEM">Free Menu Item / Gift</option>
+                      <option value="POINTS">Bonus Redeem Points</option>
+                    </select>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* TAB 4: TRANSACTIONS AUDIT LOG */}
-      {activeTab === 'transactions' && (
-        <div className="loyalty-card-box">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Transaction Audit Log</h3>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>Detailed audit trail of all points earned, redeemed, and adjusted.</p>
-            </div>
-
-            {/* Segmented Control Switcher UI matching Analytics graph switcher */}
-            <div
-              className="analytics-metric-switcher"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                backgroundColor: '#F1F5F9',
-                padding: '4px',
-                borderRadius: '8px',
-                overflowX: 'auto',
-                maxWidth: '100%',
-              }}
-            >
-              {[
-                { key: 'ALL', label: 'All Transactions', icon: <History size={14} /> },
-                { key: 'EARN_POINTS', label: 'Points Earned', icon: <TrendingUp size={14} /> },
-                { key: 'REDEEM_POINTS', label: 'Points Redeemed', icon: <Gift size={14} /> },
-                { key: 'MANUAL_ADJUSTMENT', label: 'Manual Adjustment', icon: <Settings size={14} /> },
-                { key: 'REVERSAL_REFUND', label: 'Reversals & Refunds', icon: <RefreshCw size={14} /> },
-              ].map((t) => {
-                const isActive = txTypeFilter === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setTxTypeFilter(t.key)}
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      fontWeight: isActive ? 600 : 500,
-                      borderRadius: '6px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      backgroundColor: isActive ? '#FFFFFF' : 'transparent',
-                      color: isActive ? '#0F172A' : '#64748B',
-                      boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      whiteSpace: 'nowrap',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {t.icon}
-                    <span>{t.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Timestamp</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Customer</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Type</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Ticket #</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Points Change</th>
-                  <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
-                      No transaction history recorded for this filter.
-                    </td>
-                  </tr>
+                {/* Dynamic Sub-option: Item Product Picker vs Points Input */}
+                {settings.punch_card_reward_type === 'FREE_ITEM' ? (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Select Free Gift Item Awarded
+                    </label>
+                    <select
+                      value={settings.punch_card_product_id || ''}
+                      onChange={(e) => setSettings({ ...settings, punch_card_product_id: e.target.value || null })}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
+                    >
+                      <option value="">-- Choose Free Item from Menu Catalog --</option>
+                      {productsList.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (Worth ₹{p.price})
+                        </option>
+                      ))}
+                    </select>
+                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      This item will be added to the customer's order bill at zero price (₹0) when redeemed.
+                    </span>
+                  </div>
                 ) : (
-                  filteredTransactions.map((tx) => (
-                    <tr key={tx.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '12px' }}>
-                        {new Date(tx.created_at).toLocaleString()}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
-                        {tx.customer_name} ({tx.phone})
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            background: tx.transaction_type === 'EARN_POINTS' ? '#dcfce7' : tx.transaction_type === 'REDEEM_POINTS' ? '#fef3c7' : tx.transaction_type === 'REVERSAL_REFUND' ? '#fef2f2' : '#f1f5f9',
-                            color: tx.transaction_type === 'EARN_POINTS' ? '#15803d' : tx.transaction_type === 'REDEEM_POINTS' ? '#b45309' : tx.transaction_type === 'REVERSAL_REFUND' ? '#dc2626' : '#475569',
-                          }}
-                        >
-                          {tx.transaction_type}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#334155' }}>
-                        {tx.ticket_number ? `#${tx.ticket_number}` : '-'}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: tx.points_delta > 0 ? '#16a34a' : tx.points_delta < 0 ? '#dc2626' : '#64748b' }}>
-                        {tx.points_delta > 0 ? `+${tx.points_delta}` : tx.points_delta} pts
-                      </td>
-                      <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '12px' }}>
-                        {tx.notes || '-'}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Bonus Points Amount Credited
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="1"
+                      value={settings.punch_card_reward_value}
+                      onChange={(e) => setSettings({ ...settings, punch_card_reward_value: e.target.value })}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
+                      placeholder="e.g. 100"
+                    />
+                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      Bonus points credited directly to customer balance upon punch card completion.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Earning Rules */}
+            <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  Points Earning Rate (Points per ₹1 Spent)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={settings.points_earning_rate}
+                  onChange={(e) => setSettings({ ...settings, points_earning_rate: parseFloat(e.target.value) || 0 })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+                <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  e.g., 0.10 means ₹100 spent = 10 points earned.
+                </span>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  Minimum Order Amount to Earn Points (₹)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={settings.min_order_amount}
+                  onChange={(e) => setSettings({ ...settings, min_order_amount: parseFloat(e.target.value) || 0 })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+              </div>
+            </div>
+
+            {/* Points Expiry Rule */}
+            <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  Points Expiry Policy
+                </label>
+                <select
+                  value={settings.points_expiry_type}
+                  onChange={(e) => setSettings({ ...settings, points_expiry_type: e.target.value as any })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
+                >
+                  <option value="NEVER">Never Expire (Default)</option>
+                  <option value="EXPIRE_AFTER_DAYS">Expire After Set Duration</option>
+                </select>
+              </div>
+
+              {settings.points_expiry_type === 'EXPIRE_AFTER_DAYS' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Expiry Duration (Days)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="1"
+                    value={settings.points_expiry_days}
+                    onChange={(e) => setSettings({ ...settings, points_expiry_days: parseInt(e.target.value) || 365 })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Redemption Conversion Rate */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
+              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '10px' }}>
+                Standard Points-to-Rupee Conversion Rate
+              </div>
+              <div className="loyalty-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                    Points Required
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="1"
+                    value={settings.points_redemption_rate_points}
+                    onChange={(e) => setSettings({ ...settings, points_redemption_rate_points: parseInt(e.target.value) || 100 })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                    Rupee Discount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="1"
+                    value={settings.points_redemption_rate_amount}
+                    onChange={(e) => setSettings({ ...settings, points_redemption_rate_amount: parseFloat(e.target.value) || 50 })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Save Settings Submit Button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+              <button
+                type="submit"
+                disabled={isSavingSettings}
+                style={{
+                  height: '42px',
+                  padding: '0 24px',
+                  borderRadius: '8px',
+                  background: '#971345',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: isSavingSettings ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  opacity: isSavingSettings ? 0.7 : 1,
+                }}
+              >
+                {isSavingSettings ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Saving Settings...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    <span>Save Program Settings</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* TAB 3: REWARDS CATALOG */}
+        {activeTab === 'rewards' && (
+          <div style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Rewards Catalog</h3>
+              <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', margin: 0 }}>Configure special rewards selectable by cashier during POS billing.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+              {rewards.length === 0 ? (
+                <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                  No custom rewards created yet. Click <strong>Add New Reward</strong> to create your first reward.
+                </div>
+              ) : (
+                rewards.map((r) => (
+                  <div key={r.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px', background: r.is_active ? 'white' : '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>{r.name}</div>
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: r.is_active ? '#dcfce7' : '#f1f5f9', color: r.is_active ? '#15803d' : '#64748b' }}>
+                        {r.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '13px', color: '#b45309', fontWeight: 700, marginBottom: '10px' }}>
+                      {r.points_required} Points Required
+                    </div>
+
+                    <div style={{ fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
+                      <strong>Type:</strong> {r.reward_type === 'FREE_ITEM' ? 'Free Item' : r.reward_type === 'DISCOUNT_PERCENTAGE' ? `${r.discount_value}% Off` : `₹${r.discount_value} Discount`}
+                    </div>
+
+                    {r.min_purchase_amount > 0 && (
+                      <div style={{ fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
+                        <strong>Min Purchase:</strong> ₹{r.min_purchase_amount}
+                      </div>
+                    )}
+
+                    {r.valid_until && (
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                        <strong>Valid Until:</strong> {new Date(r.valid_until).toLocaleDateString()}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                      <button
+                        onClick={() => {
+                          setEditingReward(r);
+                          setRewardForm({
+                            name: r.name,
+                            points_required: r.points_required,
+                            reward_type: r.reward_type,
+                            discount_value: r.discount_value,
+                            selected_product_ids: r.selected_product_ids || [],
+                            min_purchase_amount: r.min_purchase_amount || 0,
+                            valid_until: r.valid_until ? r.valid_until.split('T')[0] : '',
+                          });
+                          setShowRewardModal(true);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '6px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          background: 'white',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#334155',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Edit2 size={13} /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReward(r.id)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #fecaca',
+                          background: '#fef2f2',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#dc2626',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: TRANSACTIONS AUDIT LOG */}
+        {activeTab === 'transactions' && (
+          <div style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Transaction Audit Log</h3>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>Detailed audit trail of all points earned, redeemed, and adjusted.</p>
+              </div>
+
+              {/* Segmented Control Switcher UI matching Analytics graph switcher */}
+              <div
+                className="analytics-metric-switcher"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: '#F1F5F9',
+                  padding: '4px',
+                  borderRadius: '8px',
+                  overflowX: 'auto',
+                  maxWidth: '100%',
+                }}
+              >
+                {[
+                  { key: 'ALL', label: 'All Transactions', icon: <History size={14} /> },
+                  { key: 'EARN_POINTS', label: 'Points Earned', icon: <TrendingUp size={14} /> },
+                  { key: 'REDEEM_POINTS', label: 'Points Redeemed', icon: <Gift size={14} /> },
+                  { key: 'MANUAL_ADJUSTMENT', label: 'Manual Adjustment', icon: <Settings size={14} /> },
+                  { key: 'REVERSAL_REFUND', label: 'Reversals & Refunds', icon: <RefreshCw size={14} /> },
+                ].map((t) => {
+                  const isActive = txTypeFilter === t.key;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => setTxTypeFilter(t.key)}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        fontWeight: isActive ? 600 : 500,
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: isActive ? '#FFFFFF' : 'transparent',
+                        color: isActive ? '#0F172A' : '#64748B',
+                        boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {t.icon}
+                      <span>{t.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Timestamp</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Customer</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Type</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Ticket #</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Points Change</th>
+                    <th style={{ padding: '12px 16px', color: '#475569', fontWeight: 700 }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
+                        No transaction history recorded for this filter.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredTransactions.map((tx) => (
+                      <tr key={tx.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '12px' }}>
+                          {new Date(tx.created_at).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
+                          {tx.customer_name} ({tx.phone})
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              background: tx.transaction_type === 'EARN_POINTS' ? '#dcfce7' : tx.transaction_type === 'REDEEM_POINTS' ? '#fef3c7' : tx.transaction_type === 'REVERSAL_REFUND' ? '#fef2f2' : '#f1f5f9',
+                              color: tx.transaction_type === 'EARN_POINTS' ? '#15803d' : tx.transaction_type === 'REDEEM_POINTS' ? '#b45309' : tx.transaction_type === 'REVERSAL_REFUND' ? '#dc2626' : '#475569',
+                            }}
+                          >
+                            {tx.transaction_type}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#334155' }}>
+                          {tx.ticket_number ? `#${tx.ticket_number}` : '-'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: tx.points_delta > 0 ? '#16a34a' : tx.points_delta < 0 ? '#dc2626' : '#64748b' }}>
+                          {tx.points_delta > 0 ? `+${tx.points_delta}` : tx.points_delta} pts
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '12px' }}>
+                          {tx.notes || '-'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
 
       {/* MODAL: MANUAL POINTS ADJUSTMENT */}

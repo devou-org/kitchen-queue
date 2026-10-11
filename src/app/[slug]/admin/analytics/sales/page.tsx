@@ -101,17 +101,17 @@ export default function AdminSalesAnalyticsPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [page, setPage] = useState(1);
-  const initialSyncDone = useRef(false);
   const [dateTo, setDateTo] = useState(() =>
-    getCurrentBusinessDate(restaurant?.timezone, restaurant?.rollover_time)
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
   );
   const [dateFrom, setDateFrom] = useState(() =>
-    getCurrentBusinessDate(restaurant?.timezone, restaurant?.rollover_time)
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
   );
   const [orderCount, setOrderCount] = useState(0);
   const [overallRevenue, setOverallRevenue] = useState(0);
   const [dailyData, setDailyData] = useState<any[]>([]);
   const [paymentData, setPaymentData] = useState<any[]>([]);
+  const hasInitializedDateRef = useRef(false);
 
   const fetchData = useCallback(async (manualFrom?: string, manualTo?: string) => {
     setLoading(true);
@@ -169,10 +169,10 @@ export default function AdminSalesAnalyticsPage() {
     }
   }, [dateFrom, dateTo]);
 
-  // Initial fetch and restaurant sync
+  // Sync with restaurant business date if available
   useEffect(() => {
-    if (restaurant && !initialSyncDone.current) {
-      initialSyncDone.current = true;
+    if (restaurant && !hasInitializedDateRef.current) {
+      hasInitializedDateRef.current = true;
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
       setDateFrom(bDate);
       setDateTo(bDate);
@@ -180,10 +180,9 @@ export default function AdminSalesAnalyticsPage() {
     }
   }, [restaurant, fetchData]);
 
+  // Initial fetch on mount
   useEffect(() => {
-    if (!restaurant) {
-      fetchData();
-    }
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

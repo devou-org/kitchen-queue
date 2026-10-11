@@ -61,7 +61,19 @@ interface BillingData {
     };
     otpCharge?: number;
   } | null;
+  todayOtpUsage?: {
+    count: number;
+    amount: number;
+  };
 }
+
+const getTodayStr = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function BillingPage() {
   const { slug } = useParams();
@@ -71,13 +83,15 @@ export default function BillingPage() {
 
   const [paginatedTransactions, setPaginatedTransactions] = useState<any[]>([]);
   const [totalTxs, setTotalTxs] = useState(0);
+  const [rangeOtpStats, setRangeOtpStats] = useState<{ count: number; amount: number } | null>(null);
   const [txPage, setTxPage] = useState(1);
-  const [txDateFrom, setTxDateFrom] = useState('');
-  const [txDateTo, setTxDateTo] = useState('');
+  const [txDateFrom, setTxDateFrom] = useState(getTodayStr());
+  const [txDateTo, setTxDateTo] = useState(getTodayStr());
   const [txLoading, setTxLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/admin/billing', {
+    const todayStr = getTodayStr();
+    fetch(`/api/admin/billing?today=${todayStr}`, {
       headers: {
         'x-restaurant-slug': slug as string,
         'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`
@@ -123,6 +137,9 @@ export default function BillingPage() {
         if (resData.success) {
           setPaginatedTransactions(resData.data.transactions);
           setTotalTxs(resData.data.totalTransactions || 0);
+          if (resData.data.otpStats) {
+            setRangeOtpStats(resData.data.otpStats);
+          }
         } else {
           toast.error('Failed to load transactions');
         }
@@ -163,20 +180,22 @@ export default function BillingPage() {
 
   const { restaurant, transactions, summaries, pricingConfig } = data;
 
-  const currentCycleTransactions = transactions.filter(tx => {
-    if (!restaurant.billing_start_date) return true;
-    const txDate = new Date(tx.created_at);
-    const startDate = new Date(restaurant.billing_start_date);
-    const endDate = restaurant.billing_end_date ? new Date(restaurant.billing_end_date) : null;
-    return txDate >= startDate && (!endDate || txDate < endDate);
-  });
+  const currentOtpCount = rangeOtpStats ? rangeOtpStats.count : (data.todayOtpUsage?.count ?? 0);
+  const currentOtpAmount = rangeOtpStats ? rangeOtpStats.amount : (data.todayOtpUsage?.amount ?? 0);
 
-  const otpTxs = currentCycleTransactions.filter(tx => tx.transaction_type === 'OTP');
-  const currentOtpCount = otpTxs.length;
-  const currentOtpAmount = otpTxs.reduce((sum, tx) => sum + parseFloat(tx.amount || '0'), 0);
-
-  const orderTxs = currentCycleTransactions.filter(tx => tx.transaction_type === 'PER_ORDER');
-  const currentOrderAmount = orderTxs.reduce((sum, tx) => sum + parseFloat(tx.amount || '0'), 0);
+  const getDateRangeLabel = () => {
+    if (txDateFrom && txDateTo) {
+      if (txDateFrom === txDateTo) {
+        return `Date: ${new Date(txDateFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      }
+      return `${new Date(txDateFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - ${new Date(txDateTo).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    } else if (txDateFrom) {
+      return `From ${new Date(txDateFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    } else if (txDateTo) {
+      return `Until ${new Date(txDateTo).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    return 'All Time Total Accrued';
+  };
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
@@ -354,7 +373,7 @@ export default function BillingPage() {
               </div>
             </div>
 
-            {/* OTP Usage & Accrued Charges Card */}
+            {/* Total OTP Usage Card */}
             <div style={{ 
               backgroundColor: 'white', 
               borderRadius: '8px', 
@@ -362,24 +381,16 @@ export default function BillingPage() {
               padding: '20px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
             }}>
-              <h2 style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Current Cycle Usage</h2>
+              <h2 style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Total OTP Usage</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '12px' }}>
-                <span style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>₹{(currentOtpAmount + currentOrderAmount).toFixed(2)}</span>
-                <span style={{ fontSize: '11px', color: '#4b5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Accrued This Cycle</span>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>₹{currentOtpAmount.toFixed(2)}</span>
+                <span style={{ fontSize: '11px', color: '#4b5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{getDateRangeLabel()}</span>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px', fontSize: '13px', color: '#4b5563' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>OTPs Successfully Sent:</span>
                   <strong style={{ color: '#111827' }}>{currentOtpCount} SMS (₹{currentOtpAmount.toFixed(2)})</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
-                  <span>Order Commissions Accrued:</span>
-                  <strong style={{ color: '#111827' }}>₹{currentOrderAmount.toFixed(2)}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Total Cycle Accrued Charges:</span>
-                  <strong style={{ color: '#111827' }}>₹{(currentOtpAmount + currentOrderAmount).toFixed(2)}</strong>
                 </div>
               </div>
             </div>

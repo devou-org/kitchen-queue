@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
@@ -22,23 +22,29 @@ export default function AdminAnalyticsStatementsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(() =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+  );
+  const [dateTo, setDateTo] = useState(() =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+  );
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showBill, setShowBill] = useState(false);
   const [stats, setStats] = useState({ totalRevenue: 0, totalPaidRevenue: 0, orderCount: 0, paidCount: 0 });
+  const hasInitializedDateRef = useRef(false);
 
   const { slug } = useParams();
   const { restaurant } = useRestaurant();
 
   useEffect(() => {
-    if (restaurant && !dateFrom && !dateTo) {
+    if (restaurant && !hasInitializedDateRef.current) {
+      hasInitializedDateRef.current = true;
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
       setDateFrom(bDate);
       setDateTo(bDate);
     }
-  }, [restaurant, dateFrom, dateTo]);
+  }, [restaurant]);
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -125,7 +131,7 @@ export default function AdminAnalyticsStatementsPage() {
   const handleExpireOldOrders = async () => {
     if (
       !window.confirm(
-        'Are you sure you want to process unfulfilled orders from PREVIOUS days? Paid orders will be marked CLOSED, and unpaid orders will be marked EXPIRED (restoring their stock items back to inventory).'
+        'Are you sure you want to expire all unfulfilled orders from PREVIOUS days? This will restore their stock items back to inventory.'
       )
     )
       return;

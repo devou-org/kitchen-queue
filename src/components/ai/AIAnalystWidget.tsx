@@ -267,10 +267,43 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
     return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   };
 
+  const [isNearBottom, setIsNearBottom] = useState(false);
+
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
     window.addEventListener('open-ai-analyst', handleOpen);
     return () => window.removeEventListener('open-ai-analyst', handleOpen);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      const windowHeight = window.innerHeight;
+      const docHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.offsetHeight
+      );
+
+      // When the user scrolls near the bottom of the page (within 90px of bottom),
+      // make the floating button fade out so it doesn't intercept pagination/footer controls.
+      if (docHeight > windowHeight + 50) {
+        const distanceFromBottom = docHeight - (scrollY + windowHeight);
+        setIsNearBottom(distanceFromBottom <= 90);
+      } else {
+        setIsNearBottom(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
   }, []);
 
   return (
@@ -278,8 +311,8 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
       <style>{`
         .ai-analyst-hover-btn {
           position: fixed;
-          bottom: 24px;
-          right: 24px;
+          bottom: 28px;
+          right: 28px;
           z-index: 9999;
           display: flex;
           align-items: center;
@@ -295,7 +328,16 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
           box-shadow: 0 4px 18px ${primaryColor}4D;
           overflow: hidden;
           white-space: nowrap;
-          transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, transform 0.2s ease;
+          transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, transform 0.25s ease, opacity 0.25s ease, visibility 0.25s ease;
+          opacity: 1;
+          visibility: visible;
+        }
+
+        .ai-analyst-hover-btn.ai-hidden-bottom {
+          opacity: 0 !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+          transform: translateY(20px) scale(0.9) !important;
         }
 
         .ai-analyst-hover-btn:hover {
@@ -323,7 +365,7 @@ export function AIAnalystWidget({ defaultOpen = false }: { defaultOpen?: boolean
       {/* Compact Icon Floating Button (Expands on Hover) */}
       {!isOpen && (
         <button
-          className="ai-analyst-hover-btn"
+          className={`ai-analyst-hover-btn ${isNearBottom ? 'ai-hidden-bottom' : ''}`}
           onClick={() => setIsOpen(true)}
           title="AI Analyst"
         >

@@ -151,7 +151,6 @@ export default function LoginPage() {
         window.location.href = `/${slug}/menu`;
       } else {
         toast.error(data.error || 'Invalid OTP');
-        setCooldown(0); // Re-enable Send OTP button on wrong PIN
         setLoading(false);
       }
     } catch {

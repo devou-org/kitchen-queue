@@ -204,14 +204,26 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 export async function sendOTPviaSMS(phone: string, otp: string, restaurantId?: string): Promise<{ success: boolean; error?: string; data?: any }> {
   try {
-    const cleanPhone = phone.replace(/^\+91/, '').replace(/\D/g, '');
+    const cleanPhone = phone.replace(/^\+91/, '').replace(/\D/g, '').slice(-10);
+
+    const apiKey = process.env.FAST2SMS_API_KEY || '';
+    if (!apiKey) {
+      console.warn(`[SMS] FAST2SMS_API_KEY not configured. Dev OTP for ${phone}: ${otp}`);
+      if (process.env.NODE_ENV !== 'production') {
+        const { incrementOtpCount } = await import('./db');
+        await incrementOtpCount(phone, restaurantId);
+        return { success: true };
+      }
+      return { success: false, error: 'SMS service is not configured' };
+    }
 
     const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
       method: 'POST',
       headers: {
-        'accept': 'application/json',
-        'authorization': process.env.FAST2SMS_API_KEY || '',
-        'content-type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': apiKey,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       },
       body: JSON.stringify({
         sender_id: 'DEVOU',
@@ -223,16 +235,52 @@ export async function sendOTPviaSMS(phone: string, otp: string, restaurantId?: s
       }),
     });
 
-    const data = await response.json();
+    const rawText = await response.text();
+    let data: any = null;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      console.error(`Fast2SMS returned non-JSON response (HTTP ${response.status}):`, rawText.slice(0, 300));
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[DEV FALLBACK] Fast2SMS returned HTML. Dev OTP for ${phone} is: ${otp}`);
+        const { incrementOtpCount } = await import('./db');
+        await incrementOtpCount(phone, restaurantId);
+        return { success: true };
+      }
+      return { success: false, error: 'SMS provider gateway error. Please try again shortly.' };
+    }
+
     console.log('SMS Response:', data);
-    if (data.return === true || data.return === "true" || data.message) {
+    if (data && (data.return === true || data.return === "true" || (Array.isArray(data.message) && data.message.some((m: string) => m.toLowerCase().includes('successfully'))) || (typeof data.message === 'string' && data.message.toLowerCase().includes('successfully')))) {
+      try {
+        const { incrementOtpCount } = await import('./db');
+        await incrementOtpCount(phone, restaurantId);
+      } catch (logErr) {
+        console.error('Failed to log OTP in db:', logErr);
+      }
+      return { success: true };
+    }
+
+    const errorMsg = data?.message
+      ? (Array.isArray(data.message) ? data.message.join(', ') : String(data.message))
+      : 'Fast2SMS API rejected request';
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`[DEV FALLBACK] Fast2SMS error: ${errorMsg}. Dev OTP for ${phone} is: ${otp}`);
       const { incrementOtpCount } = await import('./db');
       await incrementOtpCount(phone, restaurantId);
       return { success: true };
     }
-    return { success: false, error: 'Fast2SMS API rejected request', data };
+
+    return { success: false, error: errorMsg, data };
   } catch (error: any) {
     console.error('SMS send error:', error);
-    return { success: false, error: 'Internal Error: ' + error.message };
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`[DEV FALLBACK] SMS error: ${error.message}. Dev OTP for ${phone} is: ${otp}`);
+      const { incrementOtpCount } = await import('./db');
+      await incrementOtpCount(phone, restaurantId);
+      return { success: true };
+    }
+    return { success: false, error: 'Failed to send SMS. Please try again shortly.' };
   }
 }

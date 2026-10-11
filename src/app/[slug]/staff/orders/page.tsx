@@ -18,8 +18,45 @@ import { Pagination } from '@/components/ui/Pagination';
 import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapshotModal';
 import { useAdminLayout } from '@/context/AdminLayoutContext';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+
+function resolveRoleDefaultStatus(): string {
+  if (typeof window === 'undefined') return 'PREPARING';
+  const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
+  let userRole = '';
+  let roleDefaultStatus = '';
+
+  if (userStr) {
+    try {
+      const parsed = JSON.parse(userStr);
+      userRole = parsed.role || (parsed.is_admin ? 'ADMIN' : '');
+      roleDefaultStatus = parsed.default_order_status || parsed.role_default_order_status || '';
+    } catch {}
+  }
+
+  if (roleDefaultStatus) {
+    const norm = roleDefaultStatus.trim().toUpperCase();
+    return norm === 'ALL' ? '' : norm;
+  }
+
+  const r = (userRole || '').trim().toUpperCase();
+  if (r.includes('KITCHEN') || r.includes('CHEF') || r.includes('COOK')) {
+    return 'PREPARING';
+  }
+  if (r.includes('WAITER') || r.includes('STEWARD') || r.includes('SERVER')) {
+    return 'READY';
+  }
+  if (r.includes('CASHIER') || r.includes('BILLING')) {
+    return 'SERVED';
+  }
+  if (r.includes('MANAGER') || r.includes('ADMIN')) {
+    return ''; // Show all orders
+  }
+
+  return 'PREPARING';
+}
 
 export default function StaffOrders() {
   const { slug } = useParams();
@@ -47,6 +84,21 @@ export default function StaffOrders() {
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
       if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint === 'true');
 
+      // Resolve role-based default status filter
+      const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
+      let uRole = '';
+      if (userStr) {
+        try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch {}
+      }
+      const roleKey = `qdine_orders_status_filter_${uRole || 'default'}`;
+      const savedStatus = localStorage.getItem(roleKey);
+      if (savedStatus !== null) {
+        setStatusFilter(savedStatus);
+      } else {
+        const defaultForRole = resolveRoleDefaultStatus();
+        setStatusFilter(defaultForRole);
+      }
+
       tryAutoConnectBluetooth();
     }
   }, []);
@@ -65,7 +117,9 @@ export default function StaffOrders() {
       localStorage.setItem('qdine_auto_print_kot', String(nextVal));
       localStorage.setItem('qdine_auto_print_bill', String(nextVal));
     }
-    toast.success(nextVal ? '🖨️ Auto-Print: Enabled' : '⏸️ Auto-Print: Paused');
+    toast.success(nextVal ? 'Auto-Print: Enabled' : 'Auto-Print: Paused', {
+      icon: <PrinterIllustration size={20} status={nextVal ? 'success' : 'idle'} />,
+    });
   };
 
   const fetchTables = useCallback(() => {
@@ -215,18 +269,8 @@ export default function StaffOrders() {
         return;
       }
 
-      const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
-
-      // If server already printed directly via Wi-Fi TCP or Windows spooler
-      if (data.server_printed) {
-        toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (Wi-Fi)`, {
-          id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
-        });
-        return;
-      }
-
-      toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: '🖨️',
+      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: <PrinterIllustration size={22} status="printing" />,
         duration: 3000,
       });
 
@@ -241,7 +285,8 @@ export default function StaffOrders() {
         });
         const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            icon: <PrinterIllustration size={22} status="success" />,
             id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
           });
         } else {
@@ -298,7 +343,7 @@ export default function StaffOrders() {
           payment_method: pMethod ?? prev.payment_method,
           is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
-        toast.success(`Order updated to ${newStatus}`, { id: `order-status-${id}` });
+        toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
       } else {
         toast.error(data.error || 'Failed to update');
       }
@@ -505,8 +550,17 @@ export default function StaffOrders() {
               <CustomSelect
                 value={statusFilter || 'ALL'}
                 onChange={(val) => {
-                  setStatusFilter(val === 'ALL' ? '' : val);
+                  const nextVal = val === 'ALL' ? '' : val;
+                  setStatusFilter(nextVal);
                   setPage(1);
+                  if (typeof window !== 'undefined') {
+                    const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
+                    let uRole = '';
+                    if (userStr) {
+                      try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch {}
+                    }
+                    localStorage.setItem(`qdine_orders_status_filter_${uRole || 'default'}`, nextVal);
+                  }
                 }}
                 options={statusOptions}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}

@@ -9,10 +9,9 @@ interface Transaction {
   amount: string;
   reference_id: string;
   description: string;
-  created_at: string;
   customer_name?: string | null;
-  ticket_number?: number | string | null;
-  order_id?: string | null;
+  customer_phone?: string | null;
+  created_at: string;
 }
 
 interface RecentBillingOperationsProps {
@@ -25,34 +24,6 @@ interface RecentBillingOperationsProps {
   txDateTo: string;
   setTxDateTo: (date: string) => void;
   txLoading: boolean;
-}
-
-function renderTransactionDescription(t: Transaction) {
-  if (t.customer_name) {
-    let mainText = t.description;
-
-    if (t.transaction_type === 'OTP') {
-      mainText = `OTP SMS charge for ${t.customer_name}`;
-    } else if (t.transaction_type === 'PER_ORDER') {
-      mainText = `Per Order Charge for ${t.customer_name}`;
-    } else if (t.reference_id && mainText.includes(t.reference_id)) {
-      mainText = mainText.replace(`#${t.reference_id}`, t.customer_name).replace(t.reference_id, t.customer_name);
-    } else {
-      mainText = `${mainText} (${t.customer_name})`;
-    }
-
-    return (
-      <span style={{ fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
-        {mainText}
-      </span>
-    );
-  }
-
-  return (
-    <span style={{ color: '#475569' }}>
-      {t.description}
-    </span>
-  );
 }
 
 export default function RecentBillingOperations({
@@ -168,8 +139,17 @@ export default function RecentBillingOperations({
                       {t.transaction_type}
                     </span>
                   </td>
-                  <td style={{ ...styles.td, maxWidth: '380px' }}>
-                    {renderTransactionDescription(t)}
+                  <td 
+                    style={{ ...styles.td, maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    title={
+                      t.transaction_type === 'OTP' && (t.customer_name || t.customer_phone)
+                        ? `OTP SMS charge for ${t.customer_name || t.customer_phone}`
+                        : t.description
+                    }
+                  >
+                    {t.transaction_type === 'OTP' && (t.customer_name || t.customer_phone)
+                      ? `OTP SMS charge for ${t.customer_name || t.customer_phone}`
+                      : t.description}
                   </td>
                   <td style={styles.tdAlignRight}>₹{parseFloat(t.amount || '0').toFixed(2)}</td>
                 </tr>
@@ -180,13 +160,13 @@ export default function RecentBillingOperations({
       </div>
       
       {/* Pagination Controls */}
-      {totalTxs > 0 && (
+      {totalTxs > 10 && (
         <Pagination
           currentPage={txPage}
-          totalPages={Math.max(1, Math.ceil(totalTxs / 10))}
-          onPageChange={(p) => setTxPage(p)}
-          pageSize={10}
+          totalPages={Math.ceil(totalTxs / 10)}
+          onPageChange={(page) => setTxPage(page)}
           totalRecords={totalTxs}
+          pageSize={10}
         />
       )}
     </div>

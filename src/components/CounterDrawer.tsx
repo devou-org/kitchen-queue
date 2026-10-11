@@ -269,7 +269,6 @@ export function CounterDrawer({ isOpen, onClose, slug, onCountersChange }: Count
           orderId: testOrder.id,
           counterName: counter.name,
           printerName: pName,
-          printerAddress: counter.printer_address || undefined,
           orderData: testOrder,
           slug,
         }),
@@ -278,16 +277,6 @@ export function CounterDrawer({ isOpen, onClose, slug, onCountersChange }: Count
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Failed to generate test print buffer');
-      }
-
-      // If server printed directly over Wi-Fi / LAN or Windows Spooler
-      if (data.mode === 'network') {
-        toast.success(data.message || `Printed test ticket to ${counter.name} over Wi-Fi!`, { id: toastId });
-        return;
-      }
-      if (data.mode === 'server') {
-        toast.success(data.message || `Printed test ticket to ${counter.name} via system spooler!`, { id: toastId });
-        return;
       }
 
       const printResult = await printUnifiedThermalTicket({

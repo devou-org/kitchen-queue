@@ -19,28 +19,10 @@ export async function GET(request: NextRequest) {
 
     // 1. Fetch transactions (latest 50)
     const transactions = await sql`
-      SELECT 
-        bt.id, 
-        bt.transaction_type, 
-        bt.amount, 
-        bt.reference_id, 
-        bt.description, 
-        bt.created_at,
-        COALESCE(
-          o.customer_name,
-          (SELECT o2.customer_name FROM orders o2 WHERE o2.id::text = bt.reference_id LIMIT 1),
-          (SELECT o3.customer_name FROM otp_logs ol JOIN orders o3 ON o3.phone = ol.phone WHERE ol.id::text = bt.reference_id AND o3.restaurant_id = bt.restaurant_id ORDER BY o3.created_at DESC LIMIT 1),
-          (SELECT u.name FROM otp_logs ol2 JOIN users u ON u.phone = ol2.phone WHERE ol2.id::text = bt.reference_id LIMIT 1)
-        ) AS customer_name,
-        COALESCE(
-          o.ticket_number,
-          (SELECT o2.ticket_number FROM orders o2 WHERE o2.id::text = bt.reference_id LIMIT 1),
-          (SELECT o3.ticket_number FROM otp_logs ol JOIN orders o3 ON o3.phone = ol.phone WHERE ol.id::text = bt.reference_id AND o3.restaurant_id = bt.restaurant_id ORDER BY o3.created_at DESC LIMIT 1)
-        ) AS ticket_number
-      FROM billing_transactions bt
-      LEFT JOIN orders o ON o.id::text = bt.reference_id
-      WHERE bt.restaurant_id = ${restaurant.id}
-      ORDER BY bt.created_at DESC
+      SELECT id, transaction_type, amount, reference_id, description, created_at
+      FROM billing_transactions
+      WHERE restaurant_id = ${restaurant.id}
+      ORDER BY created_at DESC
       LIMIT 50
     `;
 
@@ -78,6 +60,40 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    const { searchParams } = new URL(request.url);
+    const todayParam = searchParams.get('today');
+
+    // 4. Fetch today's OTP usage stats
+    let todayOtpStats;
+    if (todayParam) {
+      todayOtpStats = await sql`
+        SELECT 
+          COUNT(*)::int as count,
+          COALESCE(SUM(amount), 0)::float as amount
+        FROM billing_transactions
+        WHERE restaurant_id = ${restaurant.id}
+          AND transaction_type = 'OTP'
+          AND created_at >= ${todayParam}::date
+          AND created_at < (${todayParam}::date + interval '1 day')
+      `;
+    } else {
+      todayOtpStats = await sql`
+        SELECT 
+          COUNT(*)::int as count,
+          COALESCE(SUM(amount), 0)::float as amount
+        FROM billing_transactions
+        WHERE restaurant_id = ${restaurant.id}
+          AND transaction_type = 'OTP'
+          AND created_at >= CURRENT_DATE
+          AND created_at < (CURRENT_DATE + interval '1 day')
+      `;
+    }
+
+    const todayOtpUsage = {
+      count: Number(todayOtpStats[0]?.count || 0),
+      amount: Number(todayOtpStats[0]?.amount || 0)
+    };
+
     return NextResponse.json({
       success: true,
       data: {
@@ -95,6 +111,7 @@ export async function GET(request: NextRequest) {
         transactions,
         summaries,
         pricingConfig,
+        todayOtpUsage,
       }
     });
   } catch (error: any) {

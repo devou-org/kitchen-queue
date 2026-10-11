@@ -25,8 +25,10 @@ import {
   ChefHat,
   Split,
   ArrowRight,
+  AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import SplitPaymentBreakdown, { SplitAmounts, formatSplitSummary, parseSplitFromSummary, normalizeSplitAmounts } from './SplitPaymentBreakdown';
 import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
@@ -94,13 +96,14 @@ export function OrderDetailsView({
   const [mounted, setMounted] = useState(false);
   const [tempStatus, setTempStatus] = useState(initialOrder.status);
   const [tempTableNumber, setTempTableNumber] = useState(initialOrder.table_number || '');
-  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'CASH');
+  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'UPI');
   const [splitAmounts, setSplitAmounts] = useState<SplitAmounts>(() => {
     return normalizeSplitAmounts(initialOrder.payment_split, initialOrder.payment_method);
   });
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isPaymentUpdating, setIsPaymentUpdating] = useState(false);
   const [isCancelUpdating, setIsCancelUpdating] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
   const isAnyActionBusy = isStatusUpdating || isPaymentUpdating || isCancelUpdating || loading;
@@ -147,7 +150,7 @@ export function OrderDetailsView({
   React.useEffect(() => {
     setTempStatus(order.status);
     setTempTableNumber(order.table_number || '');
-    setPaymentMethod(order.payment_method || 'CASH');
+    setPaymentMethod(order.payment_method || 'UPI');
     setSplitAmounts(normalizeSplitAmounts(order.payment_split, order.payment_method));
     setIsClosing(false);
   }, [order.id, order.status, order.table_number, order.payment_method, order.payment_split]);
@@ -155,7 +158,7 @@ export function OrderDetailsView({
   const handleUpdateStatus = async (statusToApply: string) => {
     setIsStatusUpdating(true);
     try {
-      let pMethod = statusToApply === 'CLOSED' ? (order.payment_method || paymentMethod || 'CASH') : paymentMethod;
+      let pMethod = statusToApply === 'CLOSED' ? (order.payment_method || paymentMethod || 'UPI') : paymentMethod;
       let pSplit: any = null;
 
       if (statusToApply === 'CLOSED' && (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT'))) {
@@ -183,16 +186,16 @@ export function OrderDetailsView({
     }
   };
 
-  const handleCancelOrder = async () => {
-    if (!window.confirm(`Are you sure you want to cancel Order #${String(order.ticket_number).padStart(3, '0')}?`)) {
-      return;
-    }
+  const handleConfirmCancelOrder = async () => {
     setIsCancelUpdating(true);
     try {
       await onStatusChange(order.id, 'CANCELLED', tempTableNumber || order.table_number, paymentMethod);
       setOrder((prev) => ({ ...prev, status: 'CANCELLED', is_paid: false }));
+      setShowCancelModal(false);
+      return true;
     } catch {
       toast.error('Failed to cancel order');
+      return false;
     } finally {
       setIsCancelUpdating(false);
     }
@@ -201,7 +204,7 @@ export function OrderDetailsView({
   const handleMarkAsPaid = async (methodToUse?: string) => {
     setIsPaymentUpdating(true);
     try {
-      let pMethod = methodToUse || paymentMethod || order.payment_method || 'CASH';
+      let pMethod = methodToUse || paymentMethod || order.payment_method || 'UPI';
       let pSplit: any = null;
 
       if (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT')) {
@@ -430,7 +433,9 @@ export function OrderDetailsView({
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
 
-    const toastId = toast.loading(`🖨️ Printing Bill #${String(order.ticket_number).padStart(3, '0')} to ${savedPrinter}...`);
+    const toastId = toast.loading(`Printing Bill #${String(order.ticket_number).padStart(3, '0')} to ${savedPrinter}...`, {
+      icon: <PrinterIllustration size={20} status="printing" />,
+    });
 
     try {
       // Send print job directly to POS-80C thermal printer (1-click instant silent print)
@@ -1267,13 +1272,16 @@ export function OrderDetailsView({
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  width: '22px',
-                                  height: '22px',
-                                  borderRadius: '4px',
-                                  background: '#E2E8F0',
+                                  minWidth: '32px',
+                                  height: '30px',
+                                  padding: '0 6px',
+                                  borderRadius: '6px',
+                                  background: '#F1F5F9',
+                                  border: '1.5px solid #CBD5E1',
                                   color: '#0F172A',
-                                  fontWeight: 700,
-                                  fontSize: '11px',
+                                  fontWeight: 800,
+                                  fontSize: '14px',
+                                  letterSpacing: '-0.2px',
                                   flexShrink: 0,
                                 }}
                               >
@@ -1282,7 +1290,7 @@ export function OrderDetailsView({
                               <div style={{ minWidth: 0, flex: 1 }}>
                                 <div
                                   style={{
-                                    fontSize: '13px',
+                                    fontSize: '14px',
                                     fontWeight: 600,
                                     color: '#0F172A',
                                     overflow: 'hidden',
@@ -1478,7 +1486,7 @@ export function OrderDetailsView({
                         const Icon = m.icon;
                         const selected = m.id === 'SPLIT'
                           ? (paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT'))
-                          : (paymentMethod || 'CASH') === m.id;
+                          : (paymentMethod || 'UPI') === m.id;
                         return (
                           <button
                             key={m.id}
@@ -1568,7 +1576,7 @@ export function OrderDetailsView({
                       ) : (
                         <>
                           <Check size={14} />
-                          <span>Confirm as Paid · {paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split Payment' : (paymentMethod || 'CASH')}</span>
+                          <span>Confirm as Paid · {paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split Payment' : (paymentMethod || 'UPI')}</span>
                         </>
                       )}
                     </button>
@@ -1635,45 +1643,156 @@ export function OrderDetailsView({
 
         {/* ACTION: CANCEL ORDER (if active) */}
         {order.status !== 'CANCELLED' && (
-          <div style={{ padding: '16px 20px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'flex-end', background: '#FAFAFA' }}>
+          <div style={{ padding: '14px 20px', borderTop: '1px solid #F1F5F9', background: '#FAFAFA' }}>
             <button
               type="button"
-              onClick={handleCancelOrder}
+              onClick={() => setShowCancelModal(true)}
               disabled={isAnyActionBusy}
               style={{
-                background: '#FFFFFF',
-                border: '1px solid #FECACA',
+                width: '100%',
+                padding: '10px 16px',
                 borderRadius: '8px',
+                border: '1px solid #FCA5A5',
+                background: '#FEF2F2',
                 color: '#DC2626',
-                fontSize: '12px',
-                fontWeight: 600,
-                padding: '7px 14px',
-                cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
-                opacity: isAnyActionBusy && !isCancelUpdating ? 0.7 : 1,
+                fontSize: '13px',
+                fontWeight: 700,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
+                opacity: isAnyActionBusy ? 0.6 : 1,
                 transition: 'all 0.15s ease',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#FFFFFF'; }}
+              onMouseEnter={(e) => {
+                if (!isAnyActionBusy) (e.currentTarget as HTMLElement).style.background = '#FEE2E2';
+              }}
+              onMouseLeave={(e) => {
+                if (!isAnyActionBusy) (e.currentTarget as HTMLElement).style.background = '#FEF2F2';
+              }}
             >
-              {isCancelUpdating ? (
-                <>
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>Cancelling...</span>
-                </>
-              ) : (
-                <>
-                  <X size={13} />
-                  <span>Cancel Order</span>
-                </>
-              )}
+              <X size={15} />
+              Cancel Order
             </button>
           </div>
         )}
       </div>
     </aside>
+
+    {/* Cancel Order Confirmation Modal */}
+    {showCancelModal && (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(3px)',
+          zIndex: 1000000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px',
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isCancelUpdating) {
+            setShowCancelModal(false);
+          }
+        }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '380px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            padding: '24px 20px',
+            textAlign: 'center',
+            border: '1px solid #F1F5F9',
+          }}
+        >
+          <div
+            style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '50%',
+              background: '#FEF2F2',
+              border: '1px solid #FEE2E2',
+              color: '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 14px',
+            }}
+          >
+            <AlertTriangle size={26} />
+          </div>
+
+          <div style={{ fontSize: '17px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
+            Cancel Order #{order.ticket_number ? String(order.ticket_number).padStart(3, '0') : order.id?.slice(-4)}?
+          </div>
+
+          <p style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.5', margin: '0 0 20px' }}>
+            Are you sure you want to cancel this order? This action will mark the order as cancelled and release any assigned table.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <button
+              type="button"
+              disabled={isCancelUpdating}
+              onClick={() => setShowCancelModal(false)}
+              style={{
+                height: '42px',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0',
+                background: '#F1F5F9',
+                color: '#334155',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: isCancelUpdating ? 'not-allowed' : 'pointer',
+                transition: 'background 0.15s ease',
+              }}
+            >
+              Keep Order
+            </button>
+            <button
+              type="button"
+              disabled={isCancelUpdating}
+              onClick={handleConfirmCancelOrder}
+              style={{
+                height: '42px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#DC2626',
+                color: '#FFFFFF',
+                fontSize: '13px',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                cursor: isCancelUpdating ? 'not-allowed' : 'pointer',
+                opacity: isCancelUpdating ? 0.7 : 1,
+                boxShadow: '0 1px 2px rgba(220, 38, 38, 0.2)',
+                transition: 'background 0.15s ease',
+              }}
+            >
+              {isCancelUpdating ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                'Yes, Cancel'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     <EditOrderModal
       isOpen={isEditModalOpen}

@@ -27,14 +27,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- Rate Limit check start ---
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const normalizedPhone = `+91${cleanPhone}`;
+
+    // --- Rate Limit & Resend Cooldown check start ---
+    // 1. Strict 30-second resend cooldown to prevent rapid multi-clicks or parallel OTPs
+    const recentSpam = await sql`
+      SELECT sent_at 
+      FROM otp_logs 
+      WHERE (phone = ${phone} OR phone = ${normalizedPhone} OR phone = ${cleanPhone} OR RIGHT(REGEXP_REPLACE(phone, '\D', '', 'g'), 10) = ${cleanPhone})
+      ORDER BY sent_at DESC 
+      LIMIT 1
+    `;
+
+    if (recentSpam[0]) {
+      const lastSentTime = new Date(recentSpam[0].sent_at).getTime();
+      const secondsAgo = Math.floor((Date.now() - lastSentTime) / 1000);
+      if (secondsAgo >= 0 && secondsAgo < 30) {
+        return NextResponse.json({
+          success: false,
+          error: `Please wait ${30 - secondsAgo}s before requesting another OTP.`
+        }, { status: 429 });
+      }
+    }
+
+    // 2. 10-minute rolling window limit (max 4 attempts per 10 minutes)
     const recentRequests = await sql`
       SELECT COUNT(*) as count 
       FROM otp_logs 
-      WHERE phone = ${phone} AND sent_at > NOW() - INTERVAL '10 minutes'
+      WHERE (phone = ${phone} OR phone = ${normalizedPhone} OR phone = ${cleanPhone} OR RIGHT(REGEXP_REPLACE(phone, '\D', '', 'g'), 10) = ${cleanPhone})
+        AND sent_at > NOW() - INTERVAL '10 minutes'
     `;
 
-    if (recentRequests[0] && parseInt(recentRequests[0].count) >= 3) {
+    if (recentRequests[0] && parseInt(recentRequests[0].count) >= 4) {
       return NextResponse.json({ success: false, error: 'Too many OTP requests. Please wait 10 minutes.' }, { status: 429 });
     }
     // --- Rate Limit check end ---

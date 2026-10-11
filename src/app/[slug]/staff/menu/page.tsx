@@ -13,6 +13,7 @@ import { Search, Banknote, CreditCard, QrCode, Check, Printer, Split } from 'luc
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { printKotFromBrowser } from '@/lib/client-print';
@@ -139,7 +140,7 @@ export default function StaffMenuPage() {
     notes: '',
     order_type: 'DINE_IN',
     is_paid: false,
-    payment_method: 'CASH',
+    payment_method: 'UPI',
     payment_split: null,
   });
   const [menuSplit, setMenuSplit] = useState<SplitAmounts>({ CASH: 0, UPI: 0, CARD: 0 });
@@ -236,8 +237,8 @@ export default function StaffMenuPage() {
         return;
       }
 
-      toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: '🖨️',
+      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: <PrinterIllustration size={22} status="printing" />,
         duration: 3000,
       });
 
@@ -252,7 +253,8 @@ export default function StaffMenuPage() {
         });
         const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            icon: <PrinterIllustration size={22} status="success" />,
             id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
           });
         }
@@ -388,7 +390,7 @@ export default function StaffMenuPage() {
       }));
 
       // Generate a mock phone if not provided for staff orders
-      const phoneToUse = orderForm.phone || '+910000000000';
+      const phoneToUse = orderForm.phone || `+910000000000`;
       const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
       const res = await orderService.createOrder({
@@ -401,7 +403,7 @@ export default function StaffMenuPage() {
         order_type: orderForm.order_type,
         is_pos: true,
         is_paid: Boolean(orderForm.is_paid),
-        payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
+        payment_method: orderForm.is_paid ? (orderForm.payment_method || 'UPI') : undefined,
         payment_split: orderForm.is_paid ? orderForm.payment_split : undefined,
       });
 
@@ -410,7 +412,7 @@ export default function StaffMenuPage() {
         toast.success(`Order placed successfully! Ticket #${createdOrder.ticket_number}`);
         setCart(new Map());
         setCheckoutOpen(false);
-        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'CASH', payment_split: null });
+        setOrderForm({ customer_name: '', phone: '', table_number: '', party_size: 1, notes: '', order_type: 'DINE_IN', is_paid: false, payment_method: 'UPI', payment_split: null });
         setMenuSplit({ CASH: 0, UPI: 0, CARD: 0 });
         await fetchTables();
       } else {
@@ -701,7 +703,7 @@ export default function StaffMenuPage() {
                   </label>
 
                   <label
-                    onClick={() => setOrderForm({ ...orderForm, is_paid: true, payment_method: orderForm.payment_method || 'CASH' })}
+                    onClick={() => setOrderForm({ ...orderForm, is_paid: true, payment_method: orderForm.payment_method || 'UPI' })}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px', fontWeight: orderForm.is_paid ? 700 : 500, color: orderForm.is_paid ? '#0F172A' : '#64748B' }}
                   >
                     <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: orderForm.is_paid ? '2px solid var(--primary, #059669)' : '2px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', flexShrink: 0 }}>
@@ -725,7 +727,7 @@ export default function StaffMenuPage() {
                         const Icon = m.icon;
                         const selected = m.id === 'SPLIT'
                           ? (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))
-                          : (orderForm.payment_method || 'CASH') === m.id;
+                          : (orderForm.payment_method || 'UPI') === m.id;
                         return (
                           <button
                             key={m.id}
