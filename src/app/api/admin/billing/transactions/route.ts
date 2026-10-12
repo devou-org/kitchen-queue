@@ -35,13 +35,17 @@ export async function GET(request: NextRequest) {
         ol.phone AS customer_phone
       FROM billing_transactions bt
       LEFT JOIN otp_logs ol ON (bt.transaction_type = 'OTP' AND bt.reference_id = ol.id::text)
-      LEFT JOIN users u ON (
-        ol.phone IS NOT NULL AND (
+      LEFT JOIN LATERAL (
+        SELECT u.name 
+        FROM users u 
+        WHERE ol.phone IS NOT NULL AND (
           u.phone = ol.phone 
           OR u.phone = REPLACE(ol.phone, '+91', '')
           OR ol.phone = REPLACE(u.phone, '+91', '')
         )
-      )
+        ORDER BY (u.name IS NOT NULL AND u.name != '') DESC, u.created_at DESC 
+        LIMIT 1
+      ) u ON true
       LEFT JOIN LATERAL (
         SELECT o.customer_name 
         FROM orders o 
