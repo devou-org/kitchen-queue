@@ -13,6 +13,7 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { CustomMultiSelect } from '@/components/ui/CustomSelect';
+import { Pagination } from '@/components/ui/Pagination';
 import { useRestaurant } from '@/hooks/useRestaurant';
 
 type CustomerLoyalty = {
@@ -96,10 +97,23 @@ export default function AdminLoyaltyPage() {
   // Customer Directory State
   const [customers, setCustomers] = useState<CustomerLoyalty[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState('');
+  const [customerPage, setCustomerPage] = useState<number>(1);
+  const [customerPagination, setCustomerPagination] = useState<{
+    totalPages: number;
+    totalRecords: number;
+  }>({ totalPages: 1, totalRecords: 0 });
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerLoyalty | null>(null);
   const [adjustPointsDelta, setAdjustPointsDelta] = useState<number>(0);
   const [adjustReason, setAdjustReason] = useState<string>('');
   const [isAdjusting, setIsAdjusting] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearch);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [customerSearch]);
 
   // Program Settings State
   const [settings, setSettings] = useState<LoyaltySettings>({
@@ -122,6 +136,11 @@ export default function AdminLoyaltyPage() {
 
   // Rewards Catalog State
   const [rewards, setRewards] = useState<LoyaltyReward[]>([]);
+  const [rewardsPage, setRewardsPage] = useState<number>(1);
+  const [rewardsPagination, setRewardsPagination] = useState<{
+    totalPages: number;
+    totalRecords: number;
+  }>({ totalPages: 1, totalRecords: 0 });
   const [productsList, setProductsList] = useState<ProductOption[]>([]);
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [editingReward, setEditingReward] = useState<LoyaltyReward | null>(null);
@@ -138,6 +157,11 @@ export default function AdminLoyaltyPage() {
   // Transactions Log State & Segmented Filter Switcher
   const [transactions, setTransactions] = useState<LoyaltyTransaction[]>([]);
   const [txTypeFilter, setTxTypeFilter] = useState<string>('ALL');
+  const [txPage, setTxPage] = useState<number>(1);
+  const [txPagination, setTxPagination] = useState<{
+    totalPages: number;
+    totalRecords: number;
+  }>({ totalPages: 1, totalRecords: 0 });
 
 
 
@@ -168,18 +192,30 @@ export default function AdminLoyaltyPage() {
         });
       }
 
-      // Fetch customers
-      const customersRes = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(customerSearch)}`);
+      // Fetch customers with API-level pagination (50 records per page)
+      const customersRes = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(debouncedCustomerSearch)}&page=${customerPage}&limit=50`);
       const customersJson = await customersRes.json();
       if (customersJson.success) {
         setCustomers(customersJson.data || []);
+        if (customersJson.pagination) {
+          setCustomerPagination({
+            totalPages: customersJson.pagination.totalPages || 1,
+            totalRecords: customersJson.pagination.totalRecords || (customersJson.data?.length || 0),
+          });
+        }
       }
 
-      // Fetch rewards catalog
-      const rewardsRes = await fetch(`/api/admin/loyalty/rewards?slug=${slugStr}`);
+      // Fetch rewards catalog with API-level pagination
+      const rewardsRes = await fetch(`/api/admin/loyalty/rewards?slug=${slugStr}&page=${rewardsPage}&limit=50`);
       const rewardsJson = await rewardsRes.json();
       if (rewardsJson.success) {
         setRewards(rewardsJson.data || []);
+        if (rewardsJson.pagination) {
+          setRewardsPagination({
+            totalPages: rewardsJson.pagination.totalPages || 1,
+            totalRecords: rewardsJson.pagination.totalRecords || (rewardsJson.data?.length || 0),
+          });
+        }
       }
 
       // Fetch products list for reward product picker
@@ -190,11 +226,17 @@ export default function AdminLoyaltyPage() {
         setProductsList(pArr.map((p: any) => ({ id: p.id, name: p.name, price: Number(p.price || 0) })));
       }
 
-      // Fetch transactions audit log
-      const txRes = await fetch(`/api/admin/loyalty/transactions?slug=${slugStr}`);
+      // Fetch transactions audit log with API-level pagination and filter
+      const txRes = await fetch(`/api/admin/loyalty/transactions?slug=${slugStr}&page=${txPage}&limit=50&type=${encodeURIComponent(txTypeFilter)}`);
       const txJson = await txRes.json();
       if (txJson.success) {
         setTransactions(txJson.data || []);
+        if (txJson.pagination) {
+          setTxPagination({
+            totalPages: txJson.pagination.totalPages || 1,
+            totalRecords: txJson.pagination.totalRecords || (txJson.data?.length || 0),
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load loyalty data:', err);
@@ -202,7 +244,7 @@ export default function AdminLoyaltyPage() {
     } finally {
       setLoading(false);
     }
-  }, [slugStr, customerSearch]);
+  }, [slugStr, debouncedCustomerSearch, customerPage, txPage, txTypeFilter, rewardsPage]);
 
   useEffect(() => {
     fetchData();
@@ -672,7 +714,7 @@ export default function AdminLoyaltyPage() {
                   <Users size={15} style={{ marginRight: '6px' }} />
                   <span>Customers</span>
                   <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
-                    {customers.length}
+                    {customerPagination.totalRecords || customers.length}
                   </span>
                 </button>
 
@@ -693,7 +735,7 @@ export default function AdminLoyaltyPage() {
                   <Gift size={15} style={{ marginRight: '6px' }} />
                   <span>Rewards</span>
                   <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
-                    {rewards.length}
+                    {rewardsPagination.totalRecords || rewards.length}
                   </span>
                 </button>
 
@@ -705,7 +747,7 @@ export default function AdminLoyaltyPage() {
                   <History size={15} style={{ marginRight: '6px' }} />
                   <span>Audit Log</span>
                   <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
-                    {transactions.length}
+                    {txPagination.totalRecords || transactions.length}
                   </span>
                 </button>
               </div>
@@ -829,7 +871,10 @@ export default function AdminLoyaltyPage() {
                 type="text"
                 placeholder="Search by name or phone..."
                 value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value);
+                  setCustomerPage(1);
+                }}
                 style={{
                   width: '100%',
                   padding: '9px 12px 9px 36px',
@@ -841,7 +886,10 @@ export default function AdminLoyaltyPage() {
               />
               {customerSearch && (
                 <button
-                  onClick={() => setCustomerSearch('')}
+                  onClick={() => {
+                    setCustomerSearch('');
+                    setCustomerPage(1);
+                  }}
                   style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
                 >
                   <X size={14} />
@@ -850,7 +898,7 @@ export default function AdminLoyaltyPage() {
             </div>
 
             <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
-              Showing <strong>{customers.length}</strong> customer profile(s)
+              Showing <strong>{customers.length}</strong> {customerPagination.totalRecords > 0 ? `of ${customerPagination.totalRecords} ` : ''}customer profile(s)
             </div>
           </div>
 
@@ -1030,6 +1078,19 @@ export default function AdminLoyaltyPage() {
               </div>
             ))}
           </div>
+
+          {/* Pagination Controls for Customers Directory */}
+          {customerPagination.totalRecords > 50 && (
+            <div style={{ marginTop: '16px' }}>
+              <Pagination
+                currentPage={customerPage}
+                totalPages={customerPagination.totalPages}
+                totalRecords={customerPagination.totalRecords}
+                pageSize={50}
+                onPageChange={(page) => setCustomerPage(page)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -1419,6 +1480,19 @@ export default function AdminLoyaltyPage() {
               ))
             )}
           </div>
+
+          {/* Pagination Controls for Rewards Catalog */}
+          {rewardsPagination.totalRecords > 50 && (
+            <div style={{ marginTop: '16px' }}>
+              <Pagination
+                currentPage={rewardsPage}
+                totalPages={rewardsPagination.totalPages}
+                totalRecords={rewardsPagination.totalRecords}
+                pageSize={50}
+                onPageChange={(page) => setRewardsPage(page)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -1457,7 +1531,10 @@ export default function AdminLoyaltyPage() {
                   <button
                     key={t.key}
                     type="button"
-                    onClick={() => setTxTypeFilter(t.key)}
+                    onClick={() => {
+                      setTxTypeFilter(t.key);
+                      setTxPage(1);
+                    }}
                     style={{
                       padding: '6px 12px',
                       fontSize: '12px',
@@ -1540,6 +1617,19 @@ export default function AdminLoyaltyPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls for Transactions Audit Log */}
+          {txPagination.totalRecords > 50 && (
+            <div style={{ marginTop: '16px' }}>
+              <Pagination
+                currentPage={txPage}
+                totalPages={txPagination.totalPages}
+                totalRecords={txPagination.totalRecords}
+                pageSize={50}
+                onPageChange={(page) => setTxPage(page)}
+              />
+            </div>
+          )}
         </div>
       )}
       </div>

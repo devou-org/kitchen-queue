@@ -608,7 +608,7 @@ export default function AdminProducts() {
               />
               <input
                 type="text"
-                placeholder="Search products..."
+                placeholder="Search items..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{
@@ -734,7 +734,7 @@ export default function AdminProducts() {
                 <span>Counters</span>
               </button>
 
-              {/* Add Product */}
+              {/* Add Item */}
               <button
                 type="button"
                 onClick={() => {
@@ -758,7 +758,7 @@ export default function AdminProducts() {
                 }}
               >
                 <Plus size={15} />
-                <span>Add Product</span>
+                <span>Add Item</span>
               </button>
 
               {/* Maximize Layout Toggle */}
@@ -796,7 +796,7 @@ export default function AdminProducts() {
             <table className="products-table">
               <thead>
                 <tr>
-                  <th>Product</th>
+                  <th>Item</th>
                   <th>Category</th>
                   <th>Counter</th>
                   <th>Price</th>
@@ -1506,11 +1506,11 @@ export default function AdminProducts() {
             {/* Modal Body */}
             <div style={{ padding: '24px 24px 20px 24px', textAlign: 'center' }}>
               <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
-                Delete Product?
+                Delete Item?
               </h3>
               
               <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-                Are you sure you want to permanently delete this product? This cannot be undone.
+                Are you sure you want to permanently delete this item? This cannot be undone.
               </p>
 
               {/* Product Preview Card */}

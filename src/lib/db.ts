@@ -3755,12 +3755,23 @@ export async function mergeDuplicateCustomerLoyalty(restaurantId: string) {
   }
 }
 
-export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
+export async function getLoyaltyCustomersList(
+  restaurantId: string, 
+  search?: string,
+  page: number = 1,
+  limit: number = 50
+) {
   try {
     // Merge duplicate customer accounts
     await mergeDuplicateCustomerLoyalty(restaurantId);
 
-    let query;
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    let rowsQuery;
+    let countQuery;
+
     if (search && search.trim() !== '') {
       const searchTrimmed = search.trim().toLowerCase();
       const rawDigits = search.replace(/\D/g, '');
@@ -3768,7 +3779,20 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
       const searchPattern = `%${searchTrimmed}%`;
       const digitsPattern = last10Digits ? `%${last10Digits}%` : searchPattern;
 
-      query = sql`
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
+      `;
+
+      rowsQuery = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
           cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
@@ -3784,9 +3808,17 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
             RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
           )
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
       `;
     } else {
-      query = sql`
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+      `;
+
+      rowsQuery = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
           cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
@@ -3796,15 +3828,25 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
       `;
     }
 
-    const rows = await query;
-    return rows;
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      customers: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return { customers: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }
@@ -3908,18 +3950,42 @@ export async function deleteCustomerLoyaltyProfile(restaurantId: string, custome
   }
 }
 
-export async function getLoyaltyRewards(restaurantId: string) {
+export async function getLoyaltyRewards(
+  restaurantId: string,
+  page: number = 1,
+  limit: number = 50
+) {
   try {
-    const rows = await sql`
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    const countQuery = sql`
+      SELECT COUNT(*)::int as total FROM loyalty_rewards WHERE restaurant_id = ${restaurantId}
+    `;
+
+    const rowsQuery = sql`
       SELECT * FROM loyalty_rewards 
       WHERE restaurant_id = ${restaurantId}
       ORDER BY is_active DESC, points_required ASC
+      LIMIT ${safeLimit} OFFSET ${offset}
     `;
-    return rows;
+
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      rewards: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return { rewards: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }
@@ -4026,25 +4092,79 @@ export async function deleteLoyaltyReward(restaurantId: string, rewardId: string
   }
 }
 
-export async function getLoyaltyTransactionsList(restaurantId: string) {
+export async function getLoyaltyTransactionsList(
+  restaurantId: string,
+  page: number = 1,
+  limit: number = 50,
+  transactionType?: string
+) {
   try {
-    const rows = await sql`
-      SELECT 
-        lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
-        u.name as customer_name, u.phone,
-        o.ticket_number
-      FROM loyalty_transactions lt
-      JOIN users u ON u.id = lt.user_id
-      LEFT JOIN orders o ON o.id = lt.order_id
-      WHERE lt.restaurant_id = ${restaurantId}
-      ORDER BY lt.created_at DESC
-      LIMIT 100
-    `;
-    return rows;
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    let countQuery;
+    let rowsQuery;
+
+    if (transactionType && transactionType !== 'ALL') {
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        WHERE lt.restaurant_id = ${restaurantId}
+          AND lt.transaction_type = ${transactionType}
+      `;
+
+      rowsQuery = sql`
+        SELECT 
+          lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
+          u.name as customer_name, u.phone,
+          o.ticket_number
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        LEFT JOIN orders o ON o.id = lt.order_id
+        WHERE lt.restaurant_id = ${restaurantId}
+          AND lt.transaction_type = ${transactionType}
+        ORDER BY lt.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
+      `;
+    } else {
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        WHERE lt.restaurant_id = ${restaurantId}
+      `;
+
+      rowsQuery = sql`
+        SELECT 
+          lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
+          u.name as customer_name, u.phone,
+          o.ticket_number
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        LEFT JOIN orders o ON o.id = lt.order_id
+        WHERE lt.restaurant_id = ${restaurantId}
+        ORDER BY lt.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
+      `;
+    }
+
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      transactions: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return { transactions: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }

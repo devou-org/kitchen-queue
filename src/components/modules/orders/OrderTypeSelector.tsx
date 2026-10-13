@@ -7,6 +7,9 @@ interface OrderTypeSelectorProps {
   onChange: (value: OrderType) => void;
   disabled?: boolean;
   allowDelivery?: boolean;
+  hideLabel?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 const ORDER_TYPES: { id: OrderType; label: string; icon: React.ElementType; description: string }[] = [
@@ -35,24 +38,36 @@ export default function OrderTypeSelector({
   onChange,
   disabled = false,
   allowDelivery = true,
+  hideLabel = false,
+  className = '',
+  style = {},
 }: OrderTypeSelectorProps) {
   const typesToRender = allowDelivery ? ORDER_TYPES : ORDER_TYPES.filter(t => t.id !== 'DELIVERY');
 
   return (
-    <div className="card" style={{ marginBottom: '16px', padding: '16px' }}>
-      <label
-        style={{
-          display: 'block',
-          fontSize: '12px',
-          fontWeight: 800,
-          color: 'var(--text-secondary)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          marginBottom: '12px',
-        }}
-      >
-        Select Order Type *
-      </label>
+    <div
+      className={`card ${className}`.trim()}
+      style={{
+        marginBottom: '16px',
+        padding: hideLabel ? '12px' : '16px',
+        ...style,
+      }}
+    >
+      {!hideLabel && (
+        <label
+          style={{
+            display: 'block',
+            fontSize: '12px',
+            fontWeight: 800,
+            color: 'var(--text-secondary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginBottom: '12px',
+          }}
+        >
+          Select Order Type *
+        </label>
+      )}
 
       {/* Segmented Control Container */}
       <div

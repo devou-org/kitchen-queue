@@ -758,15 +758,16 @@ export default function AdminPosPage() {
         <div
           style={{
             position: 'fixed',
-            bottom: '24px',
+            bottom: 'clamp(14px, 3vw, 24px)',
             left: 0,
             right: 0,
-            padding: '0 20px',
+            padding: '0 clamp(10px, 3vw, 20px)',
             zIndex: 99999,
             pointerEvents: 'none',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
+            boxSizing: 'border-box',
           }}
         >
           <button
@@ -784,7 +785,7 @@ export default function AdminPosPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '0 20px',
+              padding: '0 clamp(12px, 2.5vw, 20px)',
               boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)',
               cursor: 'pointer',
               border: 'none',
@@ -792,6 +793,9 @@ export default function AdminPosPage() {
               color: '#FFFFFF',
               letterSpacing: '-0.01em',
               transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              gap: '8px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
@@ -802,21 +806,25 @@ export default function AdminPosPage() {
               e.currentTarget.style.boxShadow = '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.5vw, 10px)', minWidth: 0, overflow: 'hidden', flexShrink: 1 }}>
               <span
                 style={{
                   background: 'rgba(255, 255, 255, 0.25)',
                   padding: '3px 10px',
                   borderRadius: '999px',
-                  fontSize: '13px',
+                  fontSize: 'clamp(11.5px, 1.5vw, 13px)',
                   fontWeight: 900,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                 }}
               >
                 {totalItems} {totalItems === 1 ? 'item' : 'items'}
               </span>
-              <span style={{ fontSize: '15px', fontWeight: 800 }}>View Cart &amp; Checkout</span>
+              <span style={{ fontSize: 'clamp(13px, 1.8vw, 15px)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                View Cart &amp; Checkout
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 900 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1vw, 8px)', fontSize: 'clamp(14px, 1.8vw, 16px)', fontWeight: 900, flexShrink: 0, whiteSpace: 'nowrap' }}>
               <span>{formatPrice(totalPrice)}</span>
               <span style={{ fontSize: '19px', lineHeight: 1 }}>→</span>
             </div>
