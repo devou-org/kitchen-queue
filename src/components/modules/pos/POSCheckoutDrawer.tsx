@@ -710,7 +710,7 @@ export function POSCheckoutDrawer({
             style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '20px',
+              padding: 'clamp(14px, 3.5vw, 20px)',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
@@ -782,129 +782,204 @@ export function POSCheckoutDrawer({
                       key={item.product_id}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '10px',
-                        padding: '8px 12px',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        padding: '10px 12px',
                         background: '#FFFFFF',
                         border: '1px solid #E2E8F0',
                         borderRadius: '8px',
                       }}
                     >
-                      {/* Name & price */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Top Row: Item Name & Remove */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                        }}
+                      >
                         <div
                           style={{
                             fontSize: '13px',
                             fontWeight: 600,
-                            color: '#0F172A',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
+                            lineHeight: 1.35,
+                            wordBreak: 'break-word',
+                            flex: 1,
                           }}
                         >
-                          {item.name}
+                          <span>{item.name}</span>
+                          {item.is_free_reward && (
+                            <span
+                              style={{
+                                marginLeft: '6px',
+                                display: 'inline-block',
+                                background: '#ECFDF5',
+                                color: '#047857',
+                                border: '1px solid #A7F3D0',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                verticalAlign: 'middle',
+                              }}
+                            >
+                              FREE GIFT
+                            </span>
+                          )}
                         </div>
+
+                        {/* Delete button */}
+                        <button
+                          type="button"
+                          onClick={() => onUpdateCart(item.product_id, -item.quantity)}
+                          style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#94A3B8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            transition: 'color 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
+                          title="Remove item"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      {/* Bottom Row: Unit price (left) & Stepper + Subtotal (right) */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                        }}
+                      >
                         <div style={{ fontSize: '11px', color: '#64748B' }}>
                           {formatPrice(item.price)} each
                         </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          {/* Quantity Stepper */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCart(item.product_id, -1)}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '6px',
+                                border: '1px solid #CBD5E1',
+                                background: '#FFFFFF',
+                                color: '#0F172A',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                              }}
+                              title="Decrease"
+                            >
+                              <Minus size={11} />
+                            </button>
+
+                            <span
+                              style={{
+                                minWidth: '22px',
+                                textAlign: 'center',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                color: '#0F172A',
+                              }}
+                            >
+                              {item.quantity}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCart(item.product_id, 1)}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '6px',
+                                border: '1px solid #CBD5E1',
+                                background: '#FFFFFF',
+                                color: '#0F172A',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                              }}
+                              title="Increase"
+                            >
+                              <Plus size={11} />
+                            </button>
+                          </div>
+
+                          {/* Line subtotal */}
+                          <div
+                            style={{
+                              minWidth: '55px',
+                              textAlign: 'right',
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              color: '#0F172A',
+                            }}
+                          >
+                            {formatPrice(
+                              item.is_free_reward
+                                ? Math.max(0, item.quantity - 1) * (item.original_price ?? item.price)
+                                : item.price * item.quantity
+                            )}
+                          </div>
+                        </div>
                       </div>
-
-                      {/* Quantity Stepper */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <button
-                          type="button"
-                          onClick={() => onUpdateCart(item.product_id, -1)}
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '8px',
-                            border: '1px solid #CBD5E1',
-                            background: '#FFFFFF',
-                            color: '#0F172A',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                          title="Decrease"
-                        >
-                          <Minus size={12} />
-                        </button>
-
-                        <span
-                          style={{
-                            minWidth: '24px',
-                            textAlign: 'center',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            color: '#0F172A',
-                          }}
-                        >
-                          {item.quantity}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => onUpdateCart(item.product_id, 1)}
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '8px',
-                            border: '1px solid #CBD5E1',
-                            background: '#FFFFFF',
-                            color: '#0F172A',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                          title="Increase"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
-
-                      {/* Line subtotal */}
-                      <div
-                        style={{
-                          minWidth: '64px',
-                          textAlign: 'right',
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          color: '#0F172A',
-                        }}
-                      >
-                        {formatPrice(item.price * item.quantity)}
-                      </div>
-
-                      {/* Delete */}
-                      <button
-                        type="button"
-                        onClick={() => onUpdateCart(item.product_id, -item.quantity)}
-                        style={{
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '8px',
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#EF4444',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                        }}
-                        title="Remove"
-                      >
-                        <Trash2 size={13} />
-                      </button>
                     </div>
                   ))}
                 </div>
               )}
+
+              {/* Kitchen Notes placed directly under order items */}
+              <div style={{ marginTop: '2px', borderTop: '1px solid #E2E8F0', paddingTop: '10px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Kitchen Notes
+                </label>
+                <input
+                  type="text"
+                  placeholder="Less spicy, extra napkins, serve together..."
+                  value={orderForm.notes}
+                  onChange={(e) => setOrderForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    background: '#FFFFFF',
+                    fontSize: '13px',
+                    color: '#0F172A',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Section B: Order Type Selection */}
             {!isTableDirected && (
               <div>
                 <label
@@ -931,6 +1006,7 @@ export function POSCheckoutDrawer({
                       payment_method: isTakeaway ? (prev.payment_method || 'UPI') : prev.payment_method,
                     }));
                   }}
+                  hideLabel
                 />
               </div>
             )}
@@ -964,7 +1040,7 @@ export function POSCheckoutDrawer({
                   <span>Dine-In Seating & Table</span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)', gap: '10px' }}>
                   {/* Table Selection via CustomSelect */}
                   <div>
                     <label
@@ -1094,7 +1170,7 @@ export function POSCheckoutDrawer({
                 }}
               >
                 <User size={13} />
-                <span>Customer & Notes (Optional)</span>
+                <span>Customer Details (Optional)</span>
               </div>
 
               {/* Customer Name */}
@@ -1222,37 +1298,6 @@ export function POSCheckoutDrawer({
                 </div>
               </div>
 
-              {/* Kitchen Notes */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#334155',
-                    marginBottom: '5px',
-                  }}
-                >
-                  Kitchen Notes
-                </label>
-                <input
-                  type="text"
-                  placeholder="Less spicy, extra napkins, serve together..."
-                  value={orderForm.notes}
-                  onChange={(e) => setOrderForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    height: '38px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #CBD5E1',
-                    background: '#FFFFFF',
-                    fontSize: '13px',
-                    color: '#0F172A',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
             </div>
 
             {/* Section: Customer Loyalty Profile & Rewards */}

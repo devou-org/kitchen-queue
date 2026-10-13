@@ -304,10 +304,10 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           )}
           <div>
             <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-              {isEditing ? `Edit Product: ${initialData.name}` : 'Add New Product'}
+              {isEditing ? `Edit Item: ${initialData.name}` : 'Add New Item'}
             </h1>
             <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
-              Configure product information, pricing, dietary preference, and stock inventory.
+              Configure item information, pricing, dietary preference, and stock inventory.
             </p>
           </div>
         </div>
@@ -349,7 +349,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             }}
           >
             {loading ? <div className="loader" style={{ width: 16, height: 16, borderWidth: 2 }} /> : <Check size={16} />}
-            {isEditing ? 'Update Product' : 'Save Product'}
+            {isEditing ? 'Update Item' : 'Save Item'}
           </button>
 
           {isModal && (
@@ -395,7 +395,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                Product Name <span style={{ color: '#ef4444' }}>*</span>
+                Item Name <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <input
                 type="text"
