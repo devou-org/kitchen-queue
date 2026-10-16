@@ -85,7 +85,7 @@ export default function SwipeButton({
   };
 
   const handleConfirm = async () => {
-    if (hasConfirmed.current) return; // Prevent duplicate calls
+    if (hasConfirmed.current || disabled || loading) return; // Prevent duplicate calls
     hasConfirmed.current = true;
     setIsDragging(false);
     setSliderWidth(100);
@@ -99,22 +99,7 @@ export default function SwipeButton({
          hasConfirmed.current = false;
          return;
       }
-      
-      // Give a smooth grace period for async loading state to kick in
-      // If after 600ms no loading or success state occurs, reset slider
-      setTimeout(() => {
-        if (!hasConfirmed.current) return; // already reset
-        // Check current loading/success via DOM or state
-        setConfirmed((currentConfirmed) => {
-          if (currentConfirmed && !success) {
-            setSliderWidth(0);
-            hasConfirmed.current = false;
-            return false;
-          }
-          return currentConfirmed;
-        });
-      }, 600);
-
+      // Note: If request fails, useEffect handles reset when loading flips true -> false without success.
     } catch (err) {
       setConfirmed(false);
       setSliderWidth(0);
@@ -137,16 +122,25 @@ export default function SwipeButton({
     if (isDragging) {
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
-      // Fallback for some touch devices
-      const onTouchMove = (e: TouchEvent) => handleMove(e.touches[0].clientX);
-      window.addEventListener('touchmove', onTouchMove, { passive: false });
-      window.addEventListener('touchend', handleEnd);
+      
+      // Fallback only if PointerEvent is unsupported
+      const hasPointer = typeof window !== 'undefined' && 'PointerEvent' in window;
+      const onTouchMove = (e: TouchEvent) => {
+        if (e.touches[0]) handleMove(e.touches[0].clientX);
+      };
+
+      if (!hasPointer) {
+        window.addEventListener('touchmove', onTouchMove, { passive: false });
+        window.addEventListener('touchend', handleEnd);
+      }
       
       return () => {
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
-        window.removeEventListener('touchmove', onTouchMove);
-        window.removeEventListener('touchend', handleEnd);
+        if (!hasPointer) {
+          window.removeEventListener('touchmove', onTouchMove);
+          window.removeEventListener('touchend', handleEnd);
+        }
       };
     }
   }, [isDragging, sliderWidth]);

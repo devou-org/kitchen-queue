@@ -166,6 +166,7 @@ export function generateBillTemplateContentHTML(order: Order, restaurant?: BillR
       ${row('Grand Total', `Rs.${num(grandTotal)}`, true, 16)}
       ${solid}
 
+      ${order.payment_method || order.is_paid ? row('Payment', escapeHtml(order.payment_method || 'PAID'), false, 11) : ''}
       ${notesHtml}
 
       <div style="text-align:center;margin-top:10px;">

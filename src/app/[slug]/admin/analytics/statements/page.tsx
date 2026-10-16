@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Order } from '@/types';
@@ -22,28 +22,29 @@ export default function AdminAnalyticsStatementsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(() =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+  );
+  const [dateTo, setDateTo] = useState(() =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+  );
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showBill, setShowBill] = useState(false);
   const [stats, setStats] = useState({ totalRevenue: 0, totalPaidRevenue: 0, orderCount: 0, paidCount: 0 });
+  const hasInitializedDateRef = useRef(false);
 
   const { slug } = useParams();
   const { restaurant } = useRestaurant();
 
   useEffect(() => {
-    if (restaurant && !dateFrom && !dateTo) {
+    if (restaurant && !hasInitializedDateRef.current) {
+      hasInitializedDateRef.current = true;
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
-      const [year, month, day] = bDate.split('-').map(Number);
-      const d = new Date(year, month - 1, day - 7);
-      const fromYear = d.getFullYear();
-      const fromMonth = String(d.getMonth() + 1).padStart(2, '0');
-      const fromDay = String(d.getDate()).padStart(2, '0');
-      setDateFrom(`${fromYear}-${fromMonth}-${fromDay}`);
+      setDateFrom(bDate);
       setDateTo(bDate);
     }
-  }, [restaurant, dateFrom, dateTo]);
+  }, [restaurant]);
 
   const fetchOrders = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -854,7 +855,7 @@ export default function AdminAnalyticsStatementsPage() {
                       <td style={{ textAlign: 'center' }}>
                         <span
                           className={`badge ${
-                            order.status === 'PAID'
+                            order.status === 'CLOSED' || order.status === 'PAID'
                               ? 'badge-available'
                               : order.status === 'CANCELLED'
                               ? 'badge-out-of-stock'
@@ -952,7 +953,7 @@ export default function AdminAnalyticsStatementsPage() {
                 </h2>
                 <span
                   className={`badge ${
-                    selectedOrder.status === 'PAID'
+                    selectedOrder.status === 'CLOSED' || selectedOrder.status === 'PAID'
                       ? 'badge-available'
                       : selectedOrder.status === 'CANCELLED'
                       ? 'badge-out-of-stock'
@@ -1040,11 +1041,11 @@ export default function AdminAnalyticsStatementsPage() {
                     style={{
                       fontWeight: 600,
                       fontSize: '14px',
-                      color: (selectedOrder.status === 'PAID' || selectedOrder.is_paid) ? '#059669' : 'var(--primary, #EA580C)',
+                      color: (selectedOrder.status === 'CLOSED' || selectedOrder.status === 'PAID' || selectedOrder.is_paid) ? '#059669' : 'var(--primary, #EA580C)',
                       margin: 0,
                     }}
                   >
-                    {(selectedOrder.status === 'PAID' || selectedOrder.is_paid)
+                    {(selectedOrder.status === 'CLOSED' || selectedOrder.status === 'PAID' || selectedOrder.is_paid)
                       ? (selectedOrder.payment_method ? `PAID (${selectedOrder.payment_method})` : 'PAID')
                       : 'PENDING'}
                   </p>
@@ -1106,7 +1107,7 @@ export default function AdminAnalyticsStatementsPage() {
 
             {/* Bottom Action Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {(selectedOrder.status === 'PAID' || selectedOrder.is_paid) && (
+              {(selectedOrder.status === 'CLOSED' || selectedOrder.status === 'PAID' || selectedOrder.is_paid) && (
                 <button
                   type="button"
                   onClick={() => setShowBill(true)}

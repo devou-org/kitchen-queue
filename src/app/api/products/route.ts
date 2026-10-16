@@ -5,9 +5,7 @@ import { calculateProductStatus } from '@/lib/validators';
 
 export async function GET(request: NextRequest) {
   try {
-    const querySlug = request.nextUrl.searchParams.get('slug');
-    const headerSlug = request.headers.get('x-restaurant-slug');
-    const slug = querySlug || headerSlug || 'demo';
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
     const restaurant = await getRestaurantBySlug(slug);
     
     if (!restaurant) {
@@ -24,9 +22,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const querySlug = request.nextUrl.searchParams.get('slug');
-    const headerSlug = request.headers.get('x-restaurant-slug');
-    const slug = querySlug || headerSlug || 'demo';
+    const slug = request.headers.get('x-restaurant-slug') || 'demo';
     const restaurant = await getRestaurantBySlug(slug);
     
     if (!restaurant) {

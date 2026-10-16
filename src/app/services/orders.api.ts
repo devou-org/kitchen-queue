@@ -15,6 +15,7 @@ export interface CreateOrderData {
   is_pos?: boolean;
   is_paid?: boolean;
   payment_method?: string;
+  payment_split?: Record<string, number> | null;
   discount_amount?: number;
 }
 
@@ -29,6 +30,7 @@ export interface UpdateOrderData {
   order_type?: string;
   items?: { product_id: string; quantity: number }[];
   payment_method?: string;
+  payment_split?: Record<string, number> | null;
 }
 
 class OrderService {

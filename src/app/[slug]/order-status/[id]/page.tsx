@@ -24,6 +24,8 @@ import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import BillTemplate from '@/components/BillTemplate';
 
+import OrderStatusBadge from '@/components/modules/orders/OrderStatusBadge';
+
 type QueueState = {
   type: string;
   queue_number: number;
@@ -31,13 +33,19 @@ type QueueState = {
   timestamp: string;
 };
 
-const DEFAULT_STAGES = [
-  { key: 'WAITING', label: 'WAITING', icon: Search },
-  { key: 'PENDING', label: 'CHECK-IN', icon: CheckCircle2 },
+const DEFAULT_STAGES_KOT = [
+  { key: 'PENDING', label: 'ORDERED', icon: CheckCircle2 },
+  { key: 'PREPARING', label: 'PREPARING', icon: Search },
+  { key: 'SERVED', label: 'SERVED', icon: Utensils },
+  { key: 'CLOSED', label: 'COMPLETED', icon: CheckCircle2 },
+];
+
+const DEFAULT_STAGES_KDS = [
+  { key: 'PENDING', label: 'ORDERED', icon: CheckCircle2 },
   { key: 'PREPARING', label: 'PREPARING', icon: Search },
   { key: 'READY', label: 'READY', icon: Utensils },
-  { key: 'PAID', label: 'PAID', icon: CircleDollarSign },
-  { key: 'SEATED', label: 'SEATED', icon: Utensils },
+  { key: 'SERVED', label: 'SERVED', icon: Utensils },
+  { key: 'CLOSED', label: 'COMPLETED', icon: CheckCircle2 },
 ];
 
 function getStageIndex(status: string, stages: any[]) {
@@ -60,13 +68,19 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     }
   }, [restaurant, resLoading, router, slug]);
 
+  const isKdsMode = (restaurant?.kitchen_mode || 'KOT').toUpperCase() === 'KDS';
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState('');
   const [showSurveyTip, setShowSurveyTip] = useState(false);
   const [showBill, setShowBill] = useState(false);
-  const [stages, setStages] = useState(DEFAULT_STAGES);
+  const [stages, setStages] = useState(isKdsMode ? DEFAULT_STAGES_KDS : DEFAULT_STAGES_KOT);
+
+  useEffect(() => {
+    const isKds = (restaurant?.kitchen_mode || 'KOT').toUpperCase() === 'KDS';
+    setStages(isKds ? DEFAULT_STAGES_KDS : DEFAULT_STAGES_KOT);
+  }, [restaurant?.kitchen_mode]);
 
   useEffect(() => {
     if (!localStorage.getItem('hideSurveyTip_kdK8Jd')) {
@@ -101,28 +115,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     };
 
     fetchOrder();
-
-    const fetchQueueStatuses = async () => {
-      try {
-        const res = await fetch('/api/queue/statuses', {
-          headers: { 'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || '' }
-        });
-        const data = await res.json();
-        if (data.success && data.data && data.data.length > 0) {
-          const dynamicStages = data.data
-            .filter((s: any) => s.possible_queue_status !== 'CANCELLED')
-            .map((s: any) => ({
-              key: s.possible_queue_status,
-              label: s.possible_queue_status,
-              icon: CheckCircle2
-            }));
-          setStages(dynamicStages);
-        }
-      } catch (err) {
-        console.error('Failed to fetch queue statuses', err);
-      }
-    };
-    fetchQueueStatuses();
 
     if (!pusherClient || !restaurant) return;
     const channelName = restaurant.pusher_channel;
@@ -444,10 +436,10 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               </div>
               <div>
                 <div style={{ fontWeight: 800, fontSize: '14px', color: '#065F46' }}>
-                  {order.is_paid || (order.status || '').toUpperCase() === 'PAID' ? 'Loyalty Points Earned!' : 'Loyalty Points For This Order'}
+                  {order.is_paid || (order.status || '').toUpperCase() === 'CLOSED' ? 'Loyalty Points Earned!' : 'Loyalty Points For This Order'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#047857', marginTop: '2px', fontWeight: 600 }}>
-                  {order.is_paid || (order.status || '').toUpperCase() === 'PAID' ? 'Credited to your CRM balance' : 'Will be credited upon payment completion'}
+                  {order.is_paid || (order.status || '').toUpperCase() === 'CLOSED' ? 'Credited to your CRM balance' : 'Will be credited upon payment completion'}
                 </div>
               </div>
             </div>
@@ -543,8 +535,9 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
 
             {stages.map((stage, i) => {
               const Icon = stage.icon;
-              const isCompleted = stageIndex > i || (stageIndex === i && stage.key === 'PAID');
-              const isCurrent = stageIndex === i && stage.key !== 'PAID';
+              const isTerminalCompleted = stage.key === 'CLOSED' || stage.key === 'PAID';
+              const isCompleted = stageIndex > i || (stageIndex === i && isTerminalCompleted);
+              const isCurrent = stageIndex === i && !isTerminalCompleted;
               const isPending = stageIndex < i;
 
               return (
@@ -653,9 +646,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Status</span>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: '#EC7951', textTransform: 'uppercase' }}>
-                {order.status}
-              </span>
+              <OrderStatusBadge status={order.status} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

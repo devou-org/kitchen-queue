@@ -20,6 +20,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapshotModal';
 import { useAdminLayout } from '@/context/AdminLayoutContext';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 
 interface OrderUpdateLog {
   id: string;
@@ -33,6 +34,42 @@ interface OrderUpdateLog {
 }
 
 import { useParams } from 'next/navigation';
+
+function resolveRoleDefaultStatus(): string {
+  if (typeof window === 'undefined') return 'PREPARING';
+  const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
+  let userRole = '';
+  let roleDefaultStatus = '';
+
+  if (userStr) {
+    try {
+      const parsed = JSON.parse(userStr);
+      userRole = parsed.role || (parsed.is_admin ? 'ADMIN' : '');
+      roleDefaultStatus = parsed.default_order_status || parsed.role_default_order_status || '';
+    } catch {}
+  }
+
+  if (roleDefaultStatus) {
+    const norm = roleDefaultStatus.trim().toUpperCase();
+    return norm === 'ALL' ? '' : norm;
+  }
+
+  const r = (userRole || '').trim().toUpperCase();
+  if (r.includes('KITCHEN') || r.includes('CHEF') || r.includes('COOK')) {
+    return 'PREPARING';
+  }
+  if (r.includes('WAITER') || r.includes('STEWARD') || r.includes('SERVER')) {
+    return 'READY';
+  }
+  if (r.includes('CASHIER') || r.includes('BILLING')) {
+    return 'SERVED';
+  }
+  if (r.includes('MANAGER') || r.includes('ADMIN')) {
+    return ''; // Show all orders
+  }
+
+  return 'PREPARING';
+}
 
 export default function AdminOrders() {
   const { slug } = useParams();
@@ -53,12 +90,10 @@ export default function AdminOrders() {
 
   // Live Updates Log
   const [recentUpdates, setRecentUpdates] = useState<OrderUpdateLog[]>([]);
-  const [queueStatuses, setQueueStatuses] = useState<string[]>([]);
-  const [statusesLoaded, setStatusesLoaded] = useState(false);
   const [tables, setTables] = useState<any[]>([]);
   const [counters, setCounters] = useState<any[]>([]);
   const { restaurant } = useRestaurant();
-  const [autoPrintKot, setAutoPrintKot] = useState(true);
+  const [autoPrintKot, setAutoPrintKot] = useState(false);
   const [counterDrawerOpen, setCounterDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -66,7 +101,22 @@ export default function AdminOrders() {
       const savedCounter = localStorage.getItem('qdine_orders_counter_filter');
       if (savedCounter !== null) setCounterFilter(savedCounter);
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
-      if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint !== 'false');
+      if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint === 'true');
+
+      // Resolve role-based default status filter
+      const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
+      let uRole = '';
+      if (userStr) {
+        try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch {}
+      }
+      const roleKey = `qdine_orders_status_filter_${uRole || 'default'}`;
+      const savedStatus = localStorage.getItem(roleKey);
+      if (savedStatus !== null) {
+        setStatusFilter(savedStatus);
+      } else {
+        const defaultForRole = resolveRoleDefaultStatus();
+        setStatusFilter(defaultForRole);
+      }
 
       tryAutoConnectBluetooth();
     }
@@ -86,7 +136,9 @@ export default function AdminOrders() {
       localStorage.setItem('qdine_auto_print_kot', String(nextVal));
       localStorage.setItem('qdine_auto_print_bill', String(nextVal));
     }
-    toast.success(nextVal ? '🖨️ Auto-Print: Enabled' : '⏸️ Auto-Print: Paused');
+    toast.success(nextVal ? 'Auto-Print: Enabled' : 'Auto-Print: Paused', {
+      icon: <PrinterIllustration size={20} status={nextVal ? 'success' : 'idle'} />,
+    });
   };
 
   const fetchCounters = useCallback(() => {
@@ -138,29 +190,6 @@ export default function AdminOrders() {
     fetchTables();
   }, [fetchTables]);
 
-  useEffect(() => {
-    const fetchStatuses = async () => {
-      try {
-        const res = await fetch('/api/queue/statuses', {
-          headers: { 'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : slug) || '' }
-        });
-        const data = await res.json();
-        if (data.success && data.data && data.data.length > 0) {
-          setQueueStatuses(data.data.map((s: any) => s.possible_queue_status));
-        } else {
-          // Fallback if no dynamic statuses found
-          setQueueStatuses(['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED']);
-        }
-      } catch (err) {
-        console.error('Failed to fetch queue statuses', err);
-        setQueueStatuses(['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED']);
-      } finally {
-        setStatusesLoaded(true);
-      }
-    };
-    fetchStatuses();
-  }, [slug]);
-
   const dismissUpdate = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setRecentUpdates(prev => {
@@ -206,7 +235,7 @@ export default function AdminOrders() {
         sort: 'ASC',
         date_from: bDate,
         date_to: bDate,
-        status: statusFilter || 'PREPARING',
+        status: (statusFilter && statusFilter !== 'ALL') ? statusFilter : undefined,
         order_type: orderTypeFilter || undefined,
       });
 
@@ -281,8 +310,8 @@ export default function AdminOrders() {
           }
           return o;
         }).filter(o => {
-          const currentFilter = statusFilter || 'PREPARING';
-          if (currentFilter !== 'ALL') {
+          const currentFilter = statusFilter && statusFilter !== 'ALL' ? statusFilter : undefined;
+          if (currentFilter) {
             return o.status === currentFilter;
           }
           return true;
@@ -305,7 +334,7 @@ export default function AdminOrders() {
       // 2. HIGHLIGHT & LOG ADDITIONS
       // Only log and highlight if items were actually added to an active order
       const currentStatus = data.new_status || 'PENDING';
-      const isTerminal = currentStatus === 'PAID' || currentStatus === 'CANCELLED' || currentStatus === 'EXPIRED';
+      const isTerminal = currentStatus === 'CLOSED' || currentStatus === 'CANCELLED' || currentStatus === 'EXPIRED';
       if (data.items_updated && data.added_items && !isTerminal) {
 
         const newUpdate: OrderUpdateLog = {
@@ -351,7 +380,7 @@ export default function AdminOrders() {
 
     const handleKotAutoPrint = async (data: any) => {
       // Check if auto-print is enabled on this device
-      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
+      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
       if (!autoPrint) return;
 
       // Only filter if this station is an explicitly locked dedicated KDS station
@@ -361,8 +390,8 @@ export default function AdminOrders() {
         return;
       }
 
-      toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: '🖨️',
+      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: <PrinterIllustration size={22} status="printing" />,
         duration: 3000,
       });
 
@@ -378,7 +407,8 @@ export default function AdminOrders() {
 
         const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            icon: <PrinterIllustration size={22} status="success" />,
             id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
           });
         } else {
@@ -409,7 +439,7 @@ export default function AdminOrders() {
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
-        is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : undefined,
+        is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
         payment_method: pMethod || undefined
       });
@@ -417,16 +447,16 @@ export default function AdminOrders() {
         // Success feedback handled by Pusher event to avoid duplicates
         // Update local state instantly for UI responsiveness
         setOrders(prev => {
-          const currentFilter = statusFilter || 'PREPARING';
+          const currentFilter = statusFilter && statusFilter !== 'ALL' ? statusFilter : undefined;
           return prev.map(o => o.id === id ? {
             ...o,
             status: newStatus as Order['status'],
             table_number: tableNumber ?? o.table_number,
             payment_method: pMethod ?? o.payment_method,
-            is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
+            is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
           } : o)
             .filter(o => {
-              if (currentFilter !== 'ALL') return o.status === currentFilter;
+              if (currentFilter) return o.status === currentFilter;
               return true;
             });
         });
@@ -435,9 +465,9 @@ export default function AdminOrders() {
           status: newStatus as Order['status'],
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
-          is_paid: newStatus === 'PAID' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
+          is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
-        toast.success(`Order updated to ${newStatus}`);
+        toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
       } else {
         toast.error(data.error || 'Failed to update');
       }
@@ -448,7 +478,14 @@ export default function AdminOrders() {
     }
   };
 
-  const allStatuses = queueStatuses.length > 0 ? queueStatuses : ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
+  const isKotMode = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+  const allStatuses = isKotMode
+    ? ['PENDING', 'PREPARING', 'SERVED', 'CLOSED', 'CANCELLED']
+    : ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CLOSED', 'CANCELLED'];
+  const statusOptions = [
+    { value: 'ALL', label: 'All Statuses' },
+    ...allStatuses.map((s) => ({ value: s, label: s })),
+  ];
   // Active statuses exclude the first one usually (which is like PENDING or WAITING)
   const defaultStatus = allStatuses[0] || 'PENDING';
   const activeStatuses = allStatuses.slice(1);
@@ -652,17 +689,21 @@ export default function AdminOrders() {
             {/* Status Dropdown */}
             <div className="orders-filter-control" style={{ width: '130px', flexShrink: 0 }}>
               <CustomSelect
-                value={statusFilter}
+                value={statusFilter || 'ALL'}
                 onChange={(val) => {
-                  setStatusFilter(val);
+                  const nextVal = val === 'ALL' ? '' : val;
+                  setStatusFilter(nextVal);
                   setPage(1);
+                  if (typeof window !== 'undefined') {
+                    const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
+                    let uRole = '';
+                    if (userStr) {
+                      try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch {}
+                    }
+                    localStorage.setItem(`qdine_orders_status_filter_${uRole || 'default'}`, nextVal);
+                  }
                 }}
-                options={
-                  !statusesLoaded
-                    ? [{ value: 'PREPARING', label: 'PREPARING' }]
-                    : allStatuses.map((s) => ({ value: s, label: s }))
-                }
-                disabled={!statusesLoaded}
+                options={statusOptions}
                 buttonStyle={{ height: '38px', fontSize: '12px', padding: '0 8px' }}
                 className="orders-select"
                 style={{ width: '130px' }}

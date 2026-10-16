@@ -118,33 +118,94 @@ export function SalesAnalyticsChart({
     OTHER: '#8B5CF6',
   };
 
-  const paymentChartData = (paymentMethods || []).map((p) => {
-    const rawName = String(p.payment_method || '').toUpperCase();
-    const cleanName =
-      rawName === 'UPI'
-        ? 'UPI / QR'
-        : rawName === 'CASH'
-        ? 'Cash'
-        : rawName === 'CARD'
-        ? 'Card'
-        : p.payment_method || 'Other';
-    const colorKey = rawName.includes('UPI')
-      ? 'UPI'
-      : rawName.includes('CASH')
-      ? 'CASH'
-      : rawName.includes('CARD')
-      ? 'CARD'
-      : 'OTHER';
-    return {
-      name: cleanName,
-      revenue: Math.round(Number(p.total_revenue || 0)),
-      orders: Number(p.order_count || 0),
-      color: PAYMENT_COLORS[colorKey] || '#64748B',
-    };
+  const paymentBreakdownMap: Record<string, { name: string; revenue: number; orders: number; color: string }> = {
+    CASH: { name: 'Cash', revenue: 0, orders: 0, color: PAYMENT_COLORS.CASH },
+    UPI: { name: 'UPI', revenue: 0, orders: 0, color: PAYMENT_COLORS.UPI },
+    CARD: { name: 'Card', revenue: 0, orders: 0, color: PAYMENT_COLORS.CARD },
+  };
+  const otherBreakdownMap: Record<string, { name: string; revenue: number; orders: number; color: string }> = {};
+
+  (paymentMethods || []).forEach((p) => {
+    const rawName = String(p.payment_method || '').trim();
+    const upperName = rawName.toUpperCase();
+    const rev = Number(p.total_revenue || 0);
+    const ord = Number(p.order_count || 0);
+
+    if (upperName.startsWith('SPLIT')) {
+      const cashMatch = rawName.match(/Cash:\s*₹?([\d.]+)/i);
+      const upiMatch = rawName.match(/UPI:\s*₹?([\d.]+)/i);
+      const cardMatch = rawName.match(/Card:\s*₹?([\d.]+)/i);
+
+      let allocated = 0;
+      if (cashMatch) {
+        const amt = parseFloat(cashMatch[1]) || 0;
+        if (amt > 0) {
+          paymentBreakdownMap.CASH.revenue += amt;
+          paymentBreakdownMap.CASH.orders += ord;
+          allocated += amt;
+        }
+      }
+      if (upiMatch) {
+        const amt = parseFloat(upiMatch[1]) || 0;
+        if (amt > 0) {
+          paymentBreakdownMap.UPI.revenue += amt;
+          paymentBreakdownMap.UPI.orders += ord;
+          allocated += amt;
+        }
+      }
+      if (cardMatch) {
+        const amt = parseFloat(cardMatch[1]) || 0;
+        if (amt > 0) {
+          paymentBreakdownMap.CARD.revenue += amt;
+          paymentBreakdownMap.CARD.orders += ord;
+          allocated += amt;
+        }
+      }
+      if (allocated === 0 && rev > 0) {
+        paymentBreakdownMap.CASH.revenue += rev;
+        paymentBreakdownMap.CASH.orders += ord;
+      }
+    } else if (upperName === 'CASH') {
+      paymentBreakdownMap.CASH.revenue += rev;
+      paymentBreakdownMap.CASH.orders += ord;
+    } else if (upperName === 'UPI' || upperName.includes('QR')) {
+      paymentBreakdownMap.UPI.revenue += rev;
+      paymentBreakdownMap.UPI.orders += ord;
+    } else if (upperName === 'CARD') {
+      paymentBreakdownMap.CARD.revenue += rev;
+      paymentBreakdownMap.CARD.orders += ord;
+    } else {
+      const key = upperName || 'OTHER';
+      if (!otherBreakdownMap[key]) {
+        otherBreakdownMap[key] = {
+          name: rawName || 'Other',
+          revenue: 0,
+          orders: 0,
+          color: PAYMENT_COLORS.OTHER,
+        };
+      }
+      otherBreakdownMap[key].revenue += rev;
+      otherBreakdownMap[key].orders += ord;
+    }
   });
+
+  const paymentChartData = [
+    paymentBreakdownMap.CASH,
+    paymentBreakdownMap.UPI,
+    paymentBreakdownMap.CARD,
+    ...Object.values(otherBreakdownMap),
+  ]
+    .filter((p) => p.revenue > 0 || p.orders > 0)
+    .map((p) => ({
+      ...p,
+      revenue: Math.round(p.revenue),
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
 
   const totalRev = chartData.reduce((acc, curr) => acc + curr.revenue, 0);
   const totalOrd = chartData.reduce((acc, curr) => acc + curr.orders, 0);
+  const paymentTotalRev = paymentChartData.reduce((acc, curr) => acc + curr.revenue, 0);
+  const effectivePaymentRev = totalRev > 0 ? totalRev : paymentTotalRev;
   const peakDay = [...chartData].sort((a, b) => b.revenue - a.revenue)[0];
   const topProduct = topProducts[0];
   const topPayment = [...paymentChartData].sort((a, b) => b.revenue - a.revenue)[0];
@@ -646,7 +707,7 @@ export function SalesAnalyticsChart({
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           const d = payload[0].payload;
-                          const pct = totalRev > 0 ? Math.round((d.revenue / totalRev) * 100) : 0;
+                          const pct = effectivePaymentRev > 0 ? Math.round((d.revenue / effectivePaymentRev) * 100) : 0;
                           return (
                             <div
                               style={{
@@ -679,7 +740,7 @@ export function SalesAnalyticsChart({
               {/* Side / Stacked summary cards */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', minWidth: 0 }}>
                 {paymentChartData.map((p) => {
-                  const pct = totalRev > 0 ? Math.round((p.revenue / totalRev) * 100) : 0;
+                  const pct = effectivePaymentRev > 0 ? Math.round((p.revenue / effectivePaymentRev) * 100) : 0;
                   return (
                     <div
                       key={p.name}
