@@ -9,7 +9,7 @@ export interface AdminModuleDefinition {
 export const ADMIN_MODULES: AdminModuleDefinition[] = [
   {
     key: 'pos',
-    name: 'POS Terminal',
+    name: 'POS',
     description: 'Take dine-in & takeaway orders, bill generation',
     pathSegment: 'pos',
     iconName: 'Store',
@@ -41,6 +41,13 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     description: 'Stock levels, purchase orders, suppliers, and wastage',
     pathSegment: 'inventory',
     iconName: 'Boxes',
+  },
+  {
+    key: 'loyalty',
+    name: 'Loyalty',
+    description: 'Customer loyalty program, rewards catalog, and points audit log',
+    pathSegment: 'loyalty',
+    iconName: 'Gift',
   },
   {
     key: 'analytics',
@@ -90,8 +97,8 @@ export const DEFAULT_ROLE_TEMPLATES = [
   },
   {
     name: 'Manager',
-    description: 'General manager overseeing operations, menu items, inventory, analytics, and staff',
-    permissions: ['pos', 'orders', 'tables', 'products', 'inventory', 'analytics', 'staff'],
+    description: 'General manager overseeing operations, menu items, inventory, loyalty, analytics, and staff',
+    permissions: ['pos', 'orders', 'tables', 'products', 'inventory', 'loyalty', 'analytics', 'staff'],
   },
 ];
 

@@ -6,7 +6,7 @@ import { pusherServer } from '@/lib/pusher';
 import { validatePhone } from '@/lib/validators';
 import { autoQueueAndBroadcastKot } from '@/lib/kot-auto-print';
 
-const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
+const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY', 'SERVED'];
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -39,8 +39,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     if (!order) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
 
-    if (!admin && customer?.phone !== order.phone) {
-      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+    if (!admin) {
+      const normCust = customer?.phone?.replace(/\D/g, '').slice(-10);
+      const normOrder = order.phone?.replace(/\D/g, '').slice(-10);
+      if (!normCust || !normOrder || normCust !== normOrder) {
+        return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+      }
     }
 
     return NextResponse.json({ success: true, data: order });
@@ -60,7 +64,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items, payment_method } = body;
+    const { status, is_paid, table_number, customer_name, phone, notes, party_size, items, payment_method, payment_split, order_type } = body;
 
     const existing = await getOrderById(restaurant.id, id);
     if (!existing) return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
@@ -95,10 +99,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ success: false, error: 'No items provided' }, { status: 400 });
       }
       
-      // ... rest of the customer logic
-
       // 🛡️ SECURITY FIX: Enforce that customers CANNOT remove items or decrease quantities.
-      // E.g., someone intercepting the API request to delete items after the kitchen started cooking.
       const existingQtyMap = new Map<string, number>();
       for (const item of (existing.items || [])) {
         existingQtyMap.set(item.product_id, (existingQtyMap.get(item.product_id) || 0) + Number(item.quantity));
@@ -137,8 +138,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       // Verify the order belongs to this customer (by phone)
-      if (customer.phone && existing.phone !== customer.phone) {
-        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      if (customer.phone) {
+        const normCust = customer.phone.replace(/\D/g, '').slice(-10);
+        const normOrder = existing.phone?.replace(/\D/g, '').slice(-10);
+        if (!normCust || !normOrder || normCust !== normOrder) {
+          return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+        }
       }
     }
 
@@ -150,6 +155,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       || typeof notes === 'string'
       || notes === null
       || typeof party_size === 'number'
+      || typeof order_type === 'string'
+      || table_number !== undefined
       || Array.isArray(items);
 
     if (shouldUpdateDetails) {
@@ -159,8 +166,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         notes?: string | null;
         party_size?: number;
         table_number?: string | null;
+        order_type?: string;
         items?: { product_id: string; quantity: number }[];
       } = {};
+
+      if (typeof order_type === 'string' && ['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(order_type.toUpperCase())) {
+        payload.order_type = order_type.toUpperCase();
+      }
+
+      if (table_number !== undefined) {
+        const effectiveType = payload.order_type || existing.order_type;
+        if (effectiveType === 'TAKEAWAY' || effectiveType === 'DELIVERY') {
+          payload.table_number = null;
+        } else {
+          payload.table_number = table_number ? String(table_number).trim() : null;
+        }
+      } else if (payload.order_type === 'TAKEAWAY' || payload.order_type === 'DELIVERY') {
+        payload.table_number = null;
+      }
 
       if (typeof customer_name === 'string') {
         const nextName = customer_name.trim();
@@ -213,13 +236,36 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           }
 
           if (deltas.length > 0) {
-            const products = await sql`SELECT id, name FROM products WHERE id = ANY(${Array.from(productIdsToFetch)})` as {id: string, name: string}[];
-            const nameMap = new Map<string, string>((products || []).map((p: {id: string, name: string}) => [p.id, p.name]));
+            const products = await sql`SELECT id, name, counter FROM products WHERE id = ANY(${Array.from(productIdsToFetch)})` as {id: string, name: string, counter?: string}[];
+            const prodMap = new Map<string, {id: string, name: string, counter?: string}>((products || []).map(p => [p.id, p]));
             
-            addedItemsList = deltas.map(d => ({
-              product_name: (nameMap.get(d.product_id) || 'Unknown Item') as string,
-              quantity: d.quantity
+            const kotAddOnItems = deltas.map(d => {
+              const p = prodMap.get(d.product_id);
+              return {
+                product_name: (p?.name || 'Unknown Item') as string,
+                counter: (p?.counter && p.counter.trim()) ? p.counter.trim() : 'Kitchen',
+                quantity: d.quantity,
+              };
+            });
+
+            addedItemsList = kotAddOnItems.map(d => ({
+              product_name: d.product_name,
+              quantity: d.quantity,
             }));
+
+            // 🖨️ AUTO-PRINT RUNNING KOT: If and only if items were added to an already active/preparing order and mode is KOT
+            const isKotMode = ((restaurant as any).kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+            if (existing.status !== 'PENDING' && kotAddOnItems.length > 0 && isKotMode) {
+              try {
+                await autoQueueAndBroadcastKot(restaurant.id, id, {
+                  isAddOn: true,
+                  overrideItems: kotAddOnItems,
+                });
+                console.log(`🖨️ Auto-printed running KOT for ${kotAddOnItems.length} added items on Order #${existing.ticket_number}`);
+              } catch (kotErr) {
+                console.error('❌ Automatic running KOT print error:', kotErr);
+              }
+            }
           }
         }
 
@@ -231,6 +277,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: order.status,
+          order_type: order.order_type,
           table_number: order.table_number,
           is_paid: order.is_paid,
           timestamp: new Date().toISOString(),
@@ -241,15 +288,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // ✅ UPDATE STATUS, TABLE NUMBER & PAYMENT STATUS ATOMICALLY
-    const shouldUpdateStatusOrPayment = Boolean(status || table_number || typeof is_paid === 'boolean' || payment_method);
+    const shouldUpdateStatusOrPayment = Boolean(status || typeof is_paid === 'boolean' || payment_method || payment_split !== undefined || (!shouldUpdateDetails && table_number !== undefined));
     if (shouldUpdateStatusOrPayment) {
       if (status && status !== existing.status) {
+        if (status === 'PAID') {
+          return NextResponse.json({
+            success: false,
+            error: "Order status 'PAID' has been replaced by 'CLOSED'. Use status 'CLOSED' with payment fields instead.",
+          }, { status: 400 });
+        }
+
         // Fetch queue statuses for the restaurant to validate the new status
         const allowedStatusesRes = await sql`SELECT possible_queue_status FROM queue_status WHERE restaurant_id = ${restaurant.id}` as {possible_queue_status: string}[];
-        const allowedStatuses = allowedStatusesRes.map(s => s.possible_queue_status);
+        const allowedStatuses = allowedStatusesRes.map(s => s.possible_queue_status).filter(s => s !== 'PAID');
         
         // Also allow base order statuses for backwards compatibility
-        const baseOrderStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED', 'EXPIRED'];
+        const baseOrderStatuses = ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CLOSED', 'CANCELLED', 'EXPIRED'];
         const validStatuses = [...new Set([...allowedStatuses, ...baseOrderStatuses])];
         
         if (!validStatuses.includes(status)) {
@@ -272,12 +326,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       // Update order and trigger billing atomically inside db transaction
-      order = await completeOrderAndBill(restaurant.id, id, status, is_paid, table_number, payment_method);
+      const effectiveIsPaid = (status === 'CANCELLED' || status === 'EXPIRED') ? false : is_paid;
+      order = await completeOrderAndBill(restaurant.id, id, status, effectiveIsPaid, table_number, payment_method, payment_split);
 
       console.log(`✅ Order Updated: Order #${existing.ticket_number} → Status: ${order.status}, Table: ${order.table_number}, Paid: ${order.is_paid}`);
 
-      // 🖨️ AUTO-PRINT KOT PER COUNTER when transitioning to PREPARING
-      if (status === 'PREPARING') {
+      // 🖨️ AUTO-PRINT KOT PER COUNTER when transitioning to PREPARING (only in KOT mode)
+      const isKotMode = ((restaurant as any).kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+      if (status === 'PREPARING' && existing.status !== 'PREPARING' && isKotMode) {
         try {
           await autoQueueAndBroadcastKot(restaurant.id, id, true);
         } catch (kotErr) {
@@ -293,6 +349,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           order_id: id,
           ticket_number: existing.ticket_number,
           new_status: order.status,
+          order_type: order.order_type,
           table_number: order.table_number,
           is_paid: order.is_paid,
           timestamp: new Date().toISOString(),
@@ -303,7 +360,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    return NextResponse.json({ success: true, data: order, message: 'Order updated' });
+    const finalOrder = await getOrderById(restaurant.id, id);
+    return NextResponse.json({ success: true, data: finalOrder || order, message: 'Order updated' });
   } catch (error: any) {
     console.error("❌ Order Update Runtime Error:", error);
     const message = error?.message || 'Failed to update order';
@@ -320,3 +378,5 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ success: false, error: message }, { status: isBusinessError ? 400 : 500 });
   }
 }
+
+export const PATCH = PUT;

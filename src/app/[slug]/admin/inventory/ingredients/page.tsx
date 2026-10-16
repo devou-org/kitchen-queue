@@ -311,38 +311,108 @@ export default function IngredientsPage() {
         }
 
         @media (max-width: 768px) {
-          .inventory-page-header {
+          .inventory-page-header,
+          .inventory-page-header.admin-page-header-container {
             height: auto !important;
             min-height: auto !important;
-            padding: 8px 16px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            border-bottom: 1px solid var(--border) !important;
+            background: #FFFFFF !important;
+          }
+
+          .inventory-page-header .admin-page-header-container,
+          .inventory-page-header .admin-header-left,
+          .inventory-page-header .admin-header-search {
+            height: auto !important;
+            min-height: auto !important;
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
 
           .inventory-toolbar {
             flex-direction: column !important;
             align-items: stretch !important;
-            gap: 10px !important;
+            gap: 0 !important;
             height: auto !important;
+            min-height: auto !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
 
           .inventory-tabs-wrapper {
             width: 100% !important;
-            height: auto !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            padding: 0 !important;
             border-bottom: 1px solid var(--border) !important;
-            padding-bottom: 2px !important;
+            box-sizing: border-box !important;
+            background: #FFFFFF !important;
+            overflow-x: auto !important;
           }
 
           .inventory-actions {
             width: 100% !important;
-            margin-left: 0 !important;
-            justify-content: flex-start !important;
-            flex-wrap: wrap !important;
             height: auto !important;
+            min-height: auto !important;
+            margin-left: 0 !important;
+            padding: 10px 14px !important;
+            background: #F8FAFC !important;
+            border-bottom: 1px solid var(--border) !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+          }
+
+          .inventory-actions > button {
+            width: 100% !important;
+            justify-content: center !important;
+          }
+
+          .inventory-maximize-wrapper {
+            display: none !important;
+          }
+
+          .inventory-content-container {
+            padding: 12px 14px !important;
+          }
+
+          .inventory-filter-bar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            margin-bottom: 14px !important;
+          }
+
+          .inventory-search-form {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+
+          .inventory-dropdowns-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+            width: 100% !important;
+          }
+
+          .inventory-dropdowns-row > div {
+            width: 100% !important;
           }
         }
       `}</style>
       <AdminPageHeader
         className="inventory-page-header"
-        style={{ paddingTop: 0, height: '68px', minHeight: '68px', display: 'flex', alignItems: 'stretch', marginBottom: 0 }}
+        style={{ paddingTop: 0, marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="inventory-toolbar">
@@ -372,7 +442,7 @@ export default function IngredientsPage() {
                 <span>Add Ingredient</span>
               </button>
 
-              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+              <div className="inventory-maximize-wrapper" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                 <LayoutMaximizeToggle />
               </div>
             </div>
@@ -380,10 +450,11 @@ export default function IngredientsPage() {
         }
       />
 
-      <div style={{ padding: '20px 24px' }}>
+      <div className="inventory-content-container" style={{ padding: '20px 24px' }}>
 
       {/* Filter and Search Bar */}
       <div
+        className="inventory-filter-bar"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -395,6 +466,7 @@ export default function IngredientsPage() {
       >
         {/* Search */}
         <form
+          className="inventory-search-form"
           onSubmit={handleSearchSubmit}
           style={{
             position: 'relative',
@@ -431,7 +503,7 @@ export default function IngredientsPage() {
         </form>
 
         {/* Filter Dropdowns */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="inventory-dropdowns-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {/* Category */}
           <CustomSelect
             style={{ width: '190px' }}

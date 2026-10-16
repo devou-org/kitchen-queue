@@ -98,6 +98,35 @@ class AuthService {
     }
   }
 
+  async centralizedLogin(email: string, password: string): Promise<AuthResponse & { slug?: string; redirect_url?: string }> {
+    try {
+      const res = await fetch('/api/auth/centralized-login', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...this.getCommonHeaders()
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (data.success && typeof window !== 'undefined') {
+        if (data.token) {
+          localStorage.setItem('admin_token', data.token);
+          localStorage.setItem('staff_token', data.token);
+        }
+        if (data.user) {
+          localStorage.setItem('admin_user', JSON.stringify(data.user));
+        }
+        if (typeof document !== 'undefined') {
+          document.cookie = 'admin_logged_in=1; path=/; max-age=7776000; SameSite=Lax';
+        }
+      }
+      return data;
+    } catch (error) {
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  }
+
   async refresh(): Promise<AuthResponse> {
     try {
       const res = await fetch('/api/auth/refresh', {

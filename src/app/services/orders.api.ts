@@ -15,19 +15,22 @@ export interface CreateOrderData {
   is_pos?: boolean;
   is_paid?: boolean;
   payment_method?: string;
+  payment_split?: Record<string, number> | null;
   discount_amount?: number;
 }
 
 export interface UpdateOrderData {
   status?: string;
   is_paid?: boolean;
-  table_number?: string;
+  table_number?: string | null;
   customer_name?: string;
   phone?: string;
   notes?: string | null;
   party_size?: number;
+  order_type?: string;
   items?: { product_id: string; quantity: number }[];
   payment_method?: string;
+  payment_split?: Record<string, number> | null;
 }
 
 class OrderService {
@@ -160,6 +163,25 @@ class OrderService {
       return await res.json();
     } catch {
       return { success: false, error: 'Network error fetching kitchen snapshot' };
+    }
+  }
+
+  async updateOrderItemStatus(
+    orderId: string,
+    data: { item_ids?: string[]; counter?: string; status: string }
+  ): Promise<ApiResponse<Order>> {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/items/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (error) {
+      return { success: false, error: 'Network error while updating item status.' };
     }
   }
 

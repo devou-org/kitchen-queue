@@ -116,27 +116,92 @@ export function StatementAnalyticsChart({
     }));
 
   // Payment Method Breakdown
+  // Payment Method Breakdown
   const paymentMap: Record<string, { name: string; revenue: number; count: number; color: string }> = {
-    UPI: { name: 'UPI / QR', revenue: 0, count: 0, color: '#059669' },
     CASH: { name: 'Cash', revenue: 0, count: 0, color: '#2563EB' },
+    UPI: { name: 'UPI', revenue: 0, count: 0, color: '#059669' },
     CARD: { name: 'Card', revenue: 0, count: 0, color: '#D97706' },
-    OTHER: { name: 'Pending / Other', revenue: 0, count: 0, color: '#6B7280' },
   };
+  const otherPaymentMap: Record<string, { name: string; revenue: number; count: number; color: string }> = {};
 
   orders.forEach((o) => {
-    const rawMethod = (o.payment_method || '').toUpperCase();
-    const method = rawMethod === 'UPI' ? 'UPI' : rawMethod === 'CASH' ? 'CASH' : rawMethod === 'CARD' ? 'CARD' : 'OTHER';
+    const rawMethod = (o.payment_method || '').trim();
+    const upperMethod = rawMethod.toUpperCase();
     const amount = Number(o.total_price || 0);
-    paymentMap[method].revenue += amount;
-    paymentMap[method].count += 1;
+
+    let split = o.payment_split as any;
+    if (typeof split === 'string') {
+      try {
+        split = JSON.parse(split);
+      } catch {
+        split = null;
+      }
+    }
+    if ((!split || typeof split !== 'object') && upperMethod.startsWith('SPLIT')) {
+      const splitObj = { CASH: 0, UPI: 0, CARD: 0 };
+      const cashMatch = rawMethod.match(/Cash:\s*₹?([\d.]+)/i);
+      if (cashMatch) splitObj.CASH = parseFloat(cashMatch[1]) || 0;
+      const upiMatch = rawMethod.match(/UPI:\s*₹?([\d.]+)/i);
+      if (upiMatch) splitObj.UPI = parseFloat(upiMatch[1]) || 0;
+      const cardMatch = rawMethod.match(/Card:\s*₹?([\d.]+)/i);
+      if (cardMatch) splitObj.CARD = parseFloat(cardMatch[1]) || 0;
+      if (splitObj.CASH > 0 || splitObj.UPI > 0 || splitObj.CARD > 0) {
+        split = splitObj;
+      }
+    }
+
+    if (split && typeof split === 'object') {
+      let allocated = 0;
+      if (Number(split.CASH) > 0) {
+        paymentMap.CASH.revenue += Number(split.CASH);
+        paymentMap.CASH.count += 1;
+        allocated += Number(split.CASH);
+      }
+      if (Number(split.UPI) > 0) {
+        paymentMap.UPI.revenue += Number(split.UPI);
+        paymentMap.UPI.count += 1;
+        allocated += Number(split.UPI);
+      }
+      if (Number(split.CARD) > 0) {
+        paymentMap.CARD.revenue += Number(split.CARD);
+        paymentMap.CARD.count += 1;
+        allocated += Number(split.CARD);
+      }
+      if (allocated === 0 && amount > 0) {
+        paymentMap.CASH.revenue += amount;
+        paymentMap.CASH.count += 1;
+      }
+    } else if (upperMethod === 'CASH') {
+      paymentMap.CASH.revenue += amount;
+      paymentMap.CASH.count += 1;
+    } else if (upperMethod === 'UPI' || upperMethod.includes('QR')) {
+      paymentMap.UPI.revenue += amount;
+      paymentMap.UPI.count += 1;
+    } else if (upperMethod === 'CARD') {
+      paymentMap.CARD.revenue += amount;
+      paymentMap.CARD.count += 1;
+    } else {
+      const key = upperMethod || 'OTHER';
+      if (!otherPaymentMap[key]) {
+        otherPaymentMap[key] = { name: rawMethod || 'Pending / Other', revenue: 0, count: 0, color: '#6B7280' };
+      }
+      otherPaymentMap[key].revenue += amount;
+      otherPaymentMap[key].count += 1;
+    }
   });
 
-  const paymentData = Object.values(paymentMap)
+  const paymentData = [
+    paymentMap.CASH,
+    paymentMap.UPI,
+    paymentMap.CARD,
+    ...Object.values(otherPaymentMap),
+  ]
     .filter((p) => p.count > 0 || p.revenue > 0)
     .map((p) => ({
       ...p,
       revenue: Math.round(p.revenue),
-    }));
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
 
   // Status Breakdown
   const statusMap: Record<string, { name: string; count: number; revenue: number; color: string }> = {

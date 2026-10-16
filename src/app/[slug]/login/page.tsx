@@ -4,11 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { authService } from '@/app/services/auth.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-
-const COUNTRY_CODES = [
-  { code: '+91', label: '🇮🇳 +91', country: 'India' },
-
-];
+import { COUNTRY_CODES } from '@/lib/constants';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -155,7 +151,6 @@ export default function LoginPage() {
         window.location.href = `/${slug}/menu`;
       } else {
         toast.error(data.error || 'Invalid OTP');
-        setCooldown(0); // Re-enable Send OTP button on wrong PIN
         setLoading(false);
       }
     } catch {

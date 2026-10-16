@@ -7,6 +7,7 @@ async function ensureColumnExists() {
   try {
     await sql`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS is_service_active BOOLEAN DEFAULT TRUE`;
     await sql`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS service_message TEXT`;
+    await sql`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS kitchen_mode VARCHAR(10) DEFAULT 'KOT'`;
   } catch (err) {
     console.error('Migration error:', err);
   }
@@ -164,6 +165,7 @@ export async function PUT(request: NextRequest) {
       closing_time,
       rollover_time,
       is_service_active,
+      kitchen_mode,
       country,
       country_code,
       state,
@@ -173,6 +175,8 @@ export async function PUT(request: NextRequest) {
       latitude,
       longitude
     } = body;
+
+    const validKitchenMode = kitchen_mode ? (['KOT', 'KDS'].includes(String(kitchen_mode).toUpperCase()) ? String(kitchen_mode).toUpperCase() : 'KOT') : undefined;
 
     if (!name) {
       return NextResponse.json({ success: false, error: 'Name is required' }, { status: 400 });
@@ -231,6 +235,7 @@ export async function PUT(request: NextRequest) {
         city = COALESCE(${city || null}, city),
         latitude = CASE WHEN ${latitude !== undefined && latitude !== null} THEN ${Number(latitude)} ELSE latitude END,
         longitude = CASE WHEN ${longitude !== undefined && longitude !== null} THEN ${Number(longitude)} ELSE longitude END,
+        kitchen_mode = CASE WHEN ${validKitchenMode !== undefined} THEN ${validKitchenMode} ELSE kitchen_mode END,
         updated_at = NOW()
       WHERE id = ${restaurant.id}
     `;

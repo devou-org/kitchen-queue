@@ -86,11 +86,11 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const isSuperAdminOrOwner = currentUser?.is_admin === true || (currentUser?.permissions && currentUser.permissions.includes('*'));
 
   const allNavLinks = [
-    ...(showOrdering ? [{ key: 'pos', name: 'POS Terminal', href: `/${slug}/admin/pos`, icon: <Store size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'pos', name: 'POS', href: `/${slug}/admin/pos`, icon: <Store size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'orders', name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(!showOrdering && showQueue ? [{ key: 'queue', name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     { key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
-    { key: 'products', name: 'Products', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
+    { key: 'products', name: 'Menu', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
     ...(showLoyalty ? [{ key: 'loyalty', name: 'Loyalty', href: `/${slug}/admin/loyalty`, icon: <Gift size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
@@ -546,41 +546,53 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                   </div>
 
                   {/* User Details */}
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{
+                  <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span
+                      title={currentUser.name || 'Team Member'}
+                      style={{
                         fontWeight: 700,
                         fontSize: '12.5px',
                         color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                      }}>
-                        {currentUser.name || 'Team Member'}
-                      </span>
-                      <span style={{
-                        padding: '1px 5px',
-                        borderRadius: '999px',
-                        fontSize: '9.5px',
-                        fontWeight: 700,
-                        background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
-                        color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                        textTransform: 'capitalize',
-                      }}>
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {currentUser.name ? currentUser.name.trim().split(/\s+/)[0] : 'Team Member'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+                      <span
+                        style={{
+                          padding: '1px 5px',
+                          borderRadius: '999px',
+                          fontSize: '9.5px',
+                          fontWeight: 700,
+                          background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
+                          color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          textTransform: 'capitalize',
+                          lineHeight: 1.3,
+                        }}
+                      >
                         {isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')}
                       </span>
-                    </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: 'var(--text-secondary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      marginTop: '1px',
-                    }}>
-                      {currentUser.email}
+                      {currentUser.email && (
+                        <span
+                          title={currentUser.email}
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--text-secondary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            minWidth: 0,
+                          }}
+                        >
+                          {currentUser.email}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

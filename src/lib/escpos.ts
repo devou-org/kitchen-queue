@@ -58,6 +58,7 @@ export interface KotPrintData {
   counterName?: string;
   items: KotPrintItem[];
   notes?: string;
+  isAddOn?: boolean;
 }
 
 /**
@@ -81,7 +82,11 @@ export function buildKotEscposBuffer(data: KotPrintData): Buffer {
 
   addRaw(ESCPOS.TEXT_NORMAL);
   addRaw(ESCPOS.BOLD_ON);
-  addLine('*** KITCHEN ORDER TICKET ***');
+  if (data.isAddOn) {
+    addLine('*** RUNNING KOT (ADD-ON) ***');
+  } else {
+    addLine('*** KITCHEN ORDER TICKET ***');
+  }
   addRaw(ESCPOS.BOLD_OFF);
 
   // 3. Counter Banner (Prominent)

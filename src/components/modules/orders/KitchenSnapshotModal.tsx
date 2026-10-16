@@ -151,6 +151,7 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
 
   return createPortal(
     <div
+      className="kitchen-snapshot-backdrop"
       style={{
         position: 'fixed',
         inset: 0,
@@ -187,6 +188,14 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
         .kitchen-snapshot-row:hover {
           background-color: #F8FAFC !important;
         }
+        @media (max-width: 640px) {
+          .kitchen-snapshot-backdrop {
+            padding: 8px !important;
+          }
+          .kitchen-snapshot-modal-box {
+            max-height: 95vh !important;
+          }
+        }
       `}</style>
 
       {/* Modal Container with exact 8px border radius */}
@@ -217,6 +226,8 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
             justifyContent: 'space-between',
             background: '#FFFFFF',
             flexShrink: 0,
+            flexWrap: 'wrap',
+            gap: '10px',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -515,273 +526,303 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
           </div>
         </div>
 
-        {/* 4. Table Header */}
-        <div
-          style={{
-            padding: '10px 20px',
-            background: '#F8FAFC',
-            borderBottom: '1px solid #E2E8F0',
-            display: 'flex',
-            alignItems: 'center',
-            fontSize: '11px',
-            fontWeight: 700,
-            color: '#64748B',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ flex: 1 }}>Menu Item</div>
-          <div style={{ width: '90px', textAlign: 'center' }}>Pending</div>
-          <div style={{ width: '90px', textAlign: 'center' }}>Preparing</div>
-          <div style={{ width: '100px', textAlign: 'right' }}>Stock Left</div>
-        </div>
-
-        {/* 5. Scrollable Items Content */}
+        {/* 4. Scrollable Table Container */}
         <div
           style={{
             flex: 1,
+            overflowX: 'auto',
             overflowY: 'auto',
-            padding: '8px 20px',
+            WebkitOverflowScrolling: 'touch',
             display: 'flex',
             flexDirection: 'column',
+            minHeight: 0,
           }}
         >
-          {loading && items.length === 0 ? (
+          <div
+            style={{
+              minWidth: '460px',
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+            }}
+          >
+            {/* Sticky Table Header */}
             <div
               style={{
-                padding: '60px',
-                display: 'flex',
-                flexDirection: 'column',
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                padding: '10px 16px',
+                background: '#F8FAFC',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'grid',
+                gridTemplateColumns: 'minmax(140px, 1fr) 75px 80px 85px',
                 alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                color: '#64748B',
-                fontSize: '13px',
-              }}
-            >
-              <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', color: '#94A3B8' }} />
-              <span>Loading kitchen demand...</span>
-            </div>
-          ) : filteredItems.length === 0 ? (
-            <div
-              style={{
-                padding: '50px 20px',
-                textAlign: 'center',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
                 gap: '8px',
+                fontSize: '11px',
+                fontWeight: 700,
                 color: '#64748B',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                flexShrink: 0,
               }}
             >
-              <div
-                style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '8px',
-                  background: '#F1F5F9',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#94A3B8',
-                }}
-              >
-                <UtensilsCrossed size={20} />
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
-                {searchQuery || filterTab !== 'ALL' ? 'No matching demand found' : 'No active kitchen demand'}
-              </div>
-              <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>
-                {searchQuery || filterTab !== 'ALL'
-                  ? 'Try clearing the search or switching filter tabs.'
-                  : 'Active orders in Pending or Preparing state will show here.'}
-              </p>
+              <div>Menu Item</div>
+              <div style={{ textAlign: 'center' }}>Pending</div>
+              <div style={{ textAlign: 'center' }}>Preparing</div>
+              <div style={{ textAlign: 'right' }}>Stock Left</div>
             </div>
-          ) : (
-            filteredItems.map((item, idx) => {
-              const pending = Number(item.pending_qty) || 0;
-              const preparing = Number(item.preparing_qty) || 0;
-              const stock = Number(item.current_stock) || 0;
-              const isLowStock = stock < pending + preparing;
 
-              return (
+            {/* Items Content */}
+            <div
+              style={{
+                padding: '4px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+              }}
+            >
+              {loading && items.length === 0 ? (
                 <div
-                  key={item.product_id || idx}
-                  className="kitchen-snapshot-row"
                   style={{
+                    padding: '60px',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    padding: '10px 8px',
-                    borderBottom: '1px solid #F1F5F9',
-                    borderRadius: '8px',
-                    transition: 'background-color 0.15s ease',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    color: '#64748B',
+                    fontSize: '13px',
                   }}
                 >
-                  {/* Dish Info */}
+                  <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', color: '#94A3B8' }} />
+                  <span>Loading kitchen demand...</span>
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div
+                  style={{
+                    padding: '50px 20px',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    color: '#64748B',
+                  }}
+                >
                   <div
                     style={{
-                      flex: 1,
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '8px',
+                      background: '#F1F5F9',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px',
-                      minWidth: 0,
-                      paddingRight: '12px',
+                      justifyContent: 'center',
+                      color: '#94A3B8',
                     }}
                   >
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.product_name}
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: '8px',
-                          objectFit: 'cover',
-                          background: '#F1F5F9',
-                          flexShrink: 0,
-                          border: '1px solid #E2E8F0',
-                        }}
-                      />
-                    ) : (
+                    <UtensilsCrossed size={20} />
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A' }}>
+                    {searchQuery || filterTab !== 'ALL' ? 'No matching demand found' : 'No active kitchen demand'}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>
+                    {searchQuery || filterTab !== 'ALL'
+                      ? 'Try clearing the search or switching filter tabs.'
+                      : 'Active orders in Pending or Preparing state will show here.'}
+                  </p>
+                </div>
+              ) : (
+                filteredItems.map((item, idx) => {
+                  const pending = Number(item.pending_qty) || 0;
+                  const preparing = Number(item.preparing_qty) || 0;
+                  const stock = Number(item.current_stock) || 0;
+                  const isLowStock = stock < pending + preparing;
+
+                  return (
+                    <div
+                      key={item.product_id || idx}
+                      className="kitchen-snapshot-row"
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(140px, 1fr) 75px 80px 85px',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 0',
+                        borderBottom: '1px solid #F1F5F9',
+                        borderRadius: '6px',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                    >
+                      {/* Dish Info */}
                       <div
                         style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: '8px',
-                          background: '#F1F5F9',
-                          border: '1px solid #E2E8F0',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#64748B',
-                          flexShrink: 0,
+                          gap: '12px',
+                          minWidth: 0,
+                          paddingRight: '8px',
                         }}
                       >
-                        <UtensilsCrossed size={16} />
-                      </div>
-                    )}
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.product_name}
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: '8px',
+                              objectFit: 'cover',
+                              background: '#F1F5F9',
+                              flexShrink: 0,
+                              border: '1px solid #E2E8F0',
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: '8px',
+                              background: '#F1F5F9',
+                              border: '1px solid #E2E8F0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#64748B',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <UtensilsCrossed size={16} />
+                          </div>
+                        )}
 
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: '13.5px',
-                          fontWeight: 700,
-                          color: '#0F172A',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {item.product_name}
-                      </div>
-                      {item.category && (
-                        <div
-                          style={{
-                            fontSize: '11px',
-                            color: '#64748B',
-                            marginTop: '1px',
-                          }}
-                        >
-                          {item.category}
+                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              fontSize: '13.5px',
+                              fontWeight: 700,
+                              color: '#0F172A',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {item.product_name}
+                          </div>
+                          {item.category && (
+                            <div
+                              style={{
+                                fontSize: '11px',
+                                color: '#64748B',
+                                marginTop: '1px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {item.category}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
+
+                      {/* Pending Column */}
+                      <div style={{ textAlign: 'center' }}>
+                        {pending > 0 ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minWidth: '30px',
+                              padding: '3px 8px',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              fontWeight: 800,
+                              background: '#FEF3C7',
+                              color: '#B45309',
+                              border: '1px solid #FDE68A',
+                            }}
+                          >
+                            {pending}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '13px', color: '#CBD5E1', fontWeight: 600 }}>0</span>
+                        )}
+                      </div>
+
+                      {/* Preparing Column */}
+                      <div style={{ textAlign: 'center' }}>
+                        {preparing > 0 ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minWidth: '30px',
+                              padding: '3px 8px',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              fontWeight: 800,
+                              background: '#DBEAFE',
+                              color: '#1D4ED8',
+                              border: '1px solid #BFDBFE',
+                            }}
+                          >
+                            {preparing}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '13px', color: '#CBD5E1', fontWeight: 600 }}>0</span>
+                        )}
+                      </div>
+
+                      {/* Stock Left Column */}
+                      <div style={{ textAlign: 'right' }}>
+                        {isLowStock ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              padding: '3px 8px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              background: '#FEE2E2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA',
+                            }}
+                          >
+                            <AlertTriangle size={11} />
+                            <span>{stock}</span>
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '3px 8px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              background: '#F1F5F9',
+                              color: '#334155',
+                              border: '1px solid #E2E8F0',
+                            }}
+                          >
+                            {stock}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Pending Column */}
-                  <div style={{ width: '90px', textAlign: 'center' }}>
-                    {pending > 0 ? (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          minWidth: '32px',
-                          padding: '3px 8px',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: 800,
-                          background: '#FEF3C7',
-                          color: '#B45309',
-                          border: '1px solid #FDE68A',
-                        }}
-                      >
-                        {pending}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '13px', color: '#CBD5E1', fontWeight: 600 }}>0</span>
-                    )}
-                  </div>
-
-                  {/* Preparing Column */}
-                  <div style={{ width: '90px', textAlign: 'center' }}>
-                    {preparing > 0 ? (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          minWidth: '32px',
-                          padding: '3px 8px',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: 800,
-                          background: '#DBEAFE',
-                          color: '#1D4ED8',
-                          border: '1px solid #BFDBFE',
-                        }}
-                      >
-                        {preparing}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '13px', color: '#CBD5E1', fontWeight: 600 }}>0</span>
-                    )}
-                  </div>
-
-                  {/* Stock Left Column */}
-                  <div style={{ width: '100px', textAlign: 'right' }}>
-                    {isLowStock ? (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          padding: '3px 8px',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          background: '#FEE2E2',
-                          color: '#DC2626',
-                          border: '1px solid #FECACA',
-                        }}
-                      >
-                        <AlertTriangle size={11} />
-                        <span>{stock}</span>
-                      </span>
-                    ) : (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '3px 8px',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          background: '#F1F5F9',
-                          color: '#334155',
-                          border: '1px solid #E2E8F0',
-                        }}
-                      >
-                        {stock}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
 
         {/* 6. Footer */}

@@ -101,7 +101,7 @@ export default function RestaurantDetails() {
   const [address, setAddress] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#971345');
-  const [secondaryColor, setSecondaryColor] = useState('#EC7951');
+  const [secondaryColor, setSecondaryColor] = useState('#ffffff');
   const [menuLayout, setMenuLayout] = useState<'LIST' | 'GRID'>('LIST');
   const [menuTitle, setMenuTitle] = useState("Today's Specials");
   const [menuDescription, setMenuDescription] = useState("Hand-curated coastal delicacies prepared with traditional recipes.");
@@ -140,7 +140,7 @@ export default function RestaurantDetails() {
         setAddress(r.address || '');
         setLogoUrl(r.logo_url || '');
         setPrimaryColor(r.primary_color || '#971345');
-        setSecondaryColor(r.secondary_color || '#EC7951');
+        setSecondaryColor(r.secondary_color || '#ffffff');
         setMenuLayout((r as any).menu_layout || 'LIST');
         setMenuTitle(r.menu_title || "Today's Specials");
         setMenuDescription(r.menu_description || "Hand-curated coastal delicacies prepared with traditional recipes.");

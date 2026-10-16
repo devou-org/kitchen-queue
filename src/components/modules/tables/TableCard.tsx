@@ -1,11 +1,12 @@
 import React from 'react';
-import { Users, QrCode, Trash2, ShoppingBag, Edit2 } from 'lucide-react';
+import { Users, QrCode, Trash2, ShoppingBag, Edit2, Utensils } from 'lucide-react';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
 import { formatPrice } from '@/lib/format';
 
 interface TableCardProps {
   table: RestaurantTable;
-  onSelect?: (table: RestaurantTable) => void;
+  onSelect?: (table: RestaurantTable, order?: any) => void;
+  onTakeOrder?: (table: RestaurantTable) => void;
   onViewQR: (table: RestaurantTable) => void;
   onEdit: (table: RestaurantTable) => void;
   onDelete: (table: RestaurantTable) => void;
@@ -17,13 +18,15 @@ function TableVisualDiagram({
   seatedGuests,
   isOccupied,
   tableNumber,
-  primaryColor
+  primaryColor,
+  onTakeOrder,
 }: {
   capacity: number;
   seatedGuests: number;
   isOccupied: boolean;
   tableNumber: string;
   primaryColor: string;
+  onTakeOrder?: () => void;
 }) {
   let leftCount = 0;
   let rightCount = 0;
@@ -100,14 +103,54 @@ function TableVisualDiagram({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '0 16px',
+            padding: '0 8px',
             position: 'relative',
             boxShadow: isOccupied
               ? '0 4px 12px rgba(234, 179, 8, 0.12)'
               : '0 2px 6px rgba(0, 0, 0, 0.03)',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
           }}
-        />
+        >
+          {onTakeOrder && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTakeOrder();
+              }}
+              title={`Take POS Order for Table #${tableNumber}`}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                background: '#FFFFFF',
+                border: `2px solid ${primaryColor}`,
+                color: primaryColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                zIndex: 2,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.14)';
+                e.currentTarget.style.background = primaryColor;
+                e.currentTarget.style.color = '#FFFFFF';
+                e.currentTarget.style.boxShadow = `0 4px 14px ${primaryColor}45`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.background = '#FFFFFF';
+                e.currentTarget.style.color = primaryColor;
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
+              }}
+            >
+              <Utensils size={17} />
+            </button>
+          )}
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '8px', alignItems: 'center' }}>
           {rightChairs.map((occ, idx) => (
@@ -125,7 +168,15 @@ function TableVisualDiagram({
   );
 }
 
-export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primaryColor = '#059669' }: TableCardProps) {
+export function TableCard({
+  table,
+  onSelect,
+  onTakeOrder,
+  onViewQR,
+  onEdit,
+  onDelete,
+  primaryColor = '#059669',
+}: TableCardProps) {
   const isOccupied = table.status === 'OCCUPIED';
   const activeOrders = table.active_orders || [];
 
@@ -137,42 +188,17 @@ export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primary
 
   return (
     <div
-      onClick={() => onSelect?.(table)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect?.(table);
-        }
-      }}
       style={{
         background: '#FFFFFF',
         borderRadius: '8px',
-        border: '1px solid #F1F5F9',
+        border: '1px solid #E2E8F0',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
         padding: '18px',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         position: 'relative',
         overflow: 'hidden',
-        cursor: onSelect ? 'pointer' : 'default',
-      }}
-      onMouseEnter={(e) => {
-        if (onSelect) {
-          e.currentTarget.style.borderColor = `${primaryColor}60`;
-          e.currentTarget.style.boxShadow = `0 6px 20px rgba(0, 0, 0, 0.08)`;
-          e.currentTarget.style.transform = 'translateY(-2px)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onSelect) {
-          e.currentTarget.style.borderColor = '#F1F5F9';
-          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -255,6 +281,7 @@ export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primary
         isOccupied={isOccupied}
         tableNumber={table.table_number}
         primaryColor={primaryColor}
+        onTakeOrder={onTakeOrder ? () => onTakeOrder(table) : undefined}
       />
 
       {/* Plain Text Capacity & Free Seats Display */}
@@ -278,7 +305,30 @@ export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primary
       </div>
 
       {isOccupied ? (
-        <div style={{ background: '#FFFBEB', padding: '10px 12px', borderRadius: '8px', border: '1px solid #FEF08A' }}>
+        <div
+          onClick={() => onSelect?.(table, activeOrders[0])}
+          style={{
+            background: '#FFFBEB',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            border: '1px solid #FEF08A',
+            cursor: onSelect ? 'pointer' : 'default',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            if (onSelect) {
+              e.currentTarget.style.borderColor = '#F59E0B';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(245, 158, 11, 0.15)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (onSelect) {
+              e.currentTarget.style.borderColor = '#FEF08A';
+              e.currentTarget.style.boxShadow = 'none';
+            }
+          }}
+          title="Click to view table order details"
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '11px', fontWeight: 800, color: '#854D0E', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <ShoppingBag size={13} /> Active Orders ({activeOrders.length})
@@ -294,8 +344,13 @@ export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primary
                 const ticketNum = String(o.ticket_number || '').padStart(3, '0');
                 const status = o.status || 'PENDING';
                 return (
-                  <div
+                  <button
                     key={o.id || idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect?.(table, o);
+                    }}
                     style={{
                       background: '#FFFFFF',
                       border: '1px solid #FEF08A',
@@ -306,19 +361,63 @@ export function TableCard({ table, onSelect, onViewQR, onEdit, onDelete, primary
                       color: '#854D0E',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#EAB308';
+                      e.currentTarget.style.background = '#FEF9C3';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#FEF08A';
+                      e.currentTarget.style.background = '#FFFFFF';
+                    }}
+                    title={`Click to view Order #${ticketNum}`}
                   >
                     #{ticketNum} ({status})
-                  </div>
+                  </button>
                 );
               })}
             </div>
           )}
         </div>
       ) : (
-        <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: '8px', border: '1px solid #F1F5F9', color: '#94A3B8', fontSize: '12px', textAlign: 'center' }}>
-          No active orders. Ready for guests.
+        <div
+          onClick={() => onTakeOrder?.(table)}
+          style={{
+            background: '#F8FAFC',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            border: '1px dashed #CBD5E1',
+            color: '#64748B',
+            fontSize: '12px',
+            textAlign: 'center',
+            cursor: onTakeOrder ? 'pointer' : 'default',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            if (onTakeOrder) {
+              e.currentTarget.style.borderColor = primaryColor;
+              e.currentTarget.style.color = primaryColor;
+              e.currentTarget.style.background = '#FFFFFF';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (onTakeOrder) {
+              e.currentTarget.style.borderColor = '#CBD5E1';
+              e.currentTarget.style.color = '#64748B';
+              e.currentTarget.style.background = '#F8FAFC';
+            }
+          }}
+          title={`Click to take order for Table #${table.table_number}`}
+        >
+          <Utensils size={13} color={primaryColor} />
+          <span>Available • Click to take order</span>
         </div>
       )}
     </div>

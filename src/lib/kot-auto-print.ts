@@ -15,22 +15,44 @@ import sql, { getOrderById, getRestaurantById, getCounters, createPrintJob } fro
 import { buildKotEscposBuffer, KotPrintData, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
 import { pusherServer } from '@/lib/pusher';
 
-export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: string, forceBroadcast: boolean = false) {
+export interface AutoKotOptions {
+  forceBroadcast?: boolean;
+  isAddOn?: boolean;
+  overrideItems?: { product_name: string; counter?: string; quantity: number; notes?: string }[];
+}
+
+export async function autoQueueAndBroadcastKot(
+  restaurantId: string, 
+  orderId: string, 
+  optionsOrForce: boolean | AutoKotOptions = false
+) {
   try {
+    const options: AutoKotOptions = typeof optionsOrForce === 'boolean'
+      ? { forceBroadcast: optionsOrForce }
+      : (optionsOrForce || {});
+
     const order = await getOrderById(restaurantId, orderId);
     if (!order) return;
 
-    // Only auto-print orders when in PREPARING state (never in PENDING state)
-    if (order.status !== 'PREPARING') {
+    // Determine which items to print:
+    let allItems: any[] = [];
+    if (options.overrideItems && options.overrideItems.length > 0) {
+      allItems = options.overrideItems.filter((i: any) => (i.quantity || 0) > 0);
+    } else {
+      allItems = (order.items || []).filter((i: any) => (i.quantity || 0) > 0);
+    }
+
+    // Only print if there are items to print!
+    if (allItems.length === 0) return;
+
+    // For normal initial orders (not add-on), only auto-print when in PREPARING
+    if (!options.isAddOn && order.status !== 'PREPARING' && !options.forceBroadcast) {
       console.log(`ℹ️ Order #${order.ticket_number} is in "${order.status}" status (not PREPARING). Skipping automatic print.`);
       return;
     }
 
-    const allItems = (order.items || []).filter((i: any) => (i.quantity || 0) > 0);
-    if (allItems.length === 0) return;
-
     // Check if KOT jobs for this order were already queued to prevent duplicate prints
-    if (!forceBroadcast) {
+    if (!options.forceBroadcast && !options.isAddOn) {
       try {
         const existingJobs = await sql`
           SELECT id FROM print_jobs 
@@ -50,7 +72,7 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
     // Group items by counter
     const counterMap: Record<string, any[]> = {};
     for (const item of allItems) {
-      const c = (item.counter || 'Unassigned').trim();
+      const c = (item.counter || 'Kitchen').trim();
       if (!counterMap[c]) counterMap[c] = [];
       counterMap[c].push(item);
     }
@@ -71,8 +93,10 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
 
     const isWindows = process.platform === 'win32';
 
-    // Process each counter slip
+    // Process each counter slip that has items
     for (const [cName, cItems] of Object.entries(counterMap)) {
+      if (!cItems || cItems.length === 0) continue;
+
       const conf = counterPrinterMap[cName.trim().toLowerCase()] || {
         id: undefined,
         printerName: 'POS-80C',
@@ -87,26 +111,29 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
         customerName: order.customer_name,
         phone: order.phone,
         staffName: order.staff_name,
-        createdAt: order.created_at || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         counterName: cName,
         items: cItems,
         notes: order.notes,
+        isAddOn: Boolean(options.isAddOn),
       };
 
       const buffer = buildKotEscposBuffer(kotData);
       const base64Bytes = buffer.toString('base64');
 
-      // 1. Queue into database print_jobs (for Windows PC / Cloud Print Agent)
       // 1. Direct hardware print if running on Windows (Cashier / Counter PC)
       if (isWindows) {
         try {
+          const slipTitle = options.isAddOn
+            ? `RUNNING KOT #${order.ticket_number} - ${cName} (ADD-ON)`
+            : `KOT #${order.ticket_number} - ${cName}`;
           const winRes = await sendRawPrintToWindowsPrinter(
             conf.printerName,
             buffer,
-            `KOT #${order.ticket_number} - ${cName}`
+            slipTitle
           );
           if (winRes.success) {
-            console.log(`🖨️ [Windows] Printed KOT #${order.ticket_number} [${cName}] to "${conf.printerName}"`);
+            console.log(`🖨️ [Windows] Printed ${slipTitle} to "${conf.printerName}"`);
           } else {
             console.warn(`⚠️ [Windows] Print failed for ${cName} on "${conf.printerName}": ${winRes.error}`);
           }
@@ -115,7 +142,7 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
         }
       }
 
-      // 2. Queue into database print_jobs (for Windows PC / Cloud Print Agent)
+      // 2. Queue into database print_jobs
       await createPrintJob(restaurantId, {
         order_id: order.id,
         ticket_number: Number(order.ticket_number) || undefined,
@@ -124,7 +151,6 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
         raw_base64: base64Bytes,
       });
 
-      // 2. Broadcast realtime Pusher event for Android Phones / Tablets
       // 3. Broadcast realtime Pusher event for Android Phones / Tablets / Browser
       try {
         await pusherServer.trigger(`queue-channel-${restaurantId}`, 'kot_auto_print', {
@@ -135,6 +161,7 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
           printer_name: conf.printerName,
           printer_type: conf.printerType,
           printer_address: conf.printerAddress,
+          is_add_on: Boolean(options.isAddOn),
           kotData,
           base64Bytes,
           itemCount: cItems.length,
@@ -145,7 +172,8 @@ export async function autoQueueAndBroadcastKot(restaurantId: string, orderId: st
       }
     }
 
-    console.log(`🖨️ Auto-queued KOT print slips for Order #${order.ticket_number} across ${Object.keys(counterMap).length} counter(s)`);
+    const mode = options.isAddOn ? 'Add-on KOT' : 'KOT';
+    console.log(`🖨️ Auto-queued ${mode} print slips for Order #${order.ticket_number} across ${Object.keys(counterMap).length} counter(s)`);
   } catch (err) {
     console.error('autoQueueAndBroadcastKot error:', err);
   }

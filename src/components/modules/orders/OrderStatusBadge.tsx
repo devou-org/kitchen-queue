@@ -33,13 +33,36 @@ export function getOrderStatusConfig(status?: string) {
         label: 'Ready',
       };
     case 'SERVED':
+      return {
+        bg: '#f5f3ff',
+        color: '#6d28d9',
+        border: '#ddd6fe',
+        dot: '#8b5cf6',
+        label: 'Served',
+      };
+    case 'CLOSED':
+      return {
+        bg: '#f1f5f9',
+        color: '#334155',
+        border: '#cbd5e1',
+        dot: '#64748b',
+        label: 'Closed',
+      };
+    case 'PAID':
+      return {
+        bg: '#f1f5f9',
+        color: '#334155',
+        border: '#cbd5e1',
+        dot: '#64748b',
+        label: 'Closed',
+      };
     case 'COMPLETED':
       return {
         bg: '#f8fafc',
         color: '#475569',
         border: '#e2e8f0',
         dot: '#94a3b8',
-        label: normalized === 'SERVED' ? 'Served' : 'Completed',
+        label: 'Completed',
       };
     case 'CANCELLED':
       return {

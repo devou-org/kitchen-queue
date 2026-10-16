@@ -57,11 +57,11 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
 
   const fetchCategories = async () => {
     try {
-      const currentSlug = (Array.isArray(slug) ? slug[0] : (slug || '')) as string;
-      const res = await fetch('/api/categories', {
+      const currentSlug = (Array.isArray(slug) ? slug[0] : (slug || '')).replace(/[\[\]'"]/g, '').trim();
+      const res = await fetch(`/api/categories?slug=${encodeURIComponent(currentSlug)}`, {
         headers: {
           'x-restaurant-slug': currentSlug,
-          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || ''}`
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`
         },
         cache: 'no-store'
       });
@@ -76,9 +76,10 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
 
   const fetchCounters = async () => {
     try {
+      const currentSlug = (Array.isArray(slug) ? slug[0] : (slug || '')).replace(/[\[\]'"]/g, '').trim();
       const res = await fetch('/api/counters', {
         headers: {
-          'x-restaurant-slug': (Array.isArray(slug) ? slug[0] : (slug || '')) as string,
+          'x-restaurant-slug': currentSlug,
           'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || ''}`
         }
       });
@@ -102,23 +103,24 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
 
     setAddingCategory(true);
     try {
-      const res = await fetch('/api/categories', {
+      const currentSlug = (Array.isArray(slug) ? slug[0] : (slug || '')).replace(/[\[\]'"]/g, '').trim();
+      const res = await fetch(`/api/categories?slug=${encodeURIComponent(currentSlug)}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token')}`,
-          'x-restaurant-slug': slug as string
+          'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token') || ''}`,
+          'x-restaurant-slug': currentSlug
         },
-        body: JSON.stringify({ name: newCategoryName.trim() }),
+        body: JSON.stringify({ name: trimmed }),
         cache: 'no-store'
       });
       const data = await res.json();
       if (data.success) {
-        setCategories(prev => [...prev, data.data].sort((a,b) => a.name.localeCompare(b.name)));
-        setForm(f => ({ ...f, category: data.data.name }));
+        await fetchCategories();
+        setForm(f => ({ ...f, category: data.data?.name || trimmed }));
         setNewCategoryName('');
         setShowAddCategory(false);
-        toast.success('Category added');
+        toast.success(`Category "${trimmed}" added`);
       } else {
         toast.error(data.error || 'Failed to add category');
       }
@@ -302,10 +304,10 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           )}
           <div>
             <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-              {isEditing ? `Edit Product: ${initialData.name}` : 'Add New Product'}
+              {isEditing ? `Edit Item: ${initialData.name}` : 'Add New Item'}
             </h1>
             <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
-              Configure product information, pricing, dietary preference, and stock inventory.
+              Configure item information, pricing, dietary preference, and stock inventory.
             </p>
           </div>
         </div>
@@ -347,7 +349,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             }}
           >
             {loading ? <div className="loader" style={{ width: 16, height: 16, borderWidth: 2 }} /> : <Check size={16} />}
-            {isEditing ? 'Update Product' : 'Save Product'}
+            {isEditing ? 'Update Item' : 'Save Item'}
           </button>
 
           {isModal && (
@@ -393,7 +395,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                Product Name <span style={{ color: '#ef4444' }}>*</span>
+                Item Name <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <input
                 type="text"
@@ -454,7 +456,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 }}
               >
                 <option value="">Select a Category</option>
-                {form.category && !categories.find(c => c.name === form.category) && (
+                {form.category && !categories.some(c => c.name.trim().toLowerCase() === form.category.trim().toLowerCase()) && (
                   <option value={form.category}>{form.category}</option>
                 )}
                 {categories.map(cat => (
@@ -820,8 +822,11 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
 
   <CategoryReorderModal
     isOpen={reorderModalOpen}
-    onClose={() => setReorderModalOpen(false)}
-    slug={(Array.isArray(slug) ? slug[0] : (slug || '')) as string}
+    onClose={() => {
+      setReorderModalOpen(false);
+      fetchCategories();
+    }}
+    slug={(Array.isArray(slug) ? slug[0] : (slug || '')).replace(/[\[\]'"]/g, '').trim()}
     onReordered={fetchCategories}
   />
   </>
