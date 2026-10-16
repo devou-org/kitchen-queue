@@ -3959,7 +3959,12 @@ export async function getLoyaltyCustomersList(
         FROM customer_loyalty cl
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
-          AND (LOWER(u.name) LIKE ${searchPattern} OR LOWER(u.phone) LIKE ${searchPattern})
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
         LIMIT ${safeLimit} OFFSET ${offset}
       `;

@@ -802,7 +802,6 @@ export function POSCheckoutDrawer({
                         <div
                           style={{
                             fontSize: '13px',
-                            fontWeight: 600,
                             color: '#0F172A',
                             lineHeight: 1.35,
                             wordBreak: 'break-word',
@@ -956,7 +955,6 @@ export function POSCheckoutDrawer({
                   ))}
                 </div>
               )}
-
               {/* Kitchen Notes placed directly under order items */}
               <div style={{ marginTop: '2px', borderTop: '1px solid #E2E8F0', paddingTop: '10px' }}>
                 <label
@@ -990,27 +988,36 @@ export function POSCheckoutDrawer({
               </div>
             </div>
 
-            {/* Section B: Order Type Selection */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: '#64748B',
-                  marginBottom: '6px',
-                }}
-              >
-                Order Type
-              </label>
-              <OrderTypeSelector
-                value={(orderForm.order_type as OrderType) || 'DINE_IN'}
-                onChange={(val) => setOrderForm((prev) => ({ ...prev, order_type: val }))}
-                hideLabel
-              />
-            </div>
+            {!isTableDirected && (
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: '#64748B',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Order Type
+                </label>
+                <OrderTypeSelector
+                  value={(orderForm.order_type as OrderType) || 'DINE_IN'}
+                  onChange={(val) => {
+                    const isTakeaway = val === 'TAKEAWAY';
+                    setOrderForm((prev) => ({
+                      ...prev,
+                      order_type: val,
+                      is_paid: isTakeaway ? true : false,
+                      payment_method: isTakeaway ? (prev.payment_method || 'UPI') : prev.payment_method,
+                    }));
+                  }}
+                  hideLabel
+                />
+              </div>
+            )}
 
             {/* Section C: Table and Persons with CustomSelect (CRITICAL) */}
             {orderForm.order_type !== 'TAKEAWAY' && (
