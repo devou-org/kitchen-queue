@@ -802,7 +802,7 @@ export function POSCheckoutDrawer({
                         <div
                           style={{
                             fontSize: '13px',
-                            fontWeight: 600,
+                            color: '#0F172A',
                             lineHeight: 1.35,
                             wordBreak: 'break-word',
                             flex: 1,
@@ -865,7 +865,16 @@ export function POSCheckoutDrawer({
                         }}
                       >
                         <div style={{ fontSize: '11px', color: '#64748B' }}>
-                          {formatPrice(item.price)} each
+                          {item.is_free_reward ? (
+                            <span>
+                              <span style={{ textDecoration: 'line-through', color: '#94A3B8', marginRight: '4px' }}>
+                                {formatPrice(item.original_price || 0)}
+                              </span>
+                              <strong style={{ color: '#16A34A' }}>₹0.00 (Free Reward)</strong>
+                            </span>
+                          ) : (
+                            `${formatPrice(item.price)} each`
+                          )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -946,7 +955,6 @@ export function POSCheckoutDrawer({
                   ))}
                 </div>
               )}
-
               {/* Kitchen Notes placed directly under order items */}
               <div style={{ marginTop: '2px', borderTop: '1px solid #E2E8F0', paddingTop: '10px' }}>
                 <label
