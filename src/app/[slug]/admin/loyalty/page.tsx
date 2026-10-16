@@ -13,6 +13,8 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { CustomMultiSelect } from '@/components/ui/CustomSelect';
+import { Pagination } from '@/components/ui/Pagination';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 type CustomerLoyalty = {
   id: string;
@@ -93,10 +95,23 @@ export default function AdminLoyaltyPage() {
   // Customer Directory State
   const [customers, setCustomers] = useState<CustomerLoyalty[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState('');
+  const [customerPage, setCustomerPage] = useState<number>(1);
+  const [customerPagination, setCustomerPagination] = useState<{
+    totalPages: number;
+    totalRecords: number;
+  }>({ totalPages: 1, totalRecords: 0 });
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerLoyalty | null>(null);
   const [adjustPointsDelta, setAdjustPointsDelta] = useState<number>(0);
   const [adjustReason, setAdjustReason] = useState<string>('');
   const [isAdjusting, setIsAdjusting] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearch);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [customerSearch]);
 
   // Program Settings State
   const [settings, setSettings] = useState<LoyaltySettings>({
@@ -119,6 +134,11 @@ export default function AdminLoyaltyPage() {
 
   // Rewards Catalog State
   const [rewards, setRewards] = useState<LoyaltyReward[]>([]);
+  const [rewardsPage, setRewardsPage] = useState<number>(1);
+  const [rewardsPagination, setRewardsPagination] = useState<{
+    totalPages: number;
+    totalRecords: number;
+  }>({ totalPages: 1, totalRecords: 0 });
   const [productsList, setProductsList] = useState<ProductOption[]>([]);
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [editingReward, setEditingReward] = useState<LoyaltyReward | null>(null);
@@ -135,6 +155,11 @@ export default function AdminLoyaltyPage() {
   // Transactions Log State & Segmented Filter Switcher
   const [transactions, setTransactions] = useState<LoyaltyTransaction[]>([]);
   const [txTypeFilter, setTxTypeFilter] = useState<string>('ALL');
+  const [txPage, setTxPage] = useState<number>(1);
+  const [txPagination, setTxPagination] = useState<{
+    totalPages: number;
+    totalRecords: number;
+  }>({ totalPages: 1, totalRecords: 0 });
 
 
 
@@ -165,18 +190,30 @@ export default function AdminLoyaltyPage() {
         });
       }
 
-      // Fetch customers
-      const customersRes = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(customerSearch)}`);
+      // Fetch customers with API-level pagination (50 records per page)
+      const customersRes = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(debouncedCustomerSearch)}&page=${customerPage}&limit=50`);
       const customersJson = await customersRes.json();
       if (customersJson.success) {
         setCustomers(customersJson.data || []);
+        if (customersJson.pagination) {
+          setCustomerPagination({
+            totalPages: customersJson.pagination.totalPages || 1,
+            totalRecords: customersJson.pagination.totalRecords || (customersJson.data?.length || 0),
+          });
+        }
       }
 
-      // Fetch rewards catalog
-      const rewardsRes = await fetch(`/api/admin/loyalty/rewards?slug=${slugStr}`);
+      // Fetch rewards catalog with API-level pagination
+      const rewardsRes = await fetch(`/api/admin/loyalty/rewards?slug=${slugStr}&page=${rewardsPage}&limit=50`);
       const rewardsJson = await rewardsRes.json();
       if (rewardsJson.success) {
         setRewards(rewardsJson.data || []);
+        if (rewardsJson.pagination) {
+          setRewardsPagination({
+            totalPages: rewardsJson.pagination.totalPages || 1,
+            totalRecords: rewardsJson.pagination.totalRecords || (rewardsJson.data?.length || 0),
+          });
+        }
       }
 
       // Fetch products list for reward product picker
@@ -187,11 +224,17 @@ export default function AdminLoyaltyPage() {
         setProductsList(pArr.map((p: any) => ({ id: p.id, name: p.name, price: Number(p.price || 0) })));
       }
 
-      // Fetch transactions audit log
-      const txRes = await fetch(`/api/admin/loyalty/transactions?slug=${slugStr}`);
+      // Fetch transactions audit log with API-level pagination and filter
+      const txRes = await fetch(`/api/admin/loyalty/transactions?slug=${slugStr}&page=${txPage}&limit=50&type=${encodeURIComponent(txTypeFilter)}`);
       const txJson = await txRes.json();
       if (txJson.success) {
         setTransactions(txJson.data || []);
+        if (txJson.pagination) {
+          setTxPagination({
+            totalPages: txJson.pagination.totalPages || 1,
+            totalRecords: txJson.pagination.totalRecords || (txJson.data?.length || 0),
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load loyalty data:', err);
@@ -199,7 +242,7 @@ export default function AdminLoyaltyPage() {
     } finally {
       setLoading(false);
     }
-  }, [slugStr, customerSearch]);
+  }, [slugStr, debouncedCustomerSearch, customerPage, txPage, txTypeFilter, rewardsPage]);
 
   useEffect(() => {
     fetchData();
@@ -638,8 +681,8 @@ export default function AdminLoyaltyPage() {
                 >
                   <Users size={15} style={{ marginRight: '6px' }} />
                   <span>Customers</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
-                    {customers.length}
+                  <span className="loyalty-badge" style={{ background: activeTab === 'customers' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'customers' ? 'var(--primary, #971345)' : '#64748b' }}>
+                    {customerPagination.totalRecords || customers.length}
                   </span>
                 </button>
 
@@ -659,8 +702,8 @@ export default function AdminLoyaltyPage() {
                 >
                   <Gift size={15} style={{ marginRight: '6px' }} />
                   <span>Rewards</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
-                    {rewards.length}
+                  <span className="loyalty-badge" style={{ background: activeTab === 'rewards' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'rewards' ? 'var(--primary, #971345)' : '#64748b' }}>
+                    {rewardsPagination.totalRecords || rewards.length}
                   </span>
                 </button>
 
@@ -671,8 +714,8 @@ export default function AdminLoyaltyPage() {
                 >
                   <History size={15} style={{ marginRight: '6px' }} />
                   <span>Audit Log</span>
-                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'rgba(151, 19, 69, 0.12)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
-                    {transactions.length}
+                  <span className="loyalty-badge" style={{ background: activeTab === 'transactions' ? 'color-mix(in srgb, var(--primary, #971345) 15%, transparent)' : '#f1f5f9', color: activeTab === 'transactions' ? 'var(--primary, #971345)' : '#64748b' }}>
+                    {txPagination.totalRecords || transactions.length}
                   </span>
                 </button>
               </div>
@@ -781,39 +824,44 @@ export default function AdminLoyaltyPage() {
 
       <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
 
-        {/* TAB 1: CUSTOMERS DIRECTORY */}
-        {activeTab === 'customers' && (
-          <div style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border, #e2e8f0)', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                <input
-                  type="text"
-                  placeholder="Search by name or phone number..."
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px 9px 36px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '13px',
-                    outline: 'none',
+      {/* TAB 1: CUSTOMERS DIRECTORY */}
+      {activeTab === 'customers' && (
+        <div className="loyalty-card-box">
+          <div className="loyalty-cust-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+            <div className="loyalty-search-wrapper">
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search by name or phone..."
+                value={customerSearch}
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value);
+                  setCustomerPage(1);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px 9px 36px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  outline: 'none',
+                }}
+              />
+              {customerSearch && (
+                <button
+                  onClick={() => {
+                    setCustomerSearch('');
+                    setCustomerPage(1);
                   }}
-                />
-                {customerSearch && (
-                  <button
-                    onClick={() => setCustomerSearch('')}
-                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
+                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
 
-              <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
-                Showing <strong>{customers.length}</strong> customer profile(s)
-              </div>
+            <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
+              Showing <strong>{customers.length}</strong> {customerPagination.totalRecords > 0 ? `of ${customerPagination.totalRecords} ` : ''}customer profile(s)
             </div>
 
             {/* Desktop Table View */}
@@ -951,7 +999,21 @@ export default function AdminLoyaltyPage() {
               ))}
             </div>
           </div>
-        )}
+
+          {/* Pagination Controls for Customers Directory */}
+          {customerPagination.totalRecords > 50 && (
+            <div style={{ marginTop: '16px' }}>
+              <Pagination
+                currentPage={customerPage}
+                totalPages={customerPagination.totalPages}
+                totalRecords={customerPagination.totalRecords}
+                pageSize={50}
+                onPageChange={(page) => setCustomerPage(page)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
         {/* TAB 2: PROGRAM SETTINGS */}
         {activeTab === 'settings' && (
@@ -1434,9 +1496,88 @@ export default function AdminLoyaltyPage() {
                       {t.icon}
                       <span>{t.label}</span>
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Pagination Controls for Rewards Catalog */}
+          {rewardsPagination.totalRecords > 50 && (
+            <div style={{ marginTop: '16px' }}>
+              <Pagination
+                currentPage={rewardsPage}
+                totalPages={rewardsPagination.totalPages}
+                totalRecords={rewardsPagination.totalRecords}
+                pageSize={50}
+                onPageChange={(page) => setRewardsPage(page)}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: TRANSACTIONS AUDIT LOG */}
+      {activeTab === 'transactions' && (
+        <div className="loyalty-card-box">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Transaction Audit Log</h3>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>Detailed audit trail of all points earned, redeemed, and adjusted.</p>
+            </div>
+
+            {/* Segmented Control Switcher UI matching Analytics graph switcher */}
+            <div
+              className="analytics-metric-switcher"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                backgroundColor: '#F1F5F9',
+                padding: '4px',
+                borderRadius: '8px',
+                overflowX: 'auto',
+                maxWidth: '100%',
+              }}
+            >
+              {[
+                { key: 'ALL', label: 'All Transactions', icon: <History size={14} /> },
+                { key: 'EARN_POINTS', label: 'Points Earned', icon: <TrendingUp size={14} /> },
+                { key: 'REDEEM_POINTS', label: 'Points Redeemed', icon: <Gift size={14} /> },
+                { key: 'MANUAL_ADJUSTMENT', label: 'Manual Adjustment', icon: <Settings size={14} /> },
+                { key: 'REVERSAL_REFUND', label: 'Reversals & Refunds', icon: <RefreshCw size={14} /> },
+              ].map((t) => {
+                const isActive = txTypeFilter === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => {
+                      setTxTypeFilter(t.key);
+                      setTxPage(1);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: isActive ? 600 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: isActive ? '#FFFFFF' : 'transparent',
+                      color: isActive ? '#0F172A' : '#64748B',
+                      boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {t.icon}
+                    <span>{t.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div style={{ overflowX: 'auto' }}>
@@ -1497,7 +1638,21 @@ export default function AdminLoyaltyPage() {
               </table>
             </div>
           </div>
-        )}
+
+          {/* Pagination Controls for Transactions Audit Log */}
+          {txPagination.totalRecords > 50 && (
+            <div style={{ marginTop: '16px' }}>
+              <Pagination
+                currentPage={txPage}
+                totalPages={txPagination.totalPages}
+                totalRecords={txPagination.totalRecords}
+                pageSize={50}
+                onPageChange={(page) => setTxPage(page)}
+              />
+            </div>
+          )}
+        </div>
+      )}
       </div>
 
       {/* MODAL: MANUAL POINTS ADJUSTMENT */}

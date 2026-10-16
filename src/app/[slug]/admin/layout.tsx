@@ -546,41 +546,53 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                   </div>
 
                   {/* User Details */}
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{
+                  <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span
+                      title={currentUser.name || 'Team Member'}
+                      style={{
                         fontWeight: 700,
                         fontSize: '12.5px',
                         color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                      }}>
-                        {currentUser.name || 'Team Member'}
-                      </span>
-                      <span style={{
-                        padding: '1px 5px',
-                        borderRadius: '999px',
-                        fontSize: '9.5px',
-                        fontWeight: 700,
-                        background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
-                        color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                        textTransform: 'capitalize',
-                      }}>
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {currentUser.name ? currentUser.name.trim().split(/\s+/)[0] : 'Team Member'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+                      <span
+                        style={{
+                          padding: '1px 5px',
+                          borderRadius: '999px',
+                          fontSize: '9.5px',
+                          fontWeight: 700,
+                          background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
+                          color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          textTransform: 'capitalize',
+                          lineHeight: 1.3,
+                        }}
+                      >
                         {isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')}
                       </span>
-                    </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: 'var(--text-secondary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      marginTop: '1px',
-                    }}>
-                      {currentUser.email}
+                      {currentUser.email && (
+                        <span
+                          title={currentUser.email}
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--text-secondary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            minWidth: 0,
+                          }}
+                        >
+                          {currentUser.email}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
