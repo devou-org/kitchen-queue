@@ -167,13 +167,15 @@ export default function AdminPosPage() {
       setOrderForm(prev => ({
         ...prev,
         table_number: displayName,
-        party_size: maxPartySize,
+        party_size: maxPartySize > 1 ? maxPartySize : (prev.party_size || 1),
         order_type: 'DINE_IN',
-        party_size: cap > 1 ? cap : (prev.party_size || 1),
         is_paid: false,
       }));
 
-      toast.success(`Table #${displayName} selected for order`, { id: `pos-table-param` });
+      if (toastedTableRef.current !== displayName) {
+        toastedTableRef.current = displayName;
+        toast.success(`Table #${displayName} selected for order`, { id: `pos-table-param` });
+      }
     }
   }, [tableParam, mergedParam, tables]);
 

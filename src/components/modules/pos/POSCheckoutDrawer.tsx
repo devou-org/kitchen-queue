@@ -458,6 +458,8 @@ export function POSCheckoutDrawer({
     }));
   }, [tables, orderForm.table_number, orderForm.phone, orderForm.customer_name, resolveTable]);
 
+  const lastTableRef = useRef<string | null>(null);
+
   // Ensure party_size is within table's capacity
   useEffect(() => {
     if (orderForm.table_number && tables.length > 0) {
