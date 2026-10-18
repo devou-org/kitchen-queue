@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       restaurant.id,
       restaurant.slug,
       table_number,
-      parseInt(capacity || '4', 10)
+      Math.min(14, Math.max(1, parseInt(capacity || '4', 10)))
     );
 
     return NextResponse.json({

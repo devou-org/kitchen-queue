@@ -99,14 +99,22 @@ export async function POST(request: NextRequest) {
       const { TablesRepository } = await import('@/modules/tables/tables.repository');
       const { checkTableAssignment } = await import('@/lib/table-capacity');
       const tables = await TablesRepository.getTablesByRestaurant(restaurant.id);
-      const targetTable = tables.find(t => String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase());
+      const leadPart = String(table_number).split('+')[0].trim().toLowerCase();
+      const targetTable = tables.find(t =>
+        String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase() ||
+        String(t.table_number).trim().toLowerCase() === leadPart
+      );
       if (targetTable) {
         // If secondary merged table, map order to primary table
         const parentTable = targetTable.merged_into_table_id
           ? (tables.find(t => t.id === targetTable.merged_into_table_id) || targetTable)
           : targetTable;
 
-        if (targetTable.merged_into_table_id && parentTable) {
+        if (String(table_number).includes('+')) {
+          effectiveTableNumber = String(table_number).trim();
+        } else if (parentTable.merged_table_numbers && parentTable.merged_table_numbers.length > 0) {
+          effectiveTableNumber = `${parentTable.table_number}+${parentTable.merged_table_numbers.join('+')}`;
+        } else if (targetTable.merged_into_table_id && parentTable) {
           effectiveTableNumber = parentTable.table_number;
         }
 

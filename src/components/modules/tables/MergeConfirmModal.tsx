@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link2, X, Users, AlertCircle } from 'lucide-react';
+import { Merge, X, Users, AlertCircle } from 'lucide-react';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
 
 interface MergeConfirmModalProps {
@@ -79,7 +79,7 @@ export function MergeConfirmModal({
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Link2 size={18} />
+              <Merge size={18} />
             </div>
             <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
               Merge Tables?

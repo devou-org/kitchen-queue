@@ -19,8 +19,6 @@ export interface RestaurantTable {
   active_orders?: any[];
 }
 
-let schemaEnsured = false;
-
 export class TablesRepository {
   /**
    * Auto-migrate missing columns for table merge support
@@ -36,7 +34,6 @@ export class TablesRepository {
         WHERE merged_into_table_id IS NOT NULL;
       `);
       console.log('✅ Auto-migrated merged_into_table_id column and index on restaurant_tables');
-      schemaEnsured = true;
     } catch (err) {
       console.error('❌ ensureSchema failed:', err);
     }
@@ -46,10 +43,6 @@ export class TablesRepository {
    * Fetch all tables for a restaurant with live active order statistics and merged status
    */
   static async getTablesByRestaurant(restaurantId: string): Promise<RestaurantTable[]> {
-    if (!schemaEnsured) {
-      await this.ensureSchema();
-    }
-
     try {
       return await this._fetchTablesQuery(restaurantId);
     } catch (error: any) {
@@ -146,7 +139,7 @@ export class TablesRepository {
            AND o.table_number IS NOT NULL AND o.table_number != ''
            AND (o.order_type IS NULL OR o.order_type NOT IN ('TAKEAWAY', 'DELIVERY'))
          GROUP BY o.restaurant_id, o.table_number
-       ) active ON active.table_number = t.table_number
+       ) active ON (LOWER(TRIM(active.table_number)) = LOWER(TRIM(t.table_number)) OR ('+' || LOWER(TRIM(active.table_number)) || '+') LIKE ('%+' || LOWER(TRIM(t.table_number)) || '+%'))
        WHERE t.restaurant_id = $1
        ORDER BY 
          CASE 
@@ -157,18 +150,35 @@ export class TablesRepository {
       [restaurantId]
     );
 
+    const rowsById = new Map<string, any>();
+    for (const r of res.rows) {
+      rowsById.set(r.id, r);
+    }
+
     const tables: RestaurantTable[] = [];
 
     for (const r of res.rows) {
-      const activeCount = Number(r.active_orders_count || 0);
-      let computedStatus: 'AVAILABLE' | 'OCCUPIED';
+      const primaryId = r.merged_into_table_id || r.id;
+      const primaryRow = rowsById.get(primaryId) || r;
+      const childRows = res.rows.filter((row: any) => row.merged_into_table_id === primaryId);
+      const groupRows = [primaryRow, ...childRows];
 
-      if (r.merged_into_table_id) {
-        // Child table status mirrors its parent's status
-        computedStatus = (r.parent_status === 'OCCUPIED' || activeCount > 0) ? 'OCCUPIED' : 'AVAILABLE';
-      } else {
-        computedStatus = activeCount > 0 ? 'OCCUPIED' : 'AVAILABLE';
+      // Merge active orders across all group members
+      const groupOrdersMap = new Map<string, any>();
+      for (const grpRow of groupRows) {
+        const ords = Array.isArray(grpRow.active_orders)
+          ? grpRow.active_orders
+          : Array.isArray(grpRow.orders_json)
+          ? grpRow.orders_json
+          : [];
+        for (const o of ords) {
+          if (o && o.id) groupOrdersMap.set(o.id, o);
+        }
       }
+      const unifiedOrders = Array.from(groupOrdersMap.values());
+      const activeCount = unifiedOrders.length;
+
+      const computedStatus: 'AVAILABLE' | 'OCCUPIED' = activeCount > 0 ? 'OCCUPIED' : 'AVAILABLE';
 
       // Auto-heal table status in DB if out of sync
       if (r.status !== computedStatus) {
@@ -186,7 +196,7 @@ export class TablesRepository {
         merged_table_ids: Array.isArray(r.merged_table_ids) ? r.merged_table_ids : [],
         merged_children: Array.isArray(r.merged_children) ? r.merged_children : [],
         active_orders_count: activeCount,
-        active_orders: r.active_orders || []
+        active_orders: unifiedOrders
       });
     }
 

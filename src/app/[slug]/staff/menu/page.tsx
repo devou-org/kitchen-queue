@@ -139,7 +139,7 @@ export default function StaffMenuPage() {
     notes: '',
     order_type: 'DINE_IN',
     is_paid: false,
-    payment_method: 'CASH',
+    payment_method: 'UPI',
     payment_split: null,
   });
   const [menuSplit, setMenuSplit] = useState<SplitAmounts>({ CASH: 0, UPI: 0, CARD: 0 });
@@ -717,15 +717,15 @@ export default function StaffMenuPage() {
                     <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', letterSpacing: '0.02em' }}>Payment Method</label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                       {[
-                        { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'CARD', label: 'Card', icon: CreditCard },
                         { id: 'SPLIT', label: 'Split', icon: Split },
                       ].map((m) => {
                         const Icon = m.icon;
                         const selected = m.id === 'SPLIT'
                           ? (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))
-                          : (orderForm.payment_method || 'CASH') === m.id;
+                          : (orderForm.payment_method || 'UPI') === m.id;
                         return (
                           <button
                             key={m.id}

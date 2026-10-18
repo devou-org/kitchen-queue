@@ -1659,10 +1659,11 @@ export async function findOrCreateTableSession(
   partySize: number = 1
 ): Promise<{ tableId: string; tableSessionId: string }> {
   const cleanTableNum = tableNumber.trim();
+  const leadTableNum = cleanTableNum.includes('+') ? cleanTableNum.split('+')[0].trim() : cleanTableNum;
 
   let tableRes = await clientOrPool.query(
-    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND table_number = $2 LIMIT 1`,
-    [restaurantId, cleanTableNum]
+    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND (table_number = $2 OR table_number = $3) LIMIT 1`,
+    [restaurantId, cleanTableNum, leadTableNum]
   );
 
   let tableId: string;
@@ -1683,6 +1684,18 @@ export async function findOrCreateTableSession(
     `UPDATE restaurant_tables SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
     [tableId]
   );
+
+  // Also set any merged partner tables in this group to OCCUPIED
+  await clientOrPool.query(
+    `UPDATE restaurant_tables 
+     SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP 
+     WHERE restaurant_id = $1 
+       AND (
+         merged_into_table_id = $2 
+         OR id = (SELECT merged_into_table_id FROM restaurant_tables WHERE id = $2 AND merged_into_table_id IS NOT NULL)
+       )`,
+    [restaurantId, tableId]
+  ).catch((err: any) => console.error('Failed to sync merged partner table statuses:', err));
 
   let sessionRes = await clientOrPool.query(
     `SELECT id FROM table_sessions
@@ -1720,10 +1733,11 @@ export async function checkAndCloseTableSession(
 ) {
   if (!tableNumber || tableNumber.trim() === '') return;
   const cleanTableNum = tableNumber.trim();
+  const leadTableNum = cleanTableNum.includes('+') ? cleanTableNum.split('+')[0].trim() : cleanTableNum;
 
   const tblRes = await clientOrPool.query(
-    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND table_number = $2 LIMIT 1`,
-    [restaurantId, cleanTableNum]
+    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND (table_number = $2 OR table_number = $3) LIMIT 1`,
+    [restaurantId, cleanTableNum, leadTableNum]
   );
 
   if (tblRes.rows.length === 0) return;
@@ -1733,10 +1747,10 @@ export async function checkAndCloseTableSession(
     `SELECT COUNT(*)::int as active_count
      FROM orders
      WHERE restaurant_id = $1
-       AND (table_id = $2 OR table_number = $3)
+       AND (table_id = $2 OR table_number = $3 OR table_number = $4 OR ('+' || table_number || '+') LIKE ('%+' || $4 || '+%'))
        AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
        AND (order_type IS NULL OR order_type NOT IN ('TAKEAWAY', 'DELIVERY'))`,
-    [restaurantId, tableId, cleanTableNum]
+    [restaurantId, tableId, cleanTableNum, leadTableNum]
   );
 
   const activeCount = Number(activeCheck.rows[0]?.active_count || 0);

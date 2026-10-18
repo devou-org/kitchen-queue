@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, QrCode, Trash2, ShoppingBag, Edit2, Utensils, Link2, Unlink, MoreVertical } from 'lucide-react';
+import { Users, QrCode, Trash2, ShoppingBag, Edit2, Utensils, Merge, Unlink, MoreVertical, Check } from 'lucide-react';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
 import { formatPrice } from '@/lib/format';
 
@@ -13,9 +13,16 @@ interface TableCardProps {
   onUnmerge?: (table: RestaurantTable) => void;
   onMerge?: (table: RestaurantTable) => void;
   isMergeSource?: boolean;
+  isMergeTarget?: boolean;
   isMergeSelectionMode?: boolean;
   onSelectForMerge?: (table: RestaurantTable) => void;
   primaryColor?: string;
+  joinedCardPosition?: 'left' | 'right' | 'middle' | null;
+  displayTitle?: string;
+  hideActiveOrders?: boolean;
+  mergedOrdersContext?: any[];
+  allocatedSeatedGuests?: number;
+  hideHeader?: boolean;
 }
 
 function TableVisualDiagram({
@@ -75,10 +82,10 @@ function TableVisualDiagram({
 
   const chairW = compact ? '18px' : '26px';
   const chairH = compact ? '5px' : '7px';
-  const tableH = compact ? '48px' : '62px';
-  const tableMinW = compact ? (topCount > 2 ? `${topCount * 26}px` : '64px') : (topCount > 2 ? `${topCount * 36}px` : '96px');
-  const btnSize = compact ? '28px' : '36px';
-  const iconSize = compact ? 13 : 17;
+  const tableH = compact ? '42px' : '62px';
+  const tableMinW = compact ? (topCount > 2 ? `${topCount * 24}px` : '58px') : (topCount > 2 ? `${topCount * 36}px` : '96px');
+  const btnSize = compact ? '26px' : '36px';
+  const iconSize = compact ? 12 : 17;
 
   const getChairStyle = (occupied: boolean, isVertical: boolean) => ({
     width: isVertical ? chairH : chairW,
@@ -93,7 +100,7 @@ function TableVisualDiagram({
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: compact ? '8px 0 6px' : '16px 0 12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: compact ? '4px 0 4px' : '16px 0 12px' }}>
       <div style={{ display: 'flex', gap: compact ? '5px' : '8px', marginBottom: '4px', height: chairH, alignItems: 'center' }}>
         {topChairs.map((occ, idx) => (
           <div key={`top-${idx}`} style={getChairStyle(occ, false)} title={occ ? 'Occupied Seat' : 'Free Seat'} />
@@ -192,9 +199,16 @@ export function TableCard({
   onUnmerge,
   onMerge,
   isMergeSource = false,
+  isMergeTarget = false,
   isMergeSelectionMode = false,
   onSelectForMerge,
   primaryColor = '#059669',
+  joinedCardPosition = null,
+  displayTitle,
+  hideActiveOrders = false,
+  mergedOrdersContext,
+  allocatedSeatedGuests,
+  hideHeader = false,
 }: TableCardProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -213,32 +227,34 @@ export function TableCard({
     };
   }, [isMenuOpen]);
 
-  const isOccupied = table.status === 'OCCUPIED';
-  const activeOrders = table.active_orders || [];
+  const activeOrders = mergedOrdersContext || table.active_orders || [];
+  const totalMergedSeated = activeOrders.reduce((sum: number, o: any) => sum + (Number(o.party_size) || 1), 0);
+  const isOccupied = table.status === 'OCCUPIED' || totalMergedSeated > 0;
 
   const isPrimaryMerged = Boolean(table.merged_table_numbers && table.merged_table_numbers.length > 0);
   const isSecondaryMerged = Boolean(table.merged_into_table_id);
+  const isMerged = isPrimaryMerged || isSecondaryMerged;
 
-  const capacity = Number(table.capacity) || 0;
+  const capacity = Math.min(14, Math.max(1, Number(table.capacity) || 4));
   const effectiveCapacity = Number(table.effective_capacity) || capacity;
-  const seatedGuests = activeOrders.reduce((sum: number, o: any) => sum + (Number(o.party_size) || 1), 0);
-  const remainingSeats = isOccupied ? Math.max(0, effectiveCapacity - seatedGuests) : effectiveCapacity;
 
+  // For visual seated guests:
+  // If allocatedSeatedGuests is provided, use it directly.
+  // Otherwise, fallback to distribution based on joinedCardPosition
+  let seatedGuests = typeof allocatedSeatedGuests === 'number'
+    ? allocatedSeatedGuests
+    : activeOrders.reduce((sum: number, o: any) => sum + (Number(o.party_size) || 1), 0);
+  if (typeof allocatedSeatedGuests !== 'number' && mergedOrdersContext && joinedCardPosition) {
+    if (joinedCardPosition === 'left') {
+      seatedGuests = Math.min(capacity, totalMergedSeated);
+    } else if (joinedCardPosition === 'right') {
+      const remainingForRight = Math.max(0, totalMergedSeated - capacity);
+      seatedGuests = Math.min(capacity, Math.max(totalMergedSeated > 0 ? 1 : 0, remainingForRight));
+    }
+  }
+
+  const remainingSeats = isOccupied ? Math.max(0, capacity - seatedGuests) : capacity;
   const combinedTotal = activeOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0);
-
-  // Formatted combined title: Table #A1+A2 or Table #T-05+T3
-  const mergedTitle = isPrimaryMerged
-    ? `Table #${table.table_number}+${table.merged_table_numbers?.join('+')}`
-    : `Table #${table.table_number}`;
-
-  // Children tables for visual rendering
-  const childrenTables = table.merged_children && table.merged_children.length > 0
-    ? table.merged_children
-    : (table.merged_table_numbers || []).map((num, i) => ({
-        id: (table.merged_table_ids && table.merged_table_ids[i]) || `child-${i}`,
-        table_number: num,
-        capacity: 4
-      }));
 
   const handleCardClick = () => {
     if (isMergeSelectionMode && onSelectForMerge && !isMergeSource) {
@@ -246,55 +262,98 @@ export function TableCard({
     }
   };
 
+  // Determine borderRadius and borders for seamless joined cards
+  let cardBorderRadius = '12px';
+  let cardBorder = (isMergeSource || isMergeTarget)
+    ? `2px solid ${primaryColor}`
+    : isMergeSelectionMode
+    ? '1.5px dashed #CBD5E1'
+    : isMerged
+    ? `1.5px solid ${primaryColor}60`
+    : '1px solid #E2E8F0';
+
+  if (joinedCardPosition === 'left') {
+    cardBorderRadius = '12px 0 0 12px';
+    cardBorder = 'none';
+  } else if (joinedCardPosition === 'right') {
+    cardBorderRadius = '0 12px 12px 0';
+    cardBorder = 'none';
+  } else if (joinedCardPosition === 'middle') {
+    cardBorderRadius = '0';
+    cardBorder = 'none';
+  }
+
+  const titleText = displayTitle !== undefined ? displayTitle : `Table #${table.table_number}`;
+  // Show merged badge only if it's not a secondary joined card (avoids 2 duplicate badges)
+  const showMergedBadge = isMerged && (joinedCardPosition !== 'right');
+
   return (
     <div
       onClick={handleCardClick}
+      className={joinedCardPosition ? `merged-subtable-card merged-pos-${joinedCardPosition}` : ''}
       style={{
-        background: isMergeSource ? '#F0FDF4' : '#FFFFFF',
-        borderRadius: '12px',
-        border: isMergeSource
-          ? `2px solid ${primaryColor}`
-          : isMergeSelectionMode
-          ? '2px dashed #0284C7'
-          : isPrimaryMerged
-          ? `1.5px solid ${primaryColor}50`
-          : '1px solid #E2E8F0',
-        boxShadow: isMergeSource
-          ? `0 0 0 4px ${primaryColor}20, 0 8px 20px rgba(0, 0, 0, 0.08)`
-          : isPrimaryMerged
+        background: '#FFFFFF',
+        borderRadius: cardBorderRadius,
+        border: cardBorder,
+        borderLeft: (joinedCardPosition === 'right' || joinedCardPosition === 'middle') ? '1px dashed #CBD5E1' : undefined,
+        boxShadow: joinedCardPosition ? 'none' : (isMergeSource || isMergeTarget)
+          ? `0 0 0 3px ${primaryColor}25, 0 8px 20px rgba(0, 0, 0, 0.08)`
+          : isMerged
           ? `0 4px 14px ${primaryColor}12`
           : '0 2px 8px rgba(0, 0, 0, 0.04)',
-        padding: '16px 18px',
+        padding: joinedCardPosition ? '8px 10px' : '16px 18px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: joinedCardPosition ? '4px' : '12px',
         position: 'relative',
         overflow: 'visible',
         zIndex: isMenuOpen ? 40 : 1,
         cursor: isMergeSelectionMode && !isMergeSource ? 'pointer' : 'default',
         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-        transform: isMergeSource ? 'scale(1.01)' : 'none',
+        transform: (isMergeSource || isMergeTarget) ? 'scale(1.01)' : 'none',
+        height: '100%',
+        boxSizing: 'border-box',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-          <h3
+      {hideHeader ? (
+        <div style={{ textAlign: 'center', margin: '0 0 -2px 0' }}>
+          <span
             style={{
-              fontSize: '17px',
-              fontWeight: 900,
-              color: '#0F172A',
-              margin: 0,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
+              fontSize: '10.5px',
+              fontWeight: 800,
+              color: '#64748B',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              background: '#F1F5F9',
+              padding: '2px 8px',
+              borderRadius: '5px',
+              display: 'inline-block',
             }}
-            title={mergedTitle}
           >
-            {mergedTitle}
-          </h3>
+            Table #{table.table_number}
+          </span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, height: '28px' }}>
+          {titleText ? (
+            <h3
+              style={{
+                fontSize: '17px',
+                fontWeight: 900,
+                color: '#0F172A',
+                margin: 0,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {titleText}
+            </h3>
+          ) : null}
 
-          {/* Small Merged badge */}
-          {isPrimaryMerged && (
+          {/* Small Merged badge (only 1 badge shown on the joined pair) */}
+          {showMergedBadge && (
             <span
               style={{
                 display: 'inline-flex',
@@ -309,22 +368,61 @@ export function TableCard({
                 border: '1px solid #FDE68A',
                 flexShrink: 0,
               }}
+              title={
+                isPrimaryMerged
+                  ? `Merged with #${table.merged_table_numbers?.join(', #')}`
+                  : `Merged into Table #${table.parent_table_number}`
+              }
             >
-              <Link2 size={11} /> Merged
+              <Merge size={12} /> Merged
             </span>
           )}
         </div>
 
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {/* Quick Merge Button (Shown on standalone tables OR on the right table of joined merged card, hidden during merge selection) */}
+          {!isMergeSelectionMode && onMerge && (!isMerged || joinedCardPosition !== 'left') && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMerge(table);
+              }}
+              title="Merge with another table"
+              style={{
+                padding: '6px',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0',
+                background: '#F8FAFC',
+                color: primaryColor,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#F1F5F9';
+                e.currentTarget.style.borderColor = primaryColor;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#F8FAFC';
+                e.currentTarget.style.borderColor = '#E2E8F0';
+              }}
+            >
+              <Merge size={16} />
+            </button>
+          )}
+
           {/* Quick Unmerge Button for Merged Tables */}
-          {(isPrimaryMerged || isSecondaryMerged) && onUnmerge && (
+          {!isMergeSelectionMode && isMerged && onUnmerge && (joinedCardPosition !== 'left') && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onUnmerge(table);
               }}
-              title={isPrimaryMerged ? "Unmerge all joined tables" : `Detach from Table #${table.parent_table_number}`}
+              title="Unmerge table"
               style={{
                 padding: '6px',
                 borderRadius: '8px',
@@ -334,257 +432,174 @@ export function TableCard({
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#FEE2E2';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#FEF2F2';
               }}
             >
               <Unlink size={16} />
             </button>
           )}
 
-          {/* Quick Merge Button for Standalone Tables */}
-          {!isSecondaryMerged && onMerge && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMerge(table);
-              }}
-              title={isPrimaryMerged ? "Manage merged tables" : "Merge with another table"}
-              style={{
-                padding: '6px',
-                borderRadius: '8px',
-                border: `1px solid ${isPrimaryMerged ? primaryColor : '#E2E8F0'}`,
-                background: isPrimaryMerged ? `${primaryColor}12` : '#F8FAFC',
-                color: primaryColor,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Link2 size={16} />
-            </button>
-          )}
-
-          {/* 3-Dots More Options Menu */}
-          <div ref={menuRef} style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMenuOpen(prev => !prev);
-              }}
-              title="More options"
-              style={{
-                padding: '6px',
-                borderRadius: '8px',
-                border: '1px solid #E2E8F0',
-                background: isMenuOpen ? '#F1F5F9' : '#F8FAFC',
-                color: isMenuOpen ? '#0F172A' : '#64748B',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <MoreVertical size={16} />
-            </button>
-
-            {isMenuOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  right: 0,
-                  background: '#FFFFFF',
-                  borderRadius: '10px',
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
-                  minWidth: '150px',
-                  zIndex: 100,
-                  padding: '5px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px',
-                  animation: 'fadeIn 0.12s ease-out'
+          {/* 3-Dots More Options Menu (Hidden during merge mode and on joined sub-cards) */}
+          {!isMergeSelectionMode && !joinedCardPosition && (
+            <div ref={menuRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMenuOpen(prev => !prev);
                 }}
-                onClick={(e) => e.stopPropagation()}
+                title="More options"
+                style={{
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: '1px solid #E2E8F0',
+                  background: isMenuOpen ? '#F1F5F9' : '#F8FAFC',
+                  color: isMenuOpen ? '#0F172A' : '#64748B',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
               >
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsMenuOpen(false);
-                    onEdit(table);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: 'transparent',
-                    color: '#334155',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'background 0.12s ease'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <Edit2 size={14} color="#64748B" />
-                  <span>Edit Table</span>
-                </button>
+                <MoreVertical size={16} />
+              </button>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsMenuOpen(false);
-                    onViewQR(table);
-                  }}
+              {isMenuOpen && (
+                <div
                   style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    right: 0,
+                    background: '#FFFFFF',
+                    borderRadius: '10px',
+                    border: '1px solid #E2E8F0',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+                    minWidth: '150px',
+                    zIndex: 100,
+                    padding: '5px',
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: 'transparent',
-                    color: '#334155',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'background 0.12s ease'
+                    flexDirection: 'column',
+                    gap: '2px',
+                    animation: 'fadeIn 0.12s ease-out'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <QrCode size={14} color="#64748B" />
-                  <span>View QR Code</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMenuOpen(false);
+                      onEdit(table);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#334155',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'background 0.12s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <Edit2 size={14} color="#64748B" />
+                    <span>Edit Table</span>
+                  </button>
 
-                <div style={{ height: '1px', background: '#F1F5F9', margin: '3px 0' }} />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMenuOpen(false);
+                      onViewQR(table);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#334155',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'background 0.12s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <QrCode size={14} color="#64748B" />
+                    <span>View QR Code</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsMenuOpen(false);
-                    onDelete(table);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: 'transparent',
-                    color: '#DC2626',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'background 0.12s ease'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#FEF2F2'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <Trash2 size={14} color="#DC2626" />
-                  <span>Delete Table</span>
-                </button>
-              </div>
-            )}
-          </div>
+                  <div style={{ height: '1px', background: '#F1F5F9', margin: '3px 0' }} />
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMenuOpen(false);
+                      onDelete(table);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#DC2626',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'background 0.12s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#FEF2F2'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <Trash2 size={14} color="#DC2626" />
+                    <span>Delete Table</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Table Visual: Single Table Diagram OR Side-by-Side Diagram when Merged */}
-      {isPrimaryMerged ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            background: '#F8FAFC',
-            borderRadius: '10px',
-            padding: '8px 10px',
-            border: '1px solid #E2E8F0',
-            position: 'relative'
-          }}
-        >
-          {/* Lead Table */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', marginBottom: '2px' }}>
-              #{table.table_number} ({capacity}p)
-            </span>
-            <TableVisualDiagram
-              capacity={capacity}
-              seatedGuests={isOccupied ? Math.min(capacity, seatedGuests) : 0}
-              isOccupied={isOccupied}
-              tableNumber={table.table_number}
-              primaryColor={primaryColor}
-              compact={true}
-              onTakeOrder={onTakeOrder && !isSecondaryMerged ? () => onTakeOrder(table) : undefined}
-            />
-          </div>
-
-          {/* Merge Connector Icon */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: primaryColor,
-              background: `${primaryColor}15`,
-              borderRadius: '50%',
-              width: '26px',
-              height: '26px',
-              flexShrink: 0,
-            }}
-            title="Merged tables"
-          >
-            <Link2 size={13} />
-          </div>
-
-          {/* Joined Child Tables */}
-          {childrenTables.map((child: any) => (
-            <div key={child.id || child.table_number} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748B', marginBottom: '2px' }}>
-                #{child.table_number} ({child.capacity || 4}p)
-              </span>
-              <TableVisualDiagram
-                capacity={Number(child.capacity) || 4}
-                seatedGuests={isOccupied ? Math.max(0, seatedGuests - capacity) : 0}
-                isOccupied={isOccupied}
-                tableNumber={child.table_number}
-                primaryColor={primaryColor}
-                compact={true}
-              />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <TableVisualDiagram
-          capacity={effectiveCapacity}
-          seatedGuests={seatedGuests}
-          isOccupied={isOccupied}
-          tableNumber={table.table_number}
-          primaryColor={primaryColor}
-          onTakeOrder={onTakeOrder && !isSecondaryMerged ? () => onTakeOrder(table) : undefined}
-        />
       )}
+
+      <TableVisualDiagram
+        capacity={capacity}
+        seatedGuests={seatedGuests}
+        isOccupied={isOccupied}
+        tableNumber={table.table_number}
+        primaryColor={primaryColor}
+        compact={Boolean(joinedCardPosition || hideHeader)}
+        onTakeOrder={!isMergeSelectionMode && onTakeOrder && !isSecondaryMerged ? () => onTakeOrder(table) : undefined}
+      />
 
       {/* Plain Text Capacity & Free Seats Display */}
       <div
@@ -592,46 +607,55 @@ export function TableCard({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          fontSize: '13px',
-          padding: '2px 4px'
+          fontSize: joinedCardPosition ? '11.5px' : '13px',
+          padding: joinedCardPosition ? '0 2px' : '2px 4px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569' }}>
-          <Users size={15} color={primaryColor} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: joinedCardPosition ? '4px' : '6px', color: '#475569' }}>
+          <Users size={joinedCardPosition ? 13 : 15} color={primaryColor} />
           <span>
-            Capacity: <strong>{effectiveCapacity}</strong>
+            Capacity: <strong>{capacity}</strong>
           </span>
         </div>
 
-        <span style={{ fontSize: '13px', fontWeight: 700, color: remainingSeats > 0 ? (isOccupied ? '#EA580C' : '#16A34A') : '#DC2626' }}>
+        <span style={{ fontSize: joinedCardPosition ? '11.5px' : '13px', fontWeight: 700, color: remainingSeats > 0 ? (isOccupied ? '#EA580C' : '#16A34A') : '#DC2626' }}>
           {remainingSeats > 0 ? `${remainingSeats} Seats Free` : 'Full'}
         </span>
       </div>
 
-      {isOccupied ? (
+      {!hideActiveOrders && (isOccupied ? (
         <div
-          onClick={() => onSelect?.(table, activeOrders[0])}
+          onClick={(e) => {
+            if (isMergeSelectionMode) {
+              e.stopPropagation();
+              if (!isMergeSource) {
+                onSelectForMerge ? onSelectForMerge(table) : onSelect?.(table);
+              }
+            } else {
+              onSelect?.(table, activeOrders[0]);
+            }
+          }}
           style={{
             background: '#FFFBEB',
             padding: '10px 12px',
             borderRadius: '8px',
             border: '1px solid #FEF08A',
-            cursor: onSelect ? 'pointer' : 'default',
+            cursor: isMergeSelectionMode ? (!isMergeSource ? 'pointer' : 'default') : onSelect ? 'pointer' : 'default',
             transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
-            if (onSelect) {
+            if (!isMergeSelectionMode && onSelect) {
               e.currentTarget.style.borderColor = '#F59E0B';
               e.currentTarget.style.boxShadow = '0 2px 8px rgba(245, 158, 11, 0.15)';
             }
           }}
           onMouseLeave={(e) => {
-            if (onSelect) {
+            if (!isMergeSelectionMode && onSelect) {
               e.currentTarget.style.borderColor = '#FEF08A';
               e.currentTarget.style.boxShadow = 'none';
             }
           }}
-          title="Click to view table order details"
+          title={isMergeSelectionMode ? (isMergeSource ? 'First table selected' : 'Click to merge with this table') : 'Click to view table order details'}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '11px', fontWeight: 800, color: '#854D0E', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -653,7 +677,13 @@ export function TableCard({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onSelect?.(table, o);
+                      if (isMergeSelectionMode) {
+                        if (!isMergeSource) {
+                          onSelectForMerge ? onSelectForMerge(table) : onSelect?.(table);
+                        }
+                      } else {
+                        onSelect?.(table, o);
+                      }
                     }}
                     style={{
                       background: '#FFFFFF',
@@ -666,7 +696,7 @@ export function TableCard({
                       display: 'inline-flex',
                       alignItems: 'center',
                       boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                      cursor: 'pointer',
+                      cursor: isMergeSelectionMode && isMergeSource ? 'default' : 'pointer',
                       transition: 'all 0.15s ease',
                     }}
                     onMouseEnter={(e) => {
@@ -677,7 +707,7 @@ export function TableCard({
                       e.currentTarget.style.borderColor = '#FEF08A';
                       e.currentTarget.style.background = '#FFFFFF';
                     }}
-                    title={`Click to view Order #${ticketNum}`}
+                    title={isMergeSelectionMode ? 'Click to merge with this table' : `Click to view Order #${ticketNum}`}
                   >
                     #{ticketNum} ({status})
                   </button>
@@ -686,6 +716,91 @@ export function TableCard({
             </div>
           )}
         </div>
+      ) : isMergeSelectionMode ? (
+        isMergeSource ? (
+          <div
+            style={{
+              background: `${primaryColor}10`,
+              padding: '9px 12px',
+              borderRadius: '8px',
+              border: `1px solid ${primaryColor}40`,
+              color: primaryColor,
+              fontSize: '11.5px',
+              fontWeight: 700,
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+          >
+            <Merge size={13} color={primaryColor} />
+            <span>Table #{table.table_number} (Selected)</span>
+          </div>
+        ) : isMergeTarget ? (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectForMerge ? onSelectForMerge(table) : onSelect?.(table);
+            }}
+            style={{
+              background: `${primaryColor}15`,
+              padding: '9px 12px',
+              borderRadius: '8px',
+              border: `1.5px solid ${primaryColor}`,
+              color: primaryColor,
+              fontSize: '11.5px',
+              fontWeight: 700,
+              textAlign: 'center',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+            title="Selected to merge"
+          >
+            <Check size={13} color={primaryColor} />
+            <span>Selected to merge</span>
+          </div>
+        ) : (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectForMerge ? onSelectForMerge(table) : onSelect?.(table);
+            }}
+            style={{
+              background: '#F8FAFC',
+              padding: '9px 12px',
+              borderRadius: '8px',
+              border: '1px dashed #CBD5E1',
+              color: '#64748B',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              textAlign: 'center',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = primaryColor;
+              e.currentTarget.style.color = primaryColor;
+              e.currentTarget.style.background = '#FFFFFF';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#CBD5E1';
+              e.currentTarget.style.color = '#64748B';
+              e.currentTarget.style.background = '#F8FAFC';
+            }}
+            title={`Select Table #${table.table_number} to merge`}
+          >
+            <Merge size={13} />
+            <span>Click to merge with this table</span>
+          </div>
+        )
       ) : (
         <div
           onClick={() => onTakeOrder?.(table)}
@@ -723,7 +838,7 @@ export function TableCard({
           <Utensils size={13} color={primaryColor} />
           <span>Available • Click to take order</span>
         </div>
-      )}
+      ))}
     </div>
   );
 }

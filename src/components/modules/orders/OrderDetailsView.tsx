@@ -94,7 +94,7 @@ export function OrderDetailsView({
   const [mounted, setMounted] = useState(false);
   const [tempStatus, setTempStatus] = useState(initialOrder.status);
   const [tempTableNumber, setTempTableNumber] = useState(initialOrder.table_number || '');
-  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'CASH');
+  const [paymentMethod, setPaymentMethod] = useState(initialOrder.payment_method || 'UPI');
   const [splitAmounts, setSplitAmounts] = useState<SplitAmounts>(() => {
     return normalizeSplitAmounts(initialOrder.payment_split, initialOrder.payment_method);
   });
@@ -147,7 +147,7 @@ export function OrderDetailsView({
   React.useEffect(() => {
     setTempStatus(order.status);
     setTempTableNumber(order.table_number || '');
-    setPaymentMethod(order.payment_method || 'CASH');
+    setPaymentMethod(order.payment_method || 'UPI');
     setSplitAmounts(normalizeSplitAmounts(order.payment_split, order.payment_method));
     setIsClosing(false);
   }, [order.id, order.status, order.table_number, order.payment_method, order.payment_split]);
@@ -155,7 +155,7 @@ export function OrderDetailsView({
   const handleUpdateStatus = async (statusToApply: string) => {
     setIsStatusUpdating(true);
     try {
-      let pMethod = statusToApply === 'CLOSED' ? (order.payment_method || paymentMethod || 'CASH') : paymentMethod;
+      let pMethod = statusToApply === 'CLOSED' ? (order.payment_method || paymentMethod || 'UPI') : paymentMethod;
       let pSplit: any = null;
 
       if (statusToApply === 'CLOSED' && (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT'))) {
@@ -1470,15 +1470,15 @@ export function OrderDetailsView({
                     </label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                       {[
-                        { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'CARD', label: 'Card', icon: CreditCard },
                         { id: 'SPLIT', label: 'Split', icon: Split },
                       ].map((m) => {
                         const Icon = m.icon;
                         const selected = m.id === 'SPLIT'
                           ? (paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT'))
-                          : (paymentMethod || 'CASH') === m.id;
+                          : (paymentMethod || 'UPI') === m.id;
                         return (
                           <button
                             key={m.id}
@@ -1568,7 +1568,7 @@ export function OrderDetailsView({
                       ) : (
                         <>
                           <Check size={14} />
-                          <span>Confirm as Paid · {paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split Payment' : (paymentMethod || 'CASH')}</span>
+                          <span>Confirm as Paid · {paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split Payment' : (paymentMethod || 'UPI')}</span>
                         </>
                       )}
                     </button>

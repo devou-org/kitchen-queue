@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import {
@@ -393,21 +393,43 @@ export function POSCheckoutDrawer({
     }
   }, [orderForm.payment_method, orderForm.payment_split]);
 
+  // Helper to resolve any table number or composite name (e.g. T4+T3+t-09) to its lead table
+  const resolveTable = useCallback((tableNumOrValue?: string) => {
+    if (!tableNumOrValue || tables.length === 0) return null;
+    const s = String(tableNumOrValue).trim().toLowerCase();
+    const parts = s.split('+').map(p => p.trim());
+    const lead = parts[0];
+
+    const found = tables.find((t: any) => {
+      const tNum = String(t.table_number).trim().toLowerCase();
+      if (tNum === s || tNum === lead) return true;
+      if (parts.includes(tNum)) return true;
+      if (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => parts.includes(String(m).trim().toLowerCase()))) return true;
+      return false;
+    });
+
+    if (!found) return null;
+    if (found.merged_into_table_id) {
+      return tables.find((t: any) => t.id === found.merged_into_table_id) || found;
+    }
+    return found;
+  }, [tables]);
+
   // Helper to calculate max free seats for a table
   const getTableFreeSeats = (table: any, partyContext?: { phone?: string; customerName?: string }): number => {
     if (!table) return 1;
-    const cap = Number(table.capacity) || 1;
-    const check = checkTableAssignment(table, 1, partyContext);
+    const targetTable = resolveTable(table.table_number) || table;
+    const cap = Number(targetTable.effective_capacity || targetTable.capacity) || 1;
+    const check = checkTableAssignment(targetTable, 1, partyContext);
     const seated = check.occupiedSeats || 0;
     const free = cap - seated;
-    return free > 0 ? free : 1;
+    return free > 0 ? free : cap;
   };
 
-  // Dynamic Person Options based on selected table's max free seats
+  // Dynamic Person Options based on selected table's combined capacity and max free seats
   const personOptions = useMemo(() => {
-    const selectedTable = tables.find(
-      (t: any) => String(t.table_number) === String(orderForm.table_number)
-    );
+    const selectedTable = resolveTable(orderForm.table_number);
+    const totalCapacity = selectedTable ? Number(selectedTable.effective_capacity || selectedTable.capacity) || 1 : 15;
     const maxFree = selectedTable
       ? getTableFreeSeats(selectedTable, {
           phone: orderForm.phone,
@@ -415,29 +437,34 @@ export function POSCheckoutDrawer({
         })
       : 15;
 
-    return Array.from({ length: Math.max(1, maxFree) }, (_, i) => ({
+    const limit = Math.max(totalCapacity, maxFree, 1);
+
+    return Array.from({ length: limit }, (_, i) => ({
       value: String(i + 1),
       label: `${i + 1} ${i === 0 ? 'Person' : 'Persons'}`,
     }));
-  }, [tables, orderForm.table_number, orderForm.phone, orderForm.customer_name]);
+  }, [tables, orderForm.table_number, orderForm.phone, orderForm.customer_name, resolveTable]);
 
-  // Ensure party_size is always clamped to max free seats on the selected table
+  // Ensure party_size is within table's capacity
   useEffect(() => {
     if (orderForm.table_number && tables.length > 0) {
-      const selectedTable = tables.find(
-        (t: any) => String(t.table_number) === String(orderForm.table_number)
-      );
+      const selectedTable = resolveTable(orderForm.table_number);
+
       if (selectedTable) {
+        const totalCapacity = Number(selectedTable.effective_capacity || selectedTable.capacity) || 1;
         const maxFree = getTableFreeSeats(selectedTable, {
           phone: orderForm.phone,
           customerName: orderForm.customer_name,
         });
-        if (!orderForm.party_size || orderForm.party_size > maxFree) {
-          setOrderForm((prev) => ({ ...prev, party_size: maxFree }));
+        const limit = Math.max(totalCapacity, maxFree, 1);
+        if (!orderForm.party_size) {
+          setOrderForm((prev) => ({ ...prev, party_size: totalCapacity }));
+        } else if (orderForm.party_size > limit) {
+          setOrderForm((prev) => ({ ...prev, party_size: limit }));
         }
       }
     }
-  }, [orderForm.table_number, tables, orderForm.party_size, orderForm.phone, orderForm.customer_name, setOrderForm]);
+  }, [orderForm.table_number, tables, orderForm.party_size, orderForm.phone, orderForm.customer_name, setOrderForm, resolveTable]);
 
   // Table Options for CustomSelect
   const tableOptions = useMemo(() => {
@@ -445,11 +472,12 @@ export function POSCheckoutDrawer({
       { value: '', label: '-- Select Table --' },
       ...tables
         .filter((t: any) => {
+          if (t.merged_into_table_id) return false;
           const check = checkTableAssignment(t, 1, {
             phone: orderForm.phone,
             customerName: orderForm.customer_name,
           });
-          const isCurrent = t.table_number === orderForm.table_number;
+          const isCurrent = t.table_number === orderForm.table_number || (orderForm.table_number && orderForm.table_number.startsWith(t.table_number + '+'));
           return check.allowed || isCurrent;
         })
         .map((t: any) => {
@@ -477,15 +505,19 @@ export function POSCheckoutDrawer({
           }
 
           if (t.merged_table_numbers && t.merged_table_numbers.length > 0) {
-            tableLabel = `${tableLabel} [Merged: +${t.merged_table_numbers.join(', +')}]`;
+            tableLabel = `${tableLabel}+${t.merged_table_numbers.join('+')}`;
           } else if (t.merged_into_table_id) {
-            tableLabel = `${tableLabel} [Merged -> #${t.parent_table_number}]`;
+            tableLabel = `${tableLabel}->#${t.parent_table_number}`;
           }
 
           const freeSeats = Math.max(0, cap - seated);
 
+          const fullValue = (t.merged_table_numbers && t.merged_table_numbers.length > 0)
+            ? `${t.table_number}+${t.merged_table_numbers.join('+')}`
+            : String(t.table_number);
+
           return {
-            value: String(t.table_number),
+            value: fullValue,
             label: `${tableLabel} · ${seated}/${cap} (${freeSeats} Free)`,
           };
         }),
@@ -948,9 +980,9 @@ export function POSCheckoutDrawer({
                   <span>Dine-In Seating & Table</span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px', gap: '10px', width: '100%', boxSizing: 'border-box' }}>
                   {/* Table Selection via CustomSelect */}
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <label
                       style={{
                         display: 'block',
@@ -966,19 +998,14 @@ export function POSCheckoutDrawer({
                       <CustomSelect
                         value={orderForm.table_number}
                         onChange={(selectedNum) => {
-                          const matchedTable = tables.find(
-                            (t: any) => String(t.table_number) === selectedNum
-                          );
-                          const maxFree = matchedTable
-                            ? getTableFreeSeats(matchedTable, {
-                                phone: orderForm.phone,
-                                customerName: orderForm.customer_name,
-                              })
+                          const matchedTable = resolveTable(selectedNum);
+                          const maxCap = matchedTable
+                            ? Number(matchedTable.effective_capacity || matchedTable.capacity) || 1
                             : 1;
                           setOrderForm((prev) => ({
                             ...prev,
                             table_number: selectedNum,
-                            party_size: maxFree,
+                            party_size: maxCap,
                           }));
                         }}
                         options={tableOptions}
@@ -1018,7 +1045,7 @@ export function POSCheckoutDrawer({
                   </div>
 
                   {/* Persons Selection via CustomSelect */}
-                  <div>
+                  <div style={{ minWidth: 0, width: '130px' }}>
                     <label
                       style={{
                         display: 'block',
@@ -1637,15 +1664,15 @@ export function POSCheckoutDrawer({
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                     {[
-                      { id: 'CASH', label: 'Cash', icon: Banknote },
                       { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                      { id: 'CASH', label: 'Cash', icon: Banknote },
                       { id: 'CARD', label: 'Card', icon: CreditCard },
                       { id: 'SPLIT', label: 'Split', icon: Split },
                     ].map((m) => {
                       const Icon = m.icon;
                       const selected = m.id === 'SPLIT'
                         ? (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))
-                        : (orderForm.payment_method || 'CASH') === m.id;
+                        : (orderForm.payment_method || 'UPI') === m.id;
                       return (
                         <button
                           key={m.id}

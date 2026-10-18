@@ -107,6 +107,7 @@ export default function AdminPosPage() {
   const searchParams = useSearchParams();
   const slug = (params?.slug as string) || restaurant?.slug || '';
   const tableParam = searchParams?.get('table') || searchParams?.get('table_number') || '';
+  const mergedParam = searchParams?.get('merged') || '';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
@@ -139,15 +140,38 @@ export default function AdminPosPage() {
 
   useEffect(() => {
     if (tableParam) {
+      const matched = tables.find(
+        (t: any) =>
+          String(t.table_number).trim().toLowerCase() === String(tableParam).trim().toLowerCase() ||
+          (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => String(m).trim().toLowerCase() === String(tableParam).trim().toLowerCase()))
+      );
+
+      let displayName = tableParam;
+      if (mergedParam) {
+        displayName = `${tableParam}+${mergedParam}`;
+      } else if (matched) {
+        if (matched.merged_table_numbers && matched.merged_table_numbers.length > 0) {
+          displayName = `${matched.table_number}+${matched.merged_table_numbers.join('+')}`;
+        } else if (matched.parent_table_number) {
+          displayName = `${matched.parent_table_number}+${matched.table_number}`;
+        }
+      }
+
+      const maxPartySize = matched
+        ? Number(matched.effective_capacity || matched.capacity) || 1
+        : 1;
+
       setOrderForm(prev => ({
         ...prev,
-        table_number: tableParam,
+        table_number: displayName,
+        party_size: maxPartySize,
         order_type: 'DINE_IN',
         is_paid: false,
       }));
-      toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+
+      toast.success(`Table #${displayName} selected for order`, { id: `pos-table-param` });
     }
-  }, [tableParam]);
+  }, [tableParam, mergedParam, tables]);
 
   useEffect(() => {
     if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {

@@ -9,6 +9,18 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  webpack: (config) => {
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      lna: false,
+    };
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      lna: false,
+    };
+    return config;
+  },
 };
 
 export default withPWA(nextConfig);
