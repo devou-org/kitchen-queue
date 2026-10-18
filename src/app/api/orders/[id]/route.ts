@@ -6,7 +6,7 @@ import { pusherServer } from '@/lib/pusher';
 import { validatePhone } from '@/lib/validators';
 import { autoQueueAndBroadcastKot } from '@/lib/kot-auto-print';
 
-const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY'];
+const CUSTOMER_ADDABLE_STATUSES = ['PENDING', 'PREPARING', 'READY', 'SERVED'];
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -360,7 +360,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    return NextResponse.json({ success: true, data: order, message: 'Order updated' });
+    const finalOrder = await getOrderById(restaurant.id, id);
+    return NextResponse.json({ success: true, data: finalOrder || order, message: 'Order updated' });
   } catch (error: any) {
     console.error("❌ Order Update Runtime Error:", error);
     const message = error?.message || 'Failed to update order';

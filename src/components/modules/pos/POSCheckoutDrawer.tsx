@@ -27,6 +27,7 @@ import {
   Split,
   BadgeCheck,
 } from 'lucide-react';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { CartItem, OrderType } from '@/types';
 import { formatPrice } from '@/lib/format';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -62,6 +63,7 @@ export interface POSCheckoutDrawerProps {
   setOrderForm: React.Dispatch<React.SetStateAction<POSOrderFormData>>;
   onSubmitOrder: (e: React.FormEvent) => void | Promise<any>;
   submitting: boolean;
+  hideOrderType?: boolean;
 }
 
 export function POSCheckoutDrawer({
@@ -75,10 +77,19 @@ export function POSCheckoutDrawer({
   setOrderForm,
   onSubmitOrder,
   submitting,
+  hideOrderType = false,
 }: POSCheckoutDrawerProps) {
   const [mounted, setMounted] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [printingBill, setPrintingBill] = useState(false);
+
+  const isTableDirected = Boolean(
+    hideOrderType ||
+      (typeof window !== 'undefined' &&
+        (new URLSearchParams(window.location.search).get('table') ||
+          new URLSearchParams(window.location.search).get('table_number')) &&
+        orderForm.table_number)
+  );
 
   // Compute default country code based on restaurant location
   const defaultCallingCode = useMemo(() => {
@@ -108,7 +119,7 @@ export function POSCheckoutDrawer({
           setOrderForm((prev) => ({
             ...prev,
             is_paid: true,
-            payment_method: prev.payment_method || 'CASH',
+            payment_method: prev.payment_method || 'UPI',
           }));
         }
       } else {
@@ -241,12 +252,14 @@ export function POSCheckoutDrawer({
       gst_amount: gstAmount,
       total_price: totalPrice,
       is_paid: Boolean(orderForm.is_paid),
-      payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
+      payment_method: orderForm.is_paid ? (orderForm.payment_method || 'UPI') : undefined,
       notes: orderForm.notes || '',
       created_at: new Date().toISOString(),
     };
 
-    const toastId = toast.loading('🖨️ Printing Bill...');
+    const toastId = toast.loading('Printing Bill...', {
+      icon: <PrinterIllustration size={20} status="printing" />,
+    });
 
     try {
       const res = await fetch('/api/print/bill', {
@@ -463,6 +476,8 @@ export function POSCheckoutDrawer({
           setOrderForm((prev) => ({ ...prev, party_size: limit }));
         }
       }
+    } else if (!orderForm.table_number) {
+      lastTableRef.current = null;
     }
   }, [orderForm.table_number, tables, orderForm.party_size, orderForm.phone, orderForm.customer_name, setOrderForm, resolveTable]);
 
@@ -728,7 +743,7 @@ export function POSCheckoutDrawer({
             style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '20px',
+              padding: 'clamp(14px, 3.5vw, 20px)',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
@@ -800,156 +815,242 @@ export function POSCheckoutDrawer({
                       key={item.product_id}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '10px',
-                        padding: '8px 12px',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        padding: '10px 12px',
                         background: '#FFFFFF',
                         border: '1px solid #E2E8F0',
                         borderRadius: '8px',
                       }}
                     >
-                      {/* Name & price */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Top Row: Item Name & Remove */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                        }}
+                      >
                         <div
                           style={{
                             fontSize: '13px',
-                            fontWeight: 600,
                             color: '#0F172A',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
+                            lineHeight: 1.35,
+                            wordBreak: 'break-word',
+                            flex: 1,
                           }}
                         >
-                          {item.name}
+                          <span>{item.name}</span>
+                          {item.is_free_reward && (
+                            <span
+                              style={{
+                                marginLeft: '6px',
+                                display: 'inline-block',
+                                background: '#ECFDF5',
+                                color: '#047857',
+                                border: '1px solid #A7F3D0',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                verticalAlign: 'middle',
+                              }}
+                            >
+                              FREE GIFT
+                            </span>
+                          )}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748B' }}>
-                          {formatPrice(item.price)} each
-                        </div>
-                      </div>
 
-                      {/* Quantity Stepper */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {/* Delete button */}
                         <button
                           type="button"
-                          onClick={() => onUpdateCart(item.product_id, -1)}
+                          onClick={() => onUpdateCart(item.product_id, -item.quantity)}
                           style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '8px',
-                            border: '1px solid #CBD5E1',
-                            background: '#FFFFFF',
-                            color: '#0F172A',
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#94A3B8',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: 'pointer',
+                            flexShrink: 0,
+                            transition: 'color 0.15s ease',
                           }}
-                          title="Decrease"
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
+                          title="Remove item"
                         >
-                          <Minus size={12} />
-                        </button>
-
-                        <span
-                          style={{
-                            minWidth: '24px',
-                            textAlign: 'center',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            color: '#0F172A',
-                          }}
-                        >
-                          {item.quantity}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => onUpdateCart(item.product_id, 1)}
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '8px',
-                            border: '1px solid #CBD5E1',
-                            background: '#FFFFFF',
-                            color: '#0F172A',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                          title="Increase"
-                        >
-                          <Plus size={12} />
+                          <Trash2 size={13} />
                         </button>
                       </div>
 
-                      {/* Line subtotal */}
+                      {/* Bottom Row: Unit price (left) & Stepper + Subtotal (right) */}
                       <div
                         style={{
-                          minWidth: '64px',
-                          textAlign: 'right',
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          color: '#0F172A',
-                        }}
-                      >
-                        {formatPrice(item.price * item.quantity)}
-                      </div>
-
-                      {/* Delete */}
-                      <button
-                        type="button"
-                        onClick={() => onUpdateCart(item.product_id, -item.quantity)}
-                        style={{
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '8px',
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#EF4444',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
+                          justifyContent: 'space-between',
+                          gap: '8px',
                         }}
-                        title="Remove"
                       >
-                        <Trash2 size={13} />
-                      </button>
+                        <div style={{ fontSize: '11px', color: '#64748B' }}>
+                          {item.is_free_reward ? (
+                            <span>
+                              <span style={{ textDecoration: 'line-through', color: '#94A3B8', marginRight: '4px' }}>
+                                {formatPrice(item.original_price || 0)}
+                              </span>
+                              <strong style={{ color: '#16A34A' }}>₹0.00 (Free Reward)</strong>
+                            </span>
+                          ) : (
+                            `${formatPrice(item.price)} each`
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          {/* Quantity Stepper */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCart(item.product_id, -1)}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '6px',
+                                border: '1px solid #CBD5E1',
+                                background: '#FFFFFF',
+                                color: '#0F172A',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                              }}
+                              title="Decrease"
+                            >
+                              <Minus size={11} />
+                            </button>
+
+                            <span
+                              style={{
+                                minWidth: '22px',
+                                textAlign: 'center',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                color: '#0F172A',
+                              }}
+                            >
+                              {item.quantity}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCart(item.product_id, 1)}
+                              style={{
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '6px',
+                                border: '1px solid #CBD5E1',
+                                background: '#FFFFFF',
+                                color: '#0F172A',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                              }}
+                              title="Increase"
+                            >
+                              <Plus size={11} />
+                            </button>
+                          </div>
+
+                          {/* Line subtotal */}
+                          <div
+                            style={{
+                              minWidth: '55px',
+                              textAlign: 'right',
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              color: '#0F172A',
+                            }}
+                          >
+                            {formatPrice(
+                              item.is_free_reward
+                                ? Math.max(0, item.quantity - 1) * (item.original_price ?? item.price)
+                                : item.price * item.quantity
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
+              {/* Kitchen Notes placed directly under order items */}
+              <div style={{ marginTop: '2px', borderTop: '1px solid #E2E8F0', paddingTop: '10px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Kitchen Notes
+                </label>
+                <input
+                  type="text"
+                  placeholder="Less spicy, extra napkins, serve together..."
+                  value={orderForm.notes}
+                  onChange={(e) => setOrderForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    background: '#FFFFFF',
+                    fontSize: '13px',
+                    color: '#0F172A',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Section B: Order Type Selection */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: '#64748B',
-                  marginBottom: '6px',
-                }}
-              >
-                Order Type
-              </label>
-              <OrderTypeSelector
-                value={(orderForm.order_type as OrderType) || 'DINE_IN'}
-                onChange={(val) => {
-                  const isTakeaway = val === 'TAKEAWAY';
-                  setOrderForm((prev) => ({
-                    ...prev,
-                    order_type: val,
-                    is_paid: isTakeaway ? true : false,
-                    payment_method: isTakeaway ? (prev.payment_method || 'CASH') : prev.payment_method,
-                  }));
-                }}
-              />
-            </div>
+            {!isTableDirected && (
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: '#64748B',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Order Type
+                </label>
+                <OrderTypeSelector
+                  value={(orderForm.order_type as OrderType) || 'DINE_IN'}
+                  onChange={(val) => {
+                    const isTakeaway = val === 'TAKEAWAY';
+                    setOrderForm((prev) => ({
+                      ...prev,
+                      order_type: val,
+                      is_paid: isTakeaway ? true : false,
+                      payment_method: isTakeaway ? (prev.payment_method || 'UPI') : prev.payment_method,
+                    }));
+                  }}
+                  hideLabel
+                />
+              </div>
+            )}
 
             {/* Section C: Table and Persons with CustomSelect (CRITICAL) */}
             {orderForm.order_type !== 'TAKEAWAY' && (
@@ -1002,6 +1103,7 @@ export function POSCheckoutDrawer({
                           const maxCap = matchedTable
                             ? Number(matchedTable.effective_capacity || matchedTable.capacity) || 1
                             : 1;
+                          lastTableRef.current = selectedNum;
                           setOrderForm((prev) => ({
                             ...prev,
                             table_number: selectedNum,
@@ -1104,7 +1206,7 @@ export function POSCheckoutDrawer({
                 }}
               >
                 <User size={13} />
-                <span>Customer & Notes (Optional)</span>
+                <span>Customer Details (Optional)</span>
               </div>
 
               {/* Customer Name */}
@@ -1232,37 +1334,6 @@ export function POSCheckoutDrawer({
                 </div>
               </div>
 
-              {/* Kitchen Notes */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#334155',
-                    marginBottom: '5px',
-                  }}
-                >
-                  Kitchen Notes
-                </label>
-                <input
-                  type="text"
-                  placeholder="Less spicy, extra napkins, serve together..."
-                  value={orderForm.notes}
-                  onChange={(e) => setOrderForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    height: '38px',
-                    padding: '0 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #CBD5E1',
-                    background: '#FFFFFF',
-                    fontSize: '13px',
-                    color: '#0F172A',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
             </div>
 
             {/* Section: Customer Loyalty Profile & Rewards */}
@@ -1598,7 +1669,7 @@ export function POSCheckoutDrawer({
                     setOrderForm((prev) => ({
                       ...prev,
                       is_paid: true,
-                      payment_method: prev.payment_method || 'CASH',
+                      payment_method: prev.payment_method || 'UPI',
                     }))
                   }
                   style={{

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
@@ -17,6 +17,7 @@ import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { POSCheckoutDrawer, POSOrderFormData } from '@/components/modules/pos/POSCheckoutDrawer';
+import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -132,11 +133,13 @@ export default function AdminPosPage() {
     notes: '',
     order_type: 'DINE_IN',
     is_paid: false,
-    payment_method: 'CASH',
+    payment_method: 'UPI',
   });
   const [submitting, setSubmitting] = useState(false);
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<any>(null);
   const [loyaltyDiscount, setLoyaltyDiscount] = useState<number>(0);
+
+  const toastedTableRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (tableParam) {
@@ -166,6 +169,7 @@ export default function AdminPosPage() {
         table_number: displayName,
         party_size: maxPartySize,
         order_type: 'DINE_IN',
+        party_size: cap > 1 ? cap : (prev.party_size || 1),
         is_paid: false,
       }));
 
@@ -278,8 +282,8 @@ export default function AdminPosPage() {
         return;
       }
 
-      toast(`🖨️ Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: '🖨️',
+      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: <PrinterIllustration size={22} status="printing" />,
         duration: 3000,
       });
 
@@ -294,7 +298,8 @@ export default function AdminPosPage() {
         });
         const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
-          toast.success(`🖨️ Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            icon: <PrinterIllustration size={22} status="success" />,
             id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
           });
         }
@@ -422,7 +427,9 @@ export default function AdminPosPage() {
       }
 
       if (data.mode === 'server' || data.mode === 'agent') {
-        toast.success(`🖨️ Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`);
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, {
+          icon: <PrinterIllustration size={20} status="success" />,
+        });
         return;
       }
 
@@ -439,7 +446,9 @@ export default function AdminPosPage() {
       });
 
       if (clientRes.success) {
-        toast.success(`🖨️ Auto-printed Bill #${String(order.ticket_number).padStart(3, '0')}!`);
+        toast.success(`Auto-printed Bill #${String(order.ticket_number).padStart(3, '0')}!`, {
+          icon: <PrinterIllustration size={20} status="success" />,
+        });
       }
     } catch (err) {
       console.error('Auto-print bill execution error:', err);
@@ -545,7 +554,7 @@ export default function AdminPosPage() {
           notes: '',
           order_type: 'DINE_IN',
           is_paid: false,
-          payment_method: 'CASH',
+          payment_method: 'UPI',
           discount_amount: 0,
           selected_reward_id: undefined,
           auto_print_bill: willPrintBill,
@@ -802,15 +811,16 @@ export default function AdminPosPage() {
         <div
           style={{
             position: 'fixed',
-            bottom: '24px',
+            bottom: 'clamp(14px, 3vw, 24px)',
             left: 0,
             right: 0,
-            padding: '0 20px',
+            padding: '0 clamp(10px, 3vw, 20px)',
             zIndex: 99999,
             pointerEvents: 'none',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
+            boxSizing: 'border-box',
           }}
         >
           <button
@@ -828,7 +838,7 @@ export default function AdminPosPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '0 20px',
+              padding: '0 clamp(12px, 2.5vw, 20px)',
               boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)',
               cursor: 'pointer',
               border: 'none',
@@ -836,6 +846,9 @@ export default function AdminPosPage() {
               color: '#FFFFFF',
               letterSpacing: '-0.01em',
               transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              gap: '8px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
@@ -846,21 +859,25 @@ export default function AdminPosPage() {
               e.currentTarget.style.boxShadow = '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.5vw, 10px)', minWidth: 0, overflow: 'hidden', flexShrink: 1 }}>
               <span
                 style={{
                   background: 'rgba(255, 255, 255, 0.25)',
                   padding: '3px 10px',
                   borderRadius: '999px',
-                  fontSize: '13px',
+                  fontSize: 'clamp(11.5px, 1.5vw, 13px)',
                   fontWeight: 900,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                 }}
               >
                 {totalItems} {totalItems === 1 ? 'item' : 'items'}
               </span>
-              <span style={{ fontSize: '15px', fontWeight: 800 }}>View Cart &amp; Checkout</span>
+              <span style={{ fontSize: 'clamp(13px, 1.8vw, 15px)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                View Cart &amp; Checkout
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 900 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1vw, 8px)', fontSize: 'clamp(14px, 1.8vw, 16px)', fontWeight: 900, flexShrink: 0, whiteSpace: 'nowrap' }}>
               <span>{formatPrice(totalPrice)}</span>
               <span style={{ fontSize: '19px', lineHeight: 1 }}>→</span>
             </div>
@@ -880,6 +897,7 @@ export default function AdminPosPage() {
         setOrderForm={setOrderForm}
         onSubmitOrder={submitOrder}
         submitting={submitting}
+        hideOrderType={Boolean(tableParam)}
       />
       </div>
     </AdminContentWrapper>

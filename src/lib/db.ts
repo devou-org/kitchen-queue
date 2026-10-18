@@ -440,6 +440,9 @@ async function runAutoMigration(sqlConnection: any) {
           UNIQUE(restaurant_id, name)
       );
 
+      ALTER TABLE roles
+      ADD COLUMN IF NOT EXISTS default_order_status VARCHAR(30) DEFAULT 'PREPARING';
+
       ALTER TABLE staffs
       ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES roles(id) ON DELETE SET NULL;
 
@@ -887,7 +890,7 @@ export async function createProduct(data: {
         VALUES (${data.restaurant_id}, ${data.category.trim()}, COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = ${data.restaurant_id}), 0) + 10)
         ON CONFLICT (restaurant_id, name) DO NOTHING
       `;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return rows[0];
@@ -950,7 +953,7 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
           VALUES ($1, $2, COALESCE((SELECT MAX(sort_order) FROM categories WHERE restaurant_id = $1), 0) + 10)
           ON CONFLICT (restaurant_id, name) DO NOTHING
         `, [restaurantId, data.category.trim()]);
-      } catch (_) {}
+      } catch (_) { }
     }
 
     await client.query('COMMIT');
@@ -1344,34 +1347,62 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
 
 export async function getOrdersByPhonePaginated(restaurantId: string, phone: string, page: number = 1, limit: number = 20) {
   const offset = (page - 1) * limit;
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
 
   const countRows = await sql`
     SELECT COUNT(*)::integer as total
-    FROM queues q
-    JOIN users u ON u.id = q.user_id
-    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone} AND q.queue_type = 'ORDER'
+    FROM orders o
+    WHERE o.restaurant_id = ${restaurantId}
+      AND (
+        o.phone = ${phone}
+        OR o.phone = ${'+91' + cleanPhone}
+        OR o.phone = ${cleanPhone}
+        OR RIGHT(REGEXP_REPLACE(COALESCE(o.phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+      )
   `;
   const total = countRows[0]?.total || 0;
 
   const rows = await sql`
     SELECT 
-      COALESCE(o.id, q.id) as id,
-      q.id as queue_id,
-      q.token_number as ticket_number, 
-      q.created_at, 
+      o.id,
+      o.queue_id,
+      o.ticket_number, 
+      o.created_at, 
       o.total_price,
-      COALESCE(o.status, qs.possible_queue_status) as status,
+      o.status,
+      o.table_number,
+      o.order_type,
+      o.customer_name,
+      o.phone,
       (
         SELECT COUNT(oi.id)
         FROM order_items oi 
         WHERE oi.order_id = o.id
-      )::integer as item_count
-    FROM queues q
-    JOIN users u ON u.id = q.user_id
-    JOIN queue_status qs ON qs.id = q.queue_status_id
-    LEFT JOIN orders o ON o.queue_id = q.id
-    WHERE q.restaurant_id = ${restaurantId} AND u.phone = ${phone} AND q.queue_type = 'ORDER'
-    ORDER BY q.created_at DESC
+      )::integer as item_count,
+      (
+        SELECT json_agg(
+          json_build_object(
+            'id', oi.id,
+            'product_id', oi.product_id,
+            'quantity', oi.quantity,
+            'price_at_purchase', oi.price_at_purchase,
+            'status', oi.status,
+            'product_name', p.name
+          )
+        )
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = o.id
+      ) as items
+    FROM orders o
+    WHERE o.restaurant_id = ${restaurantId}
+      AND (
+        o.phone = ${phone}
+        OR o.phone = ${'+91' + cleanPhone}
+        OR o.phone = ${cleanPhone}
+        OR RIGHT(REGEXP_REPLACE(COALESCE(o.phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+      )
+    ORDER BY o.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
   return { data: rows, total, page, totalPages: Math.ceil(total / limit) };
@@ -1439,7 +1470,7 @@ export async function createOrder(data: {
   const computedTotal = Math.round(
     normalizedItems.reduce((sum, item) => sum + item.quantity * item.price_at_purchase, 0) * 100
   ) / 100;
-  
+
   // Use passed subtotal or computed total
   const finalSubtotal = data.subtotal ?? computedTotal;
   const discountVal = Number(data.discount_amount) || 0;
@@ -1530,9 +1561,9 @@ export async function createOrder(data: {
     const isTableOrder = Boolean(data.table_number && data.table_number.trim() !== '');
     const isPosOrder = Boolean(data.is_pos);
     const targetStatus = (data.status === 'PREPARING' || isPosOrder || isTableOrder) ? 'PREPARING' : (data.status || 'PENDING');
-    
+
     let statusRes = await client.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 AND possible_queue_status = $2 LIMIT 1`, [data.restaurant_id, targetStatus]);
-    
+
     if (statusRes.rows.length === 0) {
       // Fallback to any valid queue status id just to satisfy foreign key (if required), but force the string name
       statusRes = await client.query(`SELECT id FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC LIMIT 1`, [data.restaurant_id]);
@@ -1595,8 +1626,8 @@ export async function createOrder(data: {
         RETURNING id
       `,
       [
-        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus, 
-        isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId, 
+        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus,
+        isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId,
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, paymentSplit, discountVal
       ]
@@ -1824,11 +1855,11 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
 
   // Sync item status if master order status changed
   if (status === 'CANCELLED') {
-    try { await pool.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]); } catch (_) {}
+    try { await pool.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]); } catch (_) { }
   } else if (status === 'READY') {
-    try { await pool.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]); } catch (_) {}
+    try { await pool.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]); } catch (_) { }
   } else if (status === 'SERVED' || status === 'CLOSED' || status === 'COMPLETED') {
-    try { await pool.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]); } catch (_) {}
+    try { await pool.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]); } catch (_) { }
   }
   // Trigger Loyalty Points processing
   if (status === 'CLOSED' || status === 'COMPLETED' || updatedOrder?.is_paid) {
@@ -1844,16 +1875,16 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     // Fetch existing order to verify values
     const orderRes = await client.query(`
       SELECT is_paid, status, total_price, ticket_number, table_number, table_id, table_session_id, party_size, order_type FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
     `, [restaurantId, id]);
-    
+
     if (orderRes.rows.length === 0) {
       throw new Error('Order not found');
     }
-    
+
     const existing = orderRes.rows[0];
     const nextStatus = status === 'PAID' ? 'CLOSED' : (status || existing.status);
     let nextIsPaid: boolean;
@@ -1889,7 +1920,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     }
 
     const splitJson = paymentSplit ? (typeof paymentSplit === 'string' ? paymentSplit : JSON.stringify(paymentSplit)) : null;
-    
+
     // Update order
     const updateRes = await client.query(`
       UPDATE orders
@@ -1907,7 +1938,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       WHERE restaurant_id = $7 AND id = $8
       RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, payment_split, paid_at, served_at, closed_at
     `, [nextStatus, nextIsPaid, nextTableNumber, nextTableId, nextTableSessionId, paymentMethod || null, restaurantId, id, splitJson]);
-    
+
     const updatedOrder = updateRes.rows[0];
 
     // Sync item status if master order status changed
@@ -1918,13 +1949,13 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     } else if (nextStatus === 'SERVED' || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
       await client.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]);
     }
-    
+
     // Process billing if order is now paid/completed (and wasn't paid before)
     if (nextIsPaid && !existing.is_paid) {
       const { BillingService } = await import('@/modules/billing/billing.service');
       await BillingService.processOrderBilling(client, restaurantId, id, Number(existing.total_price));
     }
-    
+
     await client.query('COMMIT');
 
     // Re-evaluate table occupancy and close session if table changed or order is CLOSED, CANCELLED, or EXPIRED
@@ -3173,7 +3204,7 @@ export async function createUser(phone: string, name?: string) {
   if (!phone) return null;
   const norm = normalizePhoneNumber(phone);
   const phoneToStore = norm.length === 10 ? norm : phone.trim();
-  
+
   const existing = await getUserByPhone(phone);
   if (existing) {
     if (name && name.trim()) {
@@ -3220,16 +3251,16 @@ export async function seedDefaultRoles(restaurantId: string) {
     const existing = await sql`SELECT id, name FROM roles WHERE restaurant_id = ${restaurantId}`;
     if (existing.length === 0) {
       const defaultRoles = [
-        { name: 'Waiter', description: 'Floor staff handling dine-in tables, table orders, and checking active orders', permissions: JSON.stringify(['pos', 'orders', 'tables']) },
-        { name: 'Kitchen Staff', description: 'Kitchen and chef display for viewing and preparing live orders', permissions: JSON.stringify(['orders']) },
-        { name: 'Cashier', description: 'Counter staff managing billing, POS orders, tables, and daily sales reports', permissions: JSON.stringify(['pos', 'orders', 'tables', 'analytics']) },
-        { name: 'Manager', description: 'General manager overseeing operations, menu items, inventory, analytics, and staff', permissions: JSON.stringify(['pos', 'orders', 'tables', 'products', 'inventory', 'analytics', 'staff']) },
+        { name: 'Waiter', description: 'Floor staff handling dine-in tables, table orders, and checking active orders', permissions: JSON.stringify(['pos', 'orders', 'tables']), default_order_status: 'READY' },
+        { name: 'Kitchen Staff', description: 'Kitchen and chef display for viewing and preparing live orders', permissions: JSON.stringify(['orders']), default_order_status: 'PREPARING' },
+        { name: 'Cashier', description: 'Counter staff managing billing, POS orders, tables, and daily sales reports', permissions: JSON.stringify(['pos', 'orders', 'tables', 'analytics']), default_order_status: 'ALL' },
+        { name: 'Manager', description: 'General manager overseeing operations, menu items, inventory, analytics, and staff', permissions: JSON.stringify(['pos', 'orders', 'tables', 'products', 'inventory', 'analytics', 'staff']), default_order_status: 'ALL' },
       ];
 
       for (const r of defaultRoles) {
         await sql`
-          INSERT INTO roles (restaurant_id, name, description, permissions, is_default)
-          VALUES (${restaurantId}, ${r.name}, ${r.description}, ${r.permissions}::jsonb, true)
+          INSERT INTO roles (restaurant_id, name, description, permissions, default_order_status, is_default)
+          VALUES (${restaurantId}, ${r.name}, ${r.description}, ${r.permissions}::jsonb, ${r.default_order_status}, true)
           ON CONFLICT (restaurant_id, name) DO NOTHING
         `;
       }
@@ -3259,7 +3290,7 @@ export async function getRoles(restaurantId: string) {
   try {
     await seedDefaultRoles(restaurantId);
     return await sql`
-      SELECT r.id, r.restaurant_id, r.name, r.description, r.permissions, r.is_default, r.created_at, r.updated_at,
+      SELECT r.id, r.restaurant_id, r.name, r.description, r.permissions, r.default_order_status, r.is_default, r.created_at, r.updated_at,
              COUNT(s.id)::integer as staff_count
       FROM roles r
       LEFT JOIN staffs s ON s.role_id = r.id
@@ -3268,11 +3299,11 @@ export async function getRoles(restaurantId: string) {
       ORDER BY r.is_default DESC, r.name ASC
     `;
   } catch (err: any) {
-    if (err.message?.includes('roles') || err.message?.includes('does not exist')) {
+    if (err.message?.includes('roles') || err.message?.includes('does not exist') || err.message?.includes('default_order_status')) {
       await runAutoMigration(sql);
       await seedDefaultRoles(restaurantId);
       return await sql`
-        SELECT r.id, r.restaurant_id, r.name, r.description, r.permissions, r.is_default, r.created_at, r.updated_at,
+        SELECT r.id, r.restaurant_id, r.name, r.description, r.permissions, r.default_order_status, r.is_default, r.created_at, r.updated_at,
                COUNT(s.id)::integer as staff_count
         FROM roles r
         LEFT JOIN staffs s ON s.role_id = r.id
@@ -3290,17 +3321,18 @@ export async function getRoleById(restaurantId: string, id: string) {
   return rows[0] || null;
 }
 
-export async function createRole(restaurantId: string, data: { name: string; description?: string; permissions: string[] }) {
+export async function createRole(restaurantId: string, data: { name: string; description?: string; permissions: string[]; default_order_status?: string }) {
   const permissionsJson = JSON.stringify(data.permissions || []);
+  const defStatus = data.default_order_status || 'PREPARING';
   const rows = await sql`
-    INSERT INTO roles (restaurant_id, name, description, permissions, is_default)
-    VALUES (${restaurantId}, ${data.name.trim()}, ${data.description?.trim() || null}, ${permissionsJson}::jsonb, false)
-    RETURNING id, name, description, permissions, is_default, created_at, updated_at
+    INSERT INTO roles (restaurant_id, name, description, permissions, default_order_status, is_default)
+    VALUES (${restaurantId}, ${data.name.trim()}, ${data.description?.trim() || null}, ${permissionsJson}::jsonb, ${defStatus}, false)
+    RETURNING id, name, description, permissions, default_order_status, is_default, created_at, updated_at
   `;
   return rows[0];
 }
 
-export async function updateRole(restaurantId: string, id: string, data: { name?: string; description?: string; permissions?: string[] }) {
+export async function updateRole(restaurantId: string, id: string, data: { name?: string; description?: string; permissions?: string[]; default_order_status?: string }) {
   const existing = await getRoleById(restaurantId, id);
   if (!existing) throw new Error('Role not found');
 
@@ -3311,9 +3343,10 @@ export async function updateRole(restaurantId: string, id: string, data: { name?
       name = COALESCE(${data.name ? data.name.trim() : null}, name),
       description = COALESCE(${data.description !== undefined ? data.description.trim() : null}, description),
       permissions = COALESCE(${permissionsJson}::jsonb, permissions),
+      default_order_status = COALESCE(${data.default_order_status !== undefined ? data.default_order_status : null}, default_order_status),
       updated_at = NOW()
     WHERE restaurant_id = ${restaurantId} AND id = ${id}
-    RETURNING id, name, description, permissions, is_default, created_at, updated_at
+    RETURNING id, name, description, permissions, default_order_status, is_default, created_at, updated_at
   `;
 
   if (data.name) {
@@ -3340,18 +3373,18 @@ export async function getStaffs(restaurantId: string) {
     await seedDefaultRoles(restaurantId);
     return await sql`
       SELECT s.id, s.name, s.email, s.phone, s.role, s.role_id, s.is_active, s.created_at, s.updated_at,
-             r.name as role_name, r.permissions as role_permissions
+             r.name as role_name, r.permissions as role_permissions, r.default_order_status as role_default_order_status
       FROM staffs s
       LEFT JOIN roles r ON r.id = s.role_id
       WHERE s.restaurant_id = ${restaurantId}
       ORDER BY s.created_at DESC
     `;
   } catch (err: any) {
-    if (err.message?.includes('roles') || err.message?.includes('role_id')) {
+    if (err.message?.includes('roles') || err.message?.includes('role_id') || err.message?.includes('default_order_status')) {
       await runAutoMigration(sql);
       return await sql`
         SELECT s.id, s.name, s.email, s.phone, s.role, s.role_id, s.is_active, s.created_at, s.updated_at,
-               r.name as role_name, r.permissions as role_permissions
+               r.name as role_name, r.permissions as role_permissions, r.default_order_status as role_default_order_status
         FROM staffs s
         LEFT JOIN roles r ON r.id = s.role_id
         WHERE s.restaurant_id = ${restaurantId}
@@ -3365,7 +3398,7 @@ export async function getStaffs(restaurantId: string) {
 export async function getStaffByEmail(email: string) {
   try {
     const rows = await sql`
-      SELECT s.*, r.name as role_name, r.permissions as role_permissions
+      SELECT s.*, r.name as role_name, r.permissions as role_permissions, r.default_order_status as role_default_order_status
       FROM staffs s
       LEFT JOIN roles r ON r.id = s.role_id
       WHERE s.email = ${email}
@@ -3380,7 +3413,7 @@ export async function getStaffByEmail(email: string) {
 
 export async function getStaffById(restaurantId: string, id: string) {
   const rows = await sql`
-    SELECT s.*, r.name as role_name, r.permissions as role_permissions
+    SELECT s.*, r.name as role_name, r.permissions as role_permissions, r.default_order_status as role_default_order_status
     FROM staffs s
     LEFT JOIN roles r ON r.id = s.role_id
     WHERE s.restaurant_id = ${restaurantId} AND s.id = ${id}
@@ -3478,7 +3511,7 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
     `);
 
     await client.query(`ALTER TABLE otp_logs ADD COLUMN IF NOT EXISTS business_date DATE DEFAULT CURRENT_DATE`);
-    
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS daily_otp_stats (
         date DATE PRIMARY KEY,
@@ -3492,7 +3525,7 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
     await client.query(`ALTER TABLE daily_otp_stats DROP CONSTRAINT IF EXISTS daily_otp_stats_pkey CASCADE`);
     await client.query(`ALTER TABLE daily_otp_stats ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY`);
     await client.query(`ALTER TABLE daily_otp_stats ADD COLUMN IF NOT EXISTS restaurant_id UUID`);
-    
+
     // Add unique constraint if it doesn't exist
     await client.query(`
       DO $$
@@ -3507,15 +3540,18 @@ export async function incrementOtpCount(phone: string, restaurantId?: string) {
 
     let businessDateQuery = 'CURRENT_DATE';
     if (restaurantId) {
-      businessDateQuery = '(SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = $3)';
+      businessDateQuery = '(SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = $2)';
     }
 
-    // 1. Log the specific OTP request
+    // 1. Log the specific OTP request (normalize phone)
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const normalizedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : phone;
+
     const logRes = await client.query(`
       INSERT INTO otp_logs (phone, sent_at, restaurant_id, business_date)
-      VALUES ($1, NOW() AT TIME ZONE $2, $3, ${businessDateQuery})
+      VALUES ($1, CURRENT_TIMESTAMP, $2, ${businessDateQuery})
       RETURNING id, business_date
-    `, [phone, localTimezone, restaurantId || null]);
+    `, [normalizedPhone, restaurantId || null]);
 
     const logId = logRes.rows[0].id;
     const businessDate = logRes.rows[0].business_date;
@@ -3573,7 +3609,7 @@ export async function autoCloseRestaurants() {
   const client = await pool.connect();
   try {
     await client.query(`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS last_auto_closed_date DATE`);
-    
+
     const result = await client.query(`
       UPDATE restaurants 
       SET is_service_active = false,
@@ -3586,7 +3622,7 @@ export async function autoCloseRestaurants() {
         )
       RETURNING id
     `);
-    
+
     return { closedCount: result.rowCount };
   } catch (err) {
     console.error('Failed to auto-close restaurants:', err);
@@ -3899,16 +3935,45 @@ export async function mergeDuplicateCustomerLoyalty(restaurantId: string) {
   }
 }
 
-export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
+export async function getLoyaltyCustomersList(
+  restaurantId: string, 
+  search?: string,
+  page: number = 1,
+  limit: number = 50
+) {
   try {
     // Merge duplicate customer accounts and sync completed/paid orders
     await mergeDuplicateCustomerLoyalty(restaurantId);
     await syncAllCompletedOrdersToLoyalty(restaurantId);
 
-    let query;
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    let rowsQuery;
+    let countQuery;
+
     if (search && search.trim() !== '') {
-      const searchPattern = `%${search.trim().toLowerCase()}%`;
-      query = sql`
+      const searchTrimmed = search.trim().toLowerCase();
+      const rawDigits = search.replace(/\D/g, '');
+      const last10Digits = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+      const searchPattern = `%${searchTrimmed}%`;
+      const digitsPattern = last10Digits ? `%${last10Digits}%` : searchPattern;
+
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
+      `;
+
+      rowsQuery = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
           cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
@@ -3917,11 +3982,24 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
         FROM customer_loyalty cl
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
-          AND (LOWER(u.name) LIKE ${searchPattern} OR LOWER(u.phone) LIKE ${searchPattern})
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
       `;
     } else {
-      query = sql`
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+      `;
+
+      rowsQuery = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
           cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
@@ -3931,15 +4009,25 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
       `;
     }
 
-    const rows = await query;
-    return rows;
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      customers: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return { customers: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }
@@ -4014,18 +4102,71 @@ export async function adjustCustomerPoints(restaurantId: string, customerLoyalty
   }
 }
 
-export async function getLoyaltyRewards(restaurantId: string) {
+export async function deleteCustomerLoyaltyProfile(restaurantId: string, customerLoyaltyId: string) {
   try {
-    const rows = await sql`
-      SELECT * FROM loyalty_rewards 
-      WHERE restaurant_id = ${restaurantId}
-      ORDER BY is_active DESC, points_required ASC
+    const rec = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId} LIMIT 1
     `;
-    return rows;
+    if (rec.length === 0) return false;
+
+    const userId = rec[0].user_id;
+
+    await sql`DELETE FROM loyalty_transactions WHERE customer_loyalty_id = ${customerLoyaltyId}`;
+    await sql`DELETE FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId}`;
+
+    if (userId) {
+      const orders = await sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`;
+      if (orders.length === 0) {
+        await sql`DELETE FROM users WHERE id = ${userId}`;
+      }
+    }
+
+    return true;
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return false;
+    }
+    throw err;
+  }
+}
+
+export async function getLoyaltyRewards(
+  restaurantId: string,
+  page: number = 1,
+  limit: number = 50
+) {
+  try {
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    const countQuery = sql`
+      SELECT COUNT(*)::int as total FROM loyalty_rewards WHERE restaurant_id = ${restaurantId}
+    `;
+
+    const rowsQuery = sql`
+      SELECT * FROM loyalty_rewards 
+      WHERE restaurant_id = ${restaurantId}
+      ORDER BY is_active DESC, points_required ASC
+      LIMIT ${safeLimit} OFFSET ${offset}
+    `;
+
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      rewards: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return { rewards: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }
@@ -4089,7 +4230,7 @@ export async function updateLoyaltyReward(restaurantId: string, rewardId: string
 
     const ex = existing[0];
     const selectedIdsJson = JSON.stringify(rewardData.selected_product_ids ?? ex.selected_product_ids ?? []);
-    const validUntilVal = rewardData.valid_until !== undefined 
+    const validUntilVal = rewardData.valid_until !== undefined
       ? (rewardData.valid_until ? new Date(rewardData.valid_until).toISOString() : null)
       : ex.valid_until;
 
@@ -4132,25 +4273,79 @@ export async function deleteLoyaltyReward(restaurantId: string, rewardId: string
   }
 }
 
-export async function getLoyaltyTransactionsList(restaurantId: string) {
+export async function getLoyaltyTransactionsList(
+  restaurantId: string,
+  page: number = 1,
+  limit: number = 50,
+  transactionType?: string
+) {
   try {
-    const rows = await sql`
-      SELECT 
-        lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
-        u.name as customer_name, u.phone,
-        o.ticket_number
-      FROM loyalty_transactions lt
-      JOIN users u ON u.id = lt.user_id
-      LEFT JOIN orders o ON o.id = lt.order_id
-      WHERE lt.restaurant_id = ${restaurantId}
-      ORDER BY lt.created_at DESC
-      LIMIT 100
-    `;
-    return rows;
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    let countQuery;
+    let rowsQuery;
+
+    if (transactionType && transactionType !== 'ALL') {
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        WHERE lt.restaurant_id = ${restaurantId}
+          AND lt.transaction_type = ${transactionType}
+      `;
+
+      rowsQuery = sql`
+        SELECT 
+          lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
+          u.name as customer_name, u.phone,
+          o.ticket_number
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        LEFT JOIN orders o ON o.id = lt.order_id
+        WHERE lt.restaurant_id = ${restaurantId}
+          AND lt.transaction_type = ${transactionType}
+        ORDER BY lt.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
+      `;
+    } else {
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        WHERE lt.restaurant_id = ${restaurantId}
+      `;
+
+      rowsQuery = sql`
+        SELECT 
+          lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
+          u.name as customer_name, u.phone,
+          o.ticket_number
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        LEFT JOIN orders o ON o.id = lt.order_id
+        WHERE lt.restaurant_id = ${restaurantId}
+        ORDER BY lt.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
+      `;
+    }
+
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      transactions: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return { transactions: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }

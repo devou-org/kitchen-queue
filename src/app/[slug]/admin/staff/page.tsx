@@ -10,8 +10,18 @@ import {
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { ADMIN_MODULES } from '@/lib/admin-modules';
 import toast from 'react-hot-toast';
+
+const ORDER_STATUS_OPTIONS = [
+  { value: 'ALL', label: 'ALL' },
+  { value: 'PENDING', label: 'PENDING' },
+  { value: 'PREPARING', label: 'PREPARING' },
+  { value: 'READY', label: 'READY' },
+  { value: 'SERVED', label: 'SERVED' },
+  { value: 'CLOSED', label: 'CLOSED' },
+];
 
 const MODULE_ICONS: Record<string, any> = {
   pos: Store,
@@ -25,6 +35,52 @@ const MODULE_ICONS: Record<string, any> = {
   billing: Receipt,
   settings: Settings,
 };
+
+const ROLE_PALETTES = [
+  { bg: '#ECFDF5', color: '#065F46', border: '#A7F3D0', iconBg: '#D1FAE5', iconColor: '#059669' },
+  { bg: '#FFFBEB', color: '#92400E', border: '#FDE68A', iconBg: '#FEF3C7', iconColor: '#D97706' },
+  { bg: '#F0F9FF', color: '#075985', border: '#BAE6FD', iconBg: '#E0F2FE', iconColor: '#0284C7' },
+  { bg: '#FAF5FF', color: '#6B21A8', border: '#E9D5FF', iconBg: '#F3E8FF', iconColor: '#9333EA' },
+  { bg: '#FFF1F2', color: '#9F1239', border: '#FECDD3', iconBg: '#FFE4E6', iconColor: '#E11D48' },
+  { bg: '#FFF7ED', color: '#9A3412', border: '#FED7AA', iconBg: '#FFEDD5', iconColor: '#EA580C' },
+  { bg: '#EEF2FF', color: '#3730A3', border: '#C7D2FE', iconBg: '#E0E7FF', iconColor: '#4F46E5' },
+  { bg: '#F0FDFA', color: '#115E59', border: '#99F6E4', iconBg: '#CCFBF1', iconColor: '#0D9488' },
+  { bg: '#FDF2F8', color: '#9D174D', border: '#FBCFE8', iconBg: '#FCE7F3', iconColor: '#DB2777' },
+  { bg: '#F8FAFC', color: '#334155', border: '#CBD5E1', iconBg: '#E2E8F0', iconColor: '#475569' },
+];
+
+function getRoleBadgeStyle(roleName: string) {
+  const lower = (roleName || '').toLowerCase().trim();
+  if (lower.includes('admin') || lower.includes('owner')) {
+    return { bg: '#FFF1F2', color: '#9F1239', border: '#FECDD3', iconBg: '#FFE4E6', iconColor: '#E11D48' };
+  }
+  if (lower.includes('waiter') || lower.includes('server')) {
+    return { bg: '#ECFDF5', color: '#065F46', border: '#A7F3D0', iconBg: '#D1FAE5', iconColor: '#059669' };
+  }
+  if (lower.includes('kitchen') || lower.includes('cook') || lower.includes('chef')) {
+    return { bg: '#FFFBEB', color: '#92400E', border: '#FDE68A', iconBg: '#FEF3C7', iconColor: '#D97706' };
+  }
+  if (lower.includes('cashier') || lower.includes('counter') || lower.includes('billing')) {
+    return { bg: '#F0F9FF', color: '#075985', border: '#BAE6FD', iconBg: '#E0F2FE', iconColor: '#0284C7' };
+  }
+  if (lower.includes('manager') || lower.includes('supervisor')) {
+    return { bg: '#FAF5FF', color: '#6B21A8', border: '#E9D5FF', iconBg: '#F3E8FF', iconColor: '#9333EA' };
+  }
+  if (lower.includes('barista') || lower.includes('bartender') || lower.includes('beverage')) {
+    return { bg: '#FFF7ED', color: '#9A3412', border: '#FED7AA', iconBg: '#FFEDD5', iconColor: '#EA580C' };
+  }
+  if (lower.includes('captain') || lower.includes('lead') || lower.includes('head')) {
+    return { bg: '#EEF2FF', color: '#3730A3', border: '#C7D2FE', iconBg: '#E0E7FF', iconColor: '#4F46E5' };
+  }
+
+  // Consistent hash mapping for custom roles
+  let hash = 0;
+  for (let i = 0; i < lower.length; i++) {
+    hash = lower.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const idx = Math.abs(hash) % ROLE_PALETTES.length;
+  return ROLE_PALETTES[idx];
+}
 
 export default function StaffAdminPage() {
   const { slug } = useParams();
@@ -55,7 +111,8 @@ export default function StaffAdminPage() {
   const [roleFormData, setRoleFormData] = useState({
     name: '',
     description: '',
-    permissions: [] as string[]
+    permissions: [] as string[],
+    default_order_status: 'PREPARING'
   });
 
   const fetchData = async () => {
@@ -256,14 +313,16 @@ export default function StaffAdminPage() {
       setRoleFormData({
         name: role.name,
         description: role.description || '',
-        permissions: perms
+        permissions: perms,
+        default_order_status: role.default_order_status || 'PREPARING'
       });
     } else {
       setEditingRole(null);
       setRoleFormData({
         name: '',
         description: '',
-        permissions: ['pos', 'orders', 'tables']
+        permissions: ['pos', 'orders', 'tables'],
+        default_order_status: 'PREPARING'
       });
     }
     setRoleErrorMsg('');
@@ -820,20 +879,26 @@ export default function StaffAdminPage() {
                               </div>
                             </td>
                             <td>
-                              <span style={{ 
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '3px 8px', 
-                                borderRadius: '6px', 
-                                fontSize: '11px', 
-                                fontWeight: 700,
-                                background: displayRole.toLowerCase().includes('admin') ? '#EEF2FF' : displayRole.toLowerCase().includes('kitchen') ? '#FEF3C7' : '#ECFDF5', 
-                                color: displayRole.toLowerCase().includes('admin') ? '#4F46E5' : displayRole.toLowerCase().includes('kitchen') ? '#D97706' : '#059669'
-                              }}>
-                                <Shield size={11} />
-                                <span>{displayRole}</span>
-                              </span>
+                              {(() => {
+                                const roleStyle = getRoleBadgeStyle(displayRole);
+                                return (
+                                  <span style={{ 
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    padding: '3px 9px', 
+                                    borderRadius: '6px', 
+                                    fontSize: '11px', 
+                                    fontWeight: 700,
+                                    background: roleStyle.bg, 
+                                    color: roleStyle.color,
+                                    border: `1px solid ${roleStyle.border}`
+                                  }}>
+                                    <Shield size={11} style={{ color: roleStyle.iconColor }} />
+                                    <span>{displayRole}</span>
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '320px' }}>
@@ -843,18 +908,18 @@ export default function StaffAdminPage() {
                                   return (
                                     <span key={p} style={{
                                       fontSize: '11px',
-                                      padding: '2px 7px',
+                                      padding: '2.5px 8px',
                                       borderRadius: '6px',
                                       background: '#F1F5F9',
                                       border: '1px solid #E2E8F0',
                                       color: '#475569',
-                                      fontWeight: 500,
+                                      fontWeight: 600,
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '4px',
                                       whiteSpace: 'nowrap'
                                     }}>
-                                      <IconComp size={10} style={{ color: 'var(--primary, #971345)' }} />
+                                      <IconComp size={11} style={{ color: '#64748B' }} />
                                       <span>{mod?.name || p}</span>
                                     </span>
                                   );
@@ -940,17 +1005,18 @@ export default function StaffAdminPage() {
                 <table className="roles-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ width: '22%', paddingLeft: '20px' }}>Role</th>
-                      <th style={{ width: '28%' }}>Description</th>
-                      <th style={{ width: '32%' }}>Allowed Modules</th>
-                      <th style={{ width: '10%' }}>Assigned</th>
-                      <th style={{ textAlign: 'center', width: '110px', paddingRight: '20px' }}>Actions</th>
+                      <th style={{ width: '20%', paddingLeft: '20px' }}>Role</th>
+                      <th style={{ width: '24%' }}>Description</th>
+                      <th style={{ width: '28%' }}>Allowed Modules</th>
+                      <th style={{ width: '15%' }}>Default Order Filter</th>
+                      <th style={{ width: '8%' }}>Assigned</th>
+                      <th style={{ textAlign: 'center', width: '90px', paddingRight: '20px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRoles.length === 0 ? (
                       <tr>
-                        <td colSpan={5} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <td colSpan={6} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                           {searchQuery ? 'No roles match your search criteria.' : 'No roles configured yet. Click "Create New Role" to add one!'}
                         </td>
                       </tr>
@@ -966,28 +1032,47 @@ export default function StaffAdminPage() {
                         return (
                           <tr key={role.id}>
                             <td style={{ paddingLeft: '20px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{
-                                  width: '28px', height: '28px',
-                                  borderRadius: '6px',
-                                  background: '#EEF2FF',
-                                  color: '#4F46E5',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  flexShrink: 0
-                                }}>
-                                  <Shield size={14} />
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
-                                    {role.name}
+                              {(() => {
+                                const roleStyle = getRoleBadgeStyle(role.name);
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{
+                                      width: '32px', height: '32px',
+                                      borderRadius: '8px',
+                                      background: roleStyle.iconBg,
+                                      color: roleStyle.iconColor,
+                                      border: `1px solid ${roleStyle.border}`,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      flexShrink: 0
+                                    }}>
+                                      <Shield size={15} />
+                                    </div>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          padding: '2.5px 8px',
+                                          borderRadius: '6px',
+                                          fontSize: '12.5px',
+                                          fontWeight: 700,
+                                          background: roleStyle.bg,
+                                          color: roleStyle.color,
+                                          border: `1px solid ${roleStyle.border}`
+                                        }}>
+                                          {role.name}
+                                        </span>
+                                        {role.is_default && (
+                                          <span style={{ fontSize: '10px', color: '#64748B', fontWeight: 600, background: '#F1F5F9', border: '1px solid #E2E8F0', padding: '1px 6px', borderRadius: '4px' }}>
+                                            System Default
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
-                                  {role.is_default && (
-                                    <span style={{ fontSize: '10px', color: '#4F46E5', fontWeight: 600, background: '#EEF2FF', padding: '1px 6px', borderRadius: '4px' }}>
-                                      System Default
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+                                );
+                              })()}
                             </td>
 
                             <td style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.4 }}>
@@ -1007,20 +1092,36 @@ export default function StaffAdminPage() {
                                       alignItems: 'center',
                                       gap: '4px',
                                       fontSize: '11px',
-                                      padding: '2px 7px',
+                                      padding: '2.5px 8px',
                                       borderRadius: '6px',
                                       background: '#F1F5F9',
                                       border: '1px solid #E2E8F0',
-                                      color: '#334155',
-                                      fontWeight: 500,
+                                      color: '#475569',
+                                      fontWeight: 600,
                                       whiteSpace: 'nowrap'
                                     }}>
-                                      <IconComp size={10} style={{ color: 'var(--primary, #971345)' }} />
+                                      <IconComp size={11} style={{ color: '#64748B' }} />
                                       <span>{mod?.name || key}</span>
                                     </span>
                                   );
                                 })}
                               </div>
+                            </td>
+
+                            <td>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                background: role.default_order_status === 'READY' ? '#DCFCE7' : role.default_order_status === 'PREPARING' ? '#FEF3C7' : role.default_order_status === 'ALL' ? '#F1F5F9' : '#EDE9FE',
+                                color: role.default_order_status === 'READY' ? '#166534' : role.default_order_status === 'PREPARING' ? '#B45309' : role.default_order_status === 'ALL' ? '#475569' : '#6B21A8',
+                                border: '1px solid rgba(0,0,0,0.06)'
+                              }}>
+                                {role.default_order_status || 'PREPARING'}
+                              </span>
                             </td>
 
                             <td>
@@ -1333,6 +1434,21 @@ export default function StaffAdminPage() {
                   />
                 </div>
 
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Default Orders Tab Filter
+                  </label>
+                  <CustomSelect
+                    value={roleFormData.default_order_status || 'PREPARING'}
+                    onChange={(val) => setRoleFormData({ ...roleFormData, default_order_status: val })}
+                    options={ORDER_STATUS_OPTIONS}
+                    buttonStyle={{ height: '38px', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#64748B', display: 'block', marginTop: '4px' }}>
+                    The default filter automatically selected when users with this role open the Orders tab.
+                  </span>
+                </div>
+
                 {/* Module Permissions Checkbox Grid - Clean & Compact */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -1383,7 +1499,7 @@ export default function StaffAdminPage() {
                           <div style={{ color: isChecked ? 'var(--primary)' : '#94A3B8', display: 'flex', alignItems: 'center' }}>
                             {isChecked ? <CheckSquare size={16} /> : <Square size={16} />}
                           </div>
-                          <IconComp size={14} style={{ color: isChecked ? 'var(--primary)' : 'var(--text-secondary)', flexShrink: 0 }} />
+                          <IconComp size={14} style={{ color: isChecked ? 'var(--primary)' : '#64748B', flexShrink: 0 }} />
                           <span style={{
                             fontWeight: isChecked ? 600 : 500,
                             fontSize: '12px',

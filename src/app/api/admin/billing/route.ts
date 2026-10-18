@@ -60,6 +60,40 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    const { searchParams } = new URL(request.url);
+    const todayParam = searchParams.get('today');
+
+    // 4. Fetch today's OTP usage stats
+    let todayOtpStats;
+    if (todayParam) {
+      todayOtpStats = await sql`
+        SELECT 
+          COUNT(*)::int as count,
+          COALESCE(SUM(amount), 0)::float as amount
+        FROM billing_transactions
+        WHERE restaurant_id = ${restaurant.id}
+          AND transaction_type = 'OTP'
+          AND created_at >= ${todayParam}::date
+          AND created_at < (${todayParam}::date + interval '1 day')
+      `;
+    } else {
+      todayOtpStats = await sql`
+        SELECT 
+          COUNT(*)::int as count,
+          COALESCE(SUM(amount), 0)::float as amount
+        FROM billing_transactions
+        WHERE restaurant_id = ${restaurant.id}
+          AND transaction_type = 'OTP'
+          AND created_at >= CURRENT_DATE
+          AND created_at < (CURRENT_DATE + interval '1 day')
+      `;
+    }
+
+    const todayOtpUsage = {
+      count: Number(todayOtpStats[0]?.count || 0),
+      amount: Number(todayOtpStats[0]?.amount || 0)
+    };
+
     return NextResponse.json({
       success: true,
       data: {
@@ -77,6 +111,7 @@ export async function GET(request: NextRequest) {
         transactions,
         summaries,
         pricingConfig,
+        todayOtpUsage,
       }
     });
   } catch (error: any) {

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, permissions } = body;
+    const { name, description, permissions, default_order_status } = body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ success: false, error: 'Role name is required' }, { status: 400 });
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       description: description?.trim(),
       permissions,
+      default_order_status: default_order_status || 'PREPARING',
     });
 
     return NextResponse.json({ success: true, data: role });
