@@ -656,7 +656,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         {children}
-        {!isMaximized && isSuperAdminOrOwner && !pathname.includes('/admin/orders') && <AIAnalystWidget />}
+        {!isMaximized && isSuperAdminOrOwner && !pathname.includes('/admin/orders') && !pathname.includes('/admin/tables') && <AIAnalystWidget />}
       </main>
     </div>
     </>

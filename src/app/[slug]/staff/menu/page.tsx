@@ -719,8 +719,8 @@ export default function StaffMenuPage() {
                     <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', letterSpacing: '0.02em' }}>Payment Method</label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                       {[
-                        { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'CARD', label: 'Card', icon: CreditCard },
                         { id: 'SPLIT', label: 'Split', icon: Split },
                       ].map((m) => {
