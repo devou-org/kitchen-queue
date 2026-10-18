@@ -457,7 +457,7 @@ export function POSCheckoutDrawer({
             phone: orderForm.phone,
             customerName: orderForm.customer_name,
           });
-          const cap = Number(t.capacity) || 0;
+          const cap = Number(t.effective_capacity || t.capacity) || 0;
           const seated = check.occupiedSeats;
 
           const rawNum = String(t.table_number || '').trim();
@@ -474,6 +474,12 @@ export function POSCheckoutDrawer({
           } else if (rawNum.toLowerCase().startsWith('table ')) {
             const c = rawNum.slice(6).trim();
             tableLabel = /^\d+$/.test(c) ? `T${c}` : c;
+          }
+
+          if (t.merged_table_numbers && t.merged_table_numbers.length > 0) {
+            tableLabel = `${tableLabel} [Merged: +${t.merged_table_numbers.join(', +')}]`;
+          } else if (t.merged_into_table_id) {
+            tableLabel = `${tableLabel} [Merged -> #${t.parent_table_number}]`;
           }
 
           const freeSeats = Math.max(0, cap - seated);

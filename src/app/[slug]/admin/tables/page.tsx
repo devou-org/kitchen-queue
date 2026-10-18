@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Plus, LayoutGrid, Users, RefreshCw, QrCode, Search, X } from 'lucide-react';
+import { Plus, LayoutGrid, Users, RefreshCw, QrCode, Search, X, Link2 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -16,6 +16,7 @@ import { CreateTableModal } from '@/components/modules/tables/CreateTableModal';
 import { EditTableModal } from '@/components/modules/tables/EditTableModal';
 import { TableQRModal } from '@/components/modules/tables/TableQRModal';
 import { DeleteTableModal } from '@/components/modules/tables/DeleteTableModal';
+import { MergeConfirmModal } from '@/components/modules/tables/MergeConfirmModal';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 
 export default function AdminTablesPage() {
@@ -35,6 +36,13 @@ export default function AdminTablesPage() {
   const [orderModalLoading, setOrderModalLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addingTable, setAddingTable] = useState(false);
+  
+  // Merge Flow: Interactive Selection Mode + Confirm Popup
+  const [mergeSourceTable, setMergeSourceTable] = useState<RestaurantTable | null>(null);
+  const [mergeTargetTable, setMergeTargetTable] = useState<RestaurantTable | null>(null);
+  const [isConfirmMergeOpen, setIsConfirmMergeOpen] = useState(false);
+  const [mergeLoading, setMergeLoading] = useState(false);
+
   const [selectedEditTable, setSelectedEditTable] = useState<RestaurantTable | null>(null);
   const [selectedQRTable, setSelectedQRTable] = useState<RestaurantTable | null>(null);
   const [tableToDelete, setTableToDelete] = useState<RestaurantTable | null>(null);
@@ -164,14 +172,131 @@ export default function AdminTablesPage() {
     }
   };
 
-  // Filtered tables list
-  const filteredTables = tables.filter(t => {
+  const handleConfirmMerge = async () => {
+    if (!mergeSourceTable || !mergeTargetTable) return;
+    setMergeLoading(true);
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (slugStr) headers['x-restaurant-slug'] = slugStr;
+
+      const res = await fetch('/api/tables/merge', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          primary_table_id: mergeSourceTable.id,
+          secondary_table_ids: [mergeTargetTable.id]
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || `Table #${mergeSourceTable.table_number} and Table #${mergeTargetTable.table_number} merged!`);
+        setIsConfirmMergeOpen(false);
+        setMergeSourceTable(null);
+        setMergeTargetTable(null);
+        fetchTables();
+      } else {
+        toast.error(data.error || 'Failed to merge tables');
+      }
+    } catch {
+      toast.error('Network error merging tables');
+    } finally {
+      setMergeLoading(false);
+    }
+  };
+
+  const handleStartMergeMode = (table?: RestaurantTable) => {
+    if (table) {
+      setMergeSourceTable(table);
+      toast('Click any available table to merge with Table #' + table.table_number, {
+        icon: '🔗',
+        id: 'merge-instruction'
+      });
+    } else {
+      // User clicked "Merge Tables" button at the top header
+      setMergeSourceTable(null);
+      toast('Click the first table you want to merge', {
+        icon: '🔗',
+        id: 'merge-instruction'
+      });
+    }
+  };
+
+  const handleCancelMergeMode = () => {
+    setMergeSourceTable(null);
+    setMergeTargetTable(null);
+    setIsConfirmMergeOpen(false);
+  };
+
+  const handleTableClickInMergeMode = (targetTable: RestaurantTable) => {
+    if (!mergeSourceTable) {
+      // This is the first table chosen
+      setMergeSourceTable(targetTable);
+      toast('Now select the second table to merge', {
+        icon: '🔗',
+        id: 'merge-instruction'
+      });
+      return;
+    }
+
+    if (mergeSourceTable.id === targetTable.id) {
+      // Same table clicked, cancel selection
+      setMergeSourceTable(null);
+      return;
+    }
+
+    // Both tables selected: open confirmation popup!
+    setMergeTargetTable(targetTable);
+    setIsConfirmMergeOpen(true);
+  };
+
+  const handleUnmergeTable = async (table: RestaurantTable) => {
+    const isPrimary = (table.merged_table_numbers?.length || 0) > 0;
+    const confirmMsg = isPrimary
+      ? `Are you sure you want to unmerge all tables joined with Table #${table.table_number}?`
+      : `Are you sure you want to detach Table #${table.table_number} from Table #${table.parent_table_number}?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (slugStr) headers['x-restaurant-slug'] = slugStr;
+
+      const res = await fetch('/api/tables/unmerge', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ table_id: table.id })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || 'Table(s) unmerged successfully');
+        fetchTables();
+      } else {
+        toast.error(data.error || 'Failed to unmerge tables');
+      }
+    } catch {
+      toast.error('Network error unmerging table');
+    }
+  };
+
+  // Only display primary tables and standalone tables (hide secondary merged children)
+  // Each merged group is rendered as ONE card on the lead table
+  const visibleTables = tables.filter(t => !t.merged_into_table_id);
+
+  // Filtered visible tables list
+  const filteredTables = visibleTables.filter(t => {
     if (filter === 'AVAILABLE' && t.status !== 'AVAILABLE') return false;
     if (filter === 'OCCUPIED' && t.status !== 'OCCUPIED') return false;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      const matchesTableNumber = String(t.table_number || '').toLowerCase().includes(q);
+      const matchesTableNumber = String(t.table_number || '').toLowerCase().includes(q) ||
+        (t.merged_table_numbers || []).some(n => String(n).toLowerCase().includes(q));
       const matchesCustomer = t.active_orders?.some(
         (o: any) =>
           (o.customer_name != null && String(o.customer_name).toLowerCase().includes(q)) ||
@@ -184,9 +309,8 @@ export default function AdminTablesPage() {
     return true;
   });
 
-  const occupiedCount = tables.filter(t => t.status === 'OCCUPIED').length;
-  const availableCount = tables.filter(t => t.status === 'AVAILABLE').length;
-  // const reservedCount = tables.filter((t: any) => t.status === 'RESERVED').length;
+  const occupiedCount = visibleTables.filter(t => t.status === 'OCCUPIED').length;
+  const availableCount = visibleTables.filter(t => t.status === 'AVAILABLE').length;
 
   const totalCapacity = tables.reduce((sum, t) => sum + (Number(t.capacity) || 0), 0);
   const totalSeatedGuests = tables.reduce((sum, t) => {
@@ -494,6 +618,38 @@ export default function AdminTablesPage() {
                 <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
               </button>
 
+              {/* Merge Tables Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (mergeSourceTable) {
+                    handleCancelMergeMode();
+                  } else {
+                    handleStartMergeMode();
+                  }
+                }}
+                title={mergeSourceTable ? "Cancel merge mode" : "Merge Tables for Large Parties"}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: mergeSourceTable ? '#FEF2F2' : '#FFFFFF',
+                  border: `1px solid ${mergeSourceTable ? '#F87171' : 'var(--border, #CBD5E1)'}`,
+                  color: mergeSourceTable ? '#DC2626' : '#334155',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Link2 size={15} color={mergeSourceTable ? '#DC2626' : primaryColor} />
+                <span>{mergeSourceTable ? 'Cancel Merge' : 'Merge Tables'}</span>
+              </button>
+
               {/* Add Table Button */}
               <button
                 type="button"
@@ -526,6 +682,69 @@ export default function AdminTablesPage() {
 
       {/* Tables Content Area */}
       <div style={{ padding: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+
+      {/* Merge Selection Mode Alert Banner */}
+      {mergeSourceTable && (
+        <div
+          style={{
+            marginBottom: '16px',
+            padding: '12px 18px',
+            borderRadius: '10px',
+            background: '#F0FDF4',
+            border: `1.5px solid ${primaryColor}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            animation: 'fadeIn 0.15s ease-out',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                background: `${primaryColor}20`,
+                color: primaryColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Link2 size={16} />
+            </span>
+            <div>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', display: 'block' }}>
+                Merging with Table #{mergeSourceTable.table_number} ({mergeSourceTable.capacity} seats)
+              </span>
+              <span style={{ fontSize: '12px', color: '#475569' }}>
+                Click on the second table you want to merge together.
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCancelMergeMode}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '6px',
+              border: '1px solid #CBD5E1',
+              background: '#FFFFFF',
+              color: '#475569',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Tables Grid */}
       {loading ? (
@@ -567,11 +786,22 @@ export default function AdminTablesPage() {
             <TableCard
               key={table.id}
               table={table}
-              onSelect={(t, ord) => handleSelectTable(t, ord)}
+              onSelect={(t, ord) => {
+                if (mergeSourceTable) {
+                  handleTableClickInMergeMode(t);
+                } else {
+                  handleSelectTable(t, ord);
+                }
+              }}
               onTakeOrder={(t) => handleTakeOrder(t)}
               onEdit={(t) => setSelectedEditTable(t)}
               onViewQR={(t) => setSelectedQRTable(t)}
               onDelete={(t) => setTableToDelete(t)}
+              onUnmerge={handleUnmergeTable}
+              onMerge={(t) => handleStartMergeMode(t)}
+              isMergeSource={mergeSourceTable?.id === table.id}
+              isMergeSelectionMode={Boolean(mergeSourceTable)}
+              onSelectForMerge={(t) => handleTableClickInMergeMode(t)}
               primaryColor={primaryColor}
             />
           ))}
@@ -597,7 +827,20 @@ export default function AdminTablesPage() {
         />
       )}
 
-      {/* Modals */}
+      {/* Confirmation Popup for Merge */}
+      <MergeConfirmModal
+        isOpen={isConfirmMergeOpen}
+        onClose={() => {
+          setIsConfirmMergeOpen(false);
+          setMergeTargetTable(null);
+        }}
+        onConfirm={handleConfirmMerge}
+        sourceTable={mergeSourceTable}
+        targetTable={mergeTargetTable}
+        loading={mergeLoading}
+        primaryColor={primaryColor}
+      />
+
       <CreateTableModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

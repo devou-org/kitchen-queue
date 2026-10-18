@@ -1,4 +1,4 @@
-f# Table Merge Architecture & Implementation Specification
+# Table Merge Architecture & Implementation Specification
 
 > **Target Module**: Table Management (`src/modules/tables/`, `src/app/[slug]/admin/tables/`)  
 > **Target Branch**: `merge-table`  

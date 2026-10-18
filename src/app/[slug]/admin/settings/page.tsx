@@ -11,6 +11,7 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { ServiceToggle, checkOperatingHours } from '@/components/ServiceToggle';
+import { CounterHardwareSettings } from '@/components/CounterHardwareSettings';
 
 interface CollapsibleCardProps {
   id: string;
@@ -587,9 +588,6 @@ export default function AdminSettings() {
               isCollapsed={!!collapsedSections['service_status']}
               onToggle={() => toggleSection('service_status')}
             >
-              <p style={{ ...S.cardDesc, marginBottom: '16px' }}>
-                Manage online ordering availability, switch between Online/Offline modes, and set custom customer offline notices.
-              </p>
               <ServiceToggle 
                 primaryColor={primaryColor} 
                 onStatusChange={(online) => setIsServiceOnline(online)}
@@ -744,6 +742,66 @@ export default function AdminSettings() {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', maxWidth: '320px' }}>
                       <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} style={S.colorSwatch} />
                       <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} maxLength={7} style={S.colorInput} placeholder="#971345" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Brand Live Preview */}
+                <div style={{ marginTop: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Eye size={14} style={{ color: primaryColor || 'var(--primary, #971345)' }} />
+                    <span>Brand Live Preview</span>
+                  </div>
+
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+                    {/* Header Mockup */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="Logo" style={{ width: '34px', height: '34px', borderRadius: '6px', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: '34px', height: '34px', borderRadius: '6px', backgroundColor: primaryColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '14px' }}>
+                          {name ? name.charAt(0).toUpperCase() : '🌿'}
+                        </div>
+                      )}
+                      <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>{name || 'Restaurant Name'}</span>
+                    </div>
+
+                    {/* Body Banner Mockup */}
+                    <div style={{ padding: '24px 18px 12px 18px', background: 'linear-gradient(to bottom right, #fdfdfd, #f8fafc)' }}>
+                      <div style={{ height: '8px', width: '120px', borderRadius: '4px', backgroundColor: primaryColor, marginBottom: '8px' }} />
+                      <div style={{ height: '6px', width: '220px', borderRadius: '3px', backgroundColor: '#e2e8f0', marginBottom: '16px' }} />
+
+                      {/* Category Pill Mockup */}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ padding: '6px 14px', borderRadius: '30px', backgroundColor: primaryColor, color: 'white', fontSize: '11px', fontWeight: 700 }}>All Specials</div>
+                        <div style={{ padding: '6px 14px', borderRadius: '30px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '11px', fontWeight: 600 }}>Starters</div>
+                      </div>
+                    </div>
+
+                    {/* Mockup Item Cards */}
+                    <div style={{ padding: '0 18px 18px 18px', backgroundColor: '#f8fafc' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Layout Preview</div>
+                      {menuLayout === 'GRID' ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+                          {[1, 2].map(i => (
+                            <div key={i} style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ height: '50px', backgroundColor: '#f1f5f9', borderRadius: '6px' }} />
+                              <div style={{ height: '6px', width: '70%', backgroundColor: '#cbd5e1', borderRadius: '3px' }} />
+                              <div style={{ height: '6px', width: '40%', backgroundColor: primaryColor, borderRadius: '3px', marginTop: 'auto' }} />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ height: '6px', width: '60%', backgroundColor: '#cbd5e1', borderRadius: '3px' }} />
+                              <div style={{ height: '6px', width: '40%', backgroundColor: primaryColor, borderRadius: '3px' }} />
+                            </div>
+                            <div style={{ width: '28px', height: '28px', backgroundColor: '#f1f5f9', borderRadius: '4px', flexShrink: 0 }} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1057,8 +1115,6 @@ export default function AdminSettings() {
               isCollapsed={!!collapsedSections['autoprint']}
               onToggle={() => toggleSection('autoprint')}
             >
-              <p style={{ ...S.cardDesc, marginBottom: '16px' }}>Configure automatic printing for kitchen order tickets (KOT) and thermal printer behavior.</p>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {/* Toggle Control Row */}
                 <div
@@ -1080,9 +1136,6 @@ export default function AdminSettings() {
                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
                       Auto-Print (KOT & Customer Bills)
                     </div>
-                    <p style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0', lineHeight: 1.4 }}>
-                      Automatically trigger receipt printing for kitchen order tickets and customer bills without showing browser print dialogs.
-                    </p>
                   </div>
 
                   <div
@@ -1114,37 +1167,12 @@ export default function AdminSettings() {
                   </div>
                 </div>
 
-                {/* Status Explanation Card */}
-                <div
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: autoPrintKot ? '#F0FDF4' : '#F8FAFC',
-                    border: `1px solid ${autoPrintKot ? '#BBF7D0' : '#E2E8F0'}`,
-                    fontSize: '12px',
-                    color: autoPrintKot ? '#166534' : '#475569',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <Printer size={16} style={{ color: autoPrintKot ? '#16A34A' : '#94A3B8', marginTop: '2px', flexShrink: 0 }} />
-                  <div>
-                    <span style={{ fontWeight: 700 }}>
-                      {autoPrintKot ? 'Auto-Printing is currently active' : 'Auto-Printing is paused'}
-                    </span>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', opacity: 0.9 }}>
-                      {autoPrintKot
-                        ? 'All new incoming orders in Orders and POS will immediately trigger printing to your connected thermal printer.'
-                        : 'New orders will update quietly in the kitchen queue without opening print jobs. Staff can still click print manually.'}
-                    </p>
+                {/* Minimal Counter Printers Hardware Configuration */}
+                {slug && (
+                  <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '14px' }}>
+                    <CounterHardwareSettings slug={slug} primaryColor={primaryColor || 'var(--primary, #971345)'} />
                   </div>
-                </div>
-
-                <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>
-                  Compatible with 58mm & 80mm Bluetooth ESC/POS printers, USB thermal hardware, and browser print dialogs.
-                </p>
+                )}
               </div>
             </CollapsibleCard>
 
@@ -1187,70 +1215,7 @@ export default function AdminSettings() {
               </div>
             </CollapsibleCard>
 
-            {/* 6. Brand Live Preview */}
-            <CollapsibleCard
-              id="preview"
-              title="Brand Live Preview"
-              icon={<Eye size={18} style={{ color: 'var(--primary, #971345)' }} />}
-              isCollapsed={!!collapsedSections['preview']}
-              onToggle={() => toggleSection('preview')}
-            >
-              <p style={{ ...S.cardDesc, marginBottom: '16px' }}>Real-time visual rendering of how customers see your digital menu header.</p>
-
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-                {/* Header Mockup */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
-                  {logoUrl ? (
-                    <img src={logoUrl} alt="Logo" style={{ width: '34px', height: '34px', borderRadius: '6px', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '34px', height: '34px', borderRadius: '6px', backgroundColor: primaryColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '14px' }}>
-                      {name ? name.charAt(0).toUpperCase() : '🌿'}
-                    </div>
-                  )}
-                  <span style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>{name || 'Restaurant Name'}</span>
-                </div>
-
-                {/* Body Banner Mockup */}
-                <div style={{ padding: '24px 18px 12px 18px', background: 'linear-gradient(to bottom right, #fdfdfd, #f8fafc)' }}>
-                  <div style={{ height: '8px', width: '120px', borderRadius: '4px', backgroundColor: primaryColor, marginBottom: '8px' }} />
-                  <div style={{ height: '6px', width: '220px', borderRadius: '3px', backgroundColor: '#e2e8f0', marginBottom: '16px' }} />
-
-                  {/* Category Pill Mockup */}
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{ padding: '6px 14px', borderRadius: '30px', backgroundColor: primaryColor, color: 'white', fontSize: '11px', fontWeight: 700 }}>All Specials</div>
-                    <div style={{ padding: '6px 14px', borderRadius: '30px', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '11px', fontWeight: 600 }}>Starters</div>
-                  </div>
-                </div>
-
-                {/* Mockup Item Cards */}
-                <div style={{ padding: '0 18px 18px 18px', backgroundColor: '#f8fafc' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Layout Preview</div>
-                  {menuLayout === 'GRID' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
-                      {[1, 2].map(i => (
-                        <div key={i} style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ height: '50px', backgroundColor: '#f1f5f9', borderRadius: '6px' }} />
-                          <div style={{ height: '6px', width: '70%', backgroundColor: '#cbd5e1', borderRadius: '3px' }} />
-                          <div style={{ height: '6px', width: '40%', backgroundColor: primaryColor, borderRadius: '3px', marginTop: 'auto' }} />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ height: '6px', width: '60%', backgroundColor: '#cbd5e1', borderRadius: '3px' }} />
-                          <div style={{ height: '6px', width: '40%', backgroundColor: primaryColor, borderRadius: '3px' }} />
-                        </div>
-                        <div style={{ width: '28px', height: '28px', backgroundColor: '#f1f5f9', borderRadius: '4px', flexShrink: 0 }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CollapsibleCard>
-
-            {/* 7. Menu QR Code Card */}
+            {/* 6. Menu QR Code Card */}
             {typeof window !== 'undefined' && slug && (
               <CollapsibleCard
                 id="qrcode"

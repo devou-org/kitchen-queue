@@ -109,6 +109,15 @@ async function runAutoMigration(sqlConnection: any) {
       );
     `;
     await sqlConnection`
+      ALTER TABLE restaurant_tables
+      ADD COLUMN IF NOT EXISTS merged_into_table_id UUID REFERENCES restaurant_tables(id) ON DELETE SET NULL;
+    `;
+    await sqlConnection`
+      CREATE INDEX IF NOT EXISTS idx_restaurant_tables_merged_into 
+      ON restaurant_tables(restaurant_id, merged_into_table_id) 
+      WHERE merged_into_table_id IS NOT NULL;
+    `;
+    await sqlConnection`
       CREATE TABLE IF NOT EXISTS table_sessions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
