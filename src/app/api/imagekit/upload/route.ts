@@ -3,8 +3,8 @@ import { requireAdmin } from '@/lib/auth';
 import { uploadToImageKit } from '@/lib/imagekit';
 
 // 250 KB in bytes (250 * 1024)
-export const MAX_IMAGE_SIZE_BYTES = 250 * 1024;
-export const ALLOWED_IMAGE_TYPES = [
+const MAX_IMAGE_SIZE_BYTES = 250 * 1024;
+const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
   'image/jpg',
   'image/png',
