@@ -11,6 +11,16 @@ export interface ImageKitUploadResult {
   filePath: string;
 }
 
+export const MAX_IMAGE_SIZE_BYTES = 250 * 1024; // 250 KB
+export const ALLOWED_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/svg+xml',
+];
+
 /**
  * Returns an initialized ImageKit client instance using environment variables.
  * Supports both standard and NEXT_PUBLIC_ prefixed keys for public key and URL endpoint.
