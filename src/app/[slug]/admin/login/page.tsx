@@ -27,6 +27,7 @@ export default function AdminLogin() {
     if (perms.includes('tables')) return 'tables';
     if (perms.includes('products')) return 'products';
     if (perms.includes('inventory')) return 'inventory';
+    if (perms.includes('finance')) return 'finance';
     if (perms.includes('analytics') && showOrdering) return 'analytics';
     if (perms.includes('staff')) return 'staff';
     if (perms.includes('billing')) return 'billing';
