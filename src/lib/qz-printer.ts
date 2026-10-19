@@ -6,6 +6,15 @@
  */
 
 import qz from 'qz-tray';
+import * as qzLna from 'qz-lna';
+
+// Register LNA helper on browser globals so QZ Tray's getLna() detects it directly
+if (typeof window !== 'undefined') {
+  (window as any).lna = qzLna;
+}
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).lna = qzLna;
+}
 
 export interface QzConnectionState {
   connected: boolean;
@@ -67,6 +76,10 @@ export async function connectQzTray(retries = 1): Promise<{ success: boolean; ve
 
   isConnecting = true;
   try {
+    if (typeof window !== 'undefined') {
+      (window as any).lna = qzLna;
+    }
+
     await qz.websocket.connect({
       retries,
       delay: 1,
@@ -77,11 +90,18 @@ export async function connectQzTray(retries = 1): Promise<{ success: boolean; ve
       version: getQzVersion(),
     };
   } catch (err: any) {
-    const msg = err.message || 'Unable to connect to local QZ Tray';
+    const msg = err?.message || 'Unable to connect to local QZ Tray';
+    const isOffline =
+      msg.includes('WebSocket') ||
+      msg.includes('Failed to fetch') ||
+      msg.includes('Unable to establish connection') ||
+      msg.includes('Connection attempt denied') ||
+      msg.includes('ECONNREFUSED');
+
     return {
       success: false,
-      error: msg.includes('WebSocket') || msg.includes('Failed to fetch')
-        ? 'QZ Tray is not running on this PC. Please launch QZ Tray.'
+      error: isOffline
+        ? 'QZ Tray is not running locally. Please launch QZ Tray on this PC.'
         : msg,
     };
   } finally {
