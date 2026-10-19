@@ -141,6 +141,48 @@ export async function POST(request: NextRequest) {
     const isPaid = (hasAdminRights || body.is_pos === true) && Boolean(is_paid);
     const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : ((hasAdminRights || body.is_pos === true) && payment_method ? String(payment_method) : undefined);
 
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+
+    const isDummyPhone = !cleanPhone || cleanPhone === '0000000000' || cleanPhone.replace(/0/g, '') === '';
+    const effectiveTableNumber = order_type === 'TAKEAWAY' ? null : table_number;
+
+    // 🛡️ ANTI-DUPLICATE CHECK: Prevent identical rapid duplicate orders (e.g. customer swipe bounce)
+    // NEVER apply this to dummy/walk-in phone numbers, and never block different tables on POS
+    if (!isDummyPhone) {
+      const recentDuplicate = await sql`
+        SELECT id, ticket_number, status, total_price, created_at, customer_name, phone, table_number
+        FROM orders
+        WHERE restaurant_id = ${restaurant.id}
+          AND (
+            phone = ${phone}
+            OR phone = ${'+91' + cleanPhone}
+            OR phone = ${cleanPhone}
+            OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+          )
+          AND created_at > NOW() - INTERVAL '15 seconds'
+        ORDER BY created_at DESC
+        LIMIT 1
+      ` as any[];
+
+      if (recentDuplicate[0]) {
+        // For POS orders, only block if it's the exact same table and exact same price within 3 seconds (double-click bounce)
+        const isPosDoubleClick = isPos &&
+          String(recentDuplicate[0].table_number || '').trim().toLowerCase() === String(effectiveTableNumber || '').trim().toLowerCase() &&
+          Number(recentDuplicate[0].total_price) === Number(total_price) &&
+          (Date.now() - new Date(recentDuplicate[0].created_at).getTime() < 3000);
+
+        if (!isPos || isPosDoubleClick) {
+          console.log(`⚠️ Prevented duplicate order for ticket #${recentDuplicate[0].ticket_number}`);
+          return NextResponse.json({
+            success: true,
+            data: recentDuplicate[0],
+            message: 'Order already placed',
+            duplicate_prevented: true,
+          });
+        }
+      }
+    }
+
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
@@ -163,7 +205,7 @@ export async function POST(request: NextRequest) {
       gst_type,
       notes,
       party_size: order_type === 'TAKEAWAY' ? 0 : (party_size || 1),
-      table_number: order_type === 'TAKEAWAY' ? null : table_number,
+      table_number: effectiveTableNumber,
       order_type: order_type || 'DINE_IN',
       is_pos: isPos,
       is_paid: isPaid,
