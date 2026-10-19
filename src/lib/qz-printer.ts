@@ -24,6 +24,48 @@ export interface QzConnectionState {
 }
 
 let isConnecting = false;
+let securityConfigured = false;
+
+/**
+ * Configure digital certificate & signature handling for silent printing
+ */
+export function setupQzSecurity(): void {
+  if (securityConfigured || typeof window === 'undefined') return;
+  try {
+    // Set certificate promise to fetch public certificate
+    qz.security.setCertificatePromise((resolve) => {
+      fetch('/api/print/qz-cert')
+        .then((res) => {
+          if (!res.ok) throw new Error('No certificate configured');
+          return res.text();
+        })
+        .then(resolve)
+        .catch(() => resolve('')); // Fallback gracefully if no cert uploaded yet
+    });
+
+    // Set signature algorithm and promise
+    qz.security.setSignatureAlgorithm('SHA512');
+    qz.security.setSignaturePromise((toSign: string) => {
+      return (resolve, reject) => {
+        fetch('/api/print/qz-sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: toSign,
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error('Signing failed');
+            return res.text();
+          })
+          .then(resolve)
+          .catch(reject);
+      };
+    });
+
+    securityConfigured = true;
+  } catch (secErr) {
+    console.warn('Failed to configure QZ Tray security signing:', secErr);
+  }
+}
 
 /**
  * Check if the current environment can support QZ Tray (client-side only)
@@ -62,6 +104,9 @@ export async function connectQzTray(retries = 1): Promise<{ success: boolean; ve
   if (!isQzSupported()) {
     return { success: false, error: 'QZ Tray is only supported in browser environments' };
   }
+
+  // Setup security signing handlers
+  setupQzSecurity();
 
   if (qz.websocket.isActive()) {
     return { success: true, version: getQzVersion() };
