@@ -1674,6 +1674,14 @@ export async function createOrder(data: {
     }
 
     await client.query('COMMIT');
+
+    // Automated Finance Stream: Record POS income if order placed as paid
+    if (isPaid) {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(orderId).catch(err => console.error('Finance income record on createOrder error:', err));
+      }).catch(() => {});
+    }
+
     return await getOrderById(data.restaurant_id, orderId);
   } catch (error) {
     await client.query('ROLLBACK');
@@ -1868,6 +1876,17 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
     processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
   }
 
+  // Trigger Finance Income recording (Automated Data Stream)
+  if (status === 'CLOSED' || status === 'COMPLETED' || updatedOrder?.is_paid) {
+    import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+      FinanceService.recordPosIncome(id).catch(err => console.error('Finance income record error:', err));
+    }).catch(() => {});
+  } else if (status === 'CANCELLED' || status === 'REFUNDED') {
+    import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+      FinanceService.recordPosIncome(id).catch(err => console.error('Finance cancel record error:', err));
+    }).catch(() => {});
+  }
+
   return updatedOrder;
 }
 
@@ -1981,6 +2000,17 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
     } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
       processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
+    }
+
+    // Trigger Finance Income recording (Automated Data Stream)
+    if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(id).catch(err => console.error('Finance income record error in completeOrderAndBill:', err));
+      }).catch(() => {});
+    } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(id).catch(err => console.error('Finance cancel record error in completeOrderAndBill:', err));
+      }).catch(() => {});
     }
 
     return updatedOrder;

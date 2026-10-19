@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3, LogOut, PanelLeftClose, PanelLeftOpen, Gift } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3, LogOut, PanelLeftClose, PanelLeftOpen, Gift, Landmark } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
@@ -45,6 +45,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
   // Controlled via Super Admin Subscription Modules
   const showInventory = restaurant?.modules?.INVENTORY === true;
+  const showFinance = restaurant?.modules?.FINANCE_MANAGEMENT === true;
   const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM !== false;
 
   useEffect(() => {
@@ -92,6 +93,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     { key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
     { key: 'products', name: 'Menu', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
+    ...(showFinance ? [{ key: 'finance', name: 'Finance', href: `/${slug}/admin/finance`, icon: <Landmark size={20} strokeWidth={2.5} /> }] : []),
     ...(showLoyalty ? [{ key: 'loyalty', name: 'Loyalty', href: `/${slug}/admin/loyalty`, icon: <Gift size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'staff', name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
@@ -158,6 +160,17 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         // Double-check with a fresh fetch in case the module was just enabled in another tab/window
         refresh().then((latest) => {
           if (latest && latest.modules?.INVENTORY !== true) {
+            const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
+            router.replace(`/${slug}/admin/${target}`);
+          }
+        });
+      }
+    }
+
+    if (!resLoading && restaurant && restaurant.modules?.FINANCE_MANAGEMENT !== true) {
+      if (pathname.startsWith(`/${slug}/admin/finance`)) {
+        refresh().then((latest) => {
+          if (latest && latest.modules?.FINANCE_MANAGEMENT !== true) {
             const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
             router.replace(`/${slug}/admin/${target}`);
           }
@@ -259,12 +272,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       <link rel="manifest" href={`/api/manifest?slug=${slug}&type=admin`} />
       <div className="admin-layout">
         <style dangerouslySetInnerHTML={{ __html: `
-          ${restaurant?.primary_color ? `
           :root {
+            ${restaurant?.primary_color ? `
             --primary: ${restaurant.primary_color};
             --primary-dark: ${restaurant.primary_color};
+            ` : ''}
+            --secondary: ${restaurant?.secondary_color || '#FFFFFF'};
+            --bg: ${restaurant?.secondary_color || '#FFFFFF'};
           }
-          ` : ''}
           .sidebar {
             width: 200px;
             transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
