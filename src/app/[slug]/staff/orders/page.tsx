@@ -279,6 +279,7 @@ export default function StaffOrders() {
           base64Bytes: data.base64Bytes,
           kotData: data.kotData,
           printerName: data.printer_name,
+          printerAddress: data.printer_address,
           counterId: data.counter_id,
           counterName: data.counter_name,
           isAutoPrint: true,

@@ -140,14 +140,14 @@ export async function getQzPrinters(): Promise<{ success: boolean; printers: str
 }
 
 /**
- * Print raw base64 ESC/POS buffer directly to target printer name via QZ Tray
+ * Print raw base64 ESC/POS buffer directly to target printer name or IP/host via QZ Tray
  */
 export async function printRawEscposViaQz(
-  printerName: string,
+  printerTarget: string | { host: string; port?: number },
   base64Bytes: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  if (!printerName?.trim()) {
-    return { success: false, error: 'Printer name is required for QZ Tray' };
+  if (!printerTarget) {
+    return { success: false, error: 'Printer target is required for QZ Tray' };
   }
 
   if (!base64Bytes) {
@@ -160,10 +160,33 @@ export async function printRawEscposViaQz(
   }
 
   try {
-    const targetPrinter = printerName.trim();
-    
+    let targetConfig: any;
+    let label = '';
+
+    if (typeof printerTarget === 'object' && printerTarget?.host) {
+      targetConfig = {
+        host: printerTarget.host.trim(),
+        port: printerTarget.port || 9100,
+      };
+      label = `${targetConfig.host}:${targetConfig.port}`;
+    } else {
+      const str = String(printerTarget).trim();
+      // Check if string is an IP address format: "192.168.1.100" or "192.168.1.100:9100"
+      const ipMatch = str.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?$/);
+      if (ipMatch) {
+        targetConfig = {
+          host: ipMatch[1],
+          port: ipMatch[2] ? parseInt(ipMatch[2], 10) : 9100,
+        };
+        label = `${targetConfig.host}:${targetConfig.port}`;
+      } else {
+        targetConfig = str;
+        label = str;
+      }
+    }
+
     // Create raw print config
-    const config = qz.configs.create(targetPrinter, {
+    const config = qz.configs.create(targetConfig, {
       spool: {
         size: null,
       },
@@ -182,7 +205,7 @@ export async function printRawEscposViaQz(
 
     return {
       success: true,
-      message: `Printed raw ticket to "${targetPrinter}" via QZ Tray`,
+      message: `Printed raw ticket to "${label}" via QZ Tray`,
     };
   } catch (err: any) {
     console.error('QZ Tray print failed:', err);
