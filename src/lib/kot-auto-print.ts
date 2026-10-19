@@ -121,8 +121,8 @@ export async function autoQueueAndBroadcastKot(
       const buffer = buildKotEscposBuffer(kotData);
       const base64Bytes = buffer.toString('base64');
 
-      // 1. Direct hardware print if running on Windows (Cashier / Counter PC)
-      if (isWindows) {
+      // 1. Direct hardware print if running on Windows (only if explicitly enabled to prevent double printing with QZ Tray)
+      if (isWindows && process.env.ENABLE_WINDOWS_DIRECT_PRINT === 'true') {
         try {
           const slipTitle = options.isAddOn
             ? `RUNNING KOT #${order.ticket_number} - ${cName} (ADD-ON)`
@@ -133,9 +133,9 @@ export async function autoQueueAndBroadcastKot(
             slipTitle
           );
           if (winRes.success) {
-            console.log(`🖨️ [Windows] Printed ${slipTitle} to "${conf.printerName}"`);
+            console.log(`🖨️ [Windows Spooler] Printed ${slipTitle} to "${conf.printerName}"`);
           } else {
-            console.warn(`⚠️ [Windows] Print failed for ${cName} on "${conf.printerName}": ${winRes.error}`);
+            console.warn(`⚠️ [Windows Spooler] Print failed for ${cName} on "${conf.printerName}": ${winRes.error}`);
           }
         } catch (winErr) {
           console.error('Windows direct print error:', winErr);
