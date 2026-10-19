@@ -662,6 +662,7 @@ export interface UnifiedPrintOptions {
   base64Bytes?: string;
   kotData: KotPrintData;
   printerName?: string;
+  printerAddress?: string;
   counterId?: string;
   counterName?: string;
   forceBrowser?: boolean;
@@ -725,7 +726,7 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
   method: HardwarePrinterType;
   message?: string;
 }> {
-  const { base64Bytes, kotData, printerName = 'POS-80C', counterId, counterName = kotData?.counterName, forceBrowser = false, isAutoPrint = false } = options;
+  const { base64Bytes, kotData, printerName = 'POS-80C', printerAddress, counterId, counterName = kotData?.counterName, forceBrowser = false, isAutoPrint = false } = options;
 
   // Convert base64 to Uint8Array if provided
   let rawBytes: Uint8Array | null = null;
@@ -755,15 +756,16 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
       }
     }
 
-    // 0. Try QZ Tray first (100% silent, direct OS spooler/Windows/Mac/Linux)
+    // 0. Try QZ Tray first (100% silent, direct OS spooler/Windows/Mac/Linux or network IP)
     if (base64Bytes) {
       try {
-        const qzResult = await printRawEscposViaQz(printerName, base64Bytes);
+        const qzTarget = printerAddress?.trim() || printerName;
+        const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes);
         if (qzResult.success) {
           return {
             success: true,
             method: 'qz-tray',
-            message: `Printed via QZ Tray to "${printerName}"!`,
+            message: `Printed via QZ Tray to "${qzTarget}"!`,
           };
         }
       } catch (qzErr: any) {

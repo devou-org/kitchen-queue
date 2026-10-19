@@ -345,9 +345,12 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         throw new Error(data.error || 'Failed to generate test print buffer');
       }
 
-      // 1. Try QZ Tray directly for silent OS printing
+      // 1. Try QZ Tray directly for silent OS or network TCP printing
       if (data.base64Bytes) {
-        const qzPrintRes = await printRawEscposViaQz(pName, data.base64Bytes);
+        const target = (form.printer_type === 'NETWORK' && form.printer_address?.trim())
+          ? form.printer_address.trim()
+          : pName;
+        const qzPrintRes = await printRawEscposViaQz(target, data.base64Bytes);
         if (qzPrintRes.success) {
           toast.success(`Printed to ${counter.name} via QZ Tray!`, { id: toastId });
           return;
