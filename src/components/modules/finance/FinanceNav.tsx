@@ -54,7 +54,7 @@ export function FinanceNav({ inHeader = false }: FinanceNavProps = {}) {
           touch-action: pan-x;
           border-top: none;
           height: 100%;
-          min-height: ${inHeader ? 'auto' : '44px'};
+          min-height: ${inHeader ? 'auto' : '48px'};
           padding: 0;
           margin: 0;
           margin-bottom: ${inHeader ? '0' : '20px'};
@@ -71,11 +71,11 @@ export function FinanceNav({ inHeader = false }: FinanceNavProps = {}) {
           align-items: center;
           justify-content: center;
           height: 100%;
-          min-height: ${inHeader ? 'auto' : '44px'};
+          min-height: ${inHeader ? 'auto' : '48px'};
           box-sizing: border-box;
-          padding: ${inHeader ? '0 24px' : '0 18px'};
+          padding: ${inHeader ? '0 20px' : '0 18px'};
           border-radius: 0;
-          font-size: 14.5px;
+          font-size: 13.5px;
           font-weight: 500;
           color: #475569;
           text-decoration: none;
@@ -96,9 +96,9 @@ export function FinanceNav({ inHeader = false }: FinanceNavProps = {}) {
         }
         .finance-nav-item--active {
           font-weight: 600;
-          color: var(--primary, #E11D48);
-          background-color: color-mix(in srgb, var(--primary, #E11D48) 9%, transparent);
-          border-top: 3.5px solid var(--primary, #E11D48);
+          color: var(--primary, #971345);
+          background-color: color-mix(in srgb, var(--primary, #971345) 9%, transparent);
+          border-top: 3.5px solid var(--primary, #971345);
         }
 
         @media (max-width: 768px) {
@@ -111,7 +111,7 @@ export function FinanceNav({ inHeader = false }: FinanceNavProps = {}) {
             height: 44px !important;
             min-height: 44px !important;
             padding: 0 16px !important;
-            font-size: 13.5px !important;
+            font-size: 13px !important;
           }
         }
       `}</style>

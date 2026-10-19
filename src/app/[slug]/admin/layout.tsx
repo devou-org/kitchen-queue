@@ -272,12 +272,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       <link rel="manifest" href={`/api/manifest?slug=${slug}&type=admin`} />
       <div className="admin-layout">
         <style dangerouslySetInnerHTML={{ __html: `
-          ${restaurant?.primary_color ? `
           :root {
+            ${restaurant?.primary_color ? `
             --primary: ${restaurant.primary_color};
             --primary-dark: ${restaurant.primary_color};
+            ` : ''}
+            --secondary: ${restaurant?.secondary_color || '#FFFFFF'};
+            --bg: ${restaurant?.secondary_color || '#FFFFFF'};
           }
-          ` : ''}
           .sidebar {
             width: 200px;
             transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;

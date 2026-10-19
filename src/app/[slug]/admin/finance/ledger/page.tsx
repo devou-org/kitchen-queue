@@ -14,10 +14,14 @@ import {
 import toast, { Toaster } from 'react-hot-toast';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { useRestaurant } from '@/hooks/useRestaurant';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import { Pagination } from '@/components/ui/Pagination';
 
 export default function FinanceLedgerPage() {
   const params = useParams();
   const slug = (params?.slug as string) || '';
+  const { restaurant } = useRestaurant();
 
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -82,7 +86,7 @@ export default function FinanceLedgerPage() {
   };
 
   return (
-    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: '#F8FAFC' }}>
+    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: restaurant?.secondary_color || '#FFFFFF' }}>
       <Toaster position="top-right" />
 
       <style>{`
@@ -109,6 +113,8 @@ export default function FinanceLedgerPage() {
           display: flex;
           align-items: stretch;
           height: 68px;
+          padding-top: 10px;
+          box-sizing: border-box;
         }
         .finance-actions {
           display: flex;
@@ -152,7 +158,7 @@ export default function FinanceLedgerPage() {
                 style={{
                   height: '36px',
                   padding: '0 14px',
-                  background: '#0F172A',
+                  background: 'var(--primary, #971345)',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '12.5px',
@@ -162,6 +168,8 @@ export default function FinanceLedgerPage() {
                   alignItems: 'center',
                   gap: '6px',
                   cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                  transition: 'opacity 0.15s ease',
                 }}
               >
                 <Download size={13} />
@@ -174,12 +182,12 @@ export default function FinanceLedgerPage() {
 
       <AdminContentWrapper>
         {/* Title inside page content */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
             Financial Transactions Ledger
           </h2>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-            Complete chronological audit trail of all automated sales, inventory purchases, and manual operating expenses
+          <p style={{ fontSize: '12.5px', color: '#64748B', margin: '2px 0 0 0' }}>
+            {startDate} to {endDate}
           </p>
         </div>
 
@@ -187,10 +195,11 @@ export default function FinanceLedgerPage() {
         <div
           style={{
             background: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '8px',
+            border: '1px solid #F1F5F9',
+            borderRadius: '12px',
             padding: '14px 16px',
-            marginBottom: '20px',
+            marginBottom: '16px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             display: 'flex',
             flexWrap: 'wrap',
             gap: '12px',
@@ -219,67 +228,49 @@ export default function FinanceLedgerPage() {
           </div>
 
           {/* Type Filter */}
-          <select
-            value={entryType}
-            onChange={(e) => setEntryType(e.target.value)}
-            style={{
-              height: '34px',
-              borderRadius: '5px',
-              border: '1px solid #CBD5E1',
-              padding: '0 10px',
-              fontSize: '12.5px',
-              color: '#334155',
-              background: '#FFFFFF',
-              outline: 'none',
-            }}
-          >
-            <option value="ALL">All Flow Types</option>
-            <option value="INCOME">Income (+)</option>
-            <option value="EXPENSE">Expense (−)</option>
-          </select>
+          <div style={{ width: '160px' }}>
+            <CustomSelect
+              value={entryType}
+              onChange={(val) => setEntryType(val)}
+              options={[
+                { value: 'ALL', label: 'All Flow Types' },
+                { value: 'INCOME', label: 'Income (+)' },
+                { value: 'EXPENSE', label: 'Expense (−)' },
+              ]}
+              buttonStyle={{ height: '34px', fontSize: '12.5px', borderRadius: '5px' }}
+            />
+          </div>
 
           {/* Source Filter */}
-          <select
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            style={{
-              height: '34px',
-              borderRadius: '5px',
-              border: '1px solid #CBD5E1',
-              padding: '0 10px',
-              fontSize: '12.5px',
-              color: '#334155',
-              background: '#FFFFFF',
-              outline: 'none',
-            }}
-          >
-            <option value="ALL">All Sources</option>
-            <option value="POS_SALES">POS Terminal Sales</option>
-            <option value="INVENTORY_PURCHASE">Inventory Purchases</option>
-            <option value="PETTY_CASH">Petty Cash & Overheads</option>
-          </select>
+          <div style={{ width: '190px' }}>
+            <CustomSelect
+              value={source}
+              onChange={(val) => setSource(val)}
+              options={[
+                { value: 'ALL', label: 'All Sources' },
+                { value: 'POS_SALES', label: 'POS Terminal Sales' },
+                { value: 'INVENTORY_PURCHASE', label: 'Inventory Purchases' },
+                { value: 'PETTY_CASH', label: 'Petty Cash & Overheads' },
+              ]}
+              buttonStyle={{ height: '34px', fontSize: '12.5px', borderRadius: '5px' }}
+            />
+          </div>
 
           {/* Payment Method Filter */}
-          <select
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            style={{
-              height: '34px',
-              borderRadius: '5px',
-              border: '1px solid #CBD5E1',
-              padding: '0 10px',
-              fontSize: '12.5px',
-              color: '#334155',
-              background: '#FFFFFF',
-              outline: 'none',
-            }}
-          >
-            <option value="ALL">All Methods</option>
-            <option value="UPI">UPI</option>
-            <option value="CASH">Cash</option>
-            <option value="CARD">Card</option>
-            <option value="BANK_TRANSFER">Bank Transfer</option>
-          </select>
+          <div style={{ width: '160px' }}>
+            <CustomSelect
+              value={paymentMethod}
+              onChange={(val) => setPaymentMethod(val)}
+              options={[
+                { value: 'ALL', label: 'All Methods' },
+                { value: 'UPI', label: 'UPI' },
+                { value: 'CASH', label: 'Cash' },
+                { value: 'CARD', label: 'Card' },
+                { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+              ]}
+              buttonStyle={{ height: '34px', fontSize: '12.5px', borderRadius: '5px' }}
+            />
+          </div>
 
           {/* Dates */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -320,9 +311,10 @@ export default function FinanceLedgerPage() {
         <div
           style={{
             background: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '8px',
+            border: '1px solid #F1F5F9',
+            borderRadius: '12px',
             overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
           }}
         >
           {loading ? (
@@ -356,10 +348,16 @@ export default function FinanceLedgerPage() {
                   <tbody>
                     {transactions.map((tx) => {
                       const isIncome = tx.entry_type === 'INCOME';
+                      const cleanDate = (() => {
+                        if (!tx.transaction_date) return '—';
+                        const raw = String(tx.transaction_date).split('T')[0];
+                        const parts = raw.split('-');
+                        return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : raw;
+                      })();
                       return (
                         <tr key={tx.id} style={{ borderBottom: '1px solid #F1F5F9', color: '#334155' }}>
-                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', fontSize: '12px' }}>
-                            {tx.transaction_date}
+                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 500, color: '#475569' }}>
+                            {cleanDate}
                           </td>
                           <td style={{ padding: '10px 14px' }}>
                             <div style={{ fontWeight: 600, color: '#0F172A', fontSize: '12.5px' }}>
@@ -414,54 +412,13 @@ export default function FinanceLedgerPage() {
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    borderTop: '1px solid #E2E8F0',
-                    fontSize: '12.5px',
-                    color: '#64748B',
-                  }}
-                >
-                  <div>
-                    Showing {transactions.length} of {pagination.totalCount} entries
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      disabled={pagination.page <= 1}
-                      onClick={() => fetchLedger(pagination.page - 1)}
-                      style={{
-                        padding: '4px 10px',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '4px',
-                        background: '#FFFFFF',
-                        cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Previous
-                    </button>
-                    <span style={{ padding: '4px 8px', fontWeight: 600, color: '#0F172A' }}>
-                      Page {pagination.page} / {pagination.totalPages}
-                    </span>
-                    <button
-                      disabled={pagination.page >= pagination.totalPages}
-                      onClick={() => fetchLedger(pagination.page + 1)}
-                      style={{
-                        padding: '4px 10px',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '4px',
-                        background: '#FFFFFF',
-                        cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalCount}
+                  pageSize={pagination.limit}
+                  onPageChange={(p) => fetchLedger(p)}
+                />
               )}
             </>
           )}

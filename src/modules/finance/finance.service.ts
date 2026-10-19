@@ -85,7 +85,7 @@ export class FinanceService {
   static async recordPosIncome(orderId: string): Promise<void> {
     try {
       const orderRes = await pool.query(
-        `SELECT id, restaurant_id, total_price, status, payment_status, payment_method, payment_split, created_at, customer_name, table_number
+        `SELECT id, restaurant_id, total_price, status, is_paid, payment_method, payment_split, created_at, business_date, customer_name, table_number, gst_amount, subtotal
          FROM orders WHERE id = $1 LIMIT 1`,
         [orderId]
       );
@@ -98,9 +98,16 @@ export class FinanceService {
       if (!active) return;
 
       const isOrderPaid =
+        Boolean(order.is_paid) ||
         order.status === 'CLOSED' ||
-        order.payment_status === 'PAID' ||
-        (order.payment_status && String(order.payment_status).toUpperCase() === 'PAID');
+        order.status === 'COMPLETED' ||
+        order.status === 'READY' ||
+        order.status === 'SERVED';
+
+      // Use restaurant business_date for exact synchronization with analytics
+      const txDate = order.business_date
+        ? (typeof order.business_date === 'string' ? order.business_date.split('T')[0] : new Date(order.business_date).toLocaleDateString('en-CA'))
+        : new Date(order.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
       // If order was cancelled or voided, remove income transaction
       if (order.status === 'CANCELLED' || !isOrderPaid) {
@@ -108,7 +115,6 @@ export class FinanceService {
           `DELETE FROM finance_transactions WHERE reference_id = $1 AND source = 'POS_SALES'`,
           [order.id]
         );
-        const txDate = new Date(order.created_at).toISOString().split('T')[0];
         await this.syncDailySummary(order.restaurant_id, txDate);
         return;
       }
@@ -116,28 +122,30 @@ export class FinanceService {
       const totalAmount = Number(order.total_price) || 0;
       if (totalAmount <= 0) return;
 
-      // Calculate GST / tax component if configured for the restaurant
-      const restRes = await pool.query(
-        `SELECT gst_type, gst_rate FROM restaurants WHERE id = $1 LIMIT 1`,
-        [order.restaurant_id]
-      );
-      const rest = restRes.rows[0];
-      let taxAmount = 0;
-      let netAmount = totalAmount;
+      let taxAmount = Number(order.gst_amount) || 0;
+      let netAmount = Number(order.subtotal) || (totalAmount - taxAmount);
 
-      if (rest && rest.gst_type && rest.gst_type !== 'NONE' && Number(rest.gst_rate) > 0) {
-        const rate = Number(rest.gst_rate);
-        if (rest.gst_type === 'INCLUSIVE') {
-          taxAmount = Math.round((totalAmount - totalAmount / (1 + rate / 100)) * 100) / 100;
-          netAmount = Math.round((totalAmount - taxAmount) * 100) / 100;
-        } else {
-          // EXCLUSIVE
-          taxAmount = Math.round(((totalAmount * rate) / 100) * 100) / 100;
-          netAmount = totalAmount;
+      // If order does not have precomputed GST, check restaurant settings
+      if (taxAmount === 0) {
+        const restRes = await pool.query(
+          `SELECT gst_type, gst_rate FROM restaurants WHERE id = $1 LIMIT 1`,
+          [order.restaurant_id]
+        );
+        const rest = restRes.rows[0];
+
+        if (rest && rest.gst_type && rest.gst_type !== 'NONE' && Number(rest.gst_rate) > 0) {
+          const rate = Number(rest.gst_rate);
+          if (rest.gst_type === 'INCLUSIVE') {
+            taxAmount = Math.round((totalAmount - totalAmount / (1 + rate / 100)) * 100) / 100;
+            netAmount = Math.round((totalAmount - taxAmount) * 100) / 100;
+          } else {
+            // EXCLUSIVE
+            taxAmount = Math.round(((totalAmount * rate) / 100) * 100) / 100;
+            netAmount = totalAmount;
+          }
         }
       }
 
-      const txDate = new Date(order.created_at).toISOString().split('T')[0];
       const pMethod = order.payment_method ? String(order.payment_method).toUpperCase() : 'UPI';
       const refNumber = `Order #${order.id.slice(0, 8).toUpperCase()}${order.table_number ? ` (T${order.table_number})` : ''}`;
 
@@ -413,6 +421,8 @@ export class FinanceService {
    * Get Till Reconciliation Data for a specific date (live or stored)
    */
   static async getTillReconciliation(restaurantId: string, businessDate: string) {
+    await this.syncMissingPosOrders(restaurantId);
+
     const existing = await pool.query(
       `SELECT * FROM finance_till_reconciliations 
        WHERE restaurant_id = $1 AND business_date = $2 LIMIT 1`,
@@ -467,6 +477,59 @@ export class FinanceService {
   }
 
   /**
+   * Backfill / Sync any missing paid POS orders into finance_transactions
+   * Ensures finance ledger & overview 100% matches POS analytics numbers
+   */
+  static async syncMissingPosOrders(restaurantId: string): Promise<void> {
+    try {
+      // 1. Insert any paid/completed POS orders that are not yet in finance_transactions
+      await pool.query(
+        `INSERT INTO finance_transactions (
+          restaurant_id, entry_type, source, reference_id, reference_number,
+          category, amount, tax_amount, net_amount, payment_method,
+          description, transaction_date
+        )
+        SELECT 
+          o.restaurant_id,
+          'INCOME',
+          'POS_SALES',
+          o.id,
+          'Order #' || UPPER(SUBSTRING(o.id::text, 1, 8)) || COALESCE(' (' || o.table_number || ')', ''),
+          'Sales Revenue',
+          COALESCE(o.total_price, 0),
+          COALESCE(o.gst_amount, 0),
+          COALESCE(o.subtotal, o.total_price - COALESCE(o.gst_amount, 0), o.total_price, 0),
+          COALESCE(NULLIF(UPPER(o.payment_method::text), ''), 'UPI'),
+          'POS Order ' || COALESCE('Table ' || o.table_number, 'Counter'),
+          COALESCE(o.business_date, (o.created_at AT TIME ZONE 'Asia/Kolkata')::date)
+        FROM orders o
+        WHERE o.restaurant_id = $1
+          AND (o.is_paid = true OR o.status IN ('CLOSED', 'COMPLETED', 'READY', 'SERVED'))
+          AND o.status != 'CANCELLED'
+          AND NOT EXISTS (
+            SELECT 1 FROM finance_transactions ft 
+            WHERE ft.reference_id = o.id AND ft.source = 'POS_SALES'
+          )`,
+        [restaurantId]
+      );
+
+      // 2. Synchronize transaction_date with order business_date if ever drifted
+      await pool.query(
+        `UPDATE finance_transactions ft
+         SET transaction_date = COALESCE(o.business_date, (o.created_at AT TIME ZONE 'Asia/Kolkata')::date)
+         FROM orders o
+         WHERE ft.reference_id = o.id 
+           AND ft.source = 'POS_SALES'
+           AND ft.restaurant_id = $1
+           AND ft.transaction_date != COALESCE(o.business_date, (o.created_at AT TIME ZONE 'Asia/Kolkata')::date)`,
+        [restaurantId]
+      );
+    } catch (err) {
+      console.error('Error in syncMissingPosOrders:', err);
+    }
+  }
+
+  /**
    * P&L Summary & Tax Calculation
    */
   static async getSummary(
@@ -474,6 +537,8 @@ export class FinanceService {
     startDate?: string,
     endDate?: string
   ): Promise<FinanceSummary> {
+    await this.syncMissingPosOrders(restaurantId);
+
     const sDate = startDate || new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
     const eDate = endDate || new Date().toISOString().split('T')[0];
 
@@ -600,6 +665,8 @@ export class FinanceService {
       limit?: number;
     }
   ) {
+    await this.syncMissingPosOrders(restaurantId);
+
     const page = options.page || 1;
     const limit = options.limit || 50;
     const offset = (page - 1) * limit;
@@ -663,7 +730,13 @@ export class FinanceService {
     const totalCount = parseInt(countRes.rows[0].count, 10);
 
     const listRes = await pool.query(
-      `SELECT * FROM finance_transactions 
+      `SELECT 
+        id, restaurant_id, entry_type, source, reference_id, reference_number,
+        category, amount, tax_amount, net_amount, payment_method, description,
+        receipt_url, created_by,
+        to_char(transaction_date, 'YYYY-MM-DD') as transaction_date,
+        created_at, updated_at
+       FROM finance_transactions 
        WHERE ${whereClause} 
        ORDER BY transaction_date DESC, created_at DESC 
        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,

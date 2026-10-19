@@ -16,12 +16,14 @@ import {
 import toast, { Toaster } from 'react-hot-toast';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export default function TaxCompliancePage() {
   const params = useParams();
   const slug = (params?.slug as string) || '';
+  const { restaurant } = useRestaurant();
 
-  const [datePreset, setDatePreset] = useState<'month' | '30d' | 'quarter' | 'year'>('month');
+  const [datePreset, setDatePreset] = useState<'month' | '30d' | 'last_week' | 'quarter' | 'year'>('month');
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
@@ -33,7 +35,7 @@ export default function TaxCompliancePage() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<any>(null);
 
-  const applyPreset = (preset: 'month' | '30d' | 'quarter' | 'year') => {
+  const applyPreset = (preset: 'month' | '30d' | 'last_week' | 'quarter' | 'year') => {
     setDatePreset(preset);
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
@@ -46,6 +48,14 @@ export default function TaxCompliancePage() {
       const s = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
       setStartDate(s);
       setEndDate(todayStr);
+    } else if (preset === 'last_week') {
+      const now = new Date();
+      const currentDay = now.getDay();
+      const daysToLastMonday = (currentDay === 0 ? 6 : currentDay - 1) + 7;
+      const lastMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToLastMonday);
+      const lastSunday = new Date(lastMonday.getFullYear(), lastMonday.getMonth(), lastMonday.getDate() + 6);
+      setStartDate(lastMonday.toISOString().split('T')[0]);
+      setEndDate(lastSunday.toISOString().split('T')[0]);
     } else if (preset === 'quarter') {
       const qMonth = Math.floor(today.getMonth() / 3) * 3;
       const first = new Date(today.getFullYear(), qMonth, 1).toISOString().split('T')[0];
@@ -91,7 +101,7 @@ export default function TaxCompliancePage() {
   };
 
   return (
-    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: '#F8FAFC' }}>
+    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: restaurant?.secondary_color || '#FFFFFF' }}>
       <Toaster position="top-right" />
 
       <style>{`
@@ -118,6 +128,8 @@ export default function TaxCompliancePage() {
           display: flex;
           align-items: stretch;
           height: 68px;
+          padding-top: 10px;
+          box-sizing: border-box;
         }
         .finance-actions {
           display: flex;
@@ -165,8 +177,8 @@ export default function TaxCompliancePage() {
                 }}
                 style={{
                   height: '36px',
-                  padding: '0 12px',
-                  background: '#0F172A',
+                  padding: '0 14px',
+                  background: 'var(--primary, #971345)',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '12.5px',
@@ -176,6 +188,8 @@ export default function TaxCompliancePage() {
                   alignItems: 'center',
                   gap: '6px',
                   cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                  transition: 'opacity 0.15s ease',
                 }}
               >
                 <Download size={13} />
@@ -188,88 +202,104 @@ export default function TaxCompliancePage() {
 
       <AdminContentWrapper>
         {/* Title inside page content */}
-        <div style={{ marginBottom: '20px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
-            Tax & GST Compliance
-          </h2>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-            Automated breakdown of Output Tax collected vs Input Tax Credit paid to calculate overall tax liability
-          </p>
-        </div>
-
-        {/* Date Filter */}
-        <div
-          style={{
-            background: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {[
-              { id: 'month', label: 'This Month' },
-              { id: '30d', label: 'Last 30 Days' },
-              { id: 'quarter', label: 'This Quarter' },
-              { id: 'year', label: 'Financial Year' },
-            ].map((p) => (
-              <button
-                key={p.id}
-                onClick={() => applyPreset(p.id as any)}
-                style={{
-                  height: '32px',
-                  padding: '0 12px',
-                  borderRadius: '5px',
-                  fontSize: '12.5px',
-                  fontWeight: datePreset === p.id ? 600 : 500,
-                  border: datePreset === p.id ? '1px solid #0F172A' : '1px solid #E2E8F0',
-                  background: datePreset === p.id ? '#0F172A' : '#FFFFFF',
-                  color: datePreset === p.id ? '#FFFFFF' : '#475569',
-                  cursor: 'pointer',
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
+        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
+              Tax & GST Compliance
+            </h2>
+            <p style={{ fontSize: '12.5px', color: '#64748B', margin: '2px 0 0 0' }}>
+              {startDate} to {endDate}
+            </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Calendar size={14} style={{ color: '#64748B' }} />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+          {/* Date Filter & Presets */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div
               style={{
-                height: '32px',
-                padding: '0 8px',
-                fontSize: '12px',
-                borderRadius: '5px',
-                border: '1px solid #CBD5E1',
-                color: '#334155',
-                outline: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                backgroundColor: '#F1F5F9',
+                padding: '3px',
+                borderRadius: '8px',
+                flexWrap: 'wrap',
               }}
-            />
-            <span style={{ fontSize: '12px', color: '#94A3B8' }}>to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              style={{
-                height: '32px',
-                padding: '0 8px',
-                fontSize: '12px',
-                borderRadius: '5px',
-                border: '1px solid #CBD5E1',
-                color: '#334155',
-                outline: 'none',
-              }}
-            />
+            >
+              {[
+                { id: 'month', label: 'This Month' },
+                { id: '30d', label: 'Last 30 Days' },
+                { id: 'last_week', label: 'Last Week' },
+                { id: 'quarter', label: 'This Quarter' },
+                { id: 'year', label: 'Financial Year' },
+              ].map((p) => {
+                const isActive = datePreset === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => applyPreset(p.id as any)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: isActive ? 600 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: isActive ? '#FFFFFF' : 'transparent',
+                      color: isActive ? '#0F172A' : '#64748B',
+                      boxShadow: isActive ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setDatePreset('custom' as any);
+                  setStartDate(e.target.value);
+                }}
+                style={{
+                  height: '32px',
+                  padding: '0 8px',
+                  fontSize: '12px',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  color: '#334155',
+                  outline: 'none',
+                  background: '#FFFFFF',
+                }}
+              />
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setDatePreset('custom' as any);
+                  setEndDate(e.target.value);
+                }}
+                style={{
+                  height: '32px',
+                  padding: '0 8px',
+                  fontSize: '12px',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  color: '#334155',
+                  outline: 'none',
+                  background: '#FFFFFF',
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -285,71 +315,68 @@ export default function TaxCompliancePage() {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                gap: '16px',
-                marginBottom: '24px',
+                gap: '14px',
+                marginBottom: '20px',
               }}
             >
               {/* Output Tax */}
               <div
                 style={{
                   background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  padding: '20px',
+                  border: '1px solid #F1F5F9',
+                  borderRadius: '12px',
+                  padding: '16px 18px',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     1. Output GST (Collected)
                   </span>
                   <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155' }}>
                     <Percent size={14} />
                   </div>
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', marginTop: '10px' }}>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', marginTop: '8px' }}>
                   {formatCurrency(summary?.taxCollected || 0)}
                 </div>
-                <p style={{ fontSize: '12px', color: '#64748B', margin: '6px 0 0 0' }}>
-                  Tax collected on customer sales via POS
-                </p>
               </div>
 
               {/* Input Tax Credit */}
               <div
                 style={{
                   background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  padding: '20px',
+                  border: '1px solid #F1F5F9',
+                  borderRadius: '12px',
+                  padding: '16px 18px',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     2. Input Tax Credit (Paid)
                   </span>
                   <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155' }}>
                     <Scale size={14} />
                   </div>
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', marginTop: '10px' }}>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', marginTop: '8px' }}>
                   {formatCurrency(summary?.taxPaid || 0)}
                 </div>
-                <p style={{ fontSize: '12px', color: '#64748B', margin: '6px 0 0 0' }}>
-                  GST paid on inventory purchases and bills
-                </p>
               </div>
 
               {/* Net Liability */}
               <div
                 style={{
                   background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  padding: '20px',
+                  border: '1px solid #F1F5F9',
+                  borderRadius: '12px',
+                  padding: '16px 18px',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     3. Net Tax Payable
                   </span>
                   <div
@@ -369,19 +396,14 @@ export default function TaxCompliancePage() {
                 </div>
                 <div
                   style={{
-                    fontSize: '24px',
+                    fontSize: '22px',
                     fontWeight: 700,
                     color: (summary?.netTaxLiability || 0) > 0 ? '#DC2626' : '#059669',
-                    marginTop: '10px',
+                    marginTop: '8px',
                   }}
                 >
                   {formatCurrency(summary?.netTaxLiability || 0)}
                 </div>
-                <p style={{ fontSize: '12px', color: '#64748B', margin: '6px 0 0 0' }}>
-                  {(summary?.netTaxLiability || 0) >= 0
-                    ? 'Total net GST payable to tax authority'
-                    : 'Input credit exceeds collected tax (Carry forward)'}
-                </p>
               </div>
             </div>
 
@@ -389,12 +411,13 @@ export default function TaxCompliancePage() {
             <div
               style={{
                 background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
-                padding: '24px',
+                border: '1px solid #F1F5F9',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
               }}
             >
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: '0 0 16px 0' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: '0 0 14px 0' }}>
                 Tax Computation Formula
               </h3>
 
@@ -403,13 +426,14 @@ export default function TaxCompliancePage() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  padding: '14px 16px',
+                  padding: '12px 16px',
                   background: '#F8FAFC',
-                  borderRadius: '6px',
-                  border: '1px solid #E2E8F0',
-                  marginBottom: '20px',
-                  fontSize: '13.5px',
+                  borderRadius: '8px',
+                  border: '1px solid #F1F5F9',
+                  marginBottom: '16px',
+                  fontSize: '13px',
                   color: '#334155',
+                  flexWrap: 'wrap',
                 }}
               >
                 <span style={{ fontWeight: 600 }}>Net Tax Payable</span>

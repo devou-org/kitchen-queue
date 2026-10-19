@@ -20,6 +20,7 @@ import {
 import toast, { Toaster } from 'react-hot-toast';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { useRestaurant } from '@/hooks/useRestaurant';
 import {
   AreaChart,
   Area,
@@ -33,11 +34,12 @@ import {
 export default function FinanceOverviewPage() {
   const params = useParams();
   const slug = (params?.slug as string) || '';
+  const { restaurant } = useRestaurant();
 
-  const [datePreset, setDatePreset] = useState<'today' | 'yesterday' | '7d' | '30d' | 'month' | 'custom'>('30d');
+  const [datePreset, setDatePreset] = useState<'today' | 'yesterday' | '7d' | 'last_week' | 'month' | '30d' | 'custom'>('month');
   const [startDate, setStartDate] = useState<string>(() => {
-    const d = new Date(Date.now() - 30 * 86400000);
-    return d.toISOString().split('T')[0];
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
@@ -46,7 +48,7 @@ export default function FinanceOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<any>(null);
 
-  const applyPreset = (preset: 'today' | 'yesterday' | '7d' | '30d' | 'month') => {
+  const applyPreset = (preset: 'today' | 'yesterday' | '7d' | 'last_week' | 'month' | '30d') => {
     setDatePreset(preset);
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
@@ -62,13 +64,21 @@ export default function FinanceOverviewPage() {
       const s = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
       setStartDate(s);
       setEndDate(todayStr);
-    } else if (preset === '30d') {
-      const s = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
-      setStartDate(s);
-      setEndDate(todayStr);
+    } else if (preset === 'last_week') {
+      const now = new Date();
+      const currentDay = now.getDay();
+      const daysToLastMonday = (currentDay === 0 ? 6 : currentDay - 1) + 7;
+      const lastMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToLastMonday);
+      const lastSunday = new Date(lastMonday.getFullYear(), lastMonday.getMonth(), lastMonday.getDate() + 6);
+      setStartDate(lastMonday.toISOString().split('T')[0]);
+      setEndDate(lastSunday.toISOString().split('T')[0]);
     } else if (preset === 'month') {
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
       setStartDate(firstDay);
+      setEndDate(todayStr);
+    } else if (preset === '30d') {
+      const s = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+      setStartDate(s);
       setEndDate(todayStr);
     }
   };
@@ -113,7 +123,7 @@ export default function FinanceOverviewPage() {
   };
 
   return (
-    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: '#F8FAFC' }}>
+    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: restaurant?.secondary_color || '#FFFFFF' }}>
       <Toaster position="top-right" />
 
       <style>{`
@@ -171,7 +181,10 @@ export default function FinanceOverviewPage() {
           align-items: stretch !important;
           height: 68px !important;
           min-height: 68px !important;
-          padding: 0 !important;
+          padding-top: 10px !important;
+          padding-right: 0 !important;
+          padding-bottom: 0 !important;
+          padding-left: 0 !important;
           box-sizing: border-box !important;
           flex-shrink: 0 !important;
           margin: 0 !important;
@@ -293,8 +306,8 @@ export default function FinanceOverviewPage() {
                 onClick={handleExportCsv}
                 style={{
                   height: '36px',
-                  padding: '0 12px',
-                  background: '#0F172A',
+                  padding: '0 14px',
+                  background: 'var(--primary, #971345)',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '12.5px',
@@ -304,6 +317,8 @@ export default function FinanceOverviewPage() {
                   alignItems: 'center',
                   gap: '6px',
                   cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                  transition: 'opacity 0.15s ease',
                 }}
               >
                 <Download size={13} />
@@ -315,47 +330,6 @@ export default function FinanceOverviewPage() {
       />
 
       <AdminContentWrapper>
-        {/* Title & Presets */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
-              Profit & Loss Overview
-            </h2>
-            <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-              Showing accounting summary from {startDate} to {endDate}
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            {[
-              { id: 'today', label: 'Today' },
-              { id: 'yesterday', label: 'Yesterday' },
-              { id: '7d', label: '7 Days' },
-              { id: '30d', label: '30 Days' },
-              { id: 'month', label: 'This Month' },
-            ].map((p) => (
-              <button
-                key={p.id}
-                onClick={() => applyPreset(p.id as any)}
-                style={{
-                  height: '32px',
-                  padding: '0 12px',
-                  borderRadius: '5px',
-                  fontSize: '12px',
-                  fontWeight: datePreset === p.id ? 600 : 500,
-                  border: datePreset === p.id ? '1px solid #0F172A' : '1px solid #E2E8F0',
-                  background: datePreset === p.id ? '#0F172A' : '#FFFFFF',
-                  color: datePreset === p.id ? '#FFFFFF' : '#475569',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Loading State */}
         {loading && !summary ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '80px 0', color: '#64748B' }}>
@@ -364,156 +338,169 @@ export default function FinanceOverviewPage() {
           </div>
         ) : (
           <>
-            {/* KPI Stat Cards */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                gap: '16px',
-                marginBottom: '24px',
-              }}
-            >
-              {/* Total Revenue */}
-              <div
-                style={{
-                  background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  padding: '18px 20px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Total Revenue
-                  </span>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155' }}>
-                    <IndianRupee size={15} />
-                  </div>
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', marginTop: '10px' }}>
-                  {formatCurrency(summary?.totalRevenue || 0)}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
-                  <ArrowUpRight size={13} style={{ color: '#10B981' }} />
-                  <span>Automated POS sales stream</span>
-                </div>
-              </div>
-
-              {/* Total Expenses */}
-              <div
-                style={{
-                  background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  padding: '18px 20px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Total Expenses
-                  </span>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155' }}>
-                    <Receipt size={15} />
-                  </div>
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', marginTop: '10px' }}>
-                  {formatCurrency(summary?.totalExpenses || 0)}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
-                  <span>COGS: {formatCurrency(summary?.cogsExpenses || 0)}</span>
-                  <span>•</span>
-                  <span>Overheads: {formatCurrency(summary?.operatingExpenses || 0)}</span>
-                </div>
-              </div>
-
-              {/* Net Profit / Loss */}
-              <div
-                style={{
-                  background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  padding: '18px 20px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Net Profit / (Loss)
-                  </span>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: (summary?.netProfit || 0) >= 0 ? '#ECFDF5' : '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: (summary?.netProfit || 0) >= 0 ? '#059669' : '#DC2626' }}>
-                    {(summary?.netProfit || 0) >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
-                  </div>
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: (summary?.netProfit || 0) >= 0 ? '#059669' : '#DC2626', marginTop: '10px' }}>
-                  {formatCurrency(summary?.netProfit || 0)}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
-                  <span>Margin:</span>
-                  <strong style={{ color: (summary?.netProfit || 0) >= 0 ? '#059669' : '#DC2626' }}>
-                    {summary?.profitMarginPercent || 0}%
-                  </strong>
-                </div>
-              </div>
-
-              {/* Net Tax / GST Liability */}
-              <div
-                style={{
-                  background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  padding: '18px 20px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Net Tax Liability
-                  </span>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155' }}>
-                    <Scale size={15} />
-                  </div>
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', marginTop: '10px' }}>
-                  {formatCurrency(summary?.netTaxLiability || 0)}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
-                  <span>Collected: {formatCurrency(summary?.taxCollected || 0)}</span>
-                  <span>-</span>
-                  <span>Credit: {formatCurrency(summary?.taxPaid || 0)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Trends Chart */}
+            {/* Unified Performance Graph & Quick Stats Card (Matching Analytics Layout) */}
             <div
               style={{
                 background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
-                padding: '20px',
-                marginBottom: '24px',
+                border: '1px solid #F1F5F9',
+                borderRadius: '12px',
+                padding: '18px 20px',
+                marginBottom: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
-                    Revenue & Expense Timeline
-                  </h3>
-                  <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0 0' }}>
-                    Daily comparison of sales income vs total business expenditure
-                  </p>
+              {/* Card Header: Title + Date Subtitle & Pill Switcher Buttons */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      backgroundColor: '#F8FAFC',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: restaurant?.primary_color || '#971345',
+                    }}
+                  >
+                    <TrendingUp size={20} strokeWidth={2.5} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600, margin: 0, color: '#0F172A' }}>
+                      Profit & Loss Performance
+                    </h3>
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0 0', fontWeight: 400 }}>
+                      {startDate} to {endDate}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Date Switcher Pill Container (Arranged like screenshot) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    backgroundColor: '#F1F5F9',
+                    padding: '3px',
+                    borderRadius: '8px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {[
+                    { id: 'today', label: 'Today' },
+                    { id: 'yesterday', label: 'Yesterday' },
+                    { id: '7d', label: '7 Days' },
+                    { id: 'last_week', label: 'Last Week' },
+                    { id: 'month', label: 'This Month' },
+                  ].map((p) => {
+                    const isActive = datePreset === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyPreset(p.id as any)}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          fontWeight: isActive ? 600 : 500,
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          backgroundColor: isActive ? '#FFFFFF' : 'transparent',
+                          color: isActive ? '#0F172A' : '#64748B',
+                          boxShadow: isActive ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Metric Quick Stats Ribbon (Reduced border, clean horizontal strip) */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '12px',
+                  marginBottom: '16px',
+                  padding: '10px 16px',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '10px',
+                  border: '1px solid #F1F5F9',
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Period Revenue</span>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', marginTop: '2px' }}>
+                    {formatCurrency(summary?.totalRevenue || 0)}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Total Expenses</span>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', marginTop: '2px' }}>
+                    {formatCurrency(summary?.totalExpenses || 0)}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Net Profit / (Loss)</span>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: (summary?.netProfit || 0) >= 0 ? '#059669' : '#DC2626', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>{formatCurrency(summary?.netProfit || 0)}</span>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: (summary?.netProfit || 0) >= 0 ? '#ECFDF5' : '#FEF2F2',
+                        color: (summary?.netProfit || 0) >= 0 ? '#059669' : '#DC2626',
+                      }}
+                    >
+                      {summary?.profitMarginPercent || 0}%
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>Net Tax Liability</span>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', marginTop: '2px' }}>
+                    {formatCurrency(summary?.netTaxLiability || 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart Visual Timeline */}
               {summary?.dailyTrends && summary.dailyTrends.length > 0 ? (
-                <div style={{ height: '280px', width: '100%' }}>
+                <div style={{ height: '280px', width: '100%', marginTop: '8px' }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={summary.dailyTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0F172A" stopOpacity={0.2} />
+                          <stop offset="5%" stopColor="#0F172A" stopOpacity={0.15} />
                           <stop offset="95%" stopColor="#0F172A" stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#E11D48" stopOpacity={0.2} />
+                          <stop offset="5%" stopColor="#E11D48" stopOpacity={0.15} />
                           <stop offset="95%" stopColor="#E11D48" stopOpacity={0} />
                         </linearGradient>
                       </defs>
@@ -533,9 +520,10 @@ export default function FinanceOverviewPage() {
                         ]}
                         contentStyle={{
                           background: '#FFFFFF',
-                          border: '1px solid #E2E8F0',
-                          borderRadius: '6px',
+                          border: '1px solid #F1F5F9',
+                          borderRadius: '8px',
                           fontSize: '12px',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
                         }}
                       />
                       <Area
@@ -558,94 +546,100 @@ export default function FinanceOverviewPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '13px' }}>
+                <div style={{ height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '13px' }}>
                   No transaction data available for selected period.
                 </div>
               )}
             </div>
 
-            {/* Profit & Loss Statement Table */}
+            {/* Profit & Loss Statement Table (Clean, reduced borders) */}
             <div
               style={{
                 background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
+                border: '1px solid #F1F5F9',
+                borderRadius: '12px',
                 padding: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
               }}
             >
-              <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', margin: '0 0 16px 0' }}>
-                Profit & Loss Statement
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
+                  Profit & Loss Statement
+                </h3>
+                <span style={{ fontSize: '12px', color: '#64748B' }}>
+                  {startDate} to {endDate}
+                </span>
+              </div>
 
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
-                    <tr style={{ borderBottom: '2px solid #E2E8F0', color: '#64748B', textAlign: 'left' }}>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Accounting Line Item</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Source / Module</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, textAlign: 'right' }}>Amount</th>
+                    <tr style={{ borderBottom: '1px solid #E2E8F0', color: '#64748B', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px', fontWeight: 600 }}>Accounting Line Item</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 600 }}>Source</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {/* Income */}
                     <tr style={{ background: '#F8FAFC', fontWeight: 600, color: '#0F172A' }}>
-                      <td style={{ padding: '10px 12px' }} colSpan={2}>
+                      <td style={{ padding: '9px 12px' }} colSpan={2}>
                         1. Operating Revenue (Income)
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#059669' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'right', color: '#059669' }}>
                         {formatCurrency(summary?.totalRevenue || 0)}
                       </td>
                     </tr>
                     {summary?.paymentMethodBreakdown?.map((pm: any) => (
-                      <tr key={pm.method} style={{ borderBottom: '1px solid #F1F5F9', color: '#475569' }}>
-                        <td style={{ padding: '8px 12px 8px 28px' }}>
+                      <tr key={pm.method} style={{ borderBottom: '1px solid #F8FAFC', color: '#475569' }}>
+                        <td style={{ padding: '7px 12px 7px 24px' }}>
                           Sales via {pm.method} ({pm.count} orders)
                         </td>
-                        <td style={{ padding: '8px 12px', color: '#64748B', fontSize: '12px' }}>POS Terminal</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatCurrency(pm.total)}</td>
+                        <td style={{ padding: '7px 12px', color: '#64748B', fontSize: '12px' }}>POS Terminal</td>
+                        <td style={{ padding: '7px 12px', textAlign: 'right' }}>{formatCurrency(pm.total)}</td>
                       </tr>
                     ))}
 
                     {/* Cost of Goods Sold */}
                     <tr style={{ background: '#F8FAFC', fontWeight: 600, color: '#0F172A' }}>
-                      <td style={{ padding: '10px 12px' }} colSpan={2}>
+                      <td style={{ padding: '9px 12px' }} colSpan={2}>
                         2. Cost of Goods Sold (COGS)
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#E11D48' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'right', color: '#E11D48' }}>
                         ({formatCurrency(summary?.cogsExpenses || 0)})
                       </td>
                     </tr>
-                    <tr style={{ borderBottom: '1px solid #F1F5F9', color: '#475569' }}>
-                      <td style={{ padding: '8px 12px 8px 28px' }}>Inventory Raw Materials & Purchases</td>
-                      <td style={{ padding: '8px 12px', color: '#64748B', fontSize: '12px' }}>Inventory Receiving</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                    <tr style={{ borderBottom: '1px solid #F8FAFC', color: '#475569' }}>
+                      <td style={{ padding: '7px 12px 7px 24px' }}>Inventory Raw Materials & Purchases</td>
+                      <td style={{ padding: '7px 12px', color: '#64748B', fontSize: '12px' }}>Inventory Receiving</td>
+                      <td style={{ padding: '7px 12px', textAlign: 'right' }}>
                         {formatCurrency(summary?.cogsExpenses || 0)}
                       </td>
                     </tr>
 
                     {/* Operating Overheads */}
                     <tr style={{ background: '#F8FAFC', fontWeight: 600, color: '#0F172A' }}>
-                      <td style={{ padding: '10px 12px' }} colSpan={2}>
+                      <td style={{ padding: '9px 12px' }} colSpan={2}>
                         3. Operating Expenses & Overheads
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#E11D48' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'right', color: '#E11D48' }}>
                         ({formatCurrency(summary?.operatingExpenses || 0)})
                       </td>
                     </tr>
                     {summary?.expenseCategoryBreakdown?.filter((c: any) => c.category !== 'Cost of Goods Sold (Raw Materials)')?.map((c: any) => (
-                      <tr key={c.category} style={{ borderBottom: '1px solid #F1F5F9', color: '#475569' }}>
-                        <td style={{ padding: '8px 12px 8px 28px' }}>{c.category}</td>
-                        <td style={{ padding: '8px 12px', color: '#64748B', fontSize: '12px' }}>Petty Cash / Overheads</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatCurrency(c.total)}</td>
+                      <tr key={c.category} style={{ borderBottom: '1px solid #F8FAFC', color: '#475569' }}>
+                        <td style={{ padding: '7px 12px 7px 24px' }}>{c.category}</td>
+                        <td style={{ padding: '7px 12px', color: '#64748B', fontSize: '12px' }}>Petty Cash</td>
+                        <td style={{ padding: '7px 12px', textAlign: 'right' }}>{formatCurrency(c.total)}</td>
                       </tr>
                     ))}
 
                     {/* Summary Totals */}
-                    <tr style={{ borderTop: '2px solid #E2E8F0', background: '#F1F5F9', fontWeight: 700, fontSize: '14px' }}>
-                      <td style={{ padding: '12px' }} colSpan={2}>
+                    <tr style={{ borderTop: '1px solid #E2E8F0', background: '#F8FAFC', fontWeight: 700, fontSize: '13.5px' }}>
+                      <td style={{ padding: '10px 12px' }} colSpan={2}>
                         Net Profit / (Loss) Before Taxes
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'right', color: (summary?.netProfit || 0) >= 0 ? '#059669' : '#DC2626' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', color: (summary?.netProfit || 0) >= 0 ? '#059669' : '#DC2626' }}>
                         {formatCurrency(summary?.netProfit || 0)}
                       </td>
                     </tr>

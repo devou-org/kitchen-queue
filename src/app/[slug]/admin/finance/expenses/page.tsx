@@ -18,6 +18,9 @@ import {
 } from 'lucide-react';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { useRestaurant } from '@/hooks/useRestaurant';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import { Pagination } from '@/components/ui/Pagination';
 import toast, { Toaster } from 'react-hot-toast';
 
 const EXPENSE_CATEGORIES = [
@@ -36,10 +39,14 @@ const EXPENSE_CATEGORIES = [
 export default function PettyCashExpensesPage() {
   const params = useParams();
   const slug = (params?.slug as string) || '';
+  const { restaurant } = useRestaurant();
 
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 25;
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
@@ -64,7 +71,8 @@ export default function PettyCashExpensesPage() {
         slug,
         entryType: 'EXPENSE',
         source: 'PETTY_CASH',
-        limit: '100',
+        page: String(page),
+        limit: String(pageSize),
       });
       if (selectedCategory !== 'ALL') q.set('category', selectedCategory);
       if (search.trim()) q.set('search', search.trim());
@@ -74,6 +82,7 @@ export default function PettyCashExpensesPage() {
       if (json.success) {
         setTransactions(json.data || []);
         setTotalCount(json.pagination?.totalCount || 0);
+        setTotalPages(json.pagination?.totalPages || 1);
       } else {
         toast.error(json.error || 'Failed to fetch expenses');
       }
@@ -82,7 +91,7 @@ export default function PettyCashExpensesPage() {
     } finally {
       setLoading(false);
     }
-  }, [slug, selectedCategory, search]);
+  }, [slug, selectedCategory, search, page]);
 
   useEffect(() => {
     fetchExpenses();
@@ -163,7 +172,7 @@ export default function PettyCashExpensesPage() {
   };
 
   return (
-    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: '#F8FAFC' }}>
+    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: restaurant?.secondary_color || '#FFFFFF' }}>
       <Toaster position="top-right" />
 
       <style>{`
@@ -221,7 +230,10 @@ export default function PettyCashExpensesPage() {
           align-items: stretch !important;
           height: 68px !important;
           min-height: 68px !important;
-          padding: 0 !important;
+          padding-top: 10px !important;
+          padding-right: 0 !important;
+          padding-bottom: 0 !important;
+          padding-left: 0 !important;
           box-sizing: border-box !important;
           flex-shrink: 0 !important;
           margin: 0 !important;
@@ -278,7 +290,7 @@ export default function PettyCashExpensesPage() {
                 style={{
                   height: '36px',
                   padding: '0 14px',
-                  background: '#0F172A',
+                  background: 'var(--primary, #971345)',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '13px',
@@ -288,6 +300,8 @@ export default function PettyCashExpensesPage() {
                   alignItems: 'center',
                   gap: '6px',
                   cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                  transition: 'opacity 0.15s ease',
                 }}
               >
                 <Plus size={15} />
@@ -300,22 +314,20 @@ export default function PettyCashExpensesPage() {
 
       <AdminContentWrapper>
         {/* Title inside page content */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
             Petty Cash & Overheads
           </h2>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-            Manual record of utility bills, staff wages, store repairs, and daily operational expenses
-          </p>
         </div>
         {/* Filters */}
         <div
           style={{
             background: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '8px',
+            border: '1px solid #F1F5F9',
+            borderRadius: '12px',
             padding: '12px 16px',
-            marginBottom: '20px',
+            marginBottom: '16px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -346,27 +358,20 @@ export default function PettyCashExpensesPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>Category:</span>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              style={{
-                height: '32px',
-                borderRadius: '5px',
-                border: '1px solid #CBD5E1',
-                padding: '0 8px',
-                fontSize: '12.5px',
-                color: '#334155',
-                background: '#FFFFFF',
-                outline: 'none',
-              }}
-            >
-              <option value="ALL">All Categories</option>
-              {EXPENSE_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+            <div style={{ width: '220px' }}>
+              <CustomSelect
+                value={selectedCategory}
+                onChange={(val) => {
+                  setSelectedCategory(val);
+                  setPage(1);
+                }}
+                options={[
+                  { value: 'ALL', label: 'All Categories' },
+                  ...EXPENSE_CATEGORIES.map((cat) => ({ value: cat, label: cat }))
+                ]}
+                buttonStyle={{ height: '34px', fontSize: '12.5px', borderRadius: '6px' }}
+              />
+            </div>
           </div>
         </div>
 
@@ -374,9 +379,10 @@ export default function PettyCashExpensesPage() {
         <div
           style={{
             background: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '8px',
+            border: '1px solid #F1F5F9',
+            borderRadius: '12px',
             overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
           }}
         >
           {loading ? (
@@ -394,15 +400,16 @@ export default function PettyCashExpensesPage() {
               <button
                 onClick={() => setIsModalOpen(true)}
                 style={{
-                  height: '32px',
-                  padding: '0 12px',
-                  background: '#0F172A',
+                  height: '34px',
+                  padding: '0 14px',
+                  background: 'var(--primary, #971345)',
                   color: '#FFFFFF',
                   border: 'none',
-                  borderRadius: '5px',
-                  fontSize: '12px',
+                  borderRadius: '6px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
                   cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
                 }}
               >
                 Record First Expense
@@ -482,6 +489,16 @@ export default function PettyCashExpensesPage() {
               </table>
             </div>
           )}
+
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalRecords={totalCount}
+              pageSize={pageSize}
+              onPageChange={(p) => setPage(p)}
+            />
+          )}
         </div>
       </AdminContentWrapper>
 
@@ -537,26 +554,12 @@ export default function PettyCashExpensesPage() {
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                   Expense Category *
                 </label>
-                <select
+                <CustomSelect
                   value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  style={{
-                    width: '100%',
-                    height: '36px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    padding: '0 10px',
-                    fontSize: '13px',
-                    outline: 'none',
-                    background: '#FFFFFF',
-                  }}
-                >
-                  {EXPENSE_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm({ ...form, category: val })}
+                  options={EXPENSE_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+                  buttonStyle={{ height: '36px', fontSize: '13px', borderRadius: '6px' }}
+                />
               </div>
 
               {/* Amount & Tax */}
@@ -638,8 +641,8 @@ export default function PettyCashExpensesPage() {
                           fontSize: '12px',
                           fontWeight: 600,
                           cursor: 'pointer',
-                          border: selected ? '1.5px solid #0F172A' : '1px solid #CBD5E1',
-                          background: selected ? '#0F172A' : '#FFFFFF',
+                          border: selected ? '1.5px solid var(--primary, #971345)' : '1px solid #CBD5E1',
+                          background: selected ? 'var(--primary, #971345)' : '#FFFFFF',
                           color: selected ? '#FFFFFF' : '#475569',
                           transition: 'all 0.15s ease',
                         }}
@@ -746,7 +749,7 @@ export default function PettyCashExpensesPage() {
                     padding: '0 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    background: '#0F172A',
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '13px',
                     fontWeight: 600,
@@ -754,6 +757,7 @@ export default function PettyCashExpensesPage() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
                   }}
                 >
                   {submitting && <Loader2 size={14} className="animate-spin" />}

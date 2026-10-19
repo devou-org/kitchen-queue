@@ -16,11 +16,13 @@ import {
 } from 'lucide-react';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
+import { useRestaurant } from '@/hooks/useRestaurant';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function TillReconciliationPage() {
   const params = useParams();
   const slug = (params?.slug as string) || '';
+  const { restaurant } = useRestaurant();
 
   const [businessDate, setBusinessDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +126,7 @@ export default function TillReconciliationPage() {
   };
 
   return (
-    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: '#F8FAFC' }}>
+    <div className="admin-page-container" style={{ padding: 0, minHeight: '100vh', background: restaurant?.secondary_color || '#FFFFFF' }}>
       <Toaster position="top-right" />
 
       <style>{`
@@ -182,7 +184,10 @@ export default function TillReconciliationPage() {
           align-items: stretch !important;
           height: 68px !important;
           min-height: 68px !important;
-          padding: 0 !important;
+          padding-top: 10px !important;
+          padding-right: 0 !important;
+          padding-bottom: 0 !important;
+          padding-left: 0 !important;
           box-sizing: border-box !important;
           flex-shrink: 0 !important;
           margin: 0 !important;
@@ -281,12 +286,12 @@ export default function TillReconciliationPage() {
 
       <AdminContentWrapper>
         {/* Title inside page content */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
-            Till Reconciliation (Cash Drawer)
+            Till Reconciliation
           </h2>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-            End-of-day register audit matching expected POS cash against counted physical drawer cash for {businessDate}
+          <p style={{ fontSize: '12.5px', color: '#64748B', margin: '2px 0 0 0' }}>
+            Cash drawer audit for {businessDate}
           </p>
         </div>
         {loading ? (
@@ -295,14 +300,15 @@ export default function TillReconciliationPage() {
             <span style={{ marginLeft: '10px', fontSize: '13.5px' }}>Loading drawer statistics...</span>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', alignItems: 'start' }}>
             {/* Left: Reconciliation Workspace */}
             <div
               style={{
                 background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
-                padding: '24px',
+                border: '1px solid #F1F5F9',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -481,7 +487,7 @@ export default function TillReconciliationPage() {
                     height: '40px',
                     borderRadius: '6px',
                     border: 'none',
-                    background: '#0F172A',
+                    background: 'var(--primary, #971345)',
                     color: '#FFFFFF',
                     fontSize: '13.5px',
                     fontWeight: 600,
@@ -490,6 +496,8 @@ export default function TillReconciliationPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                    transition: 'opacity 0.15s ease',
                   }}
                 >
                   {saving ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />}
@@ -502,9 +510,10 @@ export default function TillReconciliationPage() {
             <div
               style={{
                 background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
+                border: '1px solid #F1F5F9',
+                borderRadius: '12px',
                 padding: '20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
               }}
             >
               <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', margin: '0 0 14px 0' }}>
