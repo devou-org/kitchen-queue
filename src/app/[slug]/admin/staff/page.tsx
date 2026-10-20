@@ -5,7 +5,7 @@ import {
   Plus, Trash2, Edit2, ShieldAlert, Key, UserCheck, UserX, 
   Smartphone, Mail, Shield, CheckSquare, Square, Store, ClipboardList, 
   LayoutGrid, UtensilsCrossed, Boxes, Gift, BarChart3, Users, Receipt, Settings,
-  CheckCircle2, Info, Search, X
+  CheckCircle2, Info, Search, X, Landmark
 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
@@ -29,6 +29,7 @@ const MODULE_ICONS: Record<string, any> = {
   tables: LayoutGrid,
   products: UtensilsCrossed,
   inventory: Boxes,
+  finance: Landmark,
   loyalty: Gift,
   analytics: BarChart3,
   staff: Users,

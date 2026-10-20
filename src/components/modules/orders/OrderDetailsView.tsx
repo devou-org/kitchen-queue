@@ -1596,7 +1596,7 @@ export function OrderDetailsView({
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <User size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
-                {order.customer_name || 'Guest'}
+                {order.customer_name || 'Walk-in'}
               </span>
               {order.staff_name && (
                 <span style={{ fontSize: '11px', color: '#64748B', marginLeft: 'auto' }}>
@@ -1605,7 +1605,7 @@ export function OrderDetailsView({
               )}
             </div>
 
-            {order.phone && (
+            {order.phone ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
                 <a
@@ -1614,6 +1614,11 @@ export function OrderDetailsView({
                 >
                   {order.phone}
                 </a>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                <span style={{ fontSize: '12px', color: '#94A3B8' }}>-</span>
               </div>
             )}
 

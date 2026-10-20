@@ -68,7 +68,8 @@ export interface Order {
   id: string;
   ticket_number: number;
   customer_name: string;
-  phone: string;
+  phone?: string | null;
+  user_id?: string | null;
   total_price: number;
   subtotal?: number;
   discount_amount?: number;

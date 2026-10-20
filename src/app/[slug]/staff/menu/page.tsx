@@ -390,9 +390,8 @@ export default function StaffMenuPage() {
         price_at_purchase: item.price
       }));
 
-      // Generate a mock phone if not provided for staff orders
-      const phoneToUse = orderForm.phone || `+910000000000`;
-      const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
+      const phoneToUse = orderForm.phone && orderForm.phone.trim() ? orderForm.phone.trim() : undefined;
+      const nameToUse = orderForm.customer_name && orderForm.customer_name.trim() ? orderForm.customer_name.trim() : (isTakeaway ? 'Takeaway Customer' : (orderForm.table_number ? `Table ${orderForm.table_number}` : 'Walk-in'));
 
       const res = await orderService.createOrder({
         customer_name: nameToUse,
