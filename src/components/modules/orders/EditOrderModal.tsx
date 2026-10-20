@@ -274,7 +274,7 @@ export function EditOrderModal({
       if (selectedT) {
         const check = checkTableAssignment(selectedT, Number(partySize) || 1, {
           orderId: order?.id,
-          phone: trimmedPhone || order?.phone,
+          phone: trimmedPhone || order?.phone || undefined,
           customerName: trimmedName || order?.customer_name,
         });
         const cap = Number(selectedT.capacity) || 0;
@@ -340,7 +340,7 @@ export function EditOrderModal({
     const availableTables = (tables || []).filter((t: any) => {
       const check = checkTableAssignment(t, pSize, {
         orderId: order?.id,
-        phone: phone || order?.phone,
+        phone: phone || order?.phone || undefined,
         customerName: customerName || order?.customer_name,
       });
       const cap = Number(t.capacity) || 0;
@@ -354,7 +354,7 @@ export function EditOrderModal({
     for (const t of availableTables) {
       const check = checkTableAssignment(t, pSize, {
         orderId: order?.id,
-        phone: phone || order?.phone,
+        phone: phone || order?.phone || undefined,
         customerName: customerName || order?.customer_name,
       });
       const cap = Number(t.capacity) || 0;

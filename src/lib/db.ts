@@ -1412,7 +1412,7 @@ export async function getOrdersByPhonePaginated(restaurantId: string, phone: str
 export async function createOrder(data: {
   restaurant_id: string;
   customer_name: string;
-  phone: string;
+  phone?: string | null;
   total_price: number;
   subtotal?: number;
   discount_amount?: number;
@@ -1549,13 +1549,16 @@ export async function createOrder(data: {
     }
 
     // 1. Ensure user exists
-    const userRes = await client.query(`
-      INSERT INTO users (name, phone, role)
-      VALUES ($1, $2, 'USER')
-      ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id
-    `, [data.customer_name || 'Guest', data.phone || '0000000000']);
-    const userId = userRes.rows[0].id;
+    let userId: string | null = null;
+    if (data.phone) {
+      const userRes = await client.query(`
+        INSERT INTO users (name, phone, role)
+        VALUES ($1, $2, 'USER')
+        ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name
+        RETURNING id
+      `, [data.customer_name || 'Guest', data.phone]);
+      userId = userRes.rows[0].id;
+    }
 
     // 2. Check if order is placed via table QR (table_number exists) or POS -> Set PREPARING, else PENDING
     const isTableOrder = Boolean(data.table_number && data.table_number.trim() !== '');
@@ -1626,7 +1629,7 @@ export async function createOrder(data: {
         RETURNING id
       `,
       [
-        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus,
+        data.restaurant_id, queueId, userId, data.customer_name || 'Walk-in', data.phone || null, data.total_price, defaultStatus,
         isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId,
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, paymentSplit, discountVal
@@ -4429,12 +4432,6 @@ export async function processLoyaltyForCompletedOrder(restaurantId: string, orde
       amount = amount ?? Number(orderRes[0].total_price || 0);
       userId = orderRes[0].user_id || null;
       customerName = orderRes[0].customer_name || null;
-    }
-
-    if (!phone && !userId && customerName) {
-      // Deterministically generate phone key for guest customers registered by name
-      const nameHash = Math.abs(customerName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 12345).toString().slice(0, 8);
-      phone = `99${nameHash.padStart(8, '0')}`;
     }
 
     if (!phone && !userId) return;

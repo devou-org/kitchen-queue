@@ -14,7 +14,7 @@ export interface TableOrder {
   id?: string;
   order_type?: string;
   party_size?: number | string;
-  phone?: string;
+  phone?: string | null;
   customer_name?: string;
 }
 
@@ -41,7 +41,7 @@ export interface AssignmentCheckResult {
 export function checkTableAssignment(
   table: TableInfo,
   newPartySize: number = 1,
-  currentPartyContext?: { orderId?: string; phone?: string; customerName?: string }
+  currentPartyContext?: { orderId?: string; phone?: string | null; customerName?: string }
 ): AssignmentCheckResult {
   const capacity = Number(table.effective_capacity || table.capacity) || 0;
   const activeOrders = (table.active_orders || []).filter(
