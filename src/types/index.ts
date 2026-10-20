@@ -132,6 +132,8 @@ export interface CartItem {
   quantity: number;
   image_url: string;
   status: ProductStatus;
+  original_price?: number;
+  is_free_reward?: boolean;
 }
 
 // API Response types

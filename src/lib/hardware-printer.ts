@@ -14,8 +14,15 @@
 import { KotPrintData } from './escpos';
 import { generateThermalReceiptHtml } from './thermal-receipt-html';
 import { generateBillTemplateHTML } from './bill-template-html';
+import {
+  isQzConnected,
+  connectQzTray,
+  disconnectQzTray,
+  getQzPrinters,
+  printRawEscposViaQz,
+} from './qz-printer';
 
-export type HardwarePrinterType = 'bluetooth' | 'serial' | 'usb' | 'browser';
+export type HardwarePrinterType = 'bluetooth' | 'serial' | 'usb' | 'browser' | 'rawbt' | 'qz-tray';
 
 export interface HardwarePrinterState {
   bluetoothConnected: boolean;
@@ -655,6 +662,7 @@ export interface UnifiedPrintOptions {
   base64Bytes?: string;
   kotData: KotPrintData;
   printerName?: string;
+  printerAddress?: string;
   counterId?: string;
   counterName?: string;
   forceBrowser?: boolean;
@@ -697,7 +705,7 @@ export function enqueuePrintJob<T>(job: () => Promise<T>): Promise<T> {
  */
 export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise<{
   success: boolean;
-  method: 'bluetooth' | 'serial' | 'rawbt' | 'browser';
+  method: HardwarePrinterType;
   message?: string;
 }> {
   const ticketNo = options.kotData?.ticketNumber;
@@ -706,7 +714,7 @@ export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise
     console.warn(`[HardwarePrinter] Duplicate print suppressed for Ticket #${ticketNo} (${options.counterName || options.counterId || 'ALL'})`);
     return Promise.resolve({
       success: true,
-      method: 'serial',
+      method: 'serial' as HardwarePrinterType,
       message: `Ticket #${ticketNo} already processed. Duplicate suppressed.`,
     });
   }
@@ -715,10 +723,10 @@ export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise
 
 async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): Promise<{
   success: boolean;
-  method: 'bluetooth' | 'serial' | 'rawbt' | 'browser';
+  method: HardwarePrinterType;
   message?: string;
 }> {
-  const { base64Bytes, kotData, printerName = 'POS-80C', counterId, counterName = kotData?.counterName, forceBrowser = false, isAutoPrint = false } = options;
+  const { base64Bytes, kotData, printerName = 'POS-80C', printerAddress, counterId, counterName = kotData?.counterName, forceBrowser = false, isAutoPrint = false } = options;
 
   // Convert base64 to Uint8Array if provided
   let rawBytes: Uint8Array | null = null;
@@ -745,6 +753,23 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
           method: 'rawbt',
           message: `Sent directly to RawBT Android Print Service!`,
         };
+      }
+    }
+
+    // 0. Try QZ Tray first (100% silent, direct OS spooler/Windows/Mac/Linux or network IP)
+    if (base64Bytes) {
+      try {
+        const qzTarget = printerAddress?.trim() || printerName;
+        const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes);
+        if (qzResult.success) {
+          return {
+            success: true,
+            method: 'qz-tray',
+            message: `Printed via QZ Tray to "${qzTarget}"!`,
+          };
+        }
+      } catch (qzErr: any) {
+        console.warn('QZ Tray print attempt failed, trying alternatives:', qzErr?.message);
       }
     }
 
@@ -841,12 +866,21 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
 
   // When no direct Bluetooth/Serial/RawBT/Bridge hardware is connected, this prints via the OS thermal receipt driver.
   // In Chrome Kiosk Mode (--kiosk-printing), this prints 100% silently and automatically.
+  if (!kotData) {
+    console.warn(`[HardwarePrinter] No kotData provided for thermal print.`);
+    return {
+      success: false,
+      method: 'browser',
+      message: `No KOT data available to print for "${printerName}"`,
+    };
+  }
+
   const html = generateThermalReceiptHtml(kotData);
   const printed = await printHtmlViaIframe(html);
   return {
     success: printed,
     method: 'browser',
-    message: `KOT printed for ${counterName || kotData.counterName || printerName}`,
+    message: `KOT printed for ${counterName || kotData?.counterName || printerName}`,
   };
 }
 
@@ -1108,4 +1142,13 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
     message: 'No print data or HTML available to print bill.',
   };
 }
+
+export {
+  isQzConnected,
+  connectQzTray,
+  disconnectQzTray,
+  getQzPrinters,
+  printRawEscposViaQz,
+};
+
 

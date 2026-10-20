@@ -22,8 +22,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    const rewards = await getLoyaltyRewards(restaurant.id);
-    return NextResponse.json({ success: true, data: rewards });
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
+
+    const { rewards, totalRecords, totalPages, currentPage, pageSize } = await getLoyaltyRewards(
+      restaurant.id,
+      page,
+      limit
+    );
+
+    return NextResponse.json({
+      success: true,
+      data: rewards,
+      pagination: {
+        currentPage,
+        pageSize,
+        totalRecords,
+        totalPages,
+      },
+    });
   } catch (error: any) {
     console.error('Error fetching loyalty rewards:', error);
     return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });

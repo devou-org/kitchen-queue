@@ -113,8 +113,8 @@ export default function SplitPaymentBreakdown({
   };
 
   const rows: { id: keyof SplitAmounts; label: string; icon: any; color: string }[] = [
-    { id: 'CASH', label: 'Cash', icon: Banknote, color: '#16A34A' },
     { id: 'UPI', label: 'UPI / QR', icon: QrCode, color: '#2563EB' },
+    { id: 'CASH', label: 'Cash', icon: Banknote, color: '#16A34A' },
     { id: 'CARD', label: 'Card', icon: CreditCard, color: '#7C3AED' },
   ];
 

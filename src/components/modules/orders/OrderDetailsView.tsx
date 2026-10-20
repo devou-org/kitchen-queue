@@ -1478,8 +1478,8 @@ export function OrderDetailsView({
                     </label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                       {[
-                        { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
                         { id: 'CARD', label: 'Card', icon: CreditCard },
                         { id: 'SPLIT', label: 'Split', icon: Split },
                       ].map((m) => {

@@ -130,15 +130,36 @@ export async function POST(request: NextRequest) {
 
     const cleanPhone = hasPhone ? cleanedPhone.replace(/\D/g, '').slice(-10) : '';
 
+    let effectiveTableNumber = table_number;
     if (order_type !== 'TAKEAWAY' && table_number) {
       const { TablesRepository } = await import('@/modules/tables/tables.repository');
       const { checkTableAssignment } = await import('@/lib/table-capacity');
       const tables = await TablesRepository.getTablesByRestaurant(restaurant.id);
-      const targetTable = tables.find(t => String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase());
+      const leadPart = String(table_number).split('+')[0].trim().toLowerCase();
+      const targetTable = tables.find(t =>
+        String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase() ||
+        String(t.table_number).trim().toLowerCase() === leadPart
+      );
       if (targetTable) {
         const check = checkTableAssignment(targetTable, party_size || 1, {
           phone: hasPhone ? cleanedPhone : undefined,
           customerName,
+        // If secondary merged table, map order to primary table
+        const parentTable = targetTable.merged_into_table_id
+          ? (tables.find(t => t.id === targetTable.merged_into_table_id) || targetTable)
+          : targetTable;
+
+        if (String(table_number).includes('+')) {
+          effectiveTableNumber = String(table_number).trim();
+        } else if (parentTable.merged_table_numbers && parentTable.merged_table_numbers.length > 0) {
+          effectiveTableNumber = `${parentTable.table_number}+${parentTable.merged_table_numbers.join('+')}`;
+        } else if (targetTable.merged_into_table_id && parentTable) {
+          effectiveTableNumber = parentTable.table_number;
+        }
+
+        const check = checkTableAssignment(parentTable, party_size || 1, {
+          phone,
+          customerName: customer_name
         });
         if (!check.allowed) {
           return NextResponse.json({
@@ -263,7 +284,7 @@ export async function POST(request: NextRequest) {
       gst_type,
       notes,
       party_size: order_type === 'TAKEAWAY' ? 0 : (party_size || 1),
-      table_number: order_type === 'TAKEAWAY' ? null : table_number,
+      table_number: order_type === 'TAKEAWAY' ? null : effectiveTableNumber,
       order_type: order_type || 'DINE_IN',
       is_pos: isPos,
       is_paid: isPaid,

@@ -108,6 +108,7 @@ export default function AdminPosPage() {
   const searchParams = useSearchParams();
   const slug = (params?.slug as string) || restaurant?.slug || '';
   const tableParam = searchParams?.get('table') || searchParams?.get('table_number') || '';
+  const mergedParam = searchParams?.get('merged') || '';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
@@ -142,23 +143,41 @@ export default function AdminPosPage() {
 
   useEffect(() => {
     if (tableParam) {
-      const matchedTable = tables.find(
-        (t: any) => String(t.table_number) === String(tableParam)
+      const matched = tables.find(
+        (t: any) =>
+          String(t.table_number).trim().toLowerCase() === String(tableParam).trim().toLowerCase() ||
+          (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => String(m).trim().toLowerCase() === String(tableParam).trim().toLowerCase()))
       );
-      const cap = matchedTable ? (Number(matchedTable.capacity) || 1) : 1;
+
+      let displayName = tableParam;
+      if (mergedParam) {
+        displayName = `${tableParam}+${mergedParam}`;
+      } else if (matched) {
+        if (matched.merged_table_numbers && matched.merged_table_numbers.length > 0) {
+          displayName = `${matched.table_number}+${matched.merged_table_numbers.join('+')}`;
+        } else if (matched.parent_table_number) {
+          displayName = `${matched.parent_table_number}+${matched.table_number}`;
+        }
+      }
+
+      const maxPartySize = matched
+        ? Number(matched.effective_capacity || matched.capacity) || 1
+        : 1;
+
       setOrderForm(prev => ({
         ...prev,
-        table_number: tableParam,
+        table_number: displayName,
+        party_size: maxPartySize > 1 ? maxPartySize : (prev.party_size || 1),
         order_type: 'DINE_IN',
-        party_size: cap > 1 ? cap : (prev.party_size || 1),
         is_paid: false,
       }));
-      if (toastedTableRef.current !== tableParam) {
-        toastedTableRef.current = tableParam;
-        toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+
+      if (toastedTableRef.current !== displayName) {
+        toastedTableRef.current = displayName;
+        toast.success(`Table #${displayName} selected for order`, { id: `pos-table-param` });
       }
     }
-  }, [tableParam, tables]);
+  }, [tableParam, mergedParam, tables]);
 
   useEffect(() => {
     if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
@@ -275,6 +294,7 @@ export default function AdminPosPage() {
           base64Bytes: data.base64Bytes,
           kotData: data.kotData,
           printerName: data.printer_name,
+          printerAddress: data.printer_address,
           counterId: data.counter_id,
           counterName: data.counter_name,
           isAutoPrint: true,
@@ -793,15 +813,16 @@ export default function AdminPosPage() {
         <div
           style={{
             position: 'fixed',
-            bottom: '24px',
+            bottom: 'clamp(14px, 3vw, 24px)',
             left: 0,
             right: 0,
-            padding: '0 20px',
+            padding: '0 clamp(10px, 3vw, 20px)',
             zIndex: 99999,
             pointerEvents: 'none',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
+            boxSizing: 'border-box',
           }}
         >
           <button
@@ -819,7 +840,7 @@ export default function AdminPosPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '0 20px',
+              padding: '0 clamp(12px, 2.5vw, 20px)',
               boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)',
               cursor: 'pointer',
               border: 'none',
@@ -827,6 +848,9 @@ export default function AdminPosPage() {
               color: '#FFFFFF',
               letterSpacing: '-0.01em',
               transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              gap: '8px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
@@ -837,21 +861,25 @@ export default function AdminPosPage() {
               e.currentTarget.style.boxShadow = '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.5vw, 10px)', minWidth: 0, overflow: 'hidden', flexShrink: 1 }}>
               <span
                 style={{
                   background: 'rgba(255, 255, 255, 0.25)',
                   padding: '3px 10px',
                   borderRadius: '999px',
-                  fontSize: '13px',
+                  fontSize: 'clamp(11.5px, 1.5vw, 13px)',
                   fontWeight: 900,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                 }}
               >
                 {totalItems} {totalItems === 1 ? 'item' : 'items'}
               </span>
-              <span style={{ fontSize: '15px', fontWeight: 800 }}>View Cart &amp; Checkout</span>
+              <span style={{ fontSize: 'clamp(13px, 1.8vw, 15px)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                View Cart &amp; Checkout
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 900 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1vw, 8px)', fontSize: 'clamp(14px, 1.8vw, 16px)', fontWeight: 900, flexShrink: 0, whiteSpace: 'nowrap' }}>
               <span>{formatPrice(totalPrice)}</span>
               <span style={{ fontSize: '19px', lineHeight: 1 }}>→</span>
             </div>

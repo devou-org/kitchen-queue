@@ -109,6 +109,15 @@ async function runAutoMigration(sqlConnection: any) {
       );
     `;
     await sqlConnection`
+      ALTER TABLE restaurant_tables
+      ADD COLUMN IF NOT EXISTS merged_into_table_id UUID REFERENCES restaurant_tables(id) ON DELETE SET NULL;
+    `;
+    await sqlConnection`
+      CREATE INDEX IF NOT EXISTS idx_restaurant_tables_merged_into 
+      ON restaurant_tables(restaurant_id, merged_into_table_id) 
+      WHERE merged_into_table_id IS NOT NULL;
+    `;
+    await sqlConnection`
       CREATE TABLE IF NOT EXISTS table_sessions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
@@ -1668,6 +1677,14 @@ export async function createOrder(data: {
     }
 
     await client.query('COMMIT');
+
+    // Automated Finance Stream: Record POS income if order placed as paid
+    if (isPaid) {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(orderId).catch(err => console.error('Finance income record on createOrder error:', err));
+      }).catch(() => {});
+    }
+
     return await getOrderById(data.restaurant_id, orderId);
   } catch (error) {
     await client.query('ROLLBACK');
@@ -1684,10 +1701,11 @@ export async function findOrCreateTableSession(
   partySize: number = 1
 ): Promise<{ tableId: string; tableSessionId: string }> {
   const cleanTableNum = tableNumber.trim();
+  const leadTableNum = cleanTableNum.includes('+') ? cleanTableNum.split('+')[0].trim() : cleanTableNum;
 
   let tableRes = await clientOrPool.query(
-    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND table_number = $2 LIMIT 1`,
-    [restaurantId, cleanTableNum]
+    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND (table_number = $2 OR table_number = $3) LIMIT 1`,
+    [restaurantId, cleanTableNum, leadTableNum]
   );
 
   let tableId: string;
@@ -1708,6 +1726,18 @@ export async function findOrCreateTableSession(
     `UPDATE restaurant_tables SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
     [tableId]
   );
+
+  // Also set any merged partner tables in this group to OCCUPIED
+  await clientOrPool.query(
+    `UPDATE restaurant_tables 
+     SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP 
+     WHERE restaurant_id = $1 
+       AND (
+         merged_into_table_id = $2 
+         OR id = (SELECT merged_into_table_id FROM restaurant_tables WHERE id = $2 AND merged_into_table_id IS NOT NULL)
+       )`,
+    [restaurantId, tableId]
+  ).catch((err: any) => console.error('Failed to sync merged partner table statuses:', err));
 
   let sessionRes = await clientOrPool.query(
     `SELECT id FROM table_sessions
@@ -1745,10 +1775,11 @@ export async function checkAndCloseTableSession(
 ) {
   if (!tableNumber || tableNumber.trim() === '') return;
   const cleanTableNum = tableNumber.trim();
+  const leadTableNum = cleanTableNum.includes('+') ? cleanTableNum.split('+')[0].trim() : cleanTableNum;
 
   const tblRes = await clientOrPool.query(
-    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND table_number = $2 LIMIT 1`,
-    [restaurantId, cleanTableNum]
+    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND (table_number = $2 OR table_number = $3) LIMIT 1`,
+    [restaurantId, cleanTableNum, leadTableNum]
   );
 
   if (tblRes.rows.length === 0) return;
@@ -1758,10 +1789,10 @@ export async function checkAndCloseTableSession(
     `SELECT COUNT(*)::int as active_count
      FROM orders
      WHERE restaurant_id = $1
-       AND (table_id = $2 OR table_number = $3)
+       AND (table_id = $2 OR table_number = $3 OR table_number = $4 OR ('+' || table_number || '+') LIKE ('%+' || $4 || '+%'))
        AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
        AND (order_type IS NULL OR order_type NOT IN ('TAKEAWAY', 'DELIVERY'))`,
-    [restaurantId, tableId, cleanTableNum]
+    [restaurantId, tableId, cleanTableNum, leadTableNum]
   );
 
   const activeCount = Number(activeCheck.rows[0]?.active_count || 0);
@@ -1846,6 +1877,17 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
     processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
   } else if (status === 'CANCELLED' || status === 'REFUNDED') {
     processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
+  }
+
+  // Trigger Finance Income recording (Automated Data Stream)
+  if (status === 'CLOSED' || status === 'COMPLETED' || updatedOrder?.is_paid) {
+    import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+      FinanceService.recordPosIncome(id).catch(err => console.error('Finance income record error:', err));
+    }).catch(() => {});
+  } else if (status === 'CANCELLED' || status === 'REFUNDED') {
+    import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+      FinanceService.recordPosIncome(id).catch(err => console.error('Finance cancel record error:', err));
+    }).catch(() => {});
   }
 
   return updatedOrder;
@@ -1961,6 +2003,17 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
     } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
       processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
+    }
+
+    // Trigger Finance Income recording (Automated Data Stream)
+    if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(id).catch(err => console.error('Finance income record error in completeOrderAndBill:', err));
+      }).catch(() => {});
+    } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(id).catch(err => console.error('Finance cancel record error in completeOrderAndBill:', err));
+      }).catch(() => {});
     }
 
     return updatedOrder;
@@ -3915,16 +3968,45 @@ export async function mergeDuplicateCustomerLoyalty(restaurantId: string) {
   }
 }
 
-export async function getLoyaltyCustomersList(restaurantId: string, search?: string) {
+export async function getLoyaltyCustomersList(
+  restaurantId: string, 
+  search?: string,
+  page: number = 1,
+  limit: number = 50
+) {
   try {
     // Merge duplicate customer accounts and sync completed/paid orders
     await mergeDuplicateCustomerLoyalty(restaurantId);
     await syncAllCompletedOrdersToLoyalty(restaurantId);
 
-    let query;
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    let rowsQuery;
+    let countQuery;
+
     if (search && search.trim() !== '') {
-      const searchPattern = `%${search.trim().toLowerCase()}%`;
-      query = sql`
+      const searchTrimmed = search.trim().toLowerCase();
+      const rawDigits = search.replace(/\D/g, '');
+      const last10Digits = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+      const searchPattern = `%${searchTrimmed}%`;
+      const digitsPattern = last10Digits ? `%${last10Digits}%` : searchPattern;
+
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
+      `;
+
+      rowsQuery = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
           cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
@@ -3933,11 +4015,24 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
         FROM customer_loyalty cl
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
-          AND (LOWER(u.name) LIKE ${searchPattern} OR LOWER(u.phone) LIKE ${searchPattern})
+          AND (
+            LOWER(u.name) LIKE ${searchPattern} OR 
+            LOWER(u.phone) LIKE ${searchPattern} OR
+            LOWER(u.phone) LIKE ${digitsPattern} OR
+            RIGHT(REGEXP_REPLACE(u.phone, '\\D', '', 'g'), 10) LIKE ${digitsPattern}
+          )
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
       `;
     } else {
-      query = sql`
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM customer_loyalty cl
+        JOIN users u ON u.id = cl.user_id
+        WHERE cl.restaurant_id = ${restaurantId}
+      `;
+
+      rowsQuery = sql`
         SELECT 
           cl.id, cl.user_id, cl.restaurant_id, cl.points_balance, cl.total_points_earned,
           cl.total_points_redeemed, cl.total_visits, cl.visit_progress, cl.rewards_unlocked,
@@ -3947,15 +4042,25 @@ export async function getLoyaltyCustomersList(restaurantId: string, search?: str
         JOIN users u ON u.id = cl.user_id
         WHERE cl.restaurant_id = ${restaurantId}
         ORDER BY cl.last_visit_at DESC NULLS LAST, cl.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
       `;
     }
 
-    const rows = await query;
-    return rows;
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      customers: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return { customers: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }
@@ -4030,18 +4135,71 @@ export async function adjustCustomerPoints(restaurantId: string, customerLoyalty
   }
 }
 
-export async function getLoyaltyRewards(restaurantId: string) {
+export async function deleteCustomerLoyaltyProfile(restaurantId: string, customerLoyaltyId: string) {
   try {
-    const rows = await sql`
-      SELECT * FROM loyalty_rewards 
-      WHERE restaurant_id = ${restaurantId}
-      ORDER BY is_active DESC, points_required ASC
+    const rec = await sql`
+      SELECT * FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId} LIMIT 1
     `;
-    return rows;
+    if (rec.length === 0) return false;
+
+    const userId = rec[0].user_id;
+
+    await sql`DELETE FROM loyalty_transactions WHERE customer_loyalty_id = ${customerLoyaltyId}`;
+    await sql`DELETE FROM customer_loyalty WHERE id = ${customerLoyaltyId} AND restaurant_id = ${restaurantId}`;
+
+    if (userId) {
+      const orders = await sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`;
+      if (orders.length === 0) {
+        await sql`DELETE FROM users WHERE id = ${userId}`;
+      }
+    }
+
+    return true;
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return false;
+    }
+    throw err;
+  }
+}
+
+export async function getLoyaltyRewards(
+  restaurantId: string,
+  page: number = 1,
+  limit: number = 50
+) {
+  try {
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    const countQuery = sql`
+      SELECT COUNT(*)::int as total FROM loyalty_rewards WHERE restaurant_id = ${restaurantId}
+    `;
+
+    const rowsQuery = sql`
+      SELECT * FROM loyalty_rewards 
+      WHERE restaurant_id = ${restaurantId}
+      ORDER BY is_active DESC, points_required ASC
+      LIMIT ${safeLimit} OFFSET ${offset}
+    `;
+
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      rewards: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
+  } catch (err: any) {
+    if (err.message?.includes('does not exist')) {
+      await runAutoMigration(sql);
+      return { rewards: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }
@@ -4148,25 +4306,79 @@ export async function deleteLoyaltyReward(restaurantId: string, rewardId: string
   }
 }
 
-export async function getLoyaltyTransactionsList(restaurantId: string) {
+export async function getLoyaltyTransactionsList(
+  restaurantId: string,
+  page: number = 1,
+  limit: number = 50,
+  transactionType?: string
+) {
   try {
-    const rows = await sql`
-      SELECT 
-        lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
-        u.name as customer_name, u.phone,
-        o.ticket_number
-      FROM loyalty_transactions lt
-      JOIN users u ON u.id = lt.user_id
-      LEFT JOIN orders o ON o.id = lt.order_id
-      WHERE lt.restaurant_id = ${restaurantId}
-      ORDER BY lt.created_at DESC
-      LIMIT 100
-    `;
-    return rows;
+    const safeLimit = Math.max(1, Number(limit) || 50);
+    const safePage = Math.max(1, Number(page) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    let countQuery;
+    let rowsQuery;
+
+    if (transactionType && transactionType !== 'ALL') {
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        WHERE lt.restaurant_id = ${restaurantId}
+          AND lt.transaction_type = ${transactionType}
+      `;
+
+      rowsQuery = sql`
+        SELECT 
+          lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
+          u.name as customer_name, u.phone,
+          o.ticket_number
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        LEFT JOIN orders o ON o.id = lt.order_id
+        WHERE lt.restaurant_id = ${restaurantId}
+          AND lt.transaction_type = ${transactionType}
+        ORDER BY lt.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
+      `;
+    } else {
+      countQuery = sql`
+        SELECT COUNT(*)::int as total
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        WHERE lt.restaurant_id = ${restaurantId}
+      `;
+
+      rowsQuery = sql`
+        SELECT 
+          lt.id, lt.transaction_type, lt.points_delta, lt.visit_delta, lt.notes, lt.created_at,
+          u.name as customer_name, u.phone,
+          o.ticket_number
+        FROM loyalty_transactions lt
+        JOIN users u ON u.id = lt.user_id
+        LEFT JOIN orders o ON o.id = lt.order_id
+        WHERE lt.restaurant_id = ${restaurantId}
+        ORDER BY lt.created_at DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
+      `;
+    }
+
+    const [rows, countRes] = await Promise.all([rowsQuery, countQuery]);
+    const totalRecords = Number(countRes[0]?.total || 0);
+    const totalPages = Math.ceil(totalRecords / safeLimit) || 1;
+
+    return {
+      transactions: rows,
+      totalRecords,
+      totalPages,
+      currentPage: safePage,
+      pageSize: safeLimit,
+    };
   } catch (err: any) {
     if (err.message?.includes('does not exist')) {
       await runAutoMigration(sql);
-      return [];
+      return { transactions: [], totalRecords: 0, totalPages: 1, currentPage: 1, pageSize: limit };
     }
     throw err;
   }
