@@ -141,9 +141,6 @@ export async function POST(request: NextRequest) {
         String(t.table_number).trim().toLowerCase() === leadPart
       );
       if (targetTable) {
-        const check = checkTableAssignment(targetTable, party_size || 1, {
-          phone: hasPhone ? cleanedPhone : undefined,
-          customerName,
         // If secondary merged table, map order to primary table
         const parentTable = targetTable.merged_into_table_id
           ? (tables.find(t => t.id === targetTable.merged_into_table_id) || targetTable)
@@ -158,8 +155,8 @@ export async function POST(request: NextRequest) {
         }
 
         const check = checkTableAssignment(parentTable, party_size || 1, {
-          phone,
-          customerName: customer_name
+          phone: hasPhone ? cleanedPhone : undefined,
+          customerName,
         });
         if (!check.allowed) {
           return NextResponse.json({
