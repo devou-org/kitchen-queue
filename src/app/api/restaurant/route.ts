@@ -55,6 +55,9 @@ export async function GET(request: NextRequest) {
         latitude: restaurant.latitude ? Number(restaurant.latitude) : null,
         longitude: restaurant.longitude ? Number(restaurant.longitude) : null,
         kitchen_mode: restaurant.kitchen_mode || 'KOT',
+        bill_printer_name: restaurant.bill_printer_name || 'POS-80C',
+        bill_printer_type: restaurant.bill_printer_type || 'DEFAULT',
+        bill_printer_address: restaurant.bill_printer_address || null,
         // Derived channel name so clients don't have to construct it themselves
         pusher_channel: `queue-channel-${restaurant.id}`,
         modules,

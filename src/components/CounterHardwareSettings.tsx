@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Printer,
+  Receipt,
   Bluetooth,
   BluetoothOff,
   Usb,
@@ -25,6 +26,7 @@ import {
   isBluetoothConnectedForCounter,
   isSerialConnectedForCounter,
   printUnifiedThermalTicket,
+  printUnifiedBill,
 } from '@/lib/hardware-printer';
 import {
   isQzConnected,
@@ -53,6 +55,19 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
   const [connectingCounterId, setConnectingCounterId] = useState<string | null>(null);
   const [testingCounterId, setTestingCounterId] = useState<string | null>(null);
   const [, setTick] = useState(0);
+
+  // Default Bill Printer State
+  const [billPrinter, setBillPrinter] = useState<CounterFormState>({
+    printer_name: 'POS-80C',
+    printer_type: 'DEFAULT',
+    printer_address: '',
+  });
+  const [savingBillPrinter, setSavingBillPrinter] = useState(false);
+  const [savedBillPrinter, setSavedBillPrinter] = useState(false);
+  const [testingBillPrinter, setTestingBillPrinter] = useState(false);
+  const [connectingBillBt, setConnectingBillBt] = useState(false);
+  const [connectingBillUsb, setConnectingBillUsb] = useState(false);
+  const [manualInputBillPrinter, setManualInputBillPrinter] = useState(false);
 
   // QZ Tray State
   const [qzActive, setQzActive] = useState(false);
@@ -155,9 +170,65 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
     }
   }, [getHeaders]);
 
+  const fetchBillPrinter = useCallback(async () => {
+    let localName = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_name') : null;
+    let localType = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_type') : null;
+    let localAddr = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_address') : null;
+
+    try {
+      const res = await fetch('/api/admin/bill-printer', { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          const dbName = data.data.bill_printer_name;
+          const dbType = data.data.bill_printer_type;
+          const dbAddr = data.data.bill_printer_address;
+
+          const chosenName = localName || dbName || 'POS-80C';
+          const chosenType = (localType || dbType || 'DEFAULT').toUpperCase();
+          const isNetwork = chosenType === 'NETWORK';
+          const chosenAddr = isNetwork ? (localAddr !== null ? localAddr : (dbAddr || '')) : '';
+
+          setBillPrinter({
+            printer_name: chosenName,
+            printer_type: chosenType,
+            printer_address: chosenAddr,
+          });
+
+          if (typeof window !== 'undefined') {
+            if (!localName && dbName) localStorage.setItem('qdine_bill_printer_name', dbName);
+            if (!localType && dbType) localStorage.setItem('qdine_bill_printer_type', dbType);
+            if (isNetwork && chosenAddr) {
+              localStorage.setItem('qdine_bill_printer_address', chosenAddr);
+            } else {
+              localStorage.removeItem('qdine_bill_printer_address');
+            }
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch bill printer from server:', e);
+    }
+
+    const fallbackType = (localType || 'DEFAULT').toUpperCase();
+    const isNetwork = fallbackType === 'NETWORK';
+    const fallbackAddr = isNetwork ? (localAddr || '') : '';
+    if (!isNetwork && typeof window !== 'undefined') {
+      localStorage.removeItem('qdine_bill_printer_address');
+    }
+
+    setBillPrinter({
+      printer_name: localName || 'POS-80C',
+      printer_type: fallbackType,
+      printer_address: fallbackAddr,
+    });
+  }, [getHeaders]);
+
   useEffect(() => {
     if (slug) {
       fetchCounters();
+      fetchBillPrinter();
       checkQzStatus(true);
       connectQzTray(1)
         .then(res => {
@@ -172,7 +243,222 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         })
         .catch(() => {});
     }
-  }, [slug, fetchCounters, checkQzStatus]);
+  }, [slug, fetchCounters, fetchBillPrinter, checkQzStatus]);
+
+  const handleSaveBillPrinter = async () => {
+    setSavingBillPrinter(true);
+    const isNetwork = billPrinter.printer_type === 'NETWORK';
+    const pName = billPrinter.printer_name.trim() || 'POS-80C';
+    const pAddr = isNetwork ? billPrinter.printer_address.trim() : '';
+
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('qdine_bill_printer_name', pName);
+        localStorage.setItem('qdine_bill_printer_type', billPrinter.printer_type);
+        if (isNetwork && pAddr) {
+          localStorage.setItem('qdine_bill_printer_address', pAddr);
+        } else {
+          localStorage.removeItem('qdine_bill_printer_address');
+        }
+      }
+
+      const res = await fetch('/api/admin/bill-printer', {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          bill_printer_name: pName,
+          bill_printer_type: billPrinter.printer_type,
+          bill_printer_address: isNetwork ? (pAddr || null) : null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        toast.error(data.error || 'Saved locally, but failed to sync with server');
+      } else {
+        toast.success(`Default bill printer set to "${pName}" (${billPrinter.printer_type})!`);
+      }
+
+      setSavedBillPrinter(true);
+      setTimeout(() => setSavedBillPrinter(false), 2000);
+    } catch {
+      toast.error('Saved locally. Network error updating server.');
+    } finally {
+      setSavingBillPrinter(false);
+    }
+  };
+
+  const handlePairBillBluetooth = async () => {
+    setConnectingBillBt(true);
+    const toastId = toast.loading('Scanning Bluetooth printer for Bills...');
+    try {
+      const res = await connectBluetoothPrinter(undefined, 'Bill Printer');
+      if (res.success && res.deviceName) {
+        toast.success(`Paired "${res.deviceName}" as Default Bill Printer!`, { id: toastId });
+        setBillPrinter(prev => ({
+          ...prev,
+          printer_name: res.deviceName || 'POS-80C',
+          printer_type: 'BLUETOOTH',
+          printer_address: '',
+        }));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('qdine_bill_printer_name', res.deviceName || 'POS-80C');
+          localStorage.setItem('qdine_bill_printer_type', 'BLUETOOTH');
+          localStorage.removeItem('qdine_bill_printer_address');
+        }
+        await fetch('/api/admin/bill-printer', {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            bill_printer_name: res.deviceName || 'POS-80C',
+            bill_printer_type: 'BLUETOOTH',
+            bill_printer_address: null,
+          }),
+        }).catch(() => {});
+        setTick(t => t + 1);
+      } else {
+        toast.error(res.error || 'Bluetooth pairing failed', { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Bluetooth connection cancelled', { id: toastId });
+    } finally {
+      setConnectingBillBt(false);
+    }
+  };
+
+  const handleDisconnectBillBluetooth = async () => {
+    await disconnectBluetoothPrinter(undefined, billPrinter.printer_name);
+    setTick(t => t + 1);
+    toast.success('Disconnected Bluetooth bill printer');
+  };
+
+  const handleConnectBillUsb = async () => {
+    setConnectingBillUsb(true);
+    const toastId = toast.loading('Select USB / COM printer for Bills...');
+    try {
+      const res = await connectSerialPrinter();
+      if (res.success) {
+        const devName = res.deviceName || 'USB Thermal Bill Printer';
+        toast.success(`Connected to ${devName}!`, { id: toastId });
+        setBillPrinter(prev => ({
+          ...prev,
+          printer_name: devName,
+          printer_type: 'USB',
+          printer_address: '',
+        }));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('qdine_bill_printer_name', devName);
+          localStorage.setItem('qdine_bill_printer_type', 'USB');
+          localStorage.removeItem('qdine_bill_printer_address');
+        }
+        await fetch('/api/admin/bill-printer', {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            bill_printer_name: devName,
+            bill_printer_type: 'USB',
+            bill_printer_address: null,
+          }),
+        }).catch(() => {});
+        setTick(t => t + 1);
+      } else {
+        toast.error(res.error || 'USB connection failed', { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'USB connection cancelled', { id: toastId });
+    } finally {
+      setConnectingBillUsb(false);
+    }
+  };
+
+  const handleDisconnectBillUsb = async () => {
+    await disconnectSerialPrinter();
+    setTick(t => t + 1);
+    toast.success('Disconnected USB bill printer');
+  };
+
+  const handleTestPrintBill = async () => {
+    setTestingBillPrinter(true);
+    const pName = (billPrinter.printer_name || 'POS-80C').trim();
+    const isNetwork = billPrinter.printer_type === 'NETWORK';
+    const toastId = toast.loading(`Sending test bill to default printer (${pName})...`);
+
+    const testBillOrder = {
+      id: 'test-bill-' + Date.now(),
+      ticket_number: 999,
+      order_type: 'DINE_IN',
+      table_number: 'BILL-01',
+      customer_name: 'Cashier Bill Verification',
+      staff_name: 'Admin / Cashier',
+      created_at: new Date().toISOString(),
+      items: [
+        { product_name: 'Default Bill Printer Verification', quantity: 1, price: 150 },
+        { product_name: 'Direct ESC/POS Receipt Cut', quantity: 1, price: 50 },
+      ],
+      subtotal: 200,
+      gst_type: 'NONE',
+      gst_rate: 0,
+      gst_amount: 0,
+      total_price: 200,
+      is_paid: true,
+      payment_method: 'CASH',
+      notes: `Default Bill Printer: ${pName} (${billPrinter.printer_type})`,
+    };
+
+    try {
+      const res = await fetch('/api/print/bill', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          orderId: testBillOrder.id,
+          printerName: pName,
+          printerType: billPrinter.printer_type,
+          orderData: testBillOrder,
+          slug,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate test bill buffer');
+      }
+
+      // If server printed (e.g. Windows Spooler in DEFAULT mode)
+      if (data.mode === 'server') {
+        toast.success(data.message || `Test bill sent to ${pName} via OS Spooler!`, { id: toastId });
+        return;
+      }
+
+      // Print directly using Unified Dispatcher honoring exact selected hardware type
+      const printResult = await printUnifiedBill({
+        base64Bytes: data.base64Bytes,
+        billHtml: data.billHtml,
+        orderData: testBillOrder,
+        billData: data.billData,
+        printerName: pName,
+        printerAddress: isNetwork ? billPrinter.printer_address?.trim() : undefined,
+        printerType: billPrinter.printer_type,
+        ticketNumber: 999,
+      });
+
+      if (printResult.method === 'bluetooth') {
+        toast.success(printResult.message || `Test bill printed to Bluetooth printer "${pName}"!`, { id: toastId });
+      } else if (printResult.method === 'serial') {
+        toast.success(printResult.message || `Test bill printed to USB printer "${pName}"!`, { id: toastId });
+      } else if (printResult.method === 'qz-tray') {
+        toast.success(printResult.message || `Test bill printed via QZ Tray!`, { id: toastId });
+      } else if (printResult.success) {
+        toast.success(printResult.message || 'Test bill printed!', { id: toastId });
+      } else {
+        toast.error(printResult.message || 'Test bill print failed. Please verify Bluetooth/USB connection.', { id: toastId });
+      }
+    } catch (err: any) {
+      console.error('Test bill print failed:', err);
+      toast.error(err.message || 'Test bill print failed. Check printer connection.', { id: toastId });
+    } finally {
+      setTestingBillPrinter(false);
+    }
+  };
 
   const handleFieldChange = (counterId: string, field: keyof CounterFormState, value: string) => {
     setFormStates(prev => ({
@@ -414,21 +700,8 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
     );
   }
 
-  if (counters.length === 0) {
-    return (
-      <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '8px', border: '1px dashed #CBD5E1', textAlign: 'center' }}>
-        <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#475569' }}>
-          No kitchen counters found
-        </p>
-        <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#94A3B8' }}>
-          Add counters from the sidebar or order queue to route tickets to thermal printers.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* HTML5 Datalist for Auto-discovered OS Printers */}
       <datalist id="system-printers-datalist">
         {systemPrinters.map(p => (
@@ -518,15 +791,523 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         </div>
       </div>
 
-      {/* Counters Section Title */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
+      {/* ======================================================== */}
+      {/* 1. DEFAULT BILL PRINTER SETTING (CASHIER / RECEIPT) */}
+      {/* ======================================================== */}
+      <div
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '10px',
+          border: '1.5px solid #E2E8F0',
+          padding: '14px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.03)',
+        }}
+      >
+        {/* Header: Title, Description, and Live Status Badge */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: '#ECFDF5',
+                color: '#059669',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Receipt size={17} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                  Default Bill Printer
+                </span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    padding: '2px 7px',
+                    borderRadius: '10px',
+                    backgroundColor: '#F1F5F9',
+                    color: '#475569',
+                    border: '1px solid #E2E8F0',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  Cashier Receipts
+                </span>
+              </div>
+              <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#64748B' }}>
+                All customer bills and checkout invoices will print <strong>exclusively</strong> to this printer.
+              </p>
+            </div>
+          </div>
+
+          {/* Connection Status Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {billPrinter.printer_type === 'QZ_TRAY' ? (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: qzActive ? '#EFF6FF' : '#F1F5F9',
+                  color: qzActive ? '#1D4ED8' : '#64748B',
+                  border: qzActive ? '1px solid #BFDBFE' : '1px solid #E2E8F0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <Cpu size={12} />
+                {qzActive ? 'QZ Tray Ready' : 'QZ Standby'}
+              </span>
+            ) : billPrinter.printer_type === 'BLUETOOTH' ? (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? '#EFF6FF' : '#F1F5F9',
+                  color: isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? '#2563EB' : '#64748B',
+                  border: isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? '1px solid #DBEAFE' : '1px solid #E2E8F0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <Bluetooth size={12} />
+                {isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? 'Bluetooth Paired' : 'BT Standby'}
+              </span>
+            ) : billPrinter.printer_type === 'USB' ? (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? '#F0FDF4' : '#F1F5F9',
+                  color: isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? '#16A34A' : '#64748B',
+                  border: isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? '1px solid #DCFCE7' : '1px solid #E2E8F0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <Usb size={12} />
+                {isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? 'USB Active' : 'USB Standby'}
+              </span>
+            ) : billPrinter.printer_type === 'NETWORK' ? (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: billPrinter.printer_address ? '#FAF5FF' : '#F1F5F9',
+                  color: billPrinter.printer_address ? '#9333EA' : '#64748B',
+                  border: billPrinter.printer_address ? '1px solid #F3E8FF' : '1px solid #E2E8F0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <Wifi size={12} />
+                LAN IP
+              </span>
+            ) : (
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: '#F8FAFC',
+                  color: '#64748B',
+                  border: '1px solid #E2E8F0',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <Printer size={12} />
+                System Spooler
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Configuration Row: Connection Type, Printer Device, Network IP */}
+        <div style={{ display: 'grid', gridTemplateColumns: billPrinter.printer_type === 'NETWORK' ? '1fr 1.2fr 1fr' : '1fr 1.4fr', gap: '10px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+              Connection
+            </label>
+            <select
+              value={billPrinter.printer_type}
+              onChange={e => {
+                const newType = e.target.value;
+                setBillPrinter(prev => ({
+                  ...prev,
+                  printer_type: newType,
+                  printer_address: newType === 'NETWORK' ? prev.printer_address : '',
+                }));
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('qdine_bill_printer_type', newType);
+                  if (newType !== 'NETWORK') {
+                    localStorage.removeItem('qdine_bill_printer_address');
+                  }
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '7px 9px',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                fontSize: '12px',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            >
+              <option value="DEFAULT">Default / System Spooler</option>
+              <option value="QZ_TRAY">QZ Tray (Direct Silent Printing)</option>
+              <option value="BLUETOOTH">Bluetooth (Wireless)</option>
+              <option value="USB">USB (Serial COM)</option>
+              <option value="NETWORK">Network (LAN / Wi-Fi IP)</option>
+            </select>
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <label style={{ fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                Printer Device
+              </label>
+              {systemPrinters.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setManualInputBillPrinter(prev => !prev)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    fontSize: '10px',
+                    color: '#2563EB',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {manualInputBillPrinter ? (
+                    <>
+                      <List size={10} />
+                      <span>Pick Detected</span>
+                    </>
+                  ) : (
+                    <>
+                      <Edit2 size={10} />
+                      <span>Custom Name</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {systemPrinters.length > 0 && !manualInputBillPrinter ? (
+              <select
+                value={billPrinter.printer_name}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === '__CUSTOM__') {
+                    setManualInputBillPrinter(true);
+                  } else {
+                    setBillPrinter(prev => ({
+                      ...prev,
+                      printer_name: val,
+                      printer_type: (prev.printer_type === 'BLUETOOTH') ? 'QZ_TRAY' : prev.printer_type,
+                    }));
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '7px 9px',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '12px',
+                  backgroundColor: '#FFFFFF',
+                  color: '#0F172A',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  cursor: 'pointer',
+                }}
+              >
+                {billPrinter.printer_name && !systemPrinters.includes(billPrinter.printer_name) && (
+                  <option value={billPrinter.printer_name}>
+                    {billPrinter.printer_name} (Current)
+                  </option>
+                )}
+                {!billPrinter.printer_name && (
+                  <option value="">-- Select Installed Printer --</option>
+                )}
+                {systemPrinters.map(p => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+                <option value="__CUSTOM__">✏️ Type custom name...</option>
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={billPrinter.printer_name}
+                onChange={e => setBillPrinter(prev => ({ ...prev, printer_name: e.target.value }))}
+                placeholder={systemPrinters[0] || 'POS-80C'}
+                style={{
+                  width: '100%',
+                  padding: '7px 9px',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '12px',
+                  color: '#0F172A',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            )}
+          </div>
+
+          {billPrinter.printer_type === 'NETWORK' && (
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+                IP Address & Port
+              </label>
+              <input
+                type="text"
+                value={billPrinter.printer_address}
+                onChange={e => setBillPrinter(prev => ({ ...prev, printer_address: e.target.value }))}
+                placeholder="192.168.1.100:9100"
+                style={{
+                  width: '100%',
+                  padding: '7px 9px',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  color: '#0F172A',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons: Pairing, Test Print Bill, Save */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingTop: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {billPrinter.printer_type === 'QZ_TRAY' && !qzActive && (
+              <button
+                type="button"
+                onClick={handleConnectQz}
+                disabled={qzConnecting}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '5px',
+                  border: '1px solid #BFDBFE',
+                  backgroundColor: '#EFF6FF',
+                  color: '#1D4ED8',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: qzConnecting ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                {qzConnecting ? <Loader2 size={11} className="animate-spin" /> : <Cpu size={11} />}
+                <span>Connect QZ</span>
+              </button>
+            )}
+
+            {billPrinter.printer_type === 'BLUETOOTH' && (
+              isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? (
+                <button
+                  type="button"
+                  onClick={handleDisconnectBillBluetooth}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '5px',
+                    border: '1px solid #FECACA',
+                    backgroundColor: '#FEF2F2',
+                    color: '#DC2626',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <BluetoothOff size={11} />
+                  <span>Disconnect BT</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePairBillBluetooth}
+                  disabled={connectingBillBt}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '5px',
+                    border: '1px solid #DBEAFE',
+                    backgroundColor: '#EFF6FF',
+                    color: '#2563EB',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: connectingBillBt ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  {connectingBillBt ? <Loader2 size={11} className="animate-spin" /> : <Bluetooth size={11} />}
+                  <span>Pair Bluetooth</span>
+                </button>
+              )
+            )}
+
+            {billPrinter.printer_type === 'USB' && (
+              isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? (
+                <button
+                  type="button"
+                  onClick={handleDisconnectBillUsb}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '5px',
+                    border: '1px solid #E2E8F0',
+                    backgroundColor: '#F8FAFC',
+                    color: '#475569',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Usb size={11} />
+                  <span>Disconnect USB</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConnectBillUsb}
+                  disabled={connectingBillUsb}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '5px',
+                    border: '1px solid #DCFCE7',
+                    backgroundColor: '#F0FDF4',
+                    color: '#16A34A',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: connectingBillUsb ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  {connectingBillUsb ? <Loader2 size={11} className="animate-spin" /> : <Usb size={11} />}
+                  <span>Connect USB</span>
+                </button>
+              )
+            )}
+
+            {/* Test Print Bill Button */}
+            <button
+              type="button"
+              onClick={handleTestPrintBill}
+              disabled={testingBillPrinter}
+              style={{
+                padding: '5px 11px',
+                borderRadius: '5px',
+                border: '1px solid #CBD5E1',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: testingBillPrinter ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              {testingBillPrinter ? (
+                <Loader2 size={11} className="animate-spin" style={{ color: '#059669' }} />
+              ) : (
+                <Play size={10} style={{ fill: '#059669', color: '#059669' }} />
+              )}
+              <span>Test Bill Print</span>
+            </button>
+          </div>
+
+          {/* Save Button */}
+          <button
+            type="button"
+            onClick={handleSaveBillPrinter}
+            disabled={savingBillPrinter}
+            style={{
+              padding: '5px 14px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: savedBillPrinter ? '#16A34A' : '#059669',
+              color: '#FFFFFF',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: savingBillPrinter ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            {savingBillPrinter ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : savedBillPrinter ? (
+              <Check size={11} />
+            ) : (
+              <Save size={11} />
+            )}
+            <span>{savedBillPrinter ? 'Saved' : 'Save Default Bill Printer'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* 2. COUNTER PRINTER ROUTING (KITCHEN TICKETS / KOT)       */}
+      {/* ======================================================== */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '6px', paddingBottom: '2px', borderTop: '1px solid #E2E8F0' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Counter Printer Routing ({counters.length})
+          Kitchen Counter Ticket Routing ({counters.length})
         </span>
         <button
           type="button"
           onClick={() => {
             fetchCounters();
+            fetchBillPrinter();
             checkQzStatus();
             setTick(t => t + 1);
             toast.success('Hardware refreshed');
@@ -550,8 +1331,18 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         </button>
       </div>
 
-      {/* Counter List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {/* Counter List or Empty State */}
+      {counters.length === 0 ? (
+        <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '8px', border: '1px dashed #CBD5E1', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#475569' }}>
+            No kitchen counters found
+          </p>
+          <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#94A3B8' }}>
+            Add kitchen counters from the sidebar or orders page to route KOT tickets to specific station printers.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {counters.map(counter => {
           const form = formStates[counter.id] || {
             printer_name: counter.printer_name || 'POS-80C',
@@ -1029,7 +1820,8 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

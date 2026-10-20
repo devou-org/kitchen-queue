@@ -36,7 +36,10 @@ async function runAutoMigration(sqlConnection: any) {
       ADD COLUMN IF NOT EXISTS city VARCHAR(150) DEFAULT 'Thalassery',
       ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,7) DEFAULT 11.7750435,
       ADD COLUMN IF NOT EXISTS longitude DECIMAL(10,7) DEFAULT 75.496864,
-      ADD COLUMN IF NOT EXISTS kitchen_mode VARCHAR(20) DEFAULT 'KOT';
+      ADD COLUMN IF NOT EXISTS kitchen_mode VARCHAR(20) DEFAULT 'KOT',
+      ADD COLUMN IF NOT EXISTS bill_printer_name VARCHAR(255) DEFAULT 'POS-80C',
+      ADD COLUMN IF NOT EXISTS bill_printer_type VARCHAR(50) DEFAULT 'DEFAULT',
+      ADD COLUMN IF NOT EXISTS bill_printer_address VARCHAR(255);
     `;
     await sqlConnection`
       ALTER TABLE orders
@@ -808,6 +811,23 @@ export async function updateRestaurant(id: string, data: {
 
 export async function deleteRestaurant(id: string) {
   await sql`DELETE FROM restaurants WHERE id = ${id}`;
+}
+
+export async function updateRestaurantBillPrinter(restaurantId: string, data: {
+  bill_printer_name: string;
+  bill_printer_type?: string;
+  bill_printer_address?: string | null;
+}) {
+  const rows = await sql`
+    UPDATE restaurants SET
+      bill_printer_name = ${data.bill_printer_name || 'POS-80C'},
+      bill_printer_type = ${data.bill_printer_type || 'DEFAULT'},
+      bill_printer_address = ${data.bill_printer_address || null},
+      updated_at = NOW()
+    WHERE id = ${restaurantId}
+    RETURNING id, name, bill_printer_name, bill_printer_type, bill_printer_address
+  `;
+  return rows[0] || null;
 }
 
 // ============================================

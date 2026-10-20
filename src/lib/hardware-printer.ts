@@ -968,6 +968,8 @@ export interface UnifiedBillPrintOptions {
   orderData?: any;
   billData?: any;
   printerName?: string;
+  printerAddress?: string;
+  printerType?: string;
   ticketNumber?: string | number;
   localBridgeUrl?: string;
   forceBrowser?: boolean;
@@ -975,6 +977,7 @@ export interface UnifiedBillPrintOptions {
 
 /**
  * Dispatch bill print job to the most direct, highest-priority hardware connection:
+ * 0. QZ Tray (100% silent, direct OS spooler / network TCP)
  * 1. Web Bluetooth (if paired & active)
  * 2. Web Serial / USB (if connected & active)
  * 3. Android RawBT WebSocket (Port 40213 - 100% silent, background)
@@ -984,7 +987,7 @@ export interface UnifiedBillPrintOptions {
  */
 export function printUnifiedBill(options: UnifiedBillPrintOptions): Promise<{
   success: boolean;
-  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser';
+  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser' | 'qz-tray';
   message?: string;
 }> {
   return enqueuePrintJob(() => executePrintUnifiedBill(options));
@@ -992,7 +995,7 @@ export function printUnifiedBill(options: UnifiedBillPrintOptions): Promise<{
 
 async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promise<{
   success: boolean;
-  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser';
+  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser' | 'qz-tray';
   message?: string;
 }> {
   const {
@@ -1001,6 +1004,8 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
     orderData,
     billData,
     printerName = (typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C') : 'POS-80C'),
+    printerAddress = (typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_address') || undefined) : undefined),
+    printerType = (typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_type') || 'DEFAULT') : 'DEFAULT'),
     forceBrowser = false,
   } = options;
 
@@ -1019,6 +1024,14 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
     } catch {}
   }
 
+  const effType = (printerType || (typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_type') : null) || 'DEFAULT').toUpperCase();
+  const effAddress = (effType === 'NETWORK' ? (printerAddress || (typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_address') : '')) : '')?.trim();
+
+  // If not in NETWORK mode, ensure no old Wi-Fi address remains in localStorage
+  if (effType !== 'NETWORK' && typeof window !== 'undefined') {
+    localStorage.removeItem('qdine_bill_printer_address');
+  }
+
   if (!forceBrowser && rawBytes) {
     const preferredType = typeof window !== 'undefined' ? localStorage.getItem('qdine_preferred_printer_type') : null;
 
@@ -1034,40 +1047,99 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
       }
     }
 
-    // 1. Try Bluetooth if active or attempt auto-reconnect
-    const btCheck = isBluetoothConnectedForCounter(undefined, printerName);
-    if (!btCheck.connected && (!activeBluetoothChar || !activeBluetoothDevice?.gatt?.connected)) {
-      await tryAutoConnectBluetooth();
-    }
+    // 1. BLUETOOTH MODE: Print exclusively to Bluetooth
+    if (effType === 'BLUETOOTH') {
+      const btCheck = isBluetoothConnectedForCounter(undefined, printerName, 'Bill Printer');
+      if (!btCheck.connected && (!activeBluetoothChar || !activeBluetoothDevice?.gatt?.connected)) {
+        await tryAutoConnectBluetooth();
+      }
 
-    const btNow = isBluetoothConnectedForCounter(undefined, printerName);
-    const isBtActive = btNow.connected || (activeBluetoothChar && activeBluetoothDevice?.gatt?.connected);
-    if (isBtActive) {
-      try {
-        await writeBytesToBluetooth(rawBytes, printerName);
+      const btNow = isBluetoothConnectedForCounter(undefined, printerName, 'Bill Printer');
+      const isBtActive = btNow.connected || (activeBluetoothChar && activeBluetoothDevice?.gatt?.connected);
+      if (isBtActive) {
+        try {
+          await writeBytesToBluetooth(rawBytes, printerName, undefined, 'Bill Printer');
+          return {
+            success: true,
+            method: 'bluetooth',
+            message: `Bill #${ticketNumber} printed instantly to ${btNow.deviceName || activeBluetoothDevice?.name || printerName}!`,
+          };
+        } catch (err: any) {
+          console.warn('Bluetooth bill print failed:', err.message);
+          return {
+            success: false,
+            method: 'bluetooth',
+            message: `Failed to print to Bluetooth printer (${printerName}): ${err.message}`,
+          };
+        }
+      } else {
         return {
-          success: true,
+          success: false,
           method: 'bluetooth',
-          message: `Bill #${ticketNumber} printed instantly to ${btNow.deviceName || activeBluetoothDevice?.name || 'Bluetooth Printer'}!`,
+          message: `Bluetooth printer "${printerName || 'POS-80C'}" is not connected. Please pair it in Settings.`,
         };
-      } catch (err: any) {
-        console.warn('Bluetooth bill print failed, trying alternatives:', err.message);
       }
     }
 
-    // 2. Try Serial / USB if active
-    const serialCheck = isSerialConnectedForCounter(undefined, printerName);
-    const isSerialActive = serialCheck.connected || (activeSerialPort && activeSerialPort.writable);
-    if (isSerialActive) {
-      try {
-        await writeBytesToSerial(rawBytes);
+    // 2. USB MODE: Print exclusively to USB / Serial
+    if (effType === 'USB') {
+      const serialCheck = isSerialConnectedForCounter(undefined, printerName);
+      const isSerialActive = serialCheck.connected || (activeSerialPort && activeSerialPort.writable);
+      if (isSerialActive) {
+        try {
+          await writeBytesToSerial(rawBytes);
+          return {
+            success: true,
+            method: 'serial',
+            message: `Bill #${ticketNumber} printed instantly to USB Printer (${printerName})!`,
+          };
+        } catch (err: any) {
+          console.warn('USB bill print failed:', err.message);
+          return {
+            success: false,
+            method: 'serial',
+            message: `Failed to print to USB printer (${printerName}): ${err.message}`,
+          };
+        }
+      } else {
         return {
-          success: true,
+          success: false,
           method: 'serial',
-          message: `Bill #${ticketNumber} printed instantly to USB Printer (${printerName})!`,
+          message: `USB printer "${printerName || 'POS-80C'}" is not connected. Please connect it in Settings.`,
         };
-      } catch (err: any) {
-        console.warn('USB bill print failed, trying alternatives:', err.message);
+      }
+    }
+
+    // 3. NETWORK MODE: Print to IP via QZ Tray TCP socket
+    if (effType === 'NETWORK' && effAddress && base64Bytes) {
+      try {
+        const qzResult = await printRawEscposViaQz(effAddress, base64Bytes);
+        if (qzResult.success) {
+          return {
+            success: true,
+            method: 'qz-tray',
+            message: `Bill #${ticketNumber} printed via network to "${effAddress}"!`,
+          };
+        }
+      } catch (qzErr: any) {
+        console.warn('Network bill print attempt failed:', qzErr?.message);
+      }
+    }
+
+    // 4. QZ TRAY or DEFAULT SYSTEM MODE: Print via local QZ Tray spooler to target printer
+    if ((effType === 'QZ_TRAY' || effType === 'DEFAULT') && base64Bytes) {
+      try {
+        const qzTarget = printerName || 'POS-80C';
+        const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes);
+        if (qzResult.success) {
+          return {
+            success: true,
+            method: 'qz-tray',
+            message: `Bill #${ticketNumber} printed via QZ Tray to "${qzTarget}"!`,
+          };
+        }
+      } catch (qzErr: any) {
+        console.warn('QZ Tray bill print attempt failed, trying alternatives:', qzErr?.message);
       }
     }
 

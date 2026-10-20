@@ -407,6 +407,13 @@ export default function AdminPosPage() {
     const savedPrinter = typeof window !== 'undefined'
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
+    const savedType = typeof window !== 'undefined'
+      ? (localStorage.getItem('qdine_bill_printer_type') || 'DEFAULT')
+      : 'DEFAULT';
+    const isNetwork = savedType === 'NETWORK';
+    const savedAddress = (isNetwork && typeof window !== 'undefined')
+      ? (localStorage.getItem('qdine_bill_printer_address') || undefined)
+      : undefined;
 
     try {
       const res = await fetch('/api/print/bill', {
@@ -418,6 +425,7 @@ export default function AdminPosPage() {
         body: JSON.stringify({
           orderId: order.id,
           printerName: savedPrinter,
+          printerType: savedType,
           orderData: order,
           slug: restaurantSlug,
         }),
@@ -444,6 +452,8 @@ export default function AdminPosPage() {
         orderData: order,
         billData: data.billData,
         printerName: data.printer || savedPrinter,
+        printerAddress: savedAddress,
+        printerType: savedType,
         ticketNumber: order.ticket_number,
         localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
       });
