@@ -64,7 +64,7 @@ export function generateBillTemplateContentHTML(order: Order, restaurant?: BillR
         })()
       : 'Takeaway';
 
-  const customerDisplay = order.customer_name || 'Guest';
+  const customerDisplay = order.customer_name || 'Walk-in';
   const rawTable = order.table_number ? String(order.table_number).trim() : '';
   const tableDisplay = rawTable || (ticketNum ? `#${ticketNum}` : '-');
 

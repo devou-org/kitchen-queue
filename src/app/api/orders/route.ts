@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrders, getOrderStats, createOrder, createUser, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken, requireAdmin } from '@/lib/auth';
+import { validatePhone } from '@/lib/validators';
 import { pusherServer } from '@/lib/pusher';
 import { autoQueueAndBroadcastKot } from '@/lib/kot-auto-print';
 
@@ -73,6 +74,14 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
+    const admin = await requireAdmin(request);
+    if (admin && !admin.isSuperAdmin && admin.restaurantId && admin.restaurantId !== restaurant.id) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Wrong restaurant' }, { status: 403 });
+    }
+
+    const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
+    const isPos = hasAdminRights;
+
     // 1. Check Service Status FIRST
     const { default: sql } = await import('@/lib/db');
     const settings = await sql`SELECT is_service_active, service_message FROM restaurants WHERE id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
@@ -87,12 +96,39 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method, payment_split } = body;
 
-    if (!customer_name || !phone || !items || !items.length) {
+    const cleanedPhone = typeof phone === 'string' ? phone.trim() : '';
+    const hasPhone = cleanedPhone !== '';
+    const customerName = (typeof customer_name === 'string' ? customer_name.trim() : '') || (isPos ? 'Walk-in' : '');
+
+    // Validation:
+    // Items are required for everyone (must be a non-empty array).
+    if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'Customer name, phone, and items are required'
+        error: 'At least one valid item is required'
       }, { status: 400 });
     }
+
+    // Customers (!isPos) must provide name AND phone, otherwise 400.
+    if (!isPos && (!customerName || !hasPhone)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Customer name and phone number are required'
+      }, { status: 400 });
+    }
+
+    // If a phone is provided (any caller), validate it with validatePhone.
+    if (hasPhone) {
+      const phoneValidation = validatePhone(cleanedPhone);
+      if (!phoneValidation.valid) {
+        return NextResponse.json({
+          success: false,
+          error: phoneValidation.message || 'Invalid phone number'
+        }, { status: 400 });
+      }
+    }
+
+    const cleanPhone = hasPhone ? cleanedPhone.replace(/\D/g, '').slice(-10) : '';
 
     if (order_type !== 'TAKEAWAY' && table_number) {
       const { TablesRepository } = await import('@/modules/tables/tables.repository');
@@ -101,8 +137,8 @@ export async function POST(request: NextRequest) {
       const targetTable = tables.find(t => String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase());
       if (targetTable) {
         const check = checkTableAssignment(targetTable, party_size || 1, {
-          phone,
-          customerName: customer_name
+          phone: hasPhone ? cleanedPhone : undefined,
+          customerName,
         });
         if (!check.allowed) {
           return NextResponse.json({
@@ -134,55 +170,51 @@ export async function POST(request: NextRequest) {
 
     total_price = Math.max(0, total_price - discount_amount);
 
-    const admin = await requireAdmin(request);
-    const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
-    // Explicit is_pos from POS terminal or authenticated staff/admin placing an order
-    const isPos = body.is_pos === true || hasAdminRights;
-    const isPaid = (hasAdminRights || body.is_pos === true) && Boolean(is_paid);
-    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : ((hasAdminRights || body.is_pos === true) && payment_method ? String(payment_method) : undefined);
+    const isPaid = isPos && Boolean(is_paid);
+    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : (isPos && payment_method ? String(payment_method) : undefined);
 
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    // 🛡️ ANTI-DUPLICATE CHECK: Prevent identical rapid duplicate orders within 15s (runs ONLY when !isPos)
+    if (!isPos && hasPhone) {
+      const recentDuplicate = await sql`
+        SELECT id, ticket_number, status, total_price, created_at, customer_name, phone, table_number
+        FROM orders
+        WHERE restaurant_id = ${restaurant.id}
+          AND (
+            phone = ${cleanedPhone}
+            OR phone = ${'+91' + cleanPhone}
+            OR phone = ${cleanPhone}
+            OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+          )
+          AND created_at > NOW() - INTERVAL '15 seconds'
+        ORDER BY created_at DESC
+        LIMIT 1
+      ` as any[];
 
-    // 🛡️ ANTI-DUPLICATE CHECK: Prevent identical rapid duplicate orders within 15s (e.g. swipe bounce)
-    const recentDuplicate = await sql`
-      SELECT id, ticket_number, status, total_price, created_at, customer_name, phone, table_number
-      FROM orders
-      WHERE restaurant_id = ${restaurant.id}
-        AND (
-          phone = ${phone}
-          OR phone = ${'+91' + cleanPhone}
-          OR phone = ${cleanPhone}
-          OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
-        )
-        AND created_at > NOW() - INTERVAL '15 seconds'
-      ORDER BY created_at DESC
-      LIMIT 1
-    ` as any[];
-
-    if (recentDuplicate[0]) {
-      console.log(`⚠️ Prevented duplicate order for ticket #${recentDuplicate[0].ticket_number}`);
-      return NextResponse.json({
-        success: true,
-        data: recentDuplicate[0],
-        message: 'Order already placed',
-        duplicate_prevented: true,
-      });
+      if (recentDuplicate[0]) {
+        console.log(`⚠️ Prevented duplicate order for ticket #${recentDuplicate[0].ticket_number}`);
+        return NextResponse.json({
+          success: true,
+          data: recentDuplicate[0],
+          message: 'Order already placed',
+          duplicate_prevented: true,
+        });
+      }
     }
 
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
-    // 🛡️ ACTIVE ORDER ENFORCEMENT:
+    // 🛡️ ACTIVE ORDER ENFORCEMENT (runs ONLY when !isPos):
     // PENDING / PREPARING / READY -> ❌ Don't create a new order (Append it)
     // CLOSED / EXPIRED / CANCELLED -> ✅ Create a new order
     // No previous order -> ✅ Create a new order
-    if (!isPos) {
+    if (!isPos && hasPhone) {
       const previousOrderRes = await sql`
         SELECT id, ticket_number, status, table_number, created_at, business_date
         FROM orders
         WHERE restaurant_id = ${restaurant.id}
           AND (
-            phone = ${phone}
+            phone = ${cleanedPhone}
             OR phone = ${'+91' + cleanPhone}
             OR phone = ${cleanPhone}
             OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
@@ -221,8 +253,8 @@ export async function POST(request: NextRequest) {
 
     const order = await createOrder({
       restaurant_id: restaurant.id,
-      customer_name: customer_name.trim(),
-      phone,
+      customer_name: customerName,
+      phone: hasPhone ? cleanedPhone : null,
       total_price,
       subtotal,
       discount_amount,
@@ -243,11 +275,13 @@ export async function POST(request: NextRequest) {
       items,
     });
 
-    // Persist the customer name back to the users table so checkout can auto-fill it next time
-    try {
-      await createUser(phone, customer_name.trim());
-    } catch {
-      // Non-critical — don't fail the order if this upsert fails
+    // Persist the customer name back to the users table only for customer orders with phone
+    if (hasPhone && !isPos) {
+      try {
+        await createUser(cleanedPhone, customerName);
+      } catch {
+        // Non-critical — don't fail the order if this upsert fails
+      }
     }
 
     try {
