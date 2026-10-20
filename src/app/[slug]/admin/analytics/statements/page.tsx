@@ -87,8 +87,8 @@ export default function AdminAnalyticsStatementsPage() {
     const headers = ['Ticket', 'Customer', 'Phone', 'Items', 'Total', 'Paid', 'Status', 'Date'];
     const rows = orders.map((order) => [
       `#${String(order.ticket_number).padStart(3, '0')}`,
-      `"${order.customer_name}"`,
-      `"${order.phone}"`,
+      `"${order.customer_name || 'Walk-in'}"`,
+      `"${order.phone || '-'}"`,
       `"${(order.items || []).map((i) => `${i.product_name} (x${i.quantity})`).join('; ')}"`,
       order.total_price,
       order.is_paid ? `PAID${order.payment_method ? ` (${order.payment_method})` : ''}` : 'PENDING',
@@ -806,8 +806,8 @@ export default function AdminAnalyticsStatementsPage() {
                         #{String(order.ticket_number).padStart(3, '0')}
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{order.phone}</div>
+                        <div style={{ fontWeight: 600 }}>{order.customer_name || 'Walk-in'}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{order.phone || '-'}</div>
                       </td>
                       <td>
                         <div style={{ maxWidth: '300px', fontSize: '12px' }}>
