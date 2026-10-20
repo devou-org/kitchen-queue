@@ -17,6 +17,8 @@ export interface CreateOrderData {
   payment_method?: string;
   payment_split?: Record<string, number> | null;
   discount_amount?: number;
+  loyalty_reward_id?: string;
+  selected_reward_id?: string;
 }
 
 export interface UpdateOrderData {
