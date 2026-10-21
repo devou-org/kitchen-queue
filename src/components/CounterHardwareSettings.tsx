@@ -34,6 +34,15 @@ import {
   getQzPrinters,
   printRawEscposViaQz,
 } from '@/lib/qz-printer';
+import { CustomSelect, SelectOption } from '@/components/ui/CustomSelect';
+
+const CONNECTION_OPTIONS: SelectOption[] = [
+  { value: 'DEFAULT', label: 'System Default', icon: Printer },
+  { value: 'QZ_TRAY', label: 'QZ Tray', icon: Cpu },
+  { value: 'BLUETOOTH', label: 'Bluetooth', icon: Bluetooth },
+  { value: 'USB', label: 'USB Cable', icon: Usb },
+  { value: 'NETWORK', label: 'Network (LAN / Wi-Fi)', icon: Wifi },
+];
 
 interface CounterHardwareSettingsProps {
   slug: string;
@@ -327,7 +336,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
   };
 
   const handleDisconnectBillBluetooth = async () => {
-    await disconnectBluetoothPrinter('bill_printer', billPrinter.printer_name);
+    await disconnectBluetoothPrinter('bill_printer', billPrinter.printer_name, 'Bill Printer');
     setTick(t => t + 1);
     toast.success('Disconnected Bluetooth bill printer');
   };
@@ -542,7 +551,11 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
   };
 
   const handleDisconnectBluetooth = async (counter: Counter) => {
-    await disconnectBluetoothPrinter(counter.id, formStates[counter.id]?.printer_name || counter.printer_name || undefined);
+    await disconnectBluetoothPrinter(
+      counter.id,
+      formStates[counter.id]?.printer_name || counter.printer_name || undefined,
+      counter.name
+    );
     setTick(t => t + 1);
     toast.success(`Disconnected Bluetooth printer from ${counter.name}`);
   };
@@ -726,13 +739,14 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
           border: `1px solid ${qzActive ? '#BBF7D0' : '#E2E8F0'}`,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span
             style={{
               width: '8px',
               height: '8px',
               borderRadius: '50%',
               backgroundColor: qzActive ? '#10B981' : '#94A3B8',
+              flexShrink: 0,
             }}
           />
           <span style={{ fontSize: '12px', fontWeight: 700, color: qzActive ? '#15803D' : '#475569' }}>
@@ -743,6 +757,30 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
               ({systemPrinters.length} OS printers detected)
             </span>
           )}
+          <a
+            href="https://qz.io/download/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Download QZ Tray for desktop silent printing"
+            style={{
+              fontSize: '11px',
+              color: '#2563EB',
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
+              padding: '2px 7px',
+              borderRadius: '4px',
+              backgroundColor: '#EFF6FF',
+              border: '1px solid #DBEAFE',
+              marginLeft: '2px',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#DBEAFE')}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#EFF6FF')}
+          >
+            Download QZ Tray ↗
+          </a>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -829,26 +867,25 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
-                  Default Bill Printer
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                  Bill Printer
                 </span>
                 <span
                   style={{
                     fontSize: '10px',
-                    fontWeight: 700,
+                    fontWeight: 600,
                     padding: '2px 7px',
                     borderRadius: '10px',
                     backgroundColor: '#F1F5F9',
                     color: '#475569',
                     border: '1px solid #E2E8F0',
-                    letterSpacing: '0.02em',
                   }}
                 >
-                  Cashier Receipts
+                  Receipts
                 </span>
               </div>
               <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#64748B' }}>
-                All customer bills and checkout invoices will print <strong>exclusively</strong> to this printer.
+                Prints customer bills and receipts.
               </p>
             </div>
           </div>
@@ -943,7 +980,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                 }}
               >
                 <Printer size={12} />
-                System Spooler
+                System Default
               </span>
             )}
           </div>
@@ -955,10 +992,9 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
               Connection
             </label>
-            <select
+            <CustomSelect
               value={billPrinter.printer_type}
-              onChange={e => {
-                const newType = e.target.value;
+              onChange={(newType: string) => {
                 setBillPrinter(prev => ({
                   ...prev,
                   printer_type: newType,
@@ -971,24 +1007,20 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   }
                 }
               }}
-              style={{
-                width: '100%',
-                padding: '7px 9px',
+              options={CONNECTION_OPTIONS}
+              direction="auto"
+              buttonStyle={{
+                height: '32px',
+                padding: '0 8px',
+                fontSize: '12px',
                 borderRadius: '6px',
                 border: '1px solid #CBD5E1',
-                fontSize: '12px',
-                backgroundColor: '#FFFFFF',
-                color: '#0F172A',
-                outline: 'none',
-                boxSizing: 'border-box',
+                fontWeight: 500,
               }}
-            >
-              <option value="DEFAULT">Default / System Spooler</option>
-              <option value="QZ_TRAY">QZ Tray (Direct Silent Printing)</option>
-              <option value="BLUETOOTH">Bluetooth (Wireless)</option>
-              <option value="USB">USB (Serial COM)</option>
-              <option value="NETWORK">Network (LAN / Wi-Fi IP)</option>
-            </select>
+              dropdownStyle={{
+                zIndex: 100,
+              }}
+            />
           </div>
 
           <div>
@@ -1029,48 +1061,35 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             </div>
 
             {systemPrinters.length > 0 && !manualInputBillPrinter ? (
-              <select
+              <CustomSelect
                 value={billPrinter.printer_name}
-                onChange={e => {
-                  const val = e.target.value;
-                  if (val === '__CUSTOM__') {
-                    setManualInputBillPrinter(true);
-                  } else {
-                    setBillPrinter(prev => ({
-                      ...prev,
-                      printer_name: val,
-                      printer_type: (prev.printer_type === 'BLUETOOTH') ? 'QZ_TRAY' : prev.printer_type,
-                    }));
-                  }
+                onChange={(val: string) => {
+                  setBillPrinter(prev => ({
+                    ...prev,
+                    printer_name: val,
+                    printer_type: (prev.printer_type === 'BLUETOOTH') ? 'QZ_TRAY' : prev.printer_type,
+                  }));
                 }}
-                style={{
-                  width: '100%',
-                  padding: '7px 9px',
+                options={[
+                  ...(billPrinter.printer_name && !systemPrinters.includes(billPrinter.printer_name)
+                    ? [{ value: billPrinter.printer_name, label: `${billPrinter.printer_name} (Current)`, icon: Printer }]
+                    : []),
+                  ...systemPrinters.map(p => ({ value: p, label: p, icon: Printer })),
+                ]}
+                placeholder="Select Printer..."
+                direction="auto"
+                buttonStyle={{
+                  height: '32px',
+                  padding: '0 8px',
+                  fontSize: '12px',
                   borderRadius: '6px',
                   border: '1px solid #CBD5E1',
-                  fontSize: '12px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#0F172A',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  cursor: 'pointer',
+                  fontWeight: 500,
                 }}
-              >
-                {billPrinter.printer_name && !systemPrinters.includes(billPrinter.printer_name) && (
-                  <option value={billPrinter.printer_name}>
-                    {billPrinter.printer_name} (Current)
-                  </option>
-                )}
-                {!billPrinter.printer_name && (
-                  <option value="">-- Select Installed Printer --</option>
-                )}
-                {systemPrinters.map(p => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-                <option value="__CUSTOM__">✏️ Type custom name...</option>
-              </select>
+                dropdownStyle={{
+                  zIndex: 100,
+                }}
+              />
             ) : (
               <input
                 type="text"
@@ -1079,7 +1098,8 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                 placeholder={systemPrinters[0] || 'POS-80C'}
                 style={{
                   width: '100%',
-                  padding: '7px 9px',
+                  height: '32px',
+                  padding: '6px 9px',
                   borderRadius: '6px',
                   border: '1px solid #CBD5E1',
                   fontSize: '12px',
@@ -1103,7 +1123,8 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                 placeholder="192.168.1.100:9100"
                 style={{
                   width: '100%',
-                  padding: '7px 9px',
+                  height: '32px',
+                  padding: '6px 9px',
                   borderRadius: '6px',
                   border: '1px solid #CBD5E1',
                   fontSize: '12px',
@@ -1121,27 +1142,49 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingTop: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {billPrinter.printer_type === 'QZ_TRAY' && !qzActive && (
-              <button
-                type="button"
-                onClick={handleConnectQz}
-                disabled={qzConnecting}
-                style={{
-                  padding: '5px 10px',
-                  borderRadius: '5px',
-                  border: '1px solid #BFDBFE',
-                  backgroundColor: '#EFF6FF',
-                  color: '#1D4ED8',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: qzConnecting ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                {qzConnecting ? <Loader2 size={11} className="animate-spin" /> : <Cpu size={11} />}
-                <span>Connect QZ</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleConnectQz}
+                  disabled={qzConnecting}
+                  style={{
+                    padding: '4px 9px',
+                    borderRadius: '5px',
+                    border: '1px solid #BFDBFE',
+                    backgroundColor: '#EFF6FF',
+                    color: '#1D4ED8',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: qzConnecting ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  {qzConnecting ? <Loader2 size={11} className="animate-spin" /> : <Cpu size={11} />}
+                  <span>Connect QZ</span>
+                </button>
+                <a
+                  href="https://qz.io/download/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '5px',
+                    border: '1px solid #E2E8F0',
+                    backgroundColor: '#FFFFFF',
+                    color: '#2563EB',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                  }}
+                >
+                  Download QZ ↗
+                </a>
+              </>
             )}
 
             {billPrinter.printer_type === 'BLUETOOTH' && (
@@ -1150,7 +1193,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   type="button"
                   onClick={handleDisconnectBillBluetooth}
                   style={{
-                    padding: '5px 10px',
+                    padding: '4px 8px',
                     borderRadius: '5px',
                     border: '1px solid #FECACA',
                     backgroundColor: '#FEF2F2',
@@ -1164,7 +1207,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   }}
                 >
                   <BluetoothOff size={11} />
-                  <span>Disconnect BT</span>
+                  <span>Disconnect</span>
                 </button>
               ) : (
                 <button
@@ -1172,7 +1215,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   onClick={handlePairBillBluetooth}
                   disabled={connectingBillBt}
                   style={{
-                    padding: '5px 10px',
+                    padding: '4px 9px',
                     borderRadius: '5px',
                     border: '1px solid #DBEAFE',
                     backgroundColor: '#EFF6FF',
@@ -1197,7 +1240,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   type="button"
                   onClick={handleDisconnectBillUsb}
                   style={{
-                    padding: '5px 10px',
+                    padding: '4px 8px',
                     borderRadius: '5px',
                     border: '1px solid #E2E8F0',
                     backgroundColor: '#F8FAFC',
@@ -1211,7 +1254,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   }}
                 >
                   <Usb size={11} />
-                  <span>Disconnect USB</span>
+                  <span>Disconnect</span>
                 </button>
               ) : (
                 <button
@@ -1219,7 +1262,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   onClick={handleConnectBillUsb}
                   disabled={connectingBillUsb}
                   style={{
-                    padding: '5px 10px',
+                    padding: '4px 9px',
                     borderRadius: '5px',
                     border: '1px solid #DCFCE7',
                     backgroundColor: '#F0FDF4',
@@ -1244,9 +1287,9 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
               onClick={handleTestPrintBill}
               disabled={testingBillPrinter}
               style={{
-                padding: '5px 11px',
+                padding: '4px 9px',
                 borderRadius: '5px',
-                border: '1px solid #CBD5E1',
+                border: '1px solid #E2E8F0',
                 backgroundColor: '#FFFFFF',
                 color: '#0F172A',
                 fontSize: '11px',
@@ -1254,15 +1297,15 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                 cursor: testingBillPrinter ? 'not-allowed' : 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
               }}
             >
               {testingBillPrinter ? (
-                <Loader2 size={11} className="animate-spin" style={{ color: '#059669' }} />
+                <Loader2 size={11} className="animate-spin" style={{ color: '#2563EB' }} />
               ) : (
-                <Play size={10} style={{ fill: '#059669', color: '#059669' }} />
+                <Play size={10} style={{ fill: '#2563EB', color: '#2563EB' }} />
               )}
-              <span>Test Bill Print</span>
+              <span>Test Print</span>
             </button>
           </div>
 
@@ -1272,19 +1315,18 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             onClick={handleSaveBillPrinter}
             disabled={savingBillPrinter}
             style={{
-              padding: '5px 14px',
-              borderRadius: '6px',
+              padding: '4px 11px',
+              borderRadius: '5px',
               border: 'none',
-              backgroundColor: savedBillPrinter ? '#16A34A' : '#059669',
+              backgroundColor: savedBillPrinter ? '#16A34A' : primaryColor,
               color: '#FFFFFF',
               fontSize: '11px',
               fontWeight: 700,
               cursor: savingBillPrinter ? 'not-allowed' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '5px',
+              gap: '4px',
               transition: 'all 0.15s ease',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
             }}
           >
             {savingBillPrinter ? (
@@ -1294,7 +1336,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             ) : (
               <Save size={11} />
             )}
-            <span>{savedBillPrinter ? 'Saved' : 'Save Default Bill Printer'}</span>
+            <span>{savedBillPrinter ? 'Saved' : 'Save'}</span>
           </button>
         </div>
       </div>
@@ -1483,7 +1525,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                         border: '1px solid #E2E8F0',
                       }}
                     >
-                      System Driver
+                      System Default
                     </span>
                   )}
                 </div>
@@ -1495,27 +1537,23 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '3px' }}>
                     Connection
                   </label>
-                  <select
+                  <CustomSelect
                     value={form.printer_type}
-                    onChange={e => handleFieldChange(counter.id, 'printer_type', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
+                    onChange={(newType: string) => handleFieldChange(counter.id, 'printer_type', newType)}
+                    options={CONNECTION_OPTIONS}
+                    direction="auto"
+                    buttonStyle={{
+                      height: '32px',
+                      padding: '0 8px',
+                      fontSize: '12px',
                       borderRadius: '6px',
                       border: '1px solid #CBD5E1',
-                      fontSize: '12px',
-                      backgroundColor: '#FFFFFF',
-                      color: '#0F172A',
-                      outline: 'none',
-                      boxSizing: 'border-box',
+                      fontWeight: 500,
                     }}
-                  >
-                    <option value="DEFAULT">Default / System</option>
-                    <option value="QZ_TRAY">QZ Tray (Silent Spooler)</option>
-                    <option value="BLUETOOTH">Bluetooth (Wireless)</option>
-                    <option value="USB">USB (Serial COM)</option>
-                    <option value="NETWORK">Network (LAN / Wi-Fi)</option>
-                  </select>
+                    dropdownStyle={{
+                      zIndex: 100,
+                    }}
+                  />
                 </div>
 
                 <div>
@@ -1556,47 +1594,34 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   </div>
 
                   {systemPrinters.length > 0 && !manualInputCounters[counter.id] ? (
-                    <select
+                    <CustomSelect
                       value={form.printer_name}
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (val === '__CUSTOM__') {
-                          setManualInputCounters(prev => ({ ...prev, [counter.id]: true }));
-                        } else {
-                          handleFieldChange(counter.id, 'printer_name', val);
-                          if (val && form.printer_type === 'BLUETOOTH') {
-                            handleFieldChange(counter.id, 'printer_type', 'QZ_TRAY');
-                          }
+                      onChange={(val: string) => {
+                        handleFieldChange(counter.id, 'printer_name', val);
+                        if (val && form.printer_type === 'BLUETOOTH') {
+                          handleFieldChange(counter.id, 'printer_type', 'QZ_TRAY');
                         }
                       }}
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
+                      options={[
+                        ...(form.printer_name && !systemPrinters.includes(form.printer_name)
+                          ? [{ value: form.printer_name, label: `${form.printer_name} (Current)`, icon: Printer }]
+                          : []),
+                        ...systemPrinters.map(p => ({ value: p, label: p, icon: Printer })),
+                      ]}
+                      placeholder="Select Printer..."
+                      direction="auto"
+                      buttonStyle={{
+                        height: '32px',
+                        padding: '0 8px',
+                        fontSize: '12px',
                         borderRadius: '6px',
                         border: '1px solid #CBD5E1',
-                        fontSize: '12px',
-                        backgroundColor: '#FFFFFF',
-                        color: '#0F172A',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                        cursor: 'pointer',
+                        fontWeight: 500,
                       }}
-                    >
-                      {form.printer_name && !systemPrinters.includes(form.printer_name) && (
-                        <option value={form.printer_name}>
-                          {form.printer_name} (Current)
-                        </option>
-                      )}
-                      {!form.printer_name && (
-                        <option value="">-- Select Installed Printer --</option>
-                      )}
-                      {systemPrinters.map(p => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                      <option value="__CUSTOM__">✏️ Type custom name...</option>
-                    </select>
+                      dropdownStyle={{
+                        zIndex: 100,
+                      }}
+                    />
                   ) : (
                     <input
                       type="text"
@@ -1605,6 +1630,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                       placeholder={systemPrinters[0] || 'POS-80C'}
                       style={{
                         width: '100%',
+                        height: '32px',
                         padding: '6px 8px',
                         borderRadius: '6px',
                         border: '1px solid #CBD5E1',
@@ -1620,15 +1646,16 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                 {isNet && (
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '3px' }}>
-                      IP Address
+                      IP Address & Port
                     </label>
                     <input
                       type="text"
                       value={form.printer_address}
                       onChange={e => handleFieldChange(counter.id, 'printer_address', e.target.value)}
-                      placeholder="192.168.1.150:9100"
+                      placeholder="192.168.1.100:9100"
                       style={{
                         width: '100%',
+                        height: '32px',
                         padding: '6px 8px',
                         borderRadius: '6px',
                         border: '1px solid #CBD5E1',
@@ -1648,27 +1675,49 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {isQz ? (
                     !qzActive ? (
-                      <button
-                        type="button"
-                        onClick={handleConnectQz}
-                        disabled={qzConnecting}
-                        style={{
-                          padding: '4px 9px',
-                          borderRadius: '5px',
-                          border: '1px solid #BFDBFE',
-                          backgroundColor: '#EFF6FF',
-                          color: '#1D4ED8',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: qzConnecting ? 'not-allowed' : 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        {qzConnecting ? <Loader2 size={11} className="animate-spin" /> : <Cpu size={11} />}
-                        <span>Connect QZ</span>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleConnectQz}
+                          disabled={qzConnecting}
+                          style={{
+                            padding: '4px 9px',
+                            borderRadius: '5px',
+                            border: '1px solid #BFDBFE',
+                            backgroundColor: '#EFF6FF',
+                            color: '#1D4ED8',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: qzConnecting ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          {qzConnecting ? <Loader2 size={11} className="animate-spin" /> : <Cpu size={11} />}
+                          <span>Connect QZ</span>
+                        </button>
+                        <a
+                          href="https://qz.io/download/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '5px',
+                            border: '1px solid #E2E8F0',
+                            backgroundColor: '#FFFFFF',
+                            color: '#2563EB',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                        >
+                          Download QZ ↗
+                        </a>
+                      </>
                     ) : null
                   ) : isBt ? (
                     btConnected ? (

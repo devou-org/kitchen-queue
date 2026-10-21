@@ -128,13 +128,6 @@ export function isBluetoothConnectedForCounter(
   printerName?: string,
   counterName?: string
 ): { connected: boolean; deviceName: string | null } {
-  // If a specific counter or printer is specified, we MUST match only that target!
-  const hasSpecificTarget = Boolean(
-    (counterId && counterId.trim()) ||
-    (printerName && printerName.trim() && printerName.trim().toUpperCase() !== 'POS-80C') ||
-    (counterName && counterName.trim())
-  );
-
   // 1. Direct match by counter ID
   if (counterId && activeBtConnections.has(counterId)) {
     const conn = activeBtConnections.get(counterId)!;
@@ -155,7 +148,13 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 3. Direct match by configured printer device name
+  // If a specific counter was targeted, it is strictly NOT connected.
+  // Never bleed through other counters' printers or stale localStorage!
+  if (counterId || counterName) {
+    return { connected: false, deviceName: null };
+  }
+
+  // 3. Fallback only for generic global checks without counter ID or name
   const cleanPrinterName = printerName?.trim();
   if (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C' && activeBtConnections.has(cleanPrinterName)) {
     const conn = activeBtConnections.get(cleanPrinterName)!;
@@ -166,34 +165,6 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 4. Counter ID stored preference
-  if (counterId && typeof window !== 'undefined') {
-    const savedName = localStorage.getItem(`qdine_bt_counter_${counterId}`);
-    if (savedName && activeBtConnections.has(savedName)) {
-      const conn = activeBtConnections.get(savedName)!;
-      if (conn.device?.gatt?.connected) {
-        return { connected: true, deviceName: conn.name };
-      }
-    }
-  }
-
-  // 5. Counter Name stored preference
-  if (counterName && typeof window !== 'undefined') {
-    const savedName = localStorage.getItem(`qdine_bt_counter_${counterName.trim().toLowerCase()}`);
-    if (savedName && activeBtConnections.has(savedName)) {
-      const conn = activeBtConnections.get(savedName)!;
-      if (conn.device?.gatt?.connected) {
-        return { connected: true, deviceName: conn.name };
-      }
-    }
-  }
-
-  // If a specific counter or printer was targeted and not found, DO NOT fall back!
-  if (hasSpecificTarget) {
-    return { connected: false, deviceName: null };
-  }
-
-  // 6. Universal fallback: ONLY when called with no target whatsoever (general health check)
   if (activeBluetoothDevice?.gatt?.connected) {
     return { connected: true, deviceName: activeBluetoothDevice.name };
   }
@@ -316,35 +287,76 @@ export async function connectBluetoothPrinter(counterId?: string, counterName?: 
 /**
  * Disconnect Bluetooth printer (optionally for specific counter)
  */
-export async function disconnectBluetoothPrinter(counterId?: string, printerName?: string): Promise<void> {
+export async function disconnectBluetoothPrinter(
+  counterId?: string,
+  printerName?: string,
+  counterName?: string
+): Promise<void> {
   let targetConn: ActiveBtConnection | undefined;
 
   const cleanName = printerName?.trim();
+  const cleanCounterName = counterName?.trim().toLowerCase();
+
+  // Find the active connection for this counter
   if (counterId && activeBtConnections.has(counterId)) {
     targetConn = activeBtConnections.get(counterId);
-    activeBtConnections.delete(counterId);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(`qdine_bt_counter_${counterId}`);
-    }
+  } else if (cleanCounterName && activeBtConnections.has(cleanCounterName)) {
+    targetConn = activeBtConnections.get(cleanCounterName);
   } else if (cleanName && cleanName.toUpperCase() !== 'POS-80C' && activeBtConnections.has(cleanName)) {
     targetConn = activeBtConnections.get(cleanName);
-    activeBtConnections.delete(cleanName);
-  } else if (!counterId && (!cleanName || cleanName.toUpperCase() === 'POS-80C')) {
+  } else if (!counterId && !cleanCounterName) {
     targetConn = activeBluetoothDevice
       ? { device: activeBluetoothDevice, char: activeBluetoothChar, name: activeBluetoothDevice.name }
       : undefined;
   }
 
-  if (targetConn?.device?.gatt?.connected) {
-    try {
-      targetConn.device.gatt.disconnect();
-    } catch {}
+  // Delete all counter-specific bindings
+  if (counterId) {
+    activeBtConnections.delete(counterId);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`qdine_bt_counter_${counterId}`);
+    }
   }
-  if (targetConn?.device === activeBluetoothDevice) {
-    activeBluetoothDevice = null;
-    activeBluetoothChar = null;
+  if (cleanCounterName) {
+    activeBtConnections.delete(cleanCounterName);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`qdine_bt_counter_${cleanCounterName}`);
+    }
   }
-  if (!counterId && typeof window !== 'undefined') {
+
+  // Check if any other counter is still using this physical Bluetooth device
+  let otherCounterUsingDevice = false;
+  if (targetConn?.device) {
+    for (const [key, conn] of activeBtConnections.entries()) {
+      if (conn.device === targetConn.device && key !== targetConn.name && key !== cleanName) {
+        otherCounterUsingDevice = true;
+        break;
+      }
+    }
+  }
+
+  // If no other counter is using this Bluetooth device, disconnect GATT and clean up global device reference
+  if (!otherCounterUsingDevice && targetConn?.device) {
+    if (targetConn.name) {
+      activeBtConnections.delete(targetConn.name);
+    }
+    if (cleanName && cleanName.toUpperCase() !== 'POS-80C') {
+      activeBtConnections.delete(cleanName);
+    }
+    if (targetConn.device.gatt?.connected) {
+      try {
+        targetConn.device.gatt.disconnect();
+      } catch (err) {
+        console.warn('GATT disconnect warning:', err);
+      }
+    }
+    if (activeBluetoothDevice === targetConn.device) {
+      activeBluetoothDevice = null;
+      activeBluetoothChar = null;
+    }
+  }
+
+  if (!counterId && !cleanCounterName && typeof window !== 'undefined') {
     localStorage.removeItem('qdine_bt_printer_name');
   }
 }
