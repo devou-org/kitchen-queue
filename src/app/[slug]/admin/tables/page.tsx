@@ -605,6 +605,15 @@ export default function AdminTablesPage() {
             padding: 12px 14px !important;
           }
         }
+
+        .merged-table-group-wrapper,
+        .merged-subtable-card,
+        .tables-toolbar,
+        .tables-actions {
+          -webkit-touch-callout: none !important;
+          -webkit-user-select: none !important;
+          user-select: none !important;
+        }
       `}</style>
       <AdminPageHeader
         className="tables-page-header"
@@ -871,6 +880,9 @@ export default function AdminTablesPage() {
                     cursor: mergeSourceTable && !isSourceMergedGroup ? 'pointer' : 'default',
                     transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                     transform: (isSourceMergedGroup || isTargetMergedGroup) ? 'scale(1.01)' : 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
                   }}
                 >
                   {/* Unified Minimal Header for Merged Table Group */}
