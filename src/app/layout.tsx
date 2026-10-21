@@ -40,13 +40,14 @@ export default function RootLayout({
         {children}
         <Toaster
           position="top-right"
-          containerStyle={{ zIndex: 999999 }}
+          containerStyle={{ zIndex: 9999999 }}
           toastOptions={{
             duration: 1000,
             style: {
               fontFamily: 'Inter, sans-serif',
               fontSize: '14px',
               fontWeight: 500,
+              zIndex: 9999999,
             },
             success: {
               duration: 1000,

@@ -26,6 +26,7 @@ import {
   Printer,
   Split,
   BadgeCheck,
+  Info,
 } from 'lucide-react';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { CartItem, OrderType } from '@/types';
@@ -49,6 +50,7 @@ export interface POSOrderFormData {
   payment_split?: any;
   discount_amount?: number;
   selected_reward_id?: string;
+  free_reward_product_id?: string;
   auto_print_bill?: boolean;
 }
 
@@ -105,10 +107,49 @@ export function POSCheckoutDrawer({
   const [activeRewards, setActiveRewards] = useState<any[]>([]);
   const [selectedReward, setSelectedReward] = useState<any>(null);
   const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const [loyaltySettings, setLoyaltySettings] = useState<any>(null);
+  const [loyaltyEnabled, setLoyaltyEnabled] = useState(
+    () => restaurant?.modules?.LOYALTY_PROGRAM !== false
+  );
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Check if loyalty program is enabled (both super admin module and restaurant settings)
+  useEffect(() => {
+    if (restaurant?.modules?.LOYALTY_PROGRAM === false) {
+      setLoyaltyEnabled(false);
+      setLoyaltyProfile(null);
+      setActiveRewards([]);
+      setSelectedReward(null);
+      return;
+    }
+    const slugStr = restaurant?.slug || '';
+    if (!slugStr) return;
+
+    let isSubscribed = true;
+    fetch(`/api/admin/loyalty/settings?slug=${slugStr}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!isSubscribed) return;
+        if (json.success && json.data) {
+          setLoyaltySettings(json.data);
+          const enabled = json.data.is_enabled !== false && restaurant?.modules?.LOYALTY_PROGRAM !== false;
+          setLoyaltyEnabled(enabled);
+          if (!enabled) {
+            setLoyaltyProfile(null);
+            setActiveRewards([]);
+            setSelectedReward(null);
+          }
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [restaurant?.slug, restaurant?.modules?.LOYALTY_PROGRAM, isOpen]);
 
   // Set default payment mode based on order type (Dine-in: Pay Later, Takeaway: Pay Now)
   const prevIsOpenRef = useRef(isOpen);
@@ -160,7 +201,18 @@ export function POSCheckoutDrawer({
     const rawPhone = orderForm.phone || '';
     const cleaned = rawPhone.replace(/\D/g, '');
     const slugStr = restaurant?.slug || '';
-    if (!cleaned || cleaned.length < 7 || !slugStr) {
+
+    // If super-admin module is disabled or phone input invalid, clear loyalty state
+    if (restaurant?.modules?.LOYALTY_PROGRAM === false) {
+      setLoyaltyEnabled(false);
+      setLoyaltyProfile(null);
+      setActiveRewards([]);
+      setSelectedReward(null);
+      return;
+    }
+
+    const isDummyPhone = !cleaned || cleaned.length < 10 || /^0+$/.test(cleaned.slice(-10)) || /^(\d)\1{9}$/.test(cleaned.slice(-10)) || rawPhone.includes('0000000000');
+    if (isDummyPhone || !slugStr) {
       setLoyaltyProfile(null);
       setActiveRewards([]);
       setSelectedReward(null);
@@ -171,42 +223,101 @@ export function POSCheckoutDrawer({
     setLoadingLoyalty(true);
 
     Promise.all([
-      fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(cleaned)}`).then((r) => r.json()),
-      fetch(`/api/admin/loyalty/rewards?slug=${slugStr}`).then((r) => r.json()),
+      fetch(`/api/admin/loyalty/settings?slug=${slugStr}`).then((r) => r.json()).catch(() => ({ success: false })),
+      fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(cleaned)}`).then((r) => r.json()).catch(() => ({ success: false })),
+      fetch(`/api/admin/loyalty/rewards?slug=${slugStr}`).then((r) => r.json()).catch(() => ({ success: false })),
     ])
-      .then(([custJson, rewJson]) => {
+      .then(([setJson, custJson, rewJson]) => {
         if (!isSubscribed) return;
 
+        // Check if enabled in loyalty settings
+        const isEnabled = Boolean(
+          restaurant?.modules?.LOYALTY_PROGRAM !== false &&
+          (!setJson.success || !setJson.data || setJson.data.is_enabled !== false)
+        );
+
+        setLoyaltyEnabled(isEnabled);
+        if (setJson.success && setJson.data) {
+          setLoyaltySettings(setJson.data);
+        }
+
+        // Autofill customer name if matched in CRM records
         if (custJson.success && Array.isArray(custJson.data)) {
           const match = custJson.data.find(
             (c: any) =>
               (c.phone || '').replace(/\D/g, '').endsWith(cleaned) ||
               cleaned.endsWith((c.phone || '').replace(/\D/g, ''))
           );
+          if (match?.name && !orderForm.customer_name) {
+            setOrderForm((prev) => ({ ...prev, customer_name: match.name }));
+          }
+
           if (match) {
             setLoyaltyProfile({
               id: match.id,
               points_balance: Number(match.points_balance || 0),
               total_visits: Number(match.total_visits || 0),
+              visit_progress: Number(match.visit_progress || 0),
+              rewards_unlocked: Number(match.rewards_unlocked || 0),
               total_spent: Number(match.total_spent || 0),
               phone: match.phone,
               name: match.name,
             });
-            if (match.name && !orderForm.customer_name) {
-              setOrderForm((prev) => ({ ...prev, customer_name: match.name }));
-            }
           } else {
             setLoyaltyProfile(null);
           }
+        } else {
+          setLoyaltyProfile(null);
         }
 
-        if (rewJson.success && Array.isArray(rewJson.data)) {
+        const isPunch = Boolean(setJson.success && setJson.data?.loyalty_mode === 'PUNCH_CARD');
+        if (isEnabled && isPunch) {
+          const s = setJson.data;
+          if (s.punch_card_reward_type === 'FREE_ITEM' && s.punch_card_product_id) {
+            const punchReward = {
+              id: 'PUNCH_CARD_REWARD',
+              name: `Free ${s.punch_card_product_name || 'Gift Item'}`,
+              reward_type: 'FREE_ITEM',
+              product_id: s.punch_card_product_id,
+              product_name: s.punch_card_product_name,
+              product_price: Number(s.punch_card_product_price || 0),
+              discount_value: Number(s.punch_card_product_price || 0),
+              points_required: 0,
+              min_purchase_amount: 0,
+              is_punch_card: true,
+              milestone_visits: Number(s.visit_milestone_count || 1),
+            };
+            setActiveRewards([punchReward]);
+          } else if (s.punch_card_reward_type === 'POINTS') {
+            const punchReward = {
+              id: 'PUNCH_CARD_REWARD',
+              name: `${s.punch_card_reward_value || 100} Bonus Points`,
+              reward_type: 'POINTS',
+              discount_value: 0,
+              points_required: 0,
+              min_purchase_amount: 0,
+              is_punch_card: true,
+              milestone_visits: Number(s.visit_milestone_count || 1),
+            };
+            setActiveRewards([punchReward]);
+          } else {
+            setActiveRewards([]);
+            setSelectedReward(null);
+          }
+        } else if (isEnabled && rewJson.success && Array.isArray(rewJson.data)) {
           const activeList = rewJson.data.filter((r: any) => r.is_active !== false);
           setActiveRewards(activeList);
+        } else {
+          setActiveRewards([]);
+          setSelectedReward(null);
         }
       })
       .catch(() => {
-        if (isSubscribed) setLoyaltyProfile(null);
+        if (isSubscribed) {
+          setLoyaltyProfile(null);
+          setActiveRewards([]);
+          setSelectedReward(null);
+        }
       })
       .finally(() => {
         if (isSubscribed) setLoadingLoyalty(false);
@@ -215,7 +326,7 @@ export function POSCheckoutDrawer({
     return () => {
       isSubscribed = false;
     };
-  }, [orderForm.phone, restaurant?.slug]);
+  }, [orderForm.phone, restaurant?.slug, restaurant?.modules?.LOYALTY_PROGRAM]);
 
   const handlePrintCurrentBill = async () => {
     if (printingBill || cart.size === 0) {
@@ -228,14 +339,61 @@ export function POSCheckoutDrawer({
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
 
-    const items = Array.from(cart.values()).map((item) => ({
-      product_id: item.product_id,
-      product_name: item.name,
-      name: item.name,
-      quantity: item.quantity,
-      price_at_purchase: item.price,
-      price: item.price,
-    }));
+    const freeProdId = selectedReward?.reward_type === 'FREE_ITEM'
+      ? (selectedReward.product_id || (Array.isArray(selectedReward.selected_product_ids) ? selectedReward.selected_product_ids[0] : null))
+      : null;
+
+    const items: any[] = [];
+    for (const item of cart.values()) {
+      const isFree = Boolean(
+        item.is_free_reward ||
+        (freeProdId && (
+          item.product_id === freeProdId ||
+          (Array.isArray(selectedReward?.selected_product_ids) && selectedReward.selected_product_ids.includes(item.product_id))
+        ))
+      );
+
+      if (isFree) {
+        items.push({
+          product_id: item.product_id,
+          product_name: item.name,
+          name: item.name,
+          quantity: 1,
+          price_at_purchase: 0,
+          price: 0,
+        });
+        if (item.quantity > 1) {
+          items.push({
+            product_id: item.product_id,
+            product_name: item.name,
+            name: item.name,
+            quantity: item.quantity - 1,
+            price_at_purchase: item.price,
+            price: item.price,
+          });
+        }
+      } else {
+        items.push({
+          product_id: item.product_id,
+          product_name: item.name,
+          name: item.name,
+          quantity: item.quantity,
+          price_at_purchase: item.price,
+          price: item.price,
+        });
+      }
+    }
+
+    if (freeProdId && !items.some((i: any) => i.product_id === freeProdId && i.price === 0)) {
+      items.push({
+        product_id: freeProdId,
+        product_name: selectedReward?.product_name || selectedReward?.name || 'Free Gift Item',
+        name: selectedReward?.product_name || selectedReward?.name || 'Free Gift Item',
+        quantity: 1,
+        price_at_purchase: 0,
+        price: 0,
+      });
+    }
 
     const targetSlug = restaurant?.slug || (typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : '');
 
@@ -347,41 +505,92 @@ export function POSCheckoutDrawer({
     };
   }, [isOpen]);
 
-  const totalItems = useMemo(
-    () => Array.from(cart.values()).reduce((sum, item) => sum + item.quantity, 0),
-    [cart]
-  );
+  const freeRewardProductId = useMemo(() => {
+    if (!loyaltyEnabled || restaurant?.modules?.LOYALTY_PROGRAM === false) return null;
+    if (!selectedReward || selectedReward.reward_type !== 'FREE_ITEM') return null;
+    return (
+      selectedReward.product_id ||
+      (Array.isArray(selectedReward.selected_product_ids) ? selectedReward.selected_product_ids[0] : null)
+    );
+  }, [loyaltyEnabled, restaurant?.modules?.LOYALTY_PROGRAM, selectedReward]);
 
-  const subtotal = useMemo(
-    () => Array.from(cart.values()).reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [cart]
-  );
+  const totalItems = useMemo(() => {
+    let count = Array.from(cart.values()).reduce((sum, item) => sum + item.quantity, 0);
+    if (freeRewardProductId && !cart.has(freeRewardProductId)) {
+      count += 1;
+    }
+    return count;
+  }, [cart, freeRewardProductId]);
 
-  // Compute discount amount
+  const subtotal = useMemo(() => {
+    let sum = 0;
+    for (const item of cart.values()) {
+      const isFree = Boolean(
+        item.is_free_reward ||
+        (freeRewardProductId && (
+          item.product_id === freeRewardProductId ||
+          (Array.isArray(selectedReward?.selected_product_ids) && selectedReward.selected_product_ids.includes(item.product_id))
+        ))
+      );
+      if (isFree) {
+        const paidQty = Math.max(0, item.quantity - 1);
+        sum += paidQty * (item.original_price ?? item.price);
+      } else {
+        sum += item.price * item.quantity;
+      }
+    }
+    return sum;
+  }, [cart, freeRewardProductId, selectedReward]);
+
+  // Compute discount amount (for percentage / fixed discount rewards)
   const loyaltyDiscountAmount = useMemo(() => {
+    if (!loyaltyEnabled || restaurant?.modules?.LOYALTY_PROGRAM === false) return 0;
     if (!selectedReward || !loyaltyProfile) return 0;
+
+    // Punch Card Reward
+    if (selectedReward.is_punch_card || selectedReward.id === 'PUNCH_CARD_REWARD') {
+      const milestone = Number(selectedReward.milestone_visits || loyaltySettings?.visit_milestone_count || 1);
+      const visits = Number(loyaltyProfile.total_visits || 0);
+      const unlocked = Number(loyaltyProfile.rewards_unlocked || 0);
+      if (visits < milestone && unlocked <= 0) return 0;
+
+      if (selectedReward.reward_type === 'FREE_ITEM') {
+        return 0; // Item added directly with amount ₹0 on items and bill
+      }
+      return 0;
+    }
+
     if (loyaltyProfile.points_balance < Number(selectedReward.points_required || 0)) return 0;
     if (subtotal < Number(selectedReward.min_purchase_amount || 0)) return 0;
+
+    if (selectedReward.reward_type === 'FREE_ITEM') {
+      return 0; // Item added directly with amount ₹0 on items and bill
+    }
 
     if (selectedReward.reward_type === 'DISCOUNT_PERCENTAGE') {
       return Math.round(((subtotal * Number(selectedReward.discount_value || 0)) / 100) * 100) / 100;
     }
     return Math.min(subtotal, Number(selectedReward.discount_value || 0));
-  }, [selectedReward, loyaltyProfile, subtotal]);
+  }, [loyaltyEnabled, restaurant?.modules?.LOYALTY_PROGRAM, selectedReward, loyaltyProfile, subtotal, loyaltySettings]);
 
-  // Sync discount amount into orderForm
+  // Sync discount amount and free reward product into orderForm
   useEffect(() => {
     setOrderForm((prev) => {
-      if (prev.discount_amount === loyaltyDiscountAmount && prev.selected_reward_id === (selectedReward?.id || undefined)) {
+      if (
+        prev.discount_amount === loyaltyDiscountAmount &&
+        prev.selected_reward_id === (selectedReward?.id || undefined) &&
+        prev.free_reward_product_id === (freeRewardProductId || undefined)
+      ) {
         return prev;
       }
       return {
         ...prev,
         discount_amount: loyaltyDiscountAmount,
         selected_reward_id: selectedReward?.id || undefined,
+        free_reward_product_id: freeRewardProductId || undefined,
       };
     });
-  }, [loyaltyDiscountAmount, selectedReward]);
+  }, [loyaltyDiscountAmount, selectedReward, freeRewardProductId, setOrderForm]);
 
   const { gstAmount, totalPrice } = useMemo(() => {
     let gst = 0;
@@ -757,7 +966,7 @@ export function POSCheckoutDrawer({
                 background: '#F8FAFC',
                 border: '1px solid #E2E8F0',
                 borderRadius: '8px',
-                padding: '14px',
+                padding: 'clamp(10px, 2.5vw, 14px)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px',
@@ -768,7 +977,7 @@ export function POSCheckoutDrawer({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingBottom: '4px',
+                  paddingBottom: '2px',
                 }}
               >
                 <span
@@ -812,98 +1021,86 @@ export function POSCheckoutDrawer({
                     overflowY: 'auto',
                   }}
                 >
-                  {Array.from(cart.values()).map((item) => (
+                  {Array.from(cart.values()).map((item) => {
+                    const freeProdId = selectedReward?.product_id || (Array.isArray(selectedReward?.selected_product_ids) ? selectedReward.selected_product_ids[0] : null);
+                    const isFreeRewardItem = Boolean(
+                      item.is_free_reward ||
+                      (selectedReward?.reward_type === 'FREE_ITEM' && freeProdId && (
+                        item.product_id === freeProdId ||
+                        (Array.isArray(selectedReward.selected_product_ids) && selectedReward.selected_product_ids.includes(item.product_id))
+                      ))
+                    );
+                    return (
                     <div
                       key={item.product_id}
                       style={{
                         display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        padding: '10px 12px',
-                        background: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        padding: '8px 10px',
+                        background: isFreeRewardItem ? '#F0FDF4' : '#FFFFFF',
+                        border: isFreeRewardItem ? '1.5px solid #86EFAC' : '1px solid #E2E8F0',
                         borderRadius: '8px',
                       }}
                     >
-                      {/* Top Row: Item Name & Remove */}
+                      {/* Left: Item Name (up to 2 lines on small screens) & Unit Price */}
                       <div
                         style={{
                           display: 'flex',
-                          alignItems: 'flex-start',
-                          justifyContent: 'space-between',
-                          gap: '8px',
+                          flexDirection: 'column',
+                          minWidth: 0,
+                          flex: '1 1 auto',
                         }}
                       >
                         <div
                           style={{
                             fontSize: '13px',
+                            fontWeight: 700,
                             color: '#0F172A',
-                            lineHeight: 1.35,
-                            wordBreak: 'break-word',
-                            flex: 1,
+                            lineHeight: 1.25,
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            minWidth: 0,
                           }}
                         >
-                          <span>{item.name}</span>
-                          {item.is_free_reward && (
+                          <span
+                            style={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              wordBreak: 'break-word',
+                            }}
+                            title={item.name}
+                          >
+                            {item.name}
+                          </span>
+                          {isFreeRewardItem && (
                             <span
                               style={{
-                                marginLeft: '6px',
-                                display: 'inline-block',
-                                background: '#ECFDF5',
-                                color: '#047857',
-                                border: '1px solid #A7F3D0',
-                                padding: '1px 6px',
+                                marginLeft: '5px',
+                                marginTop: '1px',
+                                flexShrink: 0,
+                                background: '#DCFCE7',
+                                color: '#15803D',
+                                border: '1px solid #86EFAC',
+                                padding: '1px 5px',
                                 borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                verticalAlign: 'middle',
+                                fontSize: '9.5px',
+                                fontWeight: 800,
                               }}
                             >
-                              FREE GIFT
+                              FREE
                             </span>
                           )}
                         </div>
 
-                        {/* Delete button */}
-                        <button
-                          type="button"
-                          onClick={() => onUpdateCart(item.product_id, -item.quantity)}
-                          style={{
-                            width: '26px',
-                            height: '26px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            background: 'transparent',
-                            color: '#94A3B8',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                            transition: 'color 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
-                          title="Remove item"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-
-                      {/* Bottom Row: Unit price (left) & Stepper + Subtotal (right) */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '8px',
-                        }}
-                      >
-                        <div style={{ fontSize: '11px', color: '#64748B' }}>
-                          {item.is_free_reward ? (
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                          {isFreeRewardItem ? (
                             <span>
                               <span style={{ textDecoration: 'line-through', color: '#94A3B8', marginRight: '4px' }}>
-                                {formatPrice(item.original_price || 0)}
+                                {formatPrice(item.original_price || item.price)}
                               </span>
                               <strong style={{ color: '#16A34A' }}>₹0.00 (Free Reward)</strong>
                             </span>
@@ -911,83 +1108,117 @@ export function POSCheckoutDrawer({
                             `${formatPrice(item.price)} each`
                           )}
                         </div>
+                      </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                          {/* Quantity Stepper */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <button
-                              type="button"
-                              onClick={() => onUpdateCart(item.product_id, -1)}
-                              style={{
-                                width: '26px',
-                                height: '26px',
-                                borderRadius: '6px',
-                                border: '1px solid #CBD5E1',
-                                background: '#FFFFFF',
-                                color: '#0F172A',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                              }}
-                              title="Decrease"
-                            >
-                              <Minus size={11} />
-                            </button>
-
-                            <span
-                              style={{
-                                minWidth: '22px',
-                                textAlign: 'center',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                color: '#0F172A',
-                              }}
-                            >
-                              {item.quantity}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => onUpdateCart(item.product_id, 1)}
-                              style={{
-                                width: '26px',
-                                height: '26px',
-                                borderRadius: '6px',
-                                border: '1px solid #CBD5E1',
-                                background: '#FFFFFF',
-                                color: '#0F172A',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                              }}
-                              title="Increase"
-                            >
-                              <Plus size={11} />
-                            </button>
-                          </div>
-
-                          {/* Line subtotal */}
-                          <div
+                      {/* Right: Quantity Stepper, Price & Red Delete Icon */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {/* Stepper */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateCart(item.product_id, -1)}
                             style={{
-                              minWidth: '55px',
-                              textAlign: 'right',
-                              fontSize: '13px',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '6px',
+                              border: '1px solid #CBD5E1',
+                              background: '#FFFFFF',
+                              color: '#0F172A',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
+                            title="Decrease"
+                          >
+                            <Minus size={11} />
+                          </button>
+
+                          <span
+                            style={{
+                              minWidth: '16px',
+                              textAlign: 'center',
+                              fontSize: '12px',
                               fontWeight: 700,
                               color: '#0F172A',
                             }}
                           >
-                            {formatPrice(
-                              item.is_free_reward
-                                ? Math.max(0, item.quantity - 1) * (item.original_price ?? item.price)
-                                : item.price * item.quantity
-                            )}
-                          </div>
+                            {item.quantity}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => onUpdateCart(item.product_id, 1)}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '6px',
+                              border: '1px solid #CBD5E1',
+                              background: '#FFFFFF',
+                              color: '#0F172A',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
+                            title="Increase"
+                          >
+                            <Plus size={11} />
+                          </button>
                         </div>
+
+                        {/* Price */}
+                        <span
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            color: '#0F172A',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {formatPrice(
+                            isFreeRewardItem
+                              ? Math.max(0, item.quantity - 1) * (item.original_price ?? item.price)
+                              : item.price * item.quantity
+                          )}
+                        </span>
+
+                        {/* Red Delete Button */}
+                        <button
+                          type="button"
+                          onClick={() => onUpdateCart(item.product_id, -item.quantity)}
+                          style={{
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#EF4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            padding: 0,
+                            transition: 'opacity 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
+                          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                          title="Remove item"
+                        >
+                          <Trash2 size={13} color="#EF4444" />
+                        </button>
                       </div>
                     </div>
-                  ))}
+                  ); })}
                 </div>
               )}
               {/* Kitchen Notes placed directly under order items */}
@@ -1312,7 +1543,7 @@ export function POSCheckoutDrawer({
                       <Loader2 size={14} className="animate-spin" />
                       Checking...
                     </span>
-                  ) : loyaltyProfile ? (
+                  ) : (loyaltyEnabled && restaurant?.modules?.LOYALTY_PROGRAM !== false && loyaltyProfile) ? (
                     <span
                       style={{
                         height: '42px',
@@ -1339,7 +1570,7 @@ export function POSCheckoutDrawer({
             </div>
 
             {/* Section: Customer Loyalty Profile & Rewards */}
-            {orderForm.phone && orderForm.phone.trim().length >= 7 && (
+            {loyaltyEnabled && restaurant?.modules?.LOYALTY_PROGRAM !== false && orderForm.phone && orderForm.phone.replace(/\D/g, '').length >= 10 && !orderForm.phone.includes('0000000000') && !/^0+$/.test(orderForm.phone.replace(/\D/g, '').slice(-10)) && (
               <div
                 style={{
                   background: '#FFFFFF',
@@ -1382,19 +1613,91 @@ export function POSCheckoutDrawer({
                           {loyaltyProfile.total_visits || 0} visits recorded
                         </div>
                       </div>
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: 800,
-                          padding: '3px 10px',
-                          borderRadius: '999px',
-                          background: 'rgba(151, 19, 69, 0.08)',
-                          color: 'var(--primary, #971345)',
-                        }}
-                      >
-                        {loyaltyProfile.points_balance.toLocaleString()} pts
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 800,
+                            padding: '3px 10px',
+                            borderRadius: '999px',
+                            background: 'rgba(151, 19, 69, 0.08)',
+                            color: 'var(--primary, #971345)',
+                          }}
+                        >
+                          {loyaltySettings?.loyalty_mode === 'PUNCH_CARD'
+                            ? `${loyaltyProfile.total_visits || 0} visits`
+                            : selectedReward && Number(selectedReward.points_required || 0) > 0
+                            ? `${Math.max(0, loyaltyProfile.points_balance - Number(selectedReward.points_required)).toLocaleString()} pts`
+                            : `${loyaltyProfile.points_balance.toLocaleString()} pts`}
+                        </span>
+                        {loyaltySettings?.loyalty_mode !== 'PUNCH_CARD' && selectedReward && Number(selectedReward.points_required || 0) > 0 && (
+                          <span style={{ fontSize: '10px', color: '#16A34A', fontWeight: 700, marginTop: '2px' }}>
+                            (-{Number(selectedReward.points_required).toLocaleString()} pts reward applied)
+                          </span>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Minimum Spend Notification / Points Qualification Indicator */}
+                    {loyaltySettings && (() => {
+                      const minOrder = Number(loyaltySettings.min_order_amount || 0);
+                      const rate = Number(loyaltySettings.points_earning_rate ?? 0.1);
+                      const isPunch = loyaltySettings.loyalty_mode === 'PUNCH_CARD';
+                      const qualifies = minOrder <= 0 || subtotal >= minOrder;
+                      const diff = Math.max(0, minOrder - subtotal);
+                      const potentialPts = Math.floor(subtotal * rate);
+
+                      if (minOrder > 0 && !qualifies) {
+                        return (
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: '#FFFBEB',
+                              border: '1px solid #FDE68A',
+                              borderRadius: '6px',
+                              padding: '6px 10px',
+                              fontSize: '11px',
+                              color: '#92400E',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <Info size={13} color="#D97706" style={{ flexShrink: 0 }} />
+                            <span>
+                              {isPunch ? (
+                                <>Min. spend to earn visit stamp: <strong>₹{minOrder}</strong> (Add <strong>₹{diff.toFixed(0)}</strong> more)</>
+                              ) : (
+                                <>Min. spend to earn points: <strong>₹{minOrder}</strong> (Add <strong>₹{diff.toFixed(0)}</strong> more)</>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (qualifies && (potentialPts > 0 || isPunch)) {
+                        return (
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              background: '#F0FDF4',
+                              border: '1px solid #BBF7D0',
+                              borderRadius: '6px',
+                              padding: '6px 10px',
+                              fontSize: '11px',
+                              color: '#166534',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <span>
+                              {isPunch ? 'Qualifies for 1 visit punch stamp' : `Qualifies to earn +${potentialPts} points`}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     {activeRewards.length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
@@ -1405,7 +1708,16 @@ export function POSCheckoutDrawer({
                           {selectedReward ? (
                             <button
                               type="button"
-                              onClick={() => setSelectedReward(null)}
+                              onClick={() => {
+                                const targetProductId = selectedReward.product_id || (Array.isArray(selectedReward.selected_product_ids) && selectedReward.selected_product_ids[0]);
+                                if (selectedReward.reward_type === 'FREE_ITEM' && targetProductId) {
+                                  const freeItemInCart = cart.get(targetProductId);
+                                  if (freeItemInCart) {
+                                    onUpdateCart(targetProductId, -1);
+                                  }
+                                }
+                                setSelectedReward(null);
+                              }}
                               style={{
                                 fontSize: '11px',
                                 color: '#EF4444',
@@ -1436,15 +1748,30 @@ export function POSCheckoutDrawer({
                           }}
                         >
                           {activeRewards.map((reward) => {
-                            const reqPts = Number(reward.points_required || 0);
-                            const minAmount = Number(reward.min_purchase_amount || 0);
-                            const hasPts = loyaltyProfile.points_balance >= reqPts;
-                            const meetsMin = subtotal >= minAmount;
-                            const isEligible = hasPts && meetsMin;
+                            const isPunchReward = reward.is_punch_card || reward.id === 'PUNCH_CARD_REWARD';
+                            let isEligible = false;
+
+                            if (isPunchReward) {
+                              const milestone = Number(reward.milestone_visits || loyaltySettings?.visit_milestone_count || 1);
+                              const visits = Number(loyaltyProfile.total_visits || 0);
+                              const unlocked = Number(loyaltyProfile.rewards_unlocked || 0);
+                              isEligible = visits >= milestone || unlocked > 0;
+                            } else {
+                              const reqPts = Number(reward.points_required || 0);
+                              const minAmount = Number(reward.min_purchase_amount || 0);
+                              const hasPts = loyaltyProfile.points_balance >= reqPts;
+                              const meetsMin = subtotal >= minAmount;
+                              isEligible = hasPts && meetsMin;
+                            }
+
                             const isSelected = selectedReward?.id === reward.id;
 
                             let benefitText = '';
-                            if (reward.reward_type === 'DISCOUNT_AMOUNT') {
+                            if (isPunchReward) {
+                              benefitText = reward.reward_type === 'FREE_ITEM'
+                                ? `Free Item (Worth ₹${reward.product_price || reward.discount_value || 0})`
+                                : `${reward.name}`;
+                            } else if (reward.reward_type === 'DISCOUNT_AMOUNT') {
                               benefitText = `₹${reward.discount_value} Flat Off`;
                             } else if (reward.reward_type === 'DISCOUNT_PERCENTAGE') {
                               benefitText = `${reward.discount_value}% Off Order`;
@@ -1456,8 +1783,8 @@ export function POSCheckoutDrawer({
                               <div
                                 key={reward.id}
                                 style={{
-                                  flex: '0 0 210px',
-                                  minWidth: '210px',
+                                  flex: '0 0 220px',
+                                  minWidth: '220px',
                                   scrollSnapAlign: 'start',
                                   display: 'flex',
                                   flexDirection: 'column',
@@ -1486,12 +1813,18 @@ export function POSCheckoutDrawer({
                                   <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16A34A', marginBottom: '2px' }}>
                                     {benefitText}
                                   </div>
-                                  <div style={{ fontSize: '11px', color: '#D97706', fontWeight: 700 }}>
-                                    {reqPts} pts required
+                                  <div style={{ fontSize: '11px', color: isEligible ? '#15803D' : '#D97706', fontWeight: 700 }}>
+                                    {isPunchReward ? (
+                                      isEligible
+                                        ? `Milestone unlocked! (${loyaltyProfile.total_visits || 0} visits)`
+                                        : `Requires ${reward.milestone_visits || 1} visits (${loyaltyProfile.total_visits || 0}/${reward.milestone_visits || 1} completed)`
+                                    ) : (
+                                      `${Number(reward.points_required || 0)} pts required`
+                                    )}
                                   </div>
-                                  {minAmount > 0 && (
+                                  {!isPunchReward && Number(reward.min_purchase_amount || 0) > 0 && (
                                     <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '1px' }}>
-                                      Min spend: ₹{minAmount}
+                                      Min spend: ₹{reward.min_purchase_amount}
                                     </div>
                                   )}
                                 </div>
@@ -1502,8 +1835,27 @@ export function POSCheckoutDrawer({
                                   onClick={() => {
                                     if (isSelected) {
                                       setSelectedReward(null);
+                                      const targetProductId = reward.product_id || (Array.isArray(reward.selected_product_ids) && reward.selected_product_ids[0]);
+                                      if (reward.reward_type === 'FREE_ITEM' && targetProductId) {
+                                        const freeItemInCart = cart.get(targetProductId);
+                                        if (freeItemInCart) {
+                                          onUpdateCart(targetProductId, -1);
+                                        }
+                                      }
                                     } else {
                                       setSelectedReward(reward);
+                                      const targetProductId = reward.product_id || (Array.isArray(reward.selected_product_ids) && reward.selected_product_ids[0]);
+                                      if (reward.reward_type === 'FREE_ITEM' && targetProductId) {
+                                        const freeItemInCart = cart.get(targetProductId);
+                                        if (!freeItemInCart) {
+                                          onUpdateCart(targetProductId, 1);
+                                          toast.success(`Added ${reward.name} to order as free reward!`);
+                                        } else {
+                                          toast.success(`${reward.name} applied as free reward!`);
+                                        }
+                                      } else {
+                                        toast.success(`${reward.name} applied!`);
+                                      }
                                     }
                                   }}
                                   style={{
@@ -1535,17 +1887,7 @@ export function POSCheckoutDrawer({
                                     transition: 'all 0.15s ease',
                                   }}
                                 >
-                                  {isSelected ? (
-                                    <>
-                                      <Check size={13} /> Applied
-                                    </>
-                                  ) : isEligible ? (
-                                    'Redeem'
-                                  ) : !meetsMin ? (
-                                    `Min spend ₹${minAmount}`
-                                  ) : (
-                                    `Needs ${reqPts - loyaltyProfile.points_balance} pts`
-                                  )}
+                                  {isSelected ? '✓ Redeemed' : isEligible ? 'Redeem Free Item' : 'Locked'}
                                 </button>
                               </div>
                             );
@@ -1559,8 +1901,31 @@ export function POSCheckoutDrawer({
                     )}
                   </div>
                 ) : (
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Loyalty profile active. Member points will automatically accumulate on this order.
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>
+                      Loyalty profile active. Member points will automatically accumulate on this order.
+                    </div>
+                    {loyaltySettings && Number(loyaltySettings.min_order_amount || 0) > 0 && subtotal < Number(loyaltySettings.min_order_amount) && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#FFFBEB',
+                          border: '1px solid #FDE68A',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          fontSize: '11px',
+                          color: '#92400E',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <Info size={13} color="#D97706" style={{ flexShrink: 0 }} />
+                        <span>
+                          Min. spend to earn points: <strong>₹{Number(loyaltySettings.min_order_amount)}</strong> (Add <strong>₹{(Number(loyaltySettings.min_order_amount) - subtotal).toFixed(0)}</strong> more)
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1878,6 +2243,21 @@ export function POSCheckoutDrawer({
                 >
                   <span>Loyalty Discount ({selectedReward?.name || 'Reward'})</span>
                   <span>-{formatPrice(loyaltyDiscountAmount)}</span>
+                </div>
+              )}
+
+              {selectedReward?.reward_type === 'FREE_ITEM' && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '13px',
+                    color: '#16A34A',
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>Free Reward ({selectedReward?.name || 'Free Item'})</span>
+                  <span>₹0.00</span>
                 </div>
               )}
 

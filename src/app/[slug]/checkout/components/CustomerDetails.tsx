@@ -13,11 +13,16 @@ export interface LoyaltyRewardOption {
   id: string;
   name: string;
   points_required: number;
-  reward_type: 'DISCOUNT_AMOUNT' | 'DISCOUNT_PERCENTAGE' | 'FREE_ITEM';
+  reward_type: 'DISCOUNT_AMOUNT' | 'DISCOUNT_PERCENTAGE' | 'FREE_ITEM' | 'POINTS';
   discount_value: number;
   min_purchase_amount: number;
   selected_product_ids?: string[];
-  is_active: boolean;
+  is_active?: boolean;
+  product_id?: string;
+  product_name?: string;
+  product_price?: number;
+  is_punch_card?: boolean;
+  milestone_visits?: number;
 }
 
 export interface CustomerLoyaltyInfo {
@@ -85,12 +90,17 @@ export default function CustomerDetails({
   const [loyaltyProfile, setLoyaltyProfile] = useState<CustomerLoyaltyInfo | null>(null);
   const [activeRewards, setActiveRewards] = useState<LoyaltyRewardOption[]>([]);
   const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const [loyaltySettings, setLoyaltySettings] = useState<any>(null);
+  const [loyaltyEnabled, setLoyaltyEnabled] = useState(
+    () => restaurant?.modules?.LOYALTY_PROGRAM !== false
+  );
 
   // Fetch Loyalty profile and rewards when phone is verified
   useEffect(() => {
-    if (!isVerified || !form.phone || !slug) {
+    if (!isVerified || !form.phone || !slug || restaurant?.modules?.LOYALTY_PROGRAM === false) {
       setLoyaltyProfile(null);
       setActiveRewards([]);
+      onSelectReward(null);
       return;
     }
 
@@ -98,11 +108,32 @@ export default function CustomerDetails({
       setLoadingLoyalty(true);
       try {
         const cleanedPhone = form.phone.replace(/\D/g, '').slice(-10);
-        // Fetch customer profile
-        const custRes = await fetch(`/api/admin/loyalty/customers?slug=${slug}&search=${encodeURIComponent(cleanedPhone)}`);
-        const custJson = await custRes.json();
-        if (custJson.success && Array.isArray(custJson.data)) {
-          const match = custJson.data.find((c: any) => {
+        // Fetch settings, customer profile, and rewards
+        const [setRes, custRes, rewRes] = await Promise.all([
+          fetch(`/api/admin/loyalty/settings?slug=${slug}`).then(r => r.json()).catch(() => ({ success: false })),
+          fetch(`/api/admin/loyalty/customers?slug=${slug}&search=${encodeURIComponent(cleanedPhone)}`).then(r => r.json()).catch(() => ({ success: false })),
+          fetch(`/api/admin/loyalty/rewards?slug=${slug}`).then(r => r.json()).catch(() => ({ success: false })),
+        ]);
+
+        const isEnabled = Boolean(
+          restaurant?.modules?.LOYALTY_PROGRAM !== false &&
+          (!setRes.success || !setRes.data || setRes.data.is_enabled !== false)
+        );
+
+        setLoyaltyEnabled(isEnabled);
+        if (setRes.success && setRes.data) {
+          setLoyaltySettings(setRes.data);
+        }
+
+        if (!isEnabled) {
+          setLoyaltyProfile(null);
+          setActiveRewards([]);
+          onSelectReward(null);
+          return;
+        }
+
+        if (custRes.success && Array.isArray(custRes.data)) {
+          const match = custRes.data.find((c: any) => {
             const cPhone = (c.phone || '').replace(/\D/g, '');
             return cPhone.endsWith(cleanedPhone) || cleanedPhone.endsWith(cPhone);
           });
@@ -118,12 +149,43 @@ export default function CustomerDetails({
           }
         }
 
-        // Fetch active rewards catalog
-        const rewRes = await fetch(`/api/admin/loyalty/rewards?slug=${slug}`);
-        const rewJson = await rewRes.json();
-        if (rewJson.success && Array.isArray(rewJson.data)) {
-          const activeList = rewJson.data.filter((r: any) => r.is_active !== false);
+        // Check mode: PUNCH_CARD vs POINTS
+        const isPunch = Boolean(setRes.success && setRes.data?.loyalty_mode === 'PUNCH_CARD');
+        if (isPunch) {
+          const s = setRes.data;
+          if (s.punch_card_reward_type === 'FREE_ITEM' && s.punch_card_product_id) {
+            setActiveRewards([{
+              id: 'PUNCH_CARD_REWARD',
+              name: `Free ${s.punch_card_product_name || 'Gift Item'}`,
+              reward_type: 'FREE_ITEM',
+              product_id: s.punch_card_product_id,
+              product_name: s.punch_card_product_name,
+              product_price: Number(s.punch_card_product_price || 0),
+              discount_value: Number(s.punch_card_product_price || 0),
+              points_required: 0,
+              min_purchase_amount: 0,
+              is_punch_card: true,
+              milestone_visits: Number(s.visit_milestone_count || 1),
+            }]);
+          } else if (s.punch_card_reward_type === 'POINTS') {
+            setActiveRewards([{
+              id: 'PUNCH_CARD_REWARD',
+              name: `${s.punch_card_reward_value || 100} Bonus Points`,
+              reward_type: 'POINTS',
+              discount_value: 0,
+              points_required: 0,
+              min_purchase_amount: 0,
+              is_punch_card: true,
+              milestone_visits: Number(s.visit_milestone_count || 1),
+            }]);
+          } else {
+            setActiveRewards([]);
+          }
+        } else if (rewRes.success && Array.isArray(rewRes.data)) {
+          const activeList = rewRes.data.filter((r: any) => r.is_active !== false);
           setActiveRewards(activeList);
+        } else {
+          setActiveRewards([]);
         }
       } catch (err) {
         console.error('Error fetching loyalty customer data:', err);
@@ -133,7 +195,7 @@ export default function CustomerDetails({
     };
 
     fetchLoyaltyData();
-  }, [isVerified, form.phone, slug]);
+  }, [isVerified, form.phone, slug, restaurant?.modules?.LOYALTY_PROGRAM]);
 
   // Notify parent whenever otpStep changes
   useEffect(() => {
@@ -446,8 +508,8 @@ export default function CustomerDetails({
                 </div>
               </div>
             )}
-            {/* LOYALTY & REWARDS CARD (WHEN VERIFIED) */}
-            {isVerified && (
+            {/* LOYALTY & REWARDS CARD (WHEN VERIFIED AND ENABLED) */}
+            {isVerified && loyaltyEnabled && restaurant?.modules?.LOYALTY_PROGRAM !== false && loyaltyProfile && (
               <div style={{
                 marginTop: '16px',
                 padding: '16px',
@@ -461,9 +523,15 @@ export default function CustomerDetails({
                       <Gift size={18} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>Loyalty Member Balance</div>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>
+                        {loyaltySettings?.loyalty_mode === 'PUNCH_CARD' ? 'Digital Punch Card' : 'Loyalty Member Balance'}
+                      </div>
                       <div style={{ fontSize: '12px', color: '#059669', fontWeight: 700 }}>
-                        {loadingLoyalty ? 'Checking balance...' : `${(loyaltyProfile?.points_balance || 0).toLocaleString()} Points Available`}
+                        {loadingLoyalty
+                          ? 'Checking balance...'
+                          : loyaltySettings?.loyalty_mode === 'PUNCH_CARD'
+                          ? `${loyaltyProfile?.total_visits || 0} Visit${(loyaltyProfile?.total_visits || 0) === 1 ? '' : 's'} Recorded`
+                          : `${(loyaltyProfile?.points_balance || 0).toLocaleString()} Points Available`}
                       </div>
                     </div>
                   </div>
@@ -473,6 +541,69 @@ export default function CustomerDetails({
                     </span>
                   )}
                 </div>
+
+                {/* Minimum Spend Notification / Point Earning Helper */}
+                {loyaltySettings && (() => {
+                  const minOrder = Number(loyaltySettings.min_order_amount || 0);
+                  const rate = Number(loyaltySettings.points_earning_rate ?? 0.1);
+                  const isPunch = loyaltySettings.loyalty_mode === 'PUNCH_CARD';
+                  const qualifies = minOrder <= 0 || subtotal >= minOrder;
+                  const diff = Math.max(0, minOrder - subtotal);
+                  const potentialPts = Math.floor(subtotal * rate);
+
+                  if (minOrder > 0 && !qualifies) {
+                    return (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        background: '#FFFBEB',
+                        border: '1px solid #FDE68A',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '12px',
+                        color: '#92400E',
+                        fontWeight: 600,
+                        lineHeight: 1.35,
+                      }}>
+                        <Info size={16} color="#D97706" style={{ flexShrink: 0 }} />
+                        <span>
+                          {isPunch ? (
+                            <>Min. spend to earn punch stamp is <strong>₹{minOrder}</strong>. Add <strong>₹{diff.toFixed(0)}</strong> more to your order!</>
+                          ) : (
+                            <>Min. spend to earn points is <strong>₹{minOrder}</strong>. Add <strong>₹{diff.toFixed(0)}</strong> more to your order to earn loyalty points!</>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  if (qualifies && (potentialPts > 0 || isPunch)) {
+                    return (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        background: '#F0FDF4',
+                        border: '1px solid #BBF7D0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontSize: '12px',
+                        color: '#166534',
+                        fontWeight: 600,
+                        lineHeight: 1.35,
+                      }}>
+                        <span>
+                          {isPunch
+                            ? 'This order qualifies for a visit punch stamp!'
+                            : `This order qualifies! You'll earn +${potentialPts} points upon completion.`}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Available Rewards Catalog - Carousel Format */}
                 {activeRewards.length > 0 && (
@@ -500,13 +631,28 @@ export default function CustomerDetails({
                       }}
                     >
                       {activeRewards.map(reward => {
+                        const isPunchReward = (reward as any).is_punch_card || reward.id === 'PUNCH_CARD_REWARD';
                         const userPoints = loyaltyProfile?.points_balance || 0;
-                        const hasEnoughPoints = userPoints >= reward.points_required;
                         const meetsMinSpend = subtotal >= reward.min_purchase_amount;
+                        let isEligible = false;
+
+                        if (isPunchReward) {
+                          const milestone = Number((reward as any).milestone_visits || loyaltySettings?.visit_milestone_count || 1);
+                          const visits = Number(loyaltyProfile?.total_visits || 0);
+                          const unlocked = Number((loyaltyProfile as any)?.rewards_unlocked || 0);
+                          isEligible = visits >= milestone || unlocked > 0;
+                        } else {
+                          const hasEnoughPoints = userPoints >= reward.points_required;
+                          isEligible = hasEnoughPoints && meetsMinSpend;
+                        }
                         const isSelected = selectedReward?.id === reward.id;
 
                         let benefitText = '';
-                        if (reward.reward_type === 'DISCOUNT_AMOUNT') {
+                        if (isPunchReward) {
+                          benefitText = (reward as any).product_price
+                            ? `Free Item (Worth ₹${(reward as any).product_price})`
+                            : 'Free Item Voucher';
+                        } else if (reward.reward_type === 'DISCOUNT_AMOUNT') {
                           benefitText = `₹${reward.discount_value} Flat Discount`;
                         } else if (reward.reward_type === 'DISCOUNT_PERCENTAGE') {
                           benefitText = `${reward.discount_value}% Off Order`;
@@ -540,10 +686,16 @@ export default function CustomerDetails({
                               <div style={{ fontSize: '12px', fontWeight: 700, color: '#059669', marginBottom: '4px' }}>
                                 {benefitText}
                               </div>
-                              <div style={{ fontSize: '11px', color: '#d97706', fontWeight: 700 }}>
-                                {reward.points_required} pts required
+                              <div style={{ fontSize: '11px', color: isEligible ? '#166534' : '#d97706', fontWeight: 700 }}>
+                                {isPunchReward ? (
+                                  isEligible
+                                    ? `Milestone unlocked! (${loyaltyProfile?.total_visits || 0} visits)`
+                                    : `Requires ${(reward as any).milestone_visits || 1} visits (${loyaltyProfile?.total_visits || 0}/${(reward as any).milestone_visits || 1} completed)`
+                                ) : (
+                                  `${reward.points_required} pts required`
+                                )}
                               </div>
-                              {reward.min_purchase_amount > 0 && (
+                              {!isPunchReward && reward.min_purchase_amount > 0 && (
                                 <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
                                   Min spend: ₹{reward.min_purchase_amount}
                                 </div>
@@ -574,7 +726,7 @@ export default function CustomerDetails({
                                 >
                                   <Check size={14} /> Applied
                                 </button>
-                              ) : hasEnoughPoints && meetsMinSpend ? (
+                              ) : isEligible ? (
                                 <button
                                   type="button"
                                   onClick={() => onSelectReward(reward)}
@@ -596,6 +748,10 @@ export default function CustomerDetails({
                                 >
                                   Redeem
                                 </button>
+                              ) : isPunchReward ? (
+                                <div style={{ width: '100%', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '6px 8px', borderRadius: '6px' }}>
+                                  Visit milestone not reached
+                                </div>
                               ) : !meetsMinSpend ? (
                                 <div style={{ width: '100%', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', padding: '6px 8px', borderRadius: '6px' }}>
                                   Min spend ₹{reward.min_purchase_amount}
