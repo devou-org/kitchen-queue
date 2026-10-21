@@ -338,6 +338,13 @@ export function POSCheckoutDrawer({
     const savedPrinter = typeof window !== 'undefined'
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
+    const savedType = typeof window !== 'undefined'
+      ? (localStorage.getItem('qdine_bill_printer_type') || 'DEFAULT')
+      : 'DEFAULT';
+    const isNetwork = savedType === 'NETWORK';
+    const savedAddress = (isNetwork && typeof window !== 'undefined')
+      ? (localStorage.getItem('qdine_bill_printer_address') || undefined)
+      : undefined;
 
     const freeProdId = selectedReward?.reward_type === 'FREE_ITEM'
       ? (selectedReward.product_id || (Array.isArray(selectedReward.selected_product_ids) ? selectedReward.selected_product_ids[0] : null))
@@ -428,6 +435,7 @@ export function POSCheckoutDrawer({
         },
         body: JSON.stringify({
           printerName: savedPrinter,
+          printerType: savedType,
           orderData: billOrderData,
           slug: targetSlug,
         }),
@@ -451,6 +459,8 @@ export function POSCheckoutDrawer({
         orderData: billOrderData,
         billData: data.billData,
         printerName: data.printer || savedPrinter,
+        printerAddress: savedAddress,
+        printerType: savedType,
         ticketNumber: billOrderData.ticket_number,
         localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
       });

@@ -432,6 +432,13 @@ export function OrderDetailsView({
     const savedPrinter = typeof window !== 'undefined'
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
+    const savedType = typeof window !== 'undefined'
+      ? (localStorage.getItem('qdine_bill_printer_type') || 'DEFAULT')
+      : 'DEFAULT';
+    const isNetwork = savedType === 'NETWORK';
+    const savedAddress = (isNetwork && typeof window !== 'undefined')
+      ? (localStorage.getItem('qdine_bill_printer_address') || undefined)
+      : undefined;
 
     const toastId = toast.loading(`Printing Bill #${String(order.ticket_number).padStart(3, '0')} to ${savedPrinter}...`, {
       icon: <PrinterIllustration size={20} status="printing" />,
@@ -448,6 +455,7 @@ export function OrderDetailsView({
         body: JSON.stringify({
           orderId: order.id,
           printerName: savedPrinter,
+          printerType: savedType,
           orderData: order,
           slug,
         }),
@@ -471,6 +479,8 @@ export function OrderDetailsView({
         orderData: order,
         billData: data.billData,
         printerName: data.printer || savedPrinter,
+        printerAddress: savedAddress,
+        printerType: savedType,
         ticketNumber: order.ticket_number,
         localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
       });

@@ -245,12 +245,7 @@ export default function AdminTablesPage() {
       // Same table clicked, cancel selection
       setMergeSourceTable(null);
       setMergeTargetTable(null);
-      return;
-    }
-
-    if (mergeTargetTable?.id === targetTable.id) {
-      // Target table clicked again, deselect target
-      setMergeTargetTable(null);
+      setIsConfirmMergeOpen(false);
       return;
     }
 
@@ -264,8 +259,9 @@ export default function AdminTablesPage() {
       return;
     }
 
-    // Set target table (displays in the bottom-right popup)
+    // Immediately open merge confirmation popup for this second table
     setMergeTargetTable(targetTable);
+    setIsConfirmMergeOpen(true);
   };
 
   const handleConfirmUnmerge = async (table: RestaurantTable) => {
@@ -1265,247 +1261,16 @@ export default function AdminTablesPage() {
       )}
       </div>
 
-      {/* Floating Bottom-Right Merge Sidepopup */}
-      {mergeSourceTable && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            width: '330px',
-            maxWidth: 'calc(100vw - 32px)',
-            background: '#FFFFFF',
-            borderRadius: '16px',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 16px 40px -10px rgba(15, 23, 42, 0.22), 0 2px 10px rgba(0, 0, 0, 0.06)',
-            zIndex: 10001,
-            overflow: 'hidden',
-            animation: 'slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
-            fontFamily: 'inherit',
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              padding: '12px 16px',
-              background: '#F8FAFC',
-              borderBottom: '1px solid #F1F5F9',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span
-                style={{
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '6px',
-                  background: `${primaryColor}15`,
-                  color: primaryColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Merge size={14} />
-              </span>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
-                Merge Tables
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCancelMergeMode}
-              title="Cancel merge"
-              style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                border: 'none',
-                background: '#F1F5F9',
-                color: '#64748B',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#E2E8F0';
-                e.currentTarget.style.color = '#0F172A';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#F1F5F9';
-                e.currentTarget.style.color = '#64748B';
-              }}
-            >
-              <X size={14} />
-            </button>
-          </div>
-
-          {/* Body: Tables Comparison */}
-          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', alignItems: 'center' }}>
-              {/* Table 1 (Source) */}
-              <div
-                style={{
-                  padding: '10px 8px',
-                  borderRadius: '10px',
-                  background: `${primaryColor}08`,
-                  border: `1.5px solid ${primaryColor}50`,
-                  textAlign: 'center',
-                }}
-              >
-                <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
-                  Table 1
-                </span>
-                <span style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', display: 'block', margin: '2px 0' }}>
-                  #{mergeSourceTable.table_number}
-                </span>
-                <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
-                  {mergeSourceTable.capacity} seats
-                </span>
-              </div>
-
-              {/* Merge icon */}
-              <div style={{ color: primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Merge size={16} />
-              </div>
-
-              {/* Table 2 (Target) */}
-              <div
-                style={{
-                  padding: '10px 8px',
-                  borderRadius: '10px',
-                  background: mergeTargetTable ? `${primaryColor}08` : '#F8FAFC',
-                  border: mergeTargetTable ? `1.5px solid ${primaryColor}50` : '1.5px dashed #CBD5E1',
-                  textAlign: 'center',
-                  minHeight: '62px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                }}
-              >
-                {mergeTargetTable ? (
-                  <>
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
-                      Table 2
-                    </span>
-                    <span style={{ fontSize: '15px', fontWeight: 900, color: '#0F172A', display: 'block', margin: '2px 0' }}>
-                      #{mergeTargetTable.table_number}
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
-                      {mergeTargetTable.capacity} seats
-                    </span>
-                  </>
-                ) : (
-                  <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600, fontStyle: 'italic', lineHeight: 1.3 }}>
-                    Click a table to select
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Combined Capacity */}
-            {mergeTargetTable ? (
-              <div
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  background: '#F1F5F9',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: '12px',
-                }}
-              >
-                <span style={{ color: '#475569', fontWeight: 600 }}>Combined Capacity</span>
-                <span style={{ color: '#0F172A', fontWeight: 800 }}>
-                  {(Number(mergeSourceTable.capacity) || 0) + (Number(mergeTargetTable.capacity) || 0)} seats
-                </span>
-              </div>
-            ) : (
-              <div style={{ fontSize: '11.5px', color: '#64748B', textAlign: 'center', padding: '2px 0' }}>
-                Click any table above to pair with Table #{mergeSourceTable.table_number}
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div
-            style={{
-              padding: '10px 16px 14px 16px',
-              borderTop: '1px solid #F1F5F9',
-              display: 'flex',
-              gap: '8px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleCancelMergeMode}
-              style={{
-                flex: 1,
-                padding: '9px 12px',
-                borderRadius: '8px',
-                border: '1px solid #E2E8F0',
-                background: '#FFFFFF',
-                color: '#475569',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#F8FAFC';
-                e.currentTarget.style.borderColor = '#CBD5E1';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#FFFFFF';
-                e.currentTarget.style.borderColor = '#E2E8F0';
-              }}
-            >
-              Cancel Merge
-            </button>
-
-            <button
-              type="button"
-              onClick={handleConfirmMerge}
-              disabled={!mergeTargetTable || mergeLoading}
-              style={{
-                flex: 1.3,
-                padding: '9px 12px',
-                borderRadius: '8px',
-                border: 'none',
-                background: mergeTargetTable ? primaryColor : '#E2E8F0',
-                color: mergeTargetTable ? '#FFFFFF' : '#94A3B8',
-                fontSize: '12px',
-                fontWeight: 800,
-                cursor: mergeTargetTable && !mergeLoading ? 'pointer' : 'not-allowed',
-                boxShadow: mergeTargetTable ? `0 2px 8px ${primaryColor}40` : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {mergeLoading ? (
-                <>
-                  <div className="animate-spin" style={{ width: '12px', height: '12px', border: '2px solid #FFFFFF', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                  <span>Merging...</span>
-                </>
-              ) : (
-                <>
-                  <Merge size={14} />
-                  <span>Merge Table</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Merge Confirmation Modal (Triggered on clicking second table) */}
+      <MergeConfirmModal
+        isOpen={isConfirmMergeOpen}
+        onClose={handleCancelMergeMode}
+        onConfirm={handleConfirmMerge}
+        sourceTable={mergeSourceTable}
+        targetTable={mergeTargetTable}
+        loading={mergeLoading}
+        primaryColor={primaryColor}
+      />
 
       {/* Slide-over Order Details Drawer */}
       {selectedOrder && (

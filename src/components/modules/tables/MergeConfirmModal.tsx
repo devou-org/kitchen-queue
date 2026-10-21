@@ -194,7 +194,7 @@ export function MergeConfirmModal({
               cursor: 'pointer'
             }}
           >
-            Cancel
+            Cancel Merge
           </button>
           <button
             type="button"

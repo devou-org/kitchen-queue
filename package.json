@@ -11,7 +11,8 @@
     "printer:sim": "node printer_simulator.js",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:bill-printer": "node scripts/run_migration_bill_printer.js"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
