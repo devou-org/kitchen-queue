@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
@@ -407,6 +407,13 @@ export default function AdminPosPage() {
     const savedPrinter = typeof window !== 'undefined'
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
+    const savedType = typeof window !== 'undefined'
+      ? (localStorage.getItem('qdine_bill_printer_type') || 'DEFAULT')
+      : 'DEFAULT';
+    const isNetwork = savedType === 'NETWORK';
+    const savedAddress = (isNetwork && typeof window !== 'undefined')
+      ? (localStorage.getItem('qdine_bill_printer_address') || undefined)
+      : undefined;
 
     try {
       const res = await fetch('/api/print/bill', {
@@ -418,6 +425,7 @@ export default function AdminPosPage() {
         body: JSON.stringify({
           orderId: order.id,
           printerName: savedPrinter,
+          printerType: savedType,
           orderData: order,
           slug: restaurantSlug,
         }),
@@ -444,6 +452,8 @@ export default function AdminPosPage() {
         orderData: order,
         billData: data.billData,
         printerName: data.printer || savedPrinter,
+        printerAddress: savedAddress,
+        printerType: savedType,
         ticketNumber: order.ticket_number,
         localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
       });
@@ -490,11 +500,43 @@ export default function AdminPosPage() {
 
     setSubmitting(true);
     try {
-      const items = Array.from(cart.values()).map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price_at_purchase: item.price
-      }));
+      const freeRewardProductId = orderForm.free_reward_product_id;
+      const items: any[] = [];
+      for (const item of cart.values()) {
+        const isFree = Boolean(
+          item.is_free_reward ||
+          (freeRewardProductId && item.product_id === freeRewardProductId)
+        );
+
+        if (isFree) {
+          items.push({
+            product_id: item.product_id,
+            quantity: 1,
+            price_at_purchase: 0,
+          });
+          if (item.quantity > 1) {
+            items.push({
+              product_id: item.product_id,
+              quantity: item.quantity - 1,
+              price_at_purchase: item.price,
+            });
+          }
+        } else {
+          items.push({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            price_at_purchase: item.price,
+          });
+        }
+      }
+
+      if (freeRewardProductId && !items.some(i => i.product_id === freeRewardProductId && i.price_at_purchase === 0)) {
+        items.push({
+          product_id: freeRewardProductId,
+          quantity: 1,
+          price_at_purchase: 0,
+        });
+      }
 
       const phoneToUse = orderForm.phone && orderForm.phone.trim() ? orderForm.phone.trim() : undefined;
       const nameToUse = orderForm.customer_name && orderForm.customer_name.trim() ? orderForm.customer_name.trim() : (isTakeaway ? 'Takeaway Customer' : (orderForm.table_number ? `Table ${orderForm.table_number}` : 'Walk-in'));
@@ -514,6 +556,8 @@ export default function AdminPosPage() {
         payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
         payment_split: orderForm.is_paid ? orderForm.payment_split : undefined,
         discount_amount: discountAmount,
+        loyalty_reward_id: orderForm.selected_reward_id,
+        selected_reward_id: orderForm.selected_reward_id,
       });
 
       if (res.success && res.data) {
@@ -523,15 +567,25 @@ export default function AdminPosPage() {
         if (orderForm.selected_reward_id && orderForm.phone) {
           try {
             const slugStr = Array.isArray(slug) ? slug[0] : slug;
-            await fetch('/api/admin/loyalty/redeem', {
+            const redeemRes = await fetch('/api/admin/loyalty/redeem', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 slug: slugStr,
                 phone: orderForm.phone.trim(),
                 reward_id: orderForm.selected_reward_id,
+                order_id: createdOrder.id,
               }),
             });
+            const redeemJson = await redeemRes.json();
+            if (redeemRes.ok && redeemJson.success) {
+              const pts = Number(redeemJson.data?.reward?.points_required || 0);
+              if (pts > 0) {
+                toast.success(`Redeemed ${pts} loyalty points!`);
+              }
+            } else {
+              console.error('Loyalty reward redemption failed:', redeemJson.error);
+            }
           } catch (err) {
             console.error('Loyalty reward redemption call error:', err);
           }
@@ -559,6 +613,7 @@ export default function AdminPosPage() {
           payment_method: 'UPI',
           discount_amount: 0,
           selected_reward_id: undefined,
+          free_reward_product_id: undefined,
           auto_print_bill: willPrintBill,
         });
         await fetchTables();
@@ -572,16 +627,37 @@ export default function AdminPosPage() {
     }
   };
 
-  const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
-  let subtotal = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
+  const totalItems = useMemo(() => {
+    let count = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
+    if (orderForm.free_reward_product_id && !cart.has(orderForm.free_reward_product_id)) {
+      count += 1;
+    }
+    return count;
+  }, [cart, orderForm.free_reward_product_id]);
+
+  const subtotal = useMemo(() => {
+    let sum = 0;
+    for (const item of cart.values()) {
+      const isFree = Boolean(
+        item.is_free_reward ||
+        (orderForm.free_reward_product_id && item.product_id === orderForm.free_reward_product_id)
+      );
+      if (isFree) {
+        sum += Math.max(0, item.quantity - 1) * item.price;
+      } else {
+        sum += item.price * item.quantity;
+      }
+    }
+    return sum;
+  }, [cart, orderForm.free_reward_product_id]);
   
   let gstAmount = 0;
   let totalPrice = subtotal;
   if (restaurant?.gst_type === 'REGULAR') {
     const rate = Number(restaurant.gst_rate) || 0;
     gstAmount = Math.round((subtotal * rate / 100) * 100) / 100;
-    totalPrice = subtotal + gstAmount;
   }
+  totalPrice = Math.max(0, subtotal + gstAmount - (Number(orderForm.discount_amount) || 0));
 
   const filtered = products
     .filter(p => {

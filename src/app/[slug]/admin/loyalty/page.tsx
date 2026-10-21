@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
 import {
@@ -165,12 +165,18 @@ export default function AdminLoyaltyPage() {
 
 
 
-  // Fetch Data
-  const fetchData = useCallback(async () => {
+  // Granular loading & fetching state
+  const productsFetchedRef = useRef(false);
+  const lastFetchedSlugRef = useRef<string | null>(null);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadingTx, setLoadingTx] = useState(false);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [loadingRewards, setLoadingRewards] = useState(false);
+
+  // Dedicated Fetchers
+  const fetchSettings = useCallback(async () => {
     if (!slugStr) return;
-    setLoading(true);
     try {
-      // Fetch settings
       const settingsRes = await fetch(`/api/admin/loyalty/settings?slug=${slugStr}`);
       const settingsJson = await settingsRes.json();
       if (settingsJson.success && settingsJson.data) {
@@ -191,9 +197,18 @@ export default function AdminLoyaltyPage() {
           punch_card_product_id: settingsJson.data.punch_card_product_id || null,
         });
       }
+    } catch (err) {
+      console.error('Failed to load loyalty settings:', err);
+    }
+  }, [slugStr]);
 
-      // Fetch customers with API-level pagination (50 records per page)
-      const customersRes = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(debouncedCustomerSearch)}&page=${customerPage}&limit=50`);
+  const fetchCustomers = useCallback(async (page?: number, search?: string) => {
+    if (!slugStr) return;
+    const pageToUse = page !== undefined ? page : customerPage;
+    const searchToUse = search !== undefined ? search : debouncedCustomerSearch;
+    setLoadingCustomers(true);
+    try {
+      const customersRes = await fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(searchToUse)}&page=${pageToUse}&limit=50`);
       const customersJson = await customersRes.json();
       if (customersJson.success) {
         setCustomers(customersJson.data || []);
@@ -204,9 +219,19 @@ export default function AdminLoyaltyPage() {
           });
         }
       }
+    } catch (err) {
+      console.error('Failed to load loyalty customers:', err);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  }, [slugStr, customerPage, debouncedCustomerSearch]);
 
-      // Fetch rewards catalog with API-level pagination
-      const rewardsRes = await fetch(`/api/admin/loyalty/rewards?slug=${slugStr}&page=${rewardsPage}&limit=50`);
+  const fetchRewards = useCallback(async (page?: number) => {
+    if (!slugStr) return;
+    const pageToUse = page !== undefined ? page : rewardsPage;
+    setLoadingRewards(true);
+    try {
+      const rewardsRes = await fetch(`/api/admin/loyalty/rewards?slug=${slugStr}&page=${pageToUse}&limit=50`);
       const rewardsJson = await rewardsRes.json();
       if (rewardsJson.success) {
         setRewards(rewardsJson.data || []);
@@ -217,17 +242,44 @@ export default function AdminLoyaltyPage() {
           });
         }
       }
+    } catch (err) {
+      console.error('Failed to load loyalty rewards:', err);
+    } finally {
+      setLoadingRewards(false);
+    }
+  }, [slugStr, rewardsPage]);
 
-      // Fetch products list for reward product picker
-      const prodsRes = await fetch(`/api/products?slug=${slugStr}`);
+  const fetchProducts = useCallback(async (force = false) => {
+    if (!slugStr) return;
+    if (productsFetchedRef.current && !force && lastFetchedSlugRef.current === slugStr) return;
+    setLoadingProducts(true);
+    try {
+      const prodsRes = await fetch(`/api/products?slug=${encodeURIComponent(slugStr)}`, {
+        headers: {
+          'x-restaurant-slug': slugStr,
+        },
+      });
       const prodsJson = await prodsRes.json();
       if (prodsJson.success || Array.isArray(prodsJson)) {
         const pArr = prodsJson.data || prodsJson || [];
         setProductsList(pArr.map((p: any) => ({ id: p.id, name: p.name, price: Number(p.price || 0) })));
+        productsFetchedRef.current = true;
+        lastFetchedSlugRef.current = slugStr;
       }
+    } catch (err) {
+      console.error('Failed to load products list:', err);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [slugStr]);
 
-      // Fetch transactions audit log with API-level pagination and filter
-      const txRes = await fetch(`/api/admin/loyalty/transactions?slug=${slugStr}&page=${txPage}&limit=50&type=${encodeURIComponent(txTypeFilter)}`);
+  const fetchTransactions = useCallback(async (page?: number, filter?: string) => {
+    if (!slugStr) return;
+    const pageToUse = page !== undefined ? page : txPage;
+    const filterToUse = filter !== undefined ? filter : txTypeFilter;
+    setLoadingTx(true);
+    try {
+      const txRes = await fetch(`/api/admin/loyalty/transactions?slug=${slugStr}&page=${pageToUse}&limit=50&type=${encodeURIComponent(filterToUse)}`);
       const txJson = await txRes.json();
       if (txJson.success) {
         setTransactions(txJson.data || []);
@@ -239,16 +291,83 @@ export default function AdminLoyaltyPage() {
         }
       }
     } catch (err) {
+      console.error('Failed to load loyalty transactions:', err);
+    } finally {
+      setLoadingTx(false);
+    }
+  }, [slugStr, txPage, txTypeFilter]);
+
+  // Master fetch: loads data across all tabs or when top-right Refresh button is clicked
+  const fetchData = useCallback(async () => {
+    if (!slugStr) return;
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchSettings(),
+        fetchCustomers(customerPage, debouncedCustomerSearch),
+        fetchRewards(rewardsPage),
+        fetchTransactions(txPage, txTypeFilter),
+        productsFetchedRef.current ? fetchProducts(true) : Promise.resolve(),
+      ]);
+    } catch (err) {
       console.error('Failed to load loyalty data:', err);
       toast.error('Failed to load loyalty data');
     } finally {
       setLoading(false);
     }
-  }, [slugStr, debouncedCustomerSearch, customerPage, txPage, txTypeFilter, rewardsPage]);
+  }, [slugStr, fetchSettings, fetchCustomers, customerPage, debouncedCustomerSearch, fetchRewards, rewardsPage, fetchTransactions, txPage, txTypeFilter, fetchProducts]);
 
+  // Initial page mount: fetch settings, customers, rewards, transactions
+  const hasMountedRef = useRef(false);
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!slugStr) return;
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      fetchData();
+    }
+  }, [slugStr, fetchData]);
+
+  // Reactive effect: only fetch customers when customer search or page changes
+  const isFirstCustomerMount = useRef(true);
+  useEffect(() => {
+    if (isFirstCustomerMount.current) {
+      isFirstCustomerMount.current = false;
+      return;
+    }
+    fetchCustomers(customerPage, debouncedCustomerSearch);
+  }, [customerPage, debouncedCustomerSearch]);
+
+  // Reactive effect: only fetch rewards when rewards page changes
+  const isFirstRewardsMount = useRef(true);
+  useEffect(() => {
+    if (isFirstRewardsMount.current) {
+      isFirstRewardsMount.current = false;
+      return;
+    }
+    fetchRewards(rewardsPage);
+  }, [rewardsPage]);
+
+  // Reactive effect: only fetch transactions when tx filter or tx page changes
+  const isFirstTxMount = useRef(true);
+  useEffect(() => {
+    if (isFirstTxMount.current) {
+      isFirstTxMount.current = false;
+      return;
+    }
+    fetchTransactions(txPage, txTypeFilter);
+  }, [txPage, txTypeFilter]);
+
+  // Lazy-load products catalog ONLY when needed (Reward Modal opened, Rewards Tab active, or Settings Tab active)
+  useEffect(() => {
+    if (
+      showRewardModal || 
+      activeTab === 'rewards' || 
+      activeTab === 'settings' ||
+      settings.loyalty_mode === 'PUNCH_CARD'
+    ) {
+      fetchProducts();
+    }
+  }, [showRewardModal, activeTab, settings.loyalty_mode, fetchProducts]);
 
   // Handle Settings Update
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -266,6 +385,7 @@ export default function AdminLoyaltyPage() {
       const json = await res.json();
       if (json.success) {
         toast.success('Loyalty settings updated successfully!');
+        fetchSettings();
       } else {
         toast.error(json.error || 'Failed to update settings');
       }
@@ -279,6 +399,11 @@ export default function AdminLoyaltyPage() {
   // Handle Manual Points Adjustment
   const handleConfirmAdjustment = async () => {
     if (!selectedCustomer || adjustPointsDelta === 0) return;
+    const currentPts = Number(selectedCustomer.points_balance || 0);
+    if (adjustPointsDelta < 0 && Math.abs(adjustPointsDelta) > currentPts) {
+      toast.error(`Cannot deduct more than customer's current balance (${currentPts} pts)`);
+      return;
+    }
     setIsAdjusting(true);
     try {
       const res = await fetch(`/api/admin/loyalty/customers`, {
@@ -297,7 +422,8 @@ export default function AdminLoyaltyPage() {
         setSelectedCustomer(null);
         setAdjustPointsDelta(0);
         setAdjustReason('');
-        fetchData();
+        fetchCustomers(customerPage, debouncedCustomerSearch);
+        fetchTransactions(txPage, txTypeFilter);
       } else {
         toast.error(json.error || 'Adjustment failed');
       }
@@ -319,7 +445,8 @@ export default function AdminLoyaltyPage() {
       const json = await res.json();
       if (json.success) {
         toast.success('Customer loyalty profile deleted successfully');
-        fetchData();
+        fetchCustomers(customerPage, debouncedCustomerSearch);
+        fetchTransactions(txPage, txTypeFilter);
       } else {
         toast.error(json.error || 'Failed to delete customer profile');
       }
@@ -332,11 +459,25 @@ export default function AdminLoyaltyPage() {
   const handleSaveReward = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!rewardForm.name.trim()) {
+        toast.error('Please enter a reward name');
+        return;
+      }
+      if (!rewardForm.points_required || rewardForm.points_required <= 0) {
+        toast.error('Please enter valid points required');
+        return;
+      }
+      if (rewardForm.reward_type === 'FREE_ITEM' && (!rewardForm.selected_product_ids || rewardForm.selected_product_ids.length === 0)) {
+        toast.error('Please select at least one product for the Free Item reward');
+        return;
+      }
+
       const method = editingReward ? 'PUT' : 'POST';
       const bodyPayload = {
         slug: slugStr,
         ...(editingReward ? { reward_id: editingReward.id } : {}),
         ...rewardForm,
+        discount_value: rewardForm.reward_type === 'FREE_ITEM' ? 0 : Number(rewardForm.discount_value || 0),
       };
 
       const res = await fetch(`/api/admin/loyalty/rewards`, {
@@ -358,7 +499,7 @@ export default function AdminLoyaltyPage() {
           min_purchase_amount: 0,
           valid_until: '',
         });
-        fetchData();
+        fetchRewards(rewardsPage);
       } else {
         toast.error(json.error || 'Failed to save reward');
       }
@@ -377,7 +518,7 @@ export default function AdminLoyaltyPage() {
       const json = await res.json();
       if (json.success) {
         toast.success('Reward deleted successfully!');
-        fetchData();
+        fetchRewards(rewardsPage);
       } else {
         toast.error(json.error || 'Failed to delete reward');
       }
@@ -400,20 +541,23 @@ export default function AdminLoyaltyPage() {
 
   return (
     <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
-      <Toaster 
-        position="top-right" 
-        containerStyle={{
-          position: 'fixed',
-          top: 20,
-          right: 20,
-          zIndex: 999999,
-        }}
-        toastOptions={{
-          style: {
-            zIndex: 999999,
-          },
-        }}
-      />
+      {mounted && createPortal(
+        <Toaster 
+          position="top-right" 
+          containerStyle={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 9999999,
+          }}
+          toastOptions={{
+            style: {
+              zIndex: 9999999,
+            },
+          }}
+        />,
+        document.body
+      )}
 
       <style>{`
         .loyalty-page-header,
@@ -917,7 +1061,14 @@ export default function AdminLoyaltyPage() {
                 </tr>
               </thead>
               <tbody>
-                {customers.length === 0 ? (
+                {loadingCustomers ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
+                      <Loader2 size={22} className="animate-spin" style={{ margin: '0 auto 8px', color: primaryColor }} />
+                      <div style={{ fontSize: '13px', fontWeight: 500 }}>Loading customer records...</div>
+                    </td>
+                  </tr>
+                ) : customers.length === 0 ? (
                   <tr>
                     <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
                       No registered loyalty customer records found.
@@ -1242,9 +1393,12 @@ export default function AdminLoyaltyPage() {
                   <select
                     value={settings.punch_card_product_id || ''}
                     onChange={(e) => setSettings({ ...settings, punch_card_product_id: e.target.value || null })}
+                    disabled={loadingProducts}
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
                   >
-                    <option value="">-- Choose Free Item from Menu Catalog --</option>
+                    <option value="">
+                      {loadingProducts ? '⏳ Loading Menu Catalog...' : '-- Choose Free Item from Menu Catalog --'}
+                    </option>
                     {productsList.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} (Worth ₹{p.price})
@@ -1390,18 +1544,20 @@ export default function AdminLoyaltyPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
-            {rewards.length === 0 ? (
+            {loadingRewards ? (
+              <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px', color: primaryColor }} />
+                <div style={{ fontSize: '13px', fontWeight: 500 }}>Loading rewards catalog...</div>
+              </div>
+            ) : rewards.length === 0 ? (
               <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
                 No custom rewards created yet. Click <strong>Add New Reward</strong> to create your first reward.
               </div>
             ) : (
               rewards.map((r) => (
-                <div key={r.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px', background: r.is_active ? 'white' : '#f8fafc' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <div key={r.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px', background: 'white' }}>
+                  <div style={{ marginBottom: '8px' }}>
                     <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>{r.name}</div>
-                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: r.is_active ? '#dcfce7' : '#f1f5f9', color: r.is_active ? '#15803d' : '#64748b' }}>
-                      {r.is_active ? 'Active' : 'Inactive'}
-                    </span>
                   </div>
 
                   <div style={{ fontSize: '13px', color: '#b45309', fontWeight: 700, marginBottom: '10px' }}>
@@ -1432,7 +1588,7 @@ export default function AdminLoyaltyPage() {
                           name: r.name,
                           points_required: r.points_required,
                           reward_type: r.reward_type,
-                          discount_value: r.discount_value,
+                          discount_value: r.reward_type === 'FREE_ITEM' ? 0 : r.discount_value,
                           selected_product_ids: r.selected_product_ids || [],
                           min_purchase_amount: r.min_purchase_amount || 0,
                           valid_until: r.valid_until ? r.valid_until.split('T')[0] : '',
@@ -1573,7 +1729,14 @@ export default function AdminLoyaltyPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTransactions.length === 0 ? (
+                {loadingTx ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
+                      <Loader2 size={22} className="animate-spin" style={{ margin: '0 auto 8px', color: primaryColor }} />
+                      <div style={{ fontSize: '13px', fontWeight: 500 }}>Updating transactions audit log...</div>
+                    </td>
+                  </tr>
+                ) : filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
                       No transaction history recorded for this filter.
@@ -1655,48 +1818,89 @@ export default function AdminLoyaltyPage() {
               Current Points Balance: <strong>{selectedCustomer.points_balance} pts</strong>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Points Adjustment (+ to add, - to deduct)
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={adjustPointsDelta}
-                onChange={(e) => setAdjustPointsDelta(parseInt(e.target.value) || 0)}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', fontWeight: 700 }}
-              />
-            </div>
+            {(() => {
+              const currentPts = Number(selectedCustomer.points_balance || 0);
+              const isDeductTooMuch = adjustPointsDelta < 0 && Math.abs(adjustPointsDelta) > currentPts;
+              const newProjected = currentPts + adjustPointsDelta;
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Reason / Audit Note
-              </label>
-              <textarea
-                value={adjustReason}
-                onChange={(e) => setAdjustReason(e.target.value)}
-                placeholder="e.g. Goodwill credit, System compensation"
-                rows={2}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-              />
-            </div>
+              return (
+                <>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Points Adjustment (+ to add, - to deduct)
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min={-currentPts}
+                      value={adjustPointsDelta}
+                      onChange={(e) => setAdjustPointsDelta(parseInt(e.target.value) || 0)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        border: isDeductTooMuch ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: isDeductTooMuch ? '#ef4444' : '#0f172a'
+                      }}
+                    />
+                    {isDeductTooMuch ? (
+                      <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: 600, marginTop: '6px', margin: '6px 0 0' }}>
+                        ⚠️ Cannot deduct more than customer's available balance ({currentPts} pts)
+                      </p>
+                    ) : adjustPointsDelta !== 0 ? (
+                      <p style={{ color: '#059669', fontSize: '12px', fontWeight: 600, marginTop: '6px', margin: '6px 0 0' }}>
+                        Resulting Balance: <strong>{newProjected} pts</strong> ({adjustPointsDelta > 0 ? `+${adjustPointsDelta}` : adjustPointsDelta})
+                      </p>
+                    ) : null}
+                  </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => setSelectedCustomer(null)}
-                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmAdjustment}
-                disabled={isAdjusting || adjustPointsDelta === 0}
-                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--primary, #059669)', color: 'white', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              >
-                {isAdjusting && <Loader2 size={16} className="animate-spin" />}
-                {isAdjusting ? 'Processing...' : 'Confirm Adjustment'}
-              </button>
-            </div>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Reason / Audit Note
+                    </label>
+                    <textarea
+                      value={adjustReason}
+                      onChange={(e) => setAdjustReason(e.target.value)}
+                      placeholder="e.g. Goodwill credit, System compensation"
+                      rows={2}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={() => setSelectedCustomer(null)}
+                      style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', color: '#334155', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmAdjustment}
+                      disabled={isAdjusting || adjustPointsDelta === 0 || isDeductTooMuch}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: (isAdjusting || adjustPointsDelta === 0 || isDeductTooMuch) ? '#94a3b8' : 'var(--primary, #059669)',
+                        color: 'white',
+                        fontWeight: 700,
+                        cursor: (isAdjusting || adjustPointsDelta === 0 || isDeductTooMuch) ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {isAdjusting && <Loader2 size={16} className="animate-spin" />}
+                      {isAdjusting ? 'Processing...' : 'Confirm Adjustment'}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>,
         document.body
@@ -1751,7 +1955,14 @@ export default function AdminLoyaltyPage() {
                 </label>
                 <select
                   value={rewardForm.reward_type}
-                  onChange={(e) => setRewardForm({ ...rewardForm, reward_type: e.target.value as any })}
+                  onChange={(e) => {
+                    const newType = e.target.value as any;
+                    setRewardForm({
+                      ...rewardForm,
+                      reward_type: newType,
+                      discount_value: newType === 'FREE_ITEM' ? 0 : (rewardForm.discount_value || 50),
+                    });
+                  }}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', background: 'white' }}
                 >
                   <option value="DISCOUNT_AMOUNT">Discount Amount (₹)</option>
@@ -1761,19 +1972,21 @@ export default function AdminLoyaltyPage() {
               </div>
             </div>
 
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                Discount Value {rewardForm.reward_type === 'DISCOUNT_PERCENTAGE' ? '(%)' : '(₹)'}
-              </label>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                value={rewardForm.discount_value}
-                onChange={(e) => setRewardForm({ ...rewardForm, discount_value: parseFloat(e.target.value) || 0 })}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-              />
-            </div>
+            {rewardForm.reward_type !== 'FREE_ITEM' && (
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                  Discount Value {rewardForm.reward_type === 'DISCOUNT_PERCENTAGE' ? '(%)' : '(₹)'}
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={rewardForm.discount_value}
+                  onChange={(e) => setRewardForm({ ...rewardForm, discount_value: parseFloat(e.target.value) || 0 })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
               <div>
@@ -1806,7 +2019,7 @@ export default function AdminLoyaltyPage() {
             {/* Product Picker */}
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Applicable / Free Products (Product Picker)
+                {rewardForm.reward_type === 'FREE_ITEM' ? 'Free Product (Select at least one) *' : 'Applicable Products (Product Picker)'}
               </label>
               <CustomMultiSelect
                 options={productsList.map((p) => ({
@@ -1816,10 +2029,18 @@ export default function AdminLoyaltyPage() {
                 }))}
                 value={rewardForm.selected_product_ids}
                 onChange={(selectedIds) => setRewardForm({ ...rewardForm, selected_product_ids: selectedIds })}
-                placeholder="Select applicable products (Leave empty for all)..."
+                placeholder={
+                  loadingProducts
+                    ? "Loading menu items..."
+                    : rewardForm.reward_type === 'FREE_ITEM'
+                    ? "Select free product(s)..."
+                    : "Select applicable products (Leave empty for all)..."
+                }
               />
               <span style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', display: 'block' }}>
-                Selected products will be eligible for this reward. Leave empty to apply to all products.
+                {rewardForm.reward_type === 'FREE_ITEM'
+                  ? 'Selected product(s) will be given for free when redeeming this reward.'
+                  : 'Selected products will be eligible for this reward. Leave empty to apply to all products.'}
               </span>
             </div>
 
