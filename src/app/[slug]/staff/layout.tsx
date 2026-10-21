@@ -6,6 +6,7 @@ import { ClipboardList, UtensilsCrossed, LogOut } from 'lucide-react';
 import { ServiceToggle } from '@/components/ServiceToggle';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { AdminLayoutProvider, useAdminLayout } from '@/context/AdminLayoutContext';
+import { LogoutConfirmModal } from '@/components/ui/LogoutConfirmModal';
 
 function parseToken(token: string) {
   try {
@@ -29,6 +30,8 @@ function StaffLayoutInner({ children }: { children: React.ReactNode }) {
   const { slug } = useParams();
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<{ name: string; role: string; restaurantName?: string; restaurantSlug?: string } | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { restaurant } = useRestaurant();
   const { isMaximized } = useAdminLayout();
 
@@ -71,19 +74,29 @@ function StaffLayoutInner({ children }: { children: React.ReactNode }) {
     return <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>{loading ? null : children}</div>;
   }
 
-  const handleLogout = async () => {
-    localStorage.removeItem('staff_token');
-    document.cookie = 'staff_token=; Max-Age=0; path=/';
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setIsLoggingOut(true);
     try {
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'staff' })
-      });
-    } catch (err) {
-      console.error('Logout API failed:', err);
+      localStorage.removeItem('staff_token');
+      document.cookie = 'staff_token=; Max-Age=0; path=/';
+      try {
+        await fetch('/api/auth/logout', { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'staff' })
+        });
+      } catch (err) {
+        console.error('Logout API failed:', err);
+      }
+      setShowLogoutModal(false);
+      router.push(`/${slug}/staff/login`);
+    } finally {
+      setIsLoggingOut(false);
     }
-    router.push(`/${slug}/staff/login`);
   };
 
   const navLinks = [
@@ -167,6 +180,14 @@ function StaffLayoutInner({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       )}
+
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        loading={isLoggingOut}
+        userName={staff?.name}
+      />
     </div>
   );
 }

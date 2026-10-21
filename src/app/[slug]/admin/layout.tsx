@@ -9,6 +9,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
 import { AIAnalystWidget } from '@/components/ai/AIAnalystWidget';
 import { AdminLayoutProvider, useAdminLayout } from '@/context/AdminLayoutContext';
+import { LogoutConfirmModal } from '@/components/ui/LogoutConfirmModal';
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -18,6 +19,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     try {
@@ -227,21 +230,32 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const handleLogout = async () => {
-    authService.logout('admin');
-    const slugStr = Array.isArray(slug) ? slug[0] : slug;
-    localStorage.removeItem(`kitchenQueue_liveAdditions_${slugStr}`);
-    document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'; document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setIsLoggingOut(true);
     try {
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'admin' })
-      });
-    } catch (err) {
-      console.error('Logout API failed:', err);
+      authService.logout('admin');
+      const slugStr = Array.isArray(slug) ? slug[0] : slug;
+      localStorage.removeItem(`kitchenQueue_liveAdditions_${slugStr}`);
+      document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      try {
+        await fetch('/api/auth/logout', { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'admin' })
+        });
+      } catch (err) {
+        console.error('Logout API failed:', err);
+      }
+      setShowLogoutModal(false);
+      router.push(`/${slug}/admin/login`);
+    } finally {
+      setIsLoggingOut(false);
     }
-    router.push(`/${slug}/admin/login`);
   };
 
 
@@ -674,6 +688,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         {!isMaximized && isSuperAdminOrOwner && !pathname.includes('/admin/orders') && !pathname.includes('/admin/tables') && <AIAnalystWidget />}
       </main>
     </div>
+
+    <LogoutConfirmModal
+      isOpen={showLogoutModal}
+      onClose={() => setShowLogoutModal(false)}
+      onConfirm={handleConfirmLogout}
+      loading={isLoggingOut}
+      userName={currentUser?.name || currentUser?.email}
+    />
     </>
   );
 }
