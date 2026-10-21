@@ -1026,7 +1026,7 @@ export function POSCheckoutDrawer({
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '8px',
+                    gap: '10px',
                     maxHeight: '220px',
                     overflowY: 'auto',
                   }}
@@ -1047,8 +1047,8 @@ export function POSCheckoutDrawer({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        gap: '8px',
-                        padding: '8px 10px',
+                        gap: '10px',
+                        padding: '10px 12px',
                         background: isFreeRewardItem ? '#F0FDF4' : '#FFFFFF',
                         border: isFreeRewardItem ? '1.5px solid #86EFAC' : '1px solid #E2E8F0',
                         borderRadius: '8px',
@@ -1125,18 +1125,18 @@ export function POSCheckoutDrawer({
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
+                          gap: '12px',
                           flexShrink: 0,
                         }}
                       >
                         {/* Stepper */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <button
                             type="button"
                             onClick={() => onUpdateCart(item.product_id, -1)}
                             style={{
-                              width: '24px',
-                              height: '24px',
+                              width: '26px',
+                              height: '26px',
                               borderRadius: '6px',
                               border: '1px solid #CBD5E1',
                               background: '#FFFFFF',
@@ -1146,17 +1146,26 @@ export function POSCheckoutDrawer({
                               justifyContent: 'center',
                               cursor: 'pointer',
                               padding: 0,
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#F1F5F9';
+                              e.currentTarget.style.borderColor = '#94A3B8';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#FFFFFF';
+                              e.currentTarget.style.borderColor = '#CBD5E1';
                             }}
                             title="Decrease"
                           >
-                            <Minus size={11} />
+                            <Minus size={12} />
                           </button>
 
                           <span
                             style={{
-                              minWidth: '16px',
+                              minWidth: '20px',
                               textAlign: 'center',
-                              fontSize: '12px',
+                              fontSize: '13px',
                               fontWeight: 700,
                               color: '#0F172A',
                             }}
@@ -1168,8 +1177,8 @@ export function POSCheckoutDrawer({
                             type="button"
                             onClick={() => onUpdateCart(item.product_id, 1)}
                             style={{
-                              width: '24px',
-                              height: '24px',
+                              width: '26px',
+                              height: '26px',
                               borderRadius: '6px',
                               border: '1px solid #CBD5E1',
                               background: '#FFFFFF',
@@ -1179,20 +1188,31 @@ export function POSCheckoutDrawer({
                               justifyContent: 'center',
                               cursor: 'pointer',
                               padding: 0,
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#F1F5F9';
+                              e.currentTarget.style.borderColor = '#94A3B8';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#FFFFFF';
+                              e.currentTarget.style.borderColor = '#CBD5E1';
                             }}
                             title="Increase"
                           >
-                            <Plus size={11} />
+                            <Plus size={12} />
                           </button>
                         </div>
 
                         {/* Price */}
                         <span
                           style={{
-                            fontSize: '13px',
+                            fontSize: '13.5px',
                             fontWeight: 700,
                             color: '#0F172A',
                             whiteSpace: 'nowrap',
+                            minWidth: '58px',
+                            textAlign: 'right',
                           }}
                         >
                           {formatPrice(
@@ -1207,8 +1227,8 @@ export function POSCheckoutDrawer({
                           type="button"
                           onClick={() => onUpdateCart(item.product_id, -item.quantity)}
                           style={{
-                            width: '22px',
-                            height: '22px',
+                            width: '26px',
+                            height: '26px',
                             borderRadius: '6px',
                             border: 'none',
                             background: 'transparent',
@@ -1218,13 +1238,19 @@ export function POSCheckoutDrawer({
                             justifyContent: 'center',
                             cursor: 'pointer',
                             padding: 0,
-                            transition: 'opacity 0.15s ease',
+                            transition: 'all 0.15s ease',
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
-                          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#FEE2E2';
+                            e.currentTarget.style.color = '#DC2626';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#EF4444';
+                          }}
                           title="Remove item"
                         >
-                          <Trash2 size={13} color="#EF4444" />
+                          <Trash2 size={14} color="currentColor" />
                         </button>
                       </div>
                     </div>

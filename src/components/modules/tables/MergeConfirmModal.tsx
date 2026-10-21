@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Merge, X, Users, AlertCircle } from 'lucide-react';
+import { Merge, X, Users } from 'lucide-react';
 import { RestaurantTable } from '@/modules/tables/tables.repository';
 
 interface MergeConfirmModalProps {
@@ -31,7 +31,6 @@ export function MergeConfirmModal({
   if (!isOpen || !mounted || !sourceTable || !targetTable) return null;
 
   const totalCapacity = (Number(sourceTable.capacity) || 0) + (Number(targetTable.capacity) || 0);
-  const hasOrders = (targetTable.active_orders_count || 0) > 0 || (sourceTable.active_orders_count || 0) > 0;
 
   return createPortal(
     <div
@@ -159,22 +158,6 @@ export function MergeConfirmModal({
             {totalCapacity} Seats
           </strong>
         </div>
-
-        {hasOrders && (
-          <div style={{
-            fontSize: '11px',
-            color: '#92400E',
-            background: '#FEF9C3',
-            padding: '8px 10px',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <AlertCircle size={14} color="#D97706" style={{ flexShrink: 0 }} />
-            <span>Active orders will be combined under <strong>Table #{sourceTable.table_number}</strong>.</span>
-          </div>
-        )}
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
