@@ -10,6 +10,8 @@ interface OrderSummaryProps {
   gstType?: string;
   discountAmount?: number;
   appliedRewardName?: string;
+  freeRewardName?: string;
+  freeRewardProductId?: string;
   total: number;
   addToMode: boolean;
   activeOrder: Order | null;
@@ -23,6 +25,8 @@ export default function OrderSummary({
   gstType, 
   discountAmount = 0,
   appliedRewardName,
+  freeRewardName,
+  freeRewardProductId,
   total, 
   addToMode, 
   activeOrder 
@@ -43,15 +47,35 @@ export default function OrderSummary({
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Your cart is empty. Go back to the menu to add items.</p>
       ) : (
         <>
-          {items.map(item => (
-            <div key={item.product_id} style={{
+          {items.map(item => {
+            const isFreeReward = Boolean(freeRewardName && freeRewardProductId && item.product_id === freeRewardProductId);
+            const displayQty = isFreeReward ? Math.max(0, item.quantity - 1) : item.quantity;
+            if (displayQty === 0) return null;
+            return (
+              <div key={item.product_id} style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '14px',
+              }}>
+                <span>{item.name} × {displayQty}</span>
+                <span style={{ fontWeight: 600 }}>{formatPrice(item.price * displayQty)}</span>
+              </div>
+            );
+          })}
+          {freeRewardName && (
+            <div style={{
               display: 'flex', justifyContent: 'space-between',
               padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '14px',
+              color: '#059669', fontWeight: 600,
             }}>
-              <span>{item.name} × {item.quantity}</span>
-              <span style={{ fontWeight: 600 }}>{formatPrice(item.price * item.quantity)}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {freeRewardName} × 1
+                <span style={{ fontSize: '10px', background: '#ECFDF5', color: '#047857', border: '1px solid #A7F3D0', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                  FREE GIFT
+                </span>
+              </span>
+              <span style={{ fontWeight: 700 }}>₹0.00</span>
             </div>
-          ))}
+          )}
           {addToMode && activeOrder && (
             <div style={{
               marginTop: '10px', padding: '8px 10px',

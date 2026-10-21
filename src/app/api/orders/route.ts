@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
 
         const check = checkTableAssignment(parentTable, party_size || 1, {
           phone: hasPhone ? cleanedPhone : undefined,
-          customerName
+          customerName,
         });
         if (!check.allowed) {
           return NextResponse.json({
@@ -290,6 +290,7 @@ export async function POST(request: NextRequest) {
       payment_split: payment_split || null,
       staff_id: staffId,
       business_date,
+      loyalty_reward_id: (body.selected_reward_id || body.loyalty_reward_id)?.toString().trim() || null,
       items,
     });
 
