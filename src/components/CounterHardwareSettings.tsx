@@ -292,7 +292,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
     setConnectingBillBt(true);
     const toastId = toast.loading('Scanning Bluetooth printer for Bills...');
     try {
-      const res = await connectBluetoothPrinter(undefined, 'Bill Printer');
+      const res = await connectBluetoothPrinter('bill_printer', 'Bill Printer');
       if (res.success && res.deviceName) {
         toast.success(`Paired "${res.deviceName}" as Default Bill Printer!`, { id: toastId });
         setBillPrinter(prev => ({
@@ -327,7 +327,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
   };
 
   const handleDisconnectBillBluetooth = async () => {
-    await disconnectBluetoothPrinter(undefined, billPrinter.printer_name);
+    await disconnectBluetoothPrinter('bill_printer', billPrinter.printer_name);
     setTick(t => t + 1);
     toast.success('Disconnected Bluetooth bill printer');
   };
@@ -336,7 +336,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
     setConnectingBillUsb(true);
     const toastId = toast.loading('Select USB / COM printer for Bills...');
     try {
-      const res = await connectSerialPrinter();
+      const res = await connectSerialPrinter('bill_printer');
       if (res.success) {
         const devName = res.deviceName || 'USB Thermal Bill Printer';
         toast.success(`Connected to ${devName}!`, { id: toastId });
@@ -372,7 +372,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
   };
 
   const handleDisconnectBillUsb = async () => {
-    await disconnectSerialPrinter();
+    await disconnectSerialPrinter('bill_printer', billPrinter.printer_name);
     setTick(t => t + 1);
     toast.success('Disconnected USB bill printer');
   };
@@ -439,6 +439,8 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         printerAddress: isNetwork ? billPrinter.printer_address?.trim() : undefined,
         printerType: billPrinter.printer_type,
         ticketNumber: 999,
+        counterId: 'bill_printer',
+        counterName: 'Bill Printer',
       });
 
       if (printResult.method === 'bluetooth') {
@@ -668,6 +670,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         kotData: fallbackKotData,
         printerName: pName,
         counterId: counter.id,
+        counterName: counter.name,
       });
 
       if (printResult.method === 'qz-tray') {
@@ -877,16 +880,16 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   fontWeight: 700,
                   padding: '3px 8px',
                   borderRadius: '6px',
-                  backgroundColor: isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? '#EFF6FF' : '#F1F5F9',
-                  color: isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? '#2563EB' : '#64748B',
-                  border: isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? '1px solid #DBEAFE' : '1px solid #E2E8F0',
+                  backgroundColor: isBluetoothConnectedForCounter('bill_printer', billPrinter.printer_name, 'Bill Printer').connected ? '#EFF6FF' : '#F1F5F9',
+                  color: isBluetoothConnectedForCounter('bill_printer', billPrinter.printer_name, 'Bill Printer').connected ? '#2563EB' : '#64748B',
+                  border: isBluetoothConnectedForCounter('bill_printer', billPrinter.printer_name, 'Bill Printer').connected ? '1px solid #DBEAFE' : '1px solid #E2E8F0',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px',
                 }}
               >
                 <Bluetooth size={12} />
-                {isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? 'Bluetooth Paired' : 'BT Standby'}
+                {isBluetoothConnectedForCounter('bill_printer', billPrinter.printer_name, 'Bill Printer').connected ? 'Bluetooth Paired' : 'BT Standby'}
               </span>
             ) : billPrinter.printer_type === 'USB' ? (
               <span
@@ -895,16 +898,16 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                   fontWeight: 700,
                   padding: '3px 8px',
                   borderRadius: '6px',
-                  backgroundColor: isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? '#F0FDF4' : '#F1F5F9',
-                  color: isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? '#16A34A' : '#64748B',
-                  border: isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? '1px solid #DCFCE7' : '1px solid #E2E8F0',
+                  backgroundColor: isSerialConnectedForCounter('bill_printer', billPrinter.printer_name).connected ? '#F0FDF4' : '#F1F5F9',
+                  color: isSerialConnectedForCounter('bill_printer', billPrinter.printer_name).connected ? '#16A34A' : '#64748B',
+                  border: isSerialConnectedForCounter('bill_printer', billPrinter.printer_name).connected ? '1px solid #DCFCE7' : '1px solid #E2E8F0',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px',
                 }}
               >
                 <Usb size={12} />
-                {isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? 'USB Active' : 'USB Standby'}
+                {isSerialConnectedForCounter('bill_printer', billPrinter.printer_name).connected ? 'USB Active' : 'USB Standby'}
               </span>
             ) : billPrinter.printer_type === 'NETWORK' ? (
               <span
@@ -1142,7 +1145,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             )}
 
             {billPrinter.printer_type === 'BLUETOOTH' && (
-              isBluetoothConnectedForCounter(undefined, billPrinter.printer_name).connected ? (
+              isBluetoothConnectedForCounter('bill_printer', billPrinter.printer_name, 'Bill Printer').connected ? (
                 <button
                   type="button"
                   onClick={handleDisconnectBillBluetooth}
@@ -1189,7 +1192,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             )}
 
             {billPrinter.printer_type === 'USB' && (
-              isSerialConnectedForCounter(undefined, billPrinter.printer_name).connected ? (
+              isSerialConnectedForCounter('bill_printer', billPrinter.printer_name).connected ? (
                 <button
                   type="button"
                   onClick={handleDisconnectBillUsb}
@@ -1355,7 +1358,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
           const isUsb = form.printer_type === 'USB';
           const isNet = form.printer_type === 'NETWORK';
 
-          const btConnected = isBluetoothConnectedForCounter(counter.id, form.printer_name).connected;
+          const btConnected = isBluetoothConnectedForCounter(counter.id, form.printer_name, counter.name).connected;
           const usbConnected = isSerialConnectedForCounter(counter.id, form.printer_name).connected;
 
           const isSaving = savingCounterId === counter.id;
