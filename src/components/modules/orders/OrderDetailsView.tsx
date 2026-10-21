@@ -101,12 +101,11 @@ export function OrderDetailsView({
     return normalizeSplitAmounts(initialOrder.payment_split, initialOrder.payment_method);
   });
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
-  const [isPaymentUpdating, setIsPaymentUpdating] = useState(false);
   const [isCancelUpdating, setIsCancelUpdating] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
-  const isAnyActionBusy = isStatusUpdating || isPaymentUpdating || isCancelUpdating || loading;
+  const isAnyActionBusy = isStatusUpdating || isCancelUpdating || loading;
 
   React.useEffect(() => {
     setOrder(initialOrder);
@@ -158,7 +157,7 @@ export function OrderDetailsView({
   const handleUpdateStatus = async (statusToApply: string) => {
     setIsStatusUpdating(true);
     try {
-      let pMethod = statusToApply === 'CLOSED' ? (order.payment_method || paymentMethod || 'UPI') : paymentMethod;
+      let pMethod = statusToApply === 'CLOSED' ? (paymentMethod || order.payment_method || 'UPI') : paymentMethod;
       let pSplit: any = null;
 
       if (statusToApply === 'CLOSED' && (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT'))) {
@@ -178,7 +177,7 @@ export function OrderDetailsView({
         ...prev,
         status: statusToApply as any,
         is_paid: statusToApply === 'CLOSED' ? true : prev.is_paid,
-        payment_method: statusToApply === 'CLOSED' ? (prev.payment_method || pMethod) : prev.payment_method,
+        payment_method: statusToApply === 'CLOSED' ? (pMethod || prev.payment_method) : prev.payment_method,
         payment_split: statusToApply === 'CLOSED' ? (pSplit || prev.payment_split) : prev.payment_split,
       }));
     } finally {
@@ -201,52 +200,44 @@ export function OrderDetailsView({
     }
   };
 
-  const handleMarkAsPaid = async (methodToUse?: string) => {
-    setIsPaymentUpdating(true);
-    try {
-      let pMethod = methodToUse || paymentMethod || order.payment_method || 'UPI';
-      let pSplit: any = null;
+  const handleSelectPaymentMethod = async (methodId: string, customSplit?: SplitAmounts) => {
+    let nextMethod = methodId;
+    let nextSplit: any = null;
 
-      if (pMethod === 'SPLIT' || pMethod.toUpperCase().startsWith('SPLIT')) {
-        const totalSplit = (splitAmounts.CASH || 0) + (splitAmounts.UPI || 0) + (splitAmounts.CARD || 0);
-        if (totalSplit <= 0) {
-          toast.error('Please allocate the split amounts across methods');
-          setIsPaymentUpdating(false);
-          return;
-        }
-        pMethod = formatSplitSummary(splitAmounts);
-        pSplit = splitAmounts;
+    if (methodId === 'SPLIT' || methodId.toUpperCase().startsWith('SPLIT')) {
+      const splitToUse = customSplit || splitAmounts;
+      if (splitToUse.CASH === 0 && splitToUse.UPI === 0 && splitToUse.CARD === 0) {
+        const half = Math.round((Number(order.total_price || 0) / 2) * 100) / 100;
+        const rest = Math.round((Number(order.total_price || 0) - half) * 100) / 100;
+        const initialSplit = { CASH: half, UPI: rest, CARD: 0 };
+        setSplitAmounts(initialSplit);
+        nextMethod = formatSplitSummary(initialSplit);
+        nextSplit = initialSplit;
+      } else {
+        nextMethod = formatSplitSummary(splitToUse);
+        nextSplit = splitToUse;
       }
+    }
 
-      const currentSt = (order.status || '').toUpperCase();
-      // If food is ALREADY served (fulfilled), paying closes the order.
-      // If food is still PENDING, PREPARING, or READY, keep kitchen status unchanged as stated in the UI ("Record payment without changing kitchen status")!
-      const targetStatus = currentSt === 'SERVED' ? 'CLOSED' : order.status;
+    setPaymentMethod(nextMethod);
+    if (nextSplit) setSplitAmounts(nextSplit);
 
+    try {
       const res = await orderService.updateOrder(order.id, {
-        status: targetStatus,
-        is_paid: true,
-        payment_method: pMethod,
-        payment_split: pSplit,
+        payment_method: nextMethod,
+        payment_split: nextSplit,
         table_number: tempTableNumber || order.table_number,
       });
       if (res.success && res.data) {
-        setOrder(res.data);
-        setTempStatus(res.data.status);
-        setPaymentMethod(res.data.payment_method || pMethod);
+        setOrder((prev) => ({
+          ...prev,
+          payment_method: nextMethod,
+          payment_split: nextSplit || prev.payment_split,
+        }));
         if (onOrderUpdated) onOrderUpdated(res.data);
-        if (targetStatus === 'CLOSED') {
-          toast.success(`Payment recorded as Paid (${pMethod}) & Order Closed`);
-        } else {
-          toast.success(`Payment recorded as Paid (${pMethod})`);
-        }
-      } else {
-        toast.error(res.error || 'Failed to update payment');
       }
-    } catch {
-      toast.error('Network error updating payment');
-    } finally {
-      setIsPaymentUpdating(false);
+    } catch (e) {
+      console.error('Error auto-saving payment method:', e);
     }
   };
 
@@ -1079,7 +1070,8 @@ export function OrderDetailsView({
             buttonBg = primaryColor;
           } else if (currentSt === 'SERVED') {
             nextTargetStatus = 'CLOSED';
-            nextButtonLabel = 'Close Order & Complete';
+            const selectedMethodLabel = paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split' : (paymentMethod || order.payment_method || 'UPI');
+            nextButtonLabel = `Close Order & Complete (${selectedMethodLabel})`;
             buttonBg = '#0F172A';
           }
 
@@ -1448,149 +1440,86 @@ export function OrderDetailsView({
               {!order.is_paid && (
                 <div
                   style={{
-                    background: '#F0FDF4',
-                    border: '1px solid #BBF7D0',
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
                     borderRadius: '8px',
                     padding: '12px 14px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '10px',
+                    gap: '8px',
                     marginTop: '4px',
-                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CreditCard size={15} style={{ color: '#16A34A' }} />
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#15803D' }}>
-                      Mark as Paid
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                      paddingTop: '8px',
-                      borderTop: '1px solid #DCFCE7',
-                    }}
-                  >
-                    <label
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        color: '#166534',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      Payment Method
-                    </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                      {[
-                        { id: 'UPI', label: 'UPI / QR', icon: QrCode },
-                        { id: 'CASH', label: 'Cash', icon: Banknote },
-                        { id: 'CARD', label: 'Card', icon: CreditCard },
-                        { id: 'SPLIT', label: 'Split', icon: Split },
-                      ].map((m) => {
-                        const Icon = m.icon;
-                        const selected = m.id === 'SPLIT'
-                          ? (paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT'))
-                          : (paymentMethod || 'UPI') === m.id;
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => {
-                              if (m.id === 'SPLIT') {
-                                if (splitAmounts.CASH === 0 && splitAmounts.UPI === 0 && splitAmounts.CARD === 0) {
-                                  const half = Math.round((Number(order.total_price || 0) / 2) * 100) / 100;
-                                  const rest = Math.round((Number(order.total_price || 0) - half) * 100) / 100;
-                                  const initialSplit = { CASH: half, UPI: rest, CARD: 0 };
-                                  setSplitAmounts(initialSplit);
-                                  setPaymentMethod(formatSplitSummary(initialSplit));
-                                } else {
-                                  setPaymentMethod(formatSplitSummary(splitAmounts));
-                                }
-                              } else {
-                                setPaymentMethod(m.id);
-                              }
-                            }}
-                            style={{
-                              height: '32px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '4px',
-                              borderRadius: '6px',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              border: selected ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
-                              background: '#FFFFFF',
-                              color: selected ? '#15803D' : '#475569',
-                              boxShadow: selected ? '0 1px 3px rgba(22, 163, 74, 0.15)' : 'none',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            <Icon size={12} />
-                            <span>{m.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {(paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT')) && (
-                      <SplitPaymentBreakdown
-                        totalAmount={Number(order.total_price || 0)}
-                        split={splitAmounts}
-                        onChange={(newSplit, summary) => {
-                          setSplitAmounts(newSplit);
-                          setPaymentMethod(summary);
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CreditCard size={14} style={{ color: '#475569' }} />
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: '#334155',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
                         }}
-                        theme="emerald"
-                      />
-                    )}
-
-                    <button
-                      type="button"
-                      disabled={isAnyActionBusy}
-                      onClick={() => handleMarkAsPaid()}
-                      style={{
-                        marginTop: '4px',
-                        width: '100%',
-                        height: '34px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: '#16A34A',
-                        color: '#FFFFFF',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
-                        opacity: isAnyActionBusy && !isPaymentUpdating ? 0.7 : 1,
-                        boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#15803D')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = '#16A34A')}
-                    >
-                      {isPaymentUpdating ? (
-                        <>
-                          <Loader2 size={13} className="animate-spin" />
-                          <span>Recording Payment...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check size={14} />
-                          <span>Confirm as Paid · {paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split Payment' : (paymentMethod || 'UPI')}</span>
-                        </>
-                      )}
-                    </button>
+                      >
+                        Payment Method
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>
+                      Settled on close
+                    </span>
                   </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                    {[
+                      { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                      { id: 'CASH', label: 'Cash', icon: Banknote },
+                      { id: 'CARD', label: 'Card', icon: CreditCard },
+                      { id: 'SPLIT', label: 'Split', icon: Split },
+                    ].map((m) => {
+                      const Icon = m.icon;
+                      const selected = m.id === 'SPLIT'
+                        ? (paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT'))
+                        : (paymentMethod || order.payment_method || 'UPI') === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleSelectPaymentMethod(m.id)}
+                          style={{
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: selected ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
+                            background: selected ? '#F0FDF4' : '#FFFFFF',
+                            color: selected ? '#15803D' : '#475569',
+                            boxShadow: selected ? '0 1px 3px rgba(22, 163, 74, 0.15)' : 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <Icon size={12} />
+                          <span>{m.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {(paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT')) && (
+                    <SplitPaymentBreakdown
+                      totalAmount={Number(order.total_price || 0)}
+                      split={splitAmounts}
+                      onChange={(newSplit) => {
+                        handleSelectPaymentMethod('SPLIT', newSplit);
+                      }}
+                      theme="emerald"
+                    />
+                  )}
                 </div>
               )}
             </div>

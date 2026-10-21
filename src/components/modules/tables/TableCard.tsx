@@ -313,6 +313,9 @@ export function TableCard({
         transform: (isMergeSource || isMergeTarget) ? 'scale(1.01)' : 'none',
         height: '100%',
         boxSizing: 'border-box',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
       }}
     >
       {hideHeader ? (
