@@ -90,22 +90,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if this counter has a dedicated configured printer
-      let counterTargetPrinter = targetPrinter;
-      try {
-        const counterRecord = await getCounterByName(restaurant.id, counterName);
-        if (counterRecord?.printer_name && counterRecord.printer_name.trim()) {
-          counterTargetPrinter = counterRecord.printer_name.trim();
-        }
-      } catch {}
+      // Check if a specific printer was requested, otherwise use counter configuration
+      let counterTargetPrinter = printerName?.trim();
+      if (!counterTargetPrinter) {
+        try {
+          const counterRecord = await getCounterByName(restaurant.id, counterName);
+          if (counterRecord?.printer_name && counterRecord.printer_name.trim()) {
+            counterTargetPrinter = counterRecord.printer_name.trim();
+          }
+        } catch {}
+      }
+      if (!counterTargetPrinter) {
+        counterTargetPrinter = targetPrinter;
+      }
 
       const kotData: KotPrintData = {
         restaurantName,
         ticketNumber: order.ticket_number,
         orderType: order.order_type,
         tableNumber: order.table_number,
-        customerName: order.customer_name,
-        phone: order.phone,
+        customerName: order.customer_name || 'Walk-in',
+        phone: order.phone || undefined,
         staffName: order.staff_name,
         createdAt: order.created_at,
         counterName: counterName,
@@ -130,6 +135,8 @@ export async function POST(request: NextRequest) {
             message: `KOT printed for ${counterName}`,
             printer: counterTargetPrinter,
             itemCount: filteredItems.length,
+            kotData,
+            base64Bytes,
           });
         }
       }
@@ -151,6 +158,8 @@ export async function POST(request: NextRequest) {
           message: `KOT sent to ${counterTargetPrinter} for ${counterName}!`,
           printer: counterTargetPrinter,
           itemCount: filteredItems.length,
+          kotData,
+          base64Bytes,
         });
       }
 
@@ -200,8 +209,8 @@ export async function POST(request: NextRequest) {
           ticketNumber: order.ticket_number,
           orderType: order.order_type,
           tableNumber: order.table_number,
-          customerName: order.customer_name,
-          phone: order.phone,
+          customerName: order.customer_name || 'Walk-in',
+          phone: order.phone || undefined,
           staffName: order.staff_name,
           createdAt: order.created_at,
           counterName: cName,
@@ -267,8 +276,8 @@ export async function POST(request: NextRequest) {
       ticketNumber: order.ticket_number,
       orderType: order.order_type,
       tableNumber: order.table_number,
-      customerName: order.customer_name,
-      phone: order.phone,
+      customerName: order.customer_name || 'Walk-in',
+      phone: order.phone || undefined,
       staffName: order.staff_name,
       createdAt: order.created_at,
       counterName: 'ALL ITEMS',
@@ -293,6 +302,8 @@ export async function POST(request: NextRequest) {
           message: `Master KOT printed for all items`,
           printer: targetPrinter,
           itemCount: allItems.length,
+          kotData,
+          base64Bytes,
         });
       }
     }
@@ -313,6 +324,8 @@ export async function POST(request: NextRequest) {
         message: `Master KOT sent to Cashier ${targetPrinter}!`,
         printer: targetPrinter,
         itemCount: allItems.length,
+        kotData,
+        base64Bytes,
       });
     }
 

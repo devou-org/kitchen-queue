@@ -50,11 +50,11 @@ export function OrderTableRow({ order, onClick, showCustomerPhone = false, isSel
       {/* 1. Customer */}
       <td style={{ padding: '18px 20px', verticalAlign: 'middle' }}>
         <div style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap' }}>
-          {order.customer_name || 'Guest'}
+          {order.customer_name || 'Walk-in'}
         </div>
-        {showCustomerPhone && order.phone && (
+        {showCustomerPhone && (
           <div style={{ fontSize: '13px', color: '#64748B', marginTop: '3px', whiteSpace: 'nowrap' }}>
-            {order.phone}
+            {order.phone || '-'}
           </div>
         )}
       </td>

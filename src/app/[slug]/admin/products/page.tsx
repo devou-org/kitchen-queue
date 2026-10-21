@@ -1412,7 +1412,7 @@ export default function AdminProducts() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '20px',
+          padding: 'clamp(8px, 2.5vw, 20px)',
           overflowY: 'auto'
         }}>
           <div style={{
@@ -1420,10 +1420,10 @@ export default function AdminProducts() {
             borderRadius: '8px',
             maxWidth: '1050px',
             width: '100%',
-            maxHeight: '90vh',
+            maxHeight: '92vh',
             overflowY: 'auto',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            padding: '28px',
+            padding: 'clamp(14px, 3.5vw, 28px)',
             position: 'relative'
           }}>
             <AdminProductForm

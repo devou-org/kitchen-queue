@@ -108,6 +108,7 @@ export default function AdminPosPage() {
   const searchParams = useSearchParams();
   const slug = (params?.slug as string) || restaurant?.slug || '';
   const tableParam = searchParams?.get('table') || searchParams?.get('table_number') || '';
+  const mergedParam = searchParams?.get('merged') || '';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
@@ -142,23 +143,41 @@ export default function AdminPosPage() {
 
   useEffect(() => {
     if (tableParam) {
-      const matchedTable = tables.find(
-        (t: any) => String(t.table_number) === String(tableParam)
+      const matched = tables.find(
+        (t: any) =>
+          String(t.table_number).trim().toLowerCase() === String(tableParam).trim().toLowerCase() ||
+          (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => String(m).trim().toLowerCase() === String(tableParam).trim().toLowerCase()))
       );
-      const cap = matchedTable ? (Number(matchedTable.capacity) || 1) : 1;
+
+      let displayName = tableParam;
+      if (mergedParam) {
+        displayName = `${tableParam}+${mergedParam}`;
+      } else if (matched) {
+        if (matched.merged_table_numbers && matched.merged_table_numbers.length > 0) {
+          displayName = `${matched.table_number}+${matched.merged_table_numbers.join('+')}`;
+        } else if (matched.parent_table_number) {
+          displayName = `${matched.parent_table_number}+${matched.table_number}`;
+        }
+      }
+
+      const maxPartySize = matched
+        ? Number(matched.effective_capacity || matched.capacity) || 1
+        : 1;
+
       setOrderForm(prev => ({
         ...prev,
-        table_number: tableParam,
+        table_number: displayName,
+        party_size: maxPartySize > 1 ? maxPartySize : (prev.party_size || 1),
         order_type: 'DINE_IN',
-        party_size: cap > 1 ? cap : (prev.party_size || 1),
         is_paid: false,
       }));
-      if (toastedTableRef.current !== tableParam) {
-        toastedTableRef.current = tableParam;
-        toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
+
+      if (toastedTableRef.current !== displayName) {
+        toastedTableRef.current = displayName;
+        toast.success(`Table #${displayName} selected for order`, { id: `pos-table-param` });
       }
     }
-  }, [tableParam, tables]);
+  }, [tableParam, mergedParam, tables]);
 
   useEffect(() => {
     if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
@@ -275,6 +294,7 @@ export default function AdminPosPage() {
           base64Bytes: data.base64Bytes,
           kotData: data.kotData,
           printerName: data.printer_name,
+          printerAddress: data.printer_address,
           counterId: data.counter_id,
           counterName: data.counter_name,
           isAutoPrint: true,
@@ -508,9 +528,8 @@ export default function AdminPosPage() {
         });
       }
 
-      // Generate a mock phone if not provided for admin/staff orders
-      const phoneToUse = orderForm.phone || `+910000000000`;
-      const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
+      const phoneToUse = orderForm.phone && orderForm.phone.trim() ? orderForm.phone.trim() : undefined;
+      const nameToUse = orderForm.customer_name && orderForm.customer_name.trim() ? orderForm.customer_name.trim() : (isTakeaway ? 'Takeaway Customer' : (orderForm.table_number ? `Table ${orderForm.table_number}` : 'Walk-in'));
 
       const discountAmount = Math.max(0, Number(orderForm.discount_amount) || 0);
 

@@ -115,6 +115,15 @@ async function runAutoMigration(sqlConnection: any) {
       );
     `;
     await sqlConnection`
+      ALTER TABLE restaurant_tables
+      ADD COLUMN IF NOT EXISTS merged_into_table_id UUID REFERENCES restaurant_tables(id) ON DELETE SET NULL;
+    `;
+    await sqlConnection`
+      CREATE INDEX IF NOT EXISTS idx_restaurant_tables_merged_into 
+      ON restaurant_tables(restaurant_id, merged_into_table_id) 
+      WHERE merged_into_table_id IS NOT NULL;
+    `;
+    await sqlConnection`
       CREATE TABLE IF NOT EXISTS table_sessions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
@@ -1409,7 +1418,7 @@ export async function getOrdersByPhonePaginated(restaurantId: string, phone: str
 export async function createOrder(data: {
   restaurant_id: string;
   customer_name: string;
-  phone: string;
+  phone?: string | null;
   total_price: number;
   subtotal?: number;
   discount_amount?: number;
@@ -1551,13 +1560,16 @@ export async function createOrder(data: {
     }
 
     // 1. Ensure user exists
-    const userRes = await client.query(`
-      INSERT INTO users (name, phone, role)
-      VALUES ($1, $2, 'USER')
-      ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id
-    `, [data.customer_name || 'Guest', data.phone || '0000000000']);
-    const userId = userRes.rows[0].id;
+    let userId: string | null = null;
+    if (data.phone) {
+      const userRes = await client.query(`
+        INSERT INTO users (name, phone, role)
+        VALUES ($1, $2, 'USER')
+        ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name
+        RETURNING id
+      `, [data.customer_name || 'Guest', data.phone]);
+      userId = userRes.rows[0].id;
+    }
 
     // 2. Check if order is placed via table QR (table_number exists) or POS -> Set PREPARING, else PENDING
     const isTableOrder = Boolean(data.table_number && data.table_number.trim() !== '');
@@ -1628,7 +1640,7 @@ export async function createOrder(data: {
         RETURNING id
       `,
       [
-        data.restaurant_id, queueId, userId, data.customer_name, data.phone, data.total_price, defaultStatus,
+        data.restaurant_id, queueId, userId, data.customer_name || 'Walk-in', data.phone || null, data.total_price, defaultStatus,
         isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId,
         data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
         pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, paymentSplit, discountVal, data.loyalty_reward_id || null
@@ -1680,6 +1692,11 @@ export async function createOrder(data: {
     // Trigger loyalty reward earning if order was placed as already paid
     if (isPaid) {
       processLoyaltyForCompletedOrder(data.restaurant_id, orderId, data.phone, Number(data.total_price || 0)).catch(err => console.error('Loyalty process error on createOrder:', err));
+    // Automated Finance Stream: Record POS income if order placed as paid
+    if (isPaid) {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(orderId).catch(err => console.error('Finance income record on createOrder error:', err));
+      }).catch(() => {});
     }
 
     return await getOrderById(data.restaurant_id, orderId);
@@ -1698,10 +1715,11 @@ export async function findOrCreateTableSession(
   partySize: number = 1
 ): Promise<{ tableId: string; tableSessionId: string }> {
   const cleanTableNum = tableNumber.trim();
+  const leadTableNum = cleanTableNum.includes('+') ? cleanTableNum.split('+')[0].trim() : cleanTableNum;
 
   let tableRes = await clientOrPool.query(
-    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND table_number = $2 LIMIT 1`,
-    [restaurantId, cleanTableNum]
+    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND (table_number = $2 OR table_number = $3) LIMIT 1`,
+    [restaurantId, cleanTableNum, leadTableNum]
   );
 
   let tableId: string;
@@ -1722,6 +1740,18 @@ export async function findOrCreateTableSession(
     `UPDATE restaurant_tables SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
     [tableId]
   );
+
+  // Also set any merged partner tables in this group to OCCUPIED
+  await clientOrPool.query(
+    `UPDATE restaurant_tables 
+     SET status = 'OCCUPIED', updated_at = CURRENT_TIMESTAMP 
+     WHERE restaurant_id = $1 
+       AND (
+         merged_into_table_id = $2 
+         OR id = (SELECT merged_into_table_id FROM restaurant_tables WHERE id = $2 AND merged_into_table_id IS NOT NULL)
+       )`,
+    [restaurantId, tableId]
+  ).catch((err: any) => console.error('Failed to sync merged partner table statuses:', err));
 
   let sessionRes = await clientOrPool.query(
     `SELECT id FROM table_sessions
@@ -1759,10 +1789,11 @@ export async function checkAndCloseTableSession(
 ) {
   if (!tableNumber || tableNumber.trim() === '') return;
   const cleanTableNum = tableNumber.trim();
+  const leadTableNum = cleanTableNum.includes('+') ? cleanTableNum.split('+')[0].trim() : cleanTableNum;
 
   const tblRes = await clientOrPool.query(
-    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND table_number = $2 LIMIT 1`,
-    [restaurantId, cleanTableNum]
+    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND (table_number = $2 OR table_number = $3) LIMIT 1`,
+    [restaurantId, cleanTableNum, leadTableNum]
   );
 
   if (tblRes.rows.length === 0) return;
@@ -1772,10 +1803,10 @@ export async function checkAndCloseTableSession(
     `SELECT COUNT(*)::int as active_count
      FROM orders
      WHERE restaurant_id = $1
-       AND (table_id = $2 OR table_number = $3)
+       AND (table_id = $2 OR table_number = $3 OR table_number = $4 OR ('+' || table_number || '+') LIKE ('%+' || $4 || '+%'))
        AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
        AND (order_type IS NULL OR order_type NOT IN ('TAKEAWAY', 'DELIVERY'))`,
-    [restaurantId, tableId, cleanTableNum]
+    [restaurantId, tableId, cleanTableNum, leadTableNum]
   );
 
   const activeCount = Number(activeCheck.rows[0]?.active_count || 0);
@@ -1860,6 +1891,17 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
     processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
   } else if (status === 'CLOSED' || status === 'COMPLETED' || updatedOrder?.is_paid) {
     processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
+  }
+
+  // Trigger Finance Income recording (Automated Data Stream)
+  if (status === 'CLOSED' || status === 'COMPLETED' || updatedOrder?.is_paid) {
+    import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+      FinanceService.recordPosIncome(id).catch(err => console.error('Finance income record error:', err));
+    }).catch(() => {});
+  } else if (status === 'CANCELLED' || status === 'REFUNDED') {
+    import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+      FinanceService.recordPosIncome(id).catch(err => console.error('Finance cancel record error:', err));
+    }).catch(() => {});
   }
 
   return updatedOrder;
@@ -1975,6 +2017,17 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
     } else if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
       processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
+    }
+
+    // Trigger Finance Income recording (Automated Data Stream)
+    if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(id).catch(err => console.error('Finance income record error in completeOrderAndBill:', err));
+      }).catch(() => {});
+    } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
+      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
+        FinanceService.recordPosIncome(id).catch(err => console.error('Finance cancel record error in completeOrderAndBill:', err));
+      }).catch(() => {});
     }
 
     return updatedOrder;
@@ -4492,13 +4545,17 @@ export async function processLoyaltyForCompletedOrder(restaurantId: string, orde
       customerName = orderRes[0].customer_name || null;
     }
 
-    // STRICT CHECK: Ignore loyalty for orders where customer did not provide a valid phone number.
-    // Table orders without a customer phone, or dummy numbers (e.g. +910000000000, 0000000000) are ignored.
-    if (!phone || !isValidLoyaltyPhone(phone)) {
-      return;
-    }
+    if (!phone && !userId) return;
 
-    const customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone, customerName || undefined);
+    let customerLoyalty;
+    if (phone) {
+      customerLoyalty = await getOrCreateCustomerLoyaltyByPhone(restaurantId, phone, customerName || undefined);
+    } else if (userId) {
+      const rows = await sql`
+        SELECT cl.*, u.name, u.phone FROM customer_loyalty cl JOIN users u ON u.id = cl.user_id WHERE cl.restaurant_id = ${restaurantId} AND cl.user_id = ${userId} LIMIT 1
+      `;
+      customerLoyalty = rows[0];
+    }
 
     if (!customerLoyalty) return;
 

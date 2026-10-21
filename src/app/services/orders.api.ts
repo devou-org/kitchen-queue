@@ -1,8 +1,8 @@
 import { ApiResponse, Order, OrderFilters } from '@/types';
 
 export interface CreateOrderData {
-  customer_name: string;
-  phone: string;
+  customer_name?: string;
+  phone?: string | null;
   items: {
     product_id: string;
     quantity: number;

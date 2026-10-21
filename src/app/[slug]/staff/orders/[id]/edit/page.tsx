@@ -169,7 +169,7 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ slug:
       return;
     }
 
-    const phoneToUse = phone || `+910000000000`;
+    const phoneToUse = phone && phone.trim() ? phone.trim() : undefined;
 
     setSaving(true);
     try {
