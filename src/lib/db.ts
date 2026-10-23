@@ -2011,7 +2011,6 @@ export async function createOrder(data: {
     if (isPaid) {
       processLoyaltyForCompletedOrder(data.restaurant_id, orderId, data.phone || undefined, Number(data.total_price || 0)).catch(err => console.error('Loyalty process error on createOrder:', err));
     }
-
     // Automated Finance Stream: Record POS income if order placed as paid
     if (isPaid) {
       import('@/modules/finance/finance.service').then(({ FinanceService }) => {
