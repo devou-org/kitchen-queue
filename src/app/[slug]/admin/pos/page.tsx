@@ -398,9 +398,21 @@ export default function AdminPosPage() {
         quantity: Math.min(newQty, 50), // allow staff/admin to order more
         image_url: product.image_url,
         status: product.status,
+        notes: existing?.notes,
       });
     }
     setCart(newCart);
+  };
+
+  const handleUpdateNotes = (id: string, notes: string) => {
+    setCart(prev => {
+      const newCart = new Map(prev);
+      const existing = newCart.get(id);
+      if (existing) {
+        newCart.set(id, { ...existing, notes });
+      }
+      return newCart;
+    });
   };
 
   const triggerAutoPrintBill = async (order: any, restaurantSlug: string) => {
@@ -528,17 +540,20 @@ export default function AdminPosPage() {
           (freeRewardProductId && item.product_id === freeRewardProductId)
         );
 
+        const itemNote = item.notes?.trim() || undefined;
         if (isFree) {
           items.push({
             product_id: item.product_id,
             quantity: 1,
             price_at_purchase: 0,
+            notes: itemNote,
           });
           if (item.quantity > 1) {
             items.push({
               product_id: item.product_id,
               quantity: item.quantity - 1,
               price_at_purchase: item.price,
+              notes: itemNote,
             });
           }
         } else {
@@ -546,6 +561,7 @@ export default function AdminPosPage() {
             product_id: item.product_id,
             quantity: item.quantity,
             price_at_purchase: item.price,
+            notes: itemNote,
           });
         }
       }
@@ -997,6 +1013,7 @@ export default function AdminPosPage() {
         onClose={() => setCheckoutOpen(false)}
         cart={cart}
         onUpdateCart={handleUpdate}
+        onUpdateCartNotes={handleUpdateNotes}
         tables={tables}
         restaurant={restaurant}
         orderForm={orderForm}

@@ -1302,6 +1302,22 @@ export function OrderDetailsView({
                                 >
                                   {item.product_name}
                                 </div>
+                                {item.notes && (
+                                  <div
+                                    style={{
+                                      fontSize: '11.5px',
+                                      color: '#B45309',
+                                      fontWeight: 600,
+                                      marginTop: '2px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}
+                                  >
+                                    <Utensils size={11} color="#D97706" style={{ flexShrink: 0 }} />
+                                    <span>Note: {item.notes}</span>
+                                  </div>
+                                )}
                                 <div style={{ fontSize: '11px', color: '#64748B' }}>
                                   {Number(item.price_at_purchase || 0) === 0 ? (
                                     <span style={{ color: '#16A34A', fontWeight: 700 }}>₹0.00 (FREE)</span>
