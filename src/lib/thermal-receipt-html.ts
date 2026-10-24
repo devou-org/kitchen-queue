@@ -6,9 +6,12 @@ import { generateBillTemplateHTML } from './bill-template-html';
  * Formatted specifically for 80mm (3-inch) POS thermal roll printers like POS-80C.
  */
 export function generateThermalReceiptHtml(data: KotPrintData): string {
+  if (!data) {
+    return '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;text-align:center;"><h3>No Receipt Data</h3></body></html>';
+  }
   const restaurantName = data.restaurantName || 'QDINE';
   const counterTitle = (data.counterName || 'ALL COUNTERS').toUpperCase();
-  const ticketPadded = `#${String(data.ticketNumber).padStart(3, '0')}`;
+  const ticketPadded = `#${String(data.ticketNumber || '000').padStart(3, '0')}`;
   const orderType = (data.orderType || 'DINE_IN').replace('_', '-').toUpperCase();
 
   const parsedDate = data.createdAt ? new Date(data.createdAt) : new Date();
@@ -314,6 +317,9 @@ export interface BillPrintData {
  * Delegates to the unified generateBillTemplateHTML single source of truth.
  */
 export function generateBillReceiptHtml(data: BillPrintData): string {
+  if (!data) {
+    return '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;text-align:center;"><h3>No Bill Data</h3></body></html>';
+  }
   const restaurantInfo = {
     name: (data.restaurantName || 'Restaurant').trim(),
     logo_url: data.logoUrl,

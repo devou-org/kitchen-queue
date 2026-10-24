@@ -351,9 +351,10 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
 
   let calcSubtotal = 0;
   for (const item of data.items) {
-    const name = (item.product_name || item.name || 'Item').trim().toUpperCase();
     const qty = Number(item.quantity) || 1;
     const price = Number(item.price_at_purchase ?? item.price ?? 0);
+    const isFree = price === 0;
+    const name = (item.product_name || item.name || 'Item').trim().toUpperCase() + (isFree ? ' [FREE]' : '');
     const itemTotal = qty * price;
     calcSubtotal += itemTotal;
 

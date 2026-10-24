@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import toast from 'react-hot-toast';
 import { Plus, X, Users, Hash } from 'lucide-react';
 
 interface CreateTableModalProps {
@@ -24,7 +25,12 @@ export function CreateTableModal({ isOpen, onClose, onSubmit, loading, primaryCo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tableNumber.trim()) return;
-    await onSubmit(tableNumber.trim(), parseInt(capacity, 10) || 4);
+    const numCap = parseInt(capacity, 10) || 4;
+    if (numCap > 14) {
+      toast.error('Seating capacity cannot exceed 14 seats');
+      return;
+    }
+    await onSubmit(tableNumber.trim(), Math.min(14, Math.max(1, numCap)));
     setTableNumber('');
     setCapacity('4');
   };
@@ -115,7 +121,7 @@ export function CreateTableModal({ isOpen, onClose, onSubmit, loading, primaryCo
               <input
                 type="number"
                 min="1"
-                max="50"
+                max="14"
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}
                 required

@@ -22,6 +22,7 @@ import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapsho
 import { useAdminLayout } from '@/context/AdminLayoutContext';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
+import { Loading } from '@/components/ui/Loading';
 
 interface OrderUpdateLog {
   id: string;
@@ -428,6 +429,7 @@ export default function AdminOrders() {
           base64Bytes,
           kotData: data.kotData,
           printerName: data.printer_name,
+          printerAddress: data.printer_address,
           counterId: data.counter_id,
           counterName: data.counter_name,
           isAutoPrint: true,
@@ -468,14 +470,15 @@ export default function AdminOrders() {
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
-  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string) => {
+  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string, pSplit?: any) => {
     setModalLoading(true);
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
         is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
-        payment_method: pMethod || undefined
+        payment_method: pMethod || undefined,
+        payment_split: pSplit || undefined,
       });
       if (data.success) {
         // Success feedback handled by Pusher event to avoid duplicates
@@ -487,6 +490,7 @@ export default function AdminOrders() {
             status: newStatus as Order['status'],
             table_number: tableNumber ?? o.table_number,
             payment_method: pMethod ?? o.payment_method,
+            payment_split: pSplit !== undefined ? pSplit : o.payment_split,
             is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
           } : o)
             .filter(o => {
@@ -499,6 +503,7 @@ export default function AdminOrders() {
           status: newStatus as Order['status'],
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
+          payment_split: pSplit !== undefined ? pSplit : prev.payment_split,
           is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
@@ -1069,7 +1074,9 @@ export default function AdminOrders() {
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {loading ? (
-            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}><div className="loader" /></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 'calc(100vh - 220px)', width: '100%' }}>
+              <div className="loader" />
+            </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', height: displayedOrders.length === 0 ? '100%' : 'auto' }}>
               <OrderTableHeader />

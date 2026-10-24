@@ -22,8 +22,11 @@ export interface TableInfo {
   id?: string;
   table_number: string;
   capacity: number;
+  effective_capacity?: number;
   status?: string;
   active_orders?: TableOrder[];
+  merged_into_table_id?: string | null;
+  merged_table_numbers?: string[];
 }
 
 export interface AssignmentCheckResult {
@@ -40,7 +43,7 @@ export function checkTableAssignment(
   newPartySize: number = 1,
   currentPartyContext?: { orderId?: string; phone?: string | null; customerName?: string }
 ): AssignmentCheckResult {
-  const capacity = Number(table.capacity) || 0;
+  const capacity = Number(table.effective_capacity || table.capacity) || 0;
   const activeOrders = (table.active_orders || []).filter(
     (o: TableOrder) => o.order_type !== 'TAKEAWAY' && o.order_type !== 'DELIVERY'
   );
