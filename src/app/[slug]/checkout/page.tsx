@@ -140,14 +140,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   const subtotal = useMemo(() => {
     let sum = 0;
     for (const item of items) {
-      if (freeRewardProductId && item.product_id === freeRewardProductId) {
-        sum += Math.max(0, item.quantity - 1) * item.price;
-      } else {
-        sum += item.price * item.quantity;
-      }
+      sum += item.price * item.quantity;
     }
     return sum;
-  }, [items, freeRewardProductId]);
+  }, [items]);
   
   let gstAmount = 0;
   let total = subtotal;
@@ -270,37 +266,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         }
 
         if (freeProductId) {
-          const existingIdx = orderItems.findIndex(i => i.product_id === freeProductId);
-          if (existingIdx >= 0) {
-            if (orderItems[existingIdx].quantity > 1) {
-              orderItems[existingIdx].quantity -= 1;
-              orderItems.push({
-                product_id: freeProductId,
-                quantity: 1,
-                price_at_purchase: 0,
-              });
-            } else {
-              orderItems[existingIdx].price_at_purchase = 0;
-            }
-          } else {
-            orderItems.push({
-              product_id: freeProductId,
-              quantity: 1,
-              price_at_purchase: 0,
-            });
-          }
-        } else if (orderItems.length > 0) {
-          // If no specific product is linked to reward, set first item as free reward
-          if (orderItems[0].quantity > 1) {
-            orderItems[0].quantity -= 1;
-            orderItems.push({
-              product_id: orderItems[0].product_id,
-              quantity: 1,
-              price_at_purchase: 0,
-            });
-          } else {
-            orderItems[0].price_at_purchase = 0;
-          }
+          orderItems.push({
+            product_id: freeProductId,
+            quantity: 1,
+            price_at_purchase: 0,
+          });
         }
       }
 
