@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
           OR phone = ${cleanPhone}
           OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
         )
-        AND created_at > NOW() - INTERVAL '15 seconds'
+        AND created_at > NOW() - INTERVAL '1 second'
       ORDER BY created_at DESC
       LIMIT 1
     ` as any[];
