@@ -16,6 +16,7 @@ import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryF
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { checkTableAssignment } from '@/lib/table-capacity';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
+import { useKeepAwake } from '@/hooks/useKeepAwake';
 import { printKotFromBrowser } from '@/lib/client-print';
 import { sortCategoriesByConfig } from '@/lib/category-order';
 import SplitPaymentBreakdown, { SplitAmounts, formatSplitSummary, parseSplitFromSummary } from '@/components/modules/orders/SplitPaymentBreakdown';
@@ -115,6 +116,9 @@ export default function StaffMenuPage() {
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
   const [dietaryFilter, setDietaryFilter] = useState<DietaryPreferenceFilter>('ALL');
+
+  const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+  useKeepAwake(isPrintStation);
 
   useEffect(() => {
     tryAutoConnectBluetooth();
@@ -228,12 +232,21 @@ export default function StaffMenuPage() {
       fetchTables();
     });
 
+    const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+
     const handleKotAutoPrint = async (data: any) => {
+      console.time(`[Perf] KOT #${data.ticket_number} Total`);
+      console.log(`[Perf] Pusher event received for ticket #${data.ticket_number} at ${new Date().toISOString()}`);
+
       const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
-      if (!autoPrint) return;
+      if (!autoPrint) {
+        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
+        return;
+      }
 
       const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
       if (dedicatedStation && dedicatedStation !== '' && dedicatedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
+        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
         return;
       }
 
@@ -243,8 +256,23 @@ export default function StaffMenuPage() {
       });
 
       try {
+        let base64Bytes = data.base64Bytes;
+        if (!base64Bytes && data.print_job_id) {
+          try {
+            const jobRes = await fetch(`/api/print/agent?jobId=${data.print_job_id}&slug=${slug}`);
+            if (jobRes.ok) {
+              const jobData = await jobRes.json();
+              if (jobData.job?.raw_base64) {
+                base64Bytes = jobData.job.raw_base64;
+              }
+            }
+          } catch (fetchErr) {
+            console.error('Failed to fetch large print job payload:', fetchErr);
+          }
+        }
+
         const result = await printUnifiedThermalTicket({
-          base64Bytes: data.base64Bytes,
+          base64Bytes,
           kotData: data.kotData,
           printerName: data.printer_name,
           printerAddress: data.printer_address,
@@ -261,17 +289,23 @@ export default function StaffMenuPage() {
         }
       } catch (err: any) {
         console.error('Auto-print execution error on staff menu:', err);
+      } finally {
+        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
       }
     };
 
-    channel.bind('kot_auto_print', handleKotAutoPrint);
+    if (isPrintStation) {
+      channel.bind('kot_auto_print', handleKotAutoPrint);
+    }
 
     return () => {
       channel.unbind('product_updated');
       channel.unbind('product_deleted');
       channel.unbind('new_order');
       channel.unbind('order_update');
-      channel.unbind('kot_auto_print', handleKotAutoPrint);
+      if (isPrintStation) {
+        channel.unbind('kot_auto_print', handleKotAutoPrint);
+      }
       pusherClient?.unsubscribe(channelName);
     };
   }, [restaurant, fetchTables]);

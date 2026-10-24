@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { getOrders, getOrderStats, createOrder, createUser, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken, requireAdmin } from '@/lib/auth';
-import { validatePhone } from '@/lib/validators';
 import { pusherServer } from '@/lib/pusher';
 import { autoQueueAndBroadcastKot } from '@/lib/kot-auto-print';
 
@@ -74,14 +73,6 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    const admin = await requireAdmin(request);
-    if (admin && !admin.isSuperAdmin && admin.restaurantId && admin.restaurantId !== restaurant.id) {
-      return NextResponse.json({ success: false, error: 'Forbidden: Wrong restaurant' }, { status: 403 });
-    }
-
-    const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
-    const isPos = hasAdminRights;
-
     // 1. Check Service Status FIRST
     const { default: sql } = await import('@/lib/db');
     const settings = await sql`SELECT is_service_active, service_message FROM restaurants WHERE id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
@@ -96,16 +87,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method, payment_split } = body;
 
-    const cleanedPhone = typeof phone === 'string' ? phone.trim() : '';
-    const hasPhone = cleanedPhone !== '';
-    const customerName = (typeof customer_name === 'string' ? customer_name.trim() : '') || (isPos ? 'Walk-in' : '');
-
-    // Validation:
-    // Items are required for everyone (must be a non-empty array).
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!customer_name || !phone || !items || !items.length) {
       return NextResponse.json({
         success: false,
-        error: 'At least one valid item is required'
+        error: 'Customer name, phone, and items are required'
       }, { status: 400 });
     }
 
@@ -237,17 +222,17 @@ export async function POST(request: NextRequest) {
     const { getCurrentBusinessDate } = require('@/lib/format');
     const business_date = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
-    // 🛡️ ACTIVE ORDER ENFORCEMENT (runs ONLY when !isPos):
+    // 🛡️ ACTIVE ORDER ENFORCEMENT:
     // PENDING / PREPARING / READY -> ❌ Don't create a new order (Append it)
     // CLOSED / EXPIRED / CANCELLED -> ✅ Create a new order
     // No previous order -> ✅ Create a new order
-    if (!isPos && hasPhone) {
+    if (!isPos) {
       const previousOrderRes = await sql`
         SELECT id, ticket_number, status, table_number, created_at, business_date
         FROM orders
         WHERE restaurant_id = ${restaurant.id}
           AND (
-            phone = ${cleanedPhone}
+            phone = ${phone}
             OR phone = ${'+91' + cleanPhone}
             OR phone = ${cleanPhone}
             OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
@@ -286,8 +271,8 @@ export async function POST(request: NextRequest) {
 
     const order = await createOrder({
       restaurant_id: restaurant.id,
-      customer_name: customerName,
-      phone: hasPhone ? cleanedPhone : null,
+      customer_name: customer_name.trim(),
+      phone,
       total_price,
       subtotal,
       discount_amount,
@@ -309,13 +294,11 @@ export async function POST(request: NextRequest) {
       items,
     });
 
-    // Persist the customer name back to the users table only for customer orders with phone
-    if (hasPhone && !isPos) {
-      try {
-        await createUser(cleanedPhone, customerName);
-      } catch {
-        // Non-critical — don't fail the order if this upsert fails
-      }
+    // Persist the customer name back to the users table so checkout can auto-fill it next time
+    try {
+      await createUser(phone, customer_name.trim());
+    } catch {
+      // Non-critical — don't fail the order if this upsert fails
     }
 
     try {
@@ -333,13 +316,15 @@ export async function POST(request: NextRequest) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
     }
 
-    // 🖨️ AUTO-PRINT KOT PER COUNTER: Only print when order is in PREPARING state (never in PENDING state)
+    // 🖨️ AUTO-PRINT KOT PER COUNTER: Run in after() so the waiter receives response immediately
     if (order && order.status === 'PREPARING') {
-      try {
-        await autoQueueAndBroadcastKot(restaurant.id, order.id);
-      } catch (kotErr) {
-        console.error('❌ Automatic KOT print error on order creation:', kotErr);
-      }
+      after(async () => {
+        try {
+          await autoQueueAndBroadcastKot(restaurant.id, order.id);
+        } catch (kotErr) {
+          console.error('❌ Automatic KOT print error on order creation:', kotErr);
+        }
+      });
     }
 
     return NextResponse.json({
