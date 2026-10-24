@@ -4,6 +4,7 @@ import {
   getAgentHeartbeat,
   updateAgentHeartbeat,
   getPendingPrintJobs,
+  getPrintJobById,
   completePrintJob,
 } from '@/lib/db';
 
@@ -20,6 +21,7 @@ async function resolveRestaurant(request: NextRequest) {
  * GET /api/print/agent
  * - Used by UI to check agent status (heartbeat)
  * - Used by agent to poll pending print jobs
+ * - Used by print station to fetch large print job payload
  */
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +31,17 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const jobId = searchParams.get('jobId');
+
+    // If fetching a specific print job by id
+    if (jobId) {
+      const job = await getPrintJobById(restaurant.id, jobId);
+      return NextResponse.json({
+        success: true,
+        job,
+      });
+    }
+
     const mode = searchParams.get('mode'); // 'poll' or 'status'
 
     // If agent is polling for jobs

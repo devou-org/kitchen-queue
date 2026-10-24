@@ -103,6 +103,7 @@ export default function AdminSettings() {
 
   // Auto-Print State (synced with orders and pos)
   const [autoPrintKot, setAutoPrintKot] = useState(false);
+  const [isPrintStation, setIsPrintStation] = useState(false);
   const [isServiceOnline, setIsServiceOnline] = useState(true);
 
   const SECTION_KEYS = ['service_status', 'profile', 'menu', 'kitchen_workflow', 'hours', 'autoprint', 'gst', 'preview', 'qrcode'];
@@ -122,6 +123,10 @@ export default function AdminSettings() {
       if (savedAutoPrint !== null) {
         setAutoPrintKot(savedAutoPrint === 'true');
       }
+      const savedStation = localStorage.getItem('qdine_is_print_station');
+      if (savedStation !== null) {
+        setIsPrintStation(savedStation === '1');
+      }
     }
   }, []);
 
@@ -135,6 +140,15 @@ export default function AdminSettings() {
     toast.success(nextVal ? 'Auto-Print (KOT & Bill): Enabled' : 'Auto-Print: Paused', {
       icon: <PrinterIllustration size={20} status={nextVal ? 'success' : 'idle'} />,
     });
+  };
+
+  const handleTogglePrintStation = () => {
+    const nextVal = !isPrintStation;
+    setIsPrintStation(nextVal);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qdine_is_print_station', nextVal ? '1' : '0');
+    }
+    toast.success(nextVal ? 'This device is now the dedicated Print Station' : 'Print Station role disabled on this device');
   };
 
   const toggleSection = (key: string) => {
@@ -1110,6 +1124,65 @@ export default function AdminSettings() {
                         position: 'absolute',
                         top: '3px',
                         left: autoPrintKot ? '25px' : '3px',
+                        transition: 'left 0.2s ease',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Print Station Designation Toggle */}
+                <div
+                  onClick={handleTogglePrintStation}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '16px',
+                    backgroundColor: isPrintStation ? '#F0FDF4' : '#F8FAFC',
+                    borderRadius: '10px',
+                    border: `1px solid ${isPrintStation ? '#BBF7D0' : '#E2E8F0'}`,
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <div style={{ minWidth: 0, flex: 1, paddingRight: '12px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      This device is the print station
+                      {isPrintStation && (
+                        <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#DCFCE7', color: '#166534' }}>
+                          ACTIVE STATION
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                      Only designated print stations subscribe to automatic KOT print events. Prevents other waiters' phones from freezing or trying to print.
+                    </p>
+                  </div>
+
+                  <div
+                    role="switch"
+                    aria-checked={isPrintStation}
+                    style={{
+                      width: '50px',
+                      height: '28px',
+                      borderRadius: '14px',
+                      backgroundColor: isPrintStation ? '#16A34A' : '#CBD5E1',
+                      position: 'relative',
+                      transition: 'background-color 0.2s ease',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '50%',
+                        backgroundColor: '#FFFFFF',
+                        position: 'absolute',
+                        top: '3px',
+                        left: isPrintStation ? '25px' : '3px',
                         transition: 'left 0.2s ease',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
                       }}

@@ -375,17 +375,26 @@ export async function writeBytesToBluetooth(
     }
   }
 
-  // BLE MTU is usually 20-512 bytes. 100 bytes is safest across all devices.
-  const CHUNK_SIZE = 100;
-  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-    const chunk = bytes.slice(i, i + CHUNK_SIZE);
-    if (writeChar.properties.writeWithoutResponse) {
-      await writeChar.writeValueWithoutResponse(chunk);
-    } else {
-      await writeChar.writeValueWithResponse(chunk);
+  // BLE MTU is usually 20-512 bytes. 180 bytes fits safely inside modern BLE MTU negotiation.
+  const CHUNK_SIZE = 180;
+  console.time('[Perf] Bluetooth write');
+  console.log('[Perf] Bluetooth write start, bytes length:', bytes.length);
+
+  try {
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+      const chunk = bytes.subarray(i, i + CHUNK_SIZE);
+      if (writeChar.properties.writeWithoutResponse) {
+        await writeChar.writeValueWithoutResponse(chunk);
+        // Small 5ms pause to prevent thermal printer buffer overflow on fire-and-forget
+        await new Promise((r) => setTimeout(r, 5));
+      } else {
+        await writeChar.writeValueWithResponse(chunk);
+        // No artificial delay needed when device acknowledges receipt
+      }
     }
-    // Small inter-chunk pause to prevent thermal printer buffer overflow
-    await new Promise((r) => setTimeout(r, 25));
+  } finally {
+    console.timeEnd('[Perf] Bluetooth write');
+    console.log('[Perf] Bluetooth write end');
   }
 }
 
@@ -733,6 +742,9 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     } catch {}
   }
 
+  console.time('[Perf] Print execution');
+  console.log('[Perf] Print start for ticket:', options.kotData?.ticketNumber);
+
   if (!forceBrowser && rawBytes) {
     const preferredType = typeof window !== 'undefined' ? localStorage.getItem('qdine_preferred_printer_type') : null;
 
@@ -740,6 +752,7 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     if (preferredType === 'rawbt' && base64Bytes) {
       const sent = printViaRawBt(base64Bytes);
       if (sent) {
+        console.timeEnd('[Perf] Print execution');
         return {
           success: true,
           method: 'rawbt',
@@ -759,6 +772,7 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     if (isBtActive) {
       try {
         await writeBytesToBluetooth(rawBytes, printerName, counterId, counterName);
+        console.timeEnd('[Perf] Print execution');
         return {
           success: true,
           method: 'bluetooth',
@@ -775,6 +789,7 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     if (isSerialActive) {
       try {
         await writeBytesToSerial(rawBytes, counterId);
+        console.timeEnd('[Perf] Print execution');
         return {
           success: true,
           method: 'serial',
@@ -785,48 +800,55 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
       }
     }
 
-    // 3. Try RawBT WebSocket on Android (Port 40213 - 100% silent background printing)
-    try {
-      const rawBtWsOk = await printViaRawBtWebSocket(rawBytes);
-      if (rawBtWsOk) {
-        return {
-          success: true,
-          method: 'rawbt',
-          message: `Printed silently via RawBT Android Print Service!`,
-        };
-      }
-    } catch {}
-
-    // 4. Try Local HTTP Bridge on Windows (Port 9123 - 100% silent background printing)
-    try {
-      const localBridgeUrl = (typeof window !== 'undefined' && localStorage.getItem('qdine_printer_bridge_url')) || 'http://127.0.0.1:9123/print';
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
-
-      const bridgeRes = await fetch(localBridgeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          printerName,
-          base64Bytes,
-          docName: `KOT #${kotData.ticketNumber} - ${counterName || kotData.counterName || 'Counter'}`,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (bridgeRes.ok) {
-        const bridgeData = await bridgeRes.json();
-        if (bridgeData.success) {
+    // When preferred type is Bluetooth, skip RawBT WebSocket and Local HTTP Bridge to avoid timeout lag
+    if (preferredType !== 'bluetooth') {
+      // 3. Try RawBT WebSocket on Android (Port 40213 - 100% silent background printing)
+      try {
+        const rawBtWsOk = await printViaRawBtWebSocket(rawBytes);
+        if (rawBtWsOk) {
+          console.timeEnd('[Perf] Print execution');
           return {
             success: true,
-            method: 'serial',
-            message: `Printed silently via local bridge to ${printerName}!`,
+            method: 'rawbt',
+            message: `Printed silently via RawBT Android Print Service!`,
           };
         }
-      }
-    } catch {}
+      } catch {}
+
+      // 4. Try Local HTTP Bridge on Windows (Port 9123 - 100% silent background printing)
+      try {
+        const localBridgeUrl = (typeof window !== 'undefined' && localStorage.getItem('qdine_printer_bridge_url')) || 'http://127.0.0.1:9123/print';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+        const bridgeRes = await fetch(localBridgeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            printerName,
+            base64Bytes,
+            docName: `KOT #${kotData.ticketNumber} - ${counterName || kotData.counterName || 'Counter'}`,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (bridgeRes.ok) {
+          const bridgeData = await bridgeRes.json();
+          if (bridgeData.success) {
+            console.timeEnd('[Perf] Print execution');
+            return {
+              success: true,
+              method: 'serial',
+              message: `Printed silently via local bridge to ${printerName}!`,
+            };
+          }
+        }
+      } catch {}
+    }
   }
+
+  console.timeEnd('[Perf] Print execution');
 
   // 5. Fallback: Browser 80mm Thermal Receipt (Manual print only; never on auto-print)
   // When isAutoPrint is true and forceBrowser is false, NEVER open the browser print dialog!
@@ -1037,47 +1059,50 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
       }
     }
 
-    // 3. Try RawBT WebSocket on Android
-    try {
-      const rawBtWsOk = await printViaRawBtWebSocket(rawBytes);
-      if (rawBtWsOk) {
-        return {
-          success: true,
-          method: 'rawbt',
-          message: 'Bill printed silently via RawBT Android Print Service!',
-        };
-      }
-    } catch {}
-
-    // 4. Try Local HTTP Bridge on Windows (Port 9123 or user-configured bridge URL)
-    try {
-      const bridgeUrl = options.localBridgeUrl || (typeof window !== 'undefined' && localStorage.getItem('qdine_printer_bridge_url')) || 'http://127.0.0.1:9123/print';
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
-
-      const bridgeRes = await fetch(bridgeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          printerName,
-          base64Bytes,
-          docName: `Bill #${ticketNumber || ''}`,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (bridgeRes.ok) {
-        const bridgeData = await bridgeRes.json();
-        if (bridgeData.success) {
+    // When preferred type is Bluetooth, skip RawBT WebSocket and Local HTTP Bridge to avoid timeout lag
+    if (preferredType !== 'bluetooth') {
+      // 3. Try RawBT WebSocket on Android
+      try {
+        const rawBtWsOk = await printViaRawBtWebSocket(rawBytes);
+        if (rawBtWsOk) {
           return {
             success: true,
-            method: 'bridge',
-            message: `Bill #${ticketNumber} sent silently to ${printerName} via local bridge!`,
+            method: 'rawbt',
+            message: 'Bill printed silently via RawBT Android Print Service!',
           };
         }
-      }
-    } catch {}
+      } catch {}
+
+      // 4. Try Local HTTP Bridge on Windows (Port 9123 or user-configured bridge URL)
+      try {
+        const bridgeUrl = options.localBridgeUrl || (typeof window !== 'undefined' && localStorage.getItem('qdine_printer_bridge_url')) || 'http://127.0.0.1:9123/print';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+        const bridgeRes = await fetch(bridgeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            printerName,
+            base64Bytes,
+            docName: `Bill #${ticketNumber || ''}`,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (bridgeRes.ok) {
+          const bridgeData = await bridgeRes.json();
+          if (bridgeData.success) {
+            return {
+              success: true,
+              method: 'bridge',
+              message: `Bill #${ticketNumber} sent silently to ${printerName} via local bridge!`,
+            };
+          }
+        }
+      } catch {}
+    }
   }
 
   // 5. Fallback: Browser 80mm Thermal Receipt (via hidden iframe)

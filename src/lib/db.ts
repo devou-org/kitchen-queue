@@ -3665,6 +3665,19 @@ export async function getPendingPrintJobs(restaurantId: string) {
   }
 }
 
+export async function getPrintJobById(restaurantId: string, jobId: string) {
+  try {
+    const rows = await sql`
+      SELECT * FROM print_jobs
+      WHERE id = ${jobId} AND restaurant_id = ${restaurantId}
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  } catch (err: any) {
+    return null;
+  }
+}
+
 export async function completePrintJob(restaurantId: string, jobId: string) {
   try {
     const rows = await sql`
