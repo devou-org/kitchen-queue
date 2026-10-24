@@ -710,6 +710,28 @@ export function POSCheckoutDrawer({
     prevTotalRef.current = totalPrice;
   }, [totalPrice, isSplitPayment, setOrderForm]);
 
+  // Helper to resolve any table number or composite name (e.g. T4+T3+t-09) to its lead table
+  const resolveTable = useCallback((tableNumOrValue?: string) => {
+    if (!tableNumOrValue || tables.length === 0) return null;
+    const s = String(tableNumOrValue).trim().toLowerCase();
+    const parts = s.split('+').map(p => p.trim());
+    const lead = parts[0];
+
+    const found = tables.find((t: any) => {
+      const tNum = String(t.table_number).trim().toLowerCase();
+      if (tNum === s || tNum === lead) return true;
+      if (parts.includes(tNum)) return true;
+      if (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => parts.includes(String(m).trim().toLowerCase()))) return true;
+      return false;
+    });
+
+    if (!found) return null;
+    if (found.merged_into_table_id) {
+      return tables.find((t: any) => t.id === found.merged_into_table_id) || found;
+    }
+    return found;
+  }, [tables]);
+
   // Helper to calculate max free seats for a table
   const getTableFreeSeats = (table: any, partyContext?: { phone?: string; customerName?: string }): number => {
     if (!table) return 1;

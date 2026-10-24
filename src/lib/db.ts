@@ -2340,14 +2340,11 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       }
     }
 
-    // Trigger Loyalty Points processing
-    if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
-      processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || effectiveTotal)).catch(err => console.error('Loyalty process error:', err));
     // Trigger Loyalty Points processing: Cancellations take precedence
     if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
       processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
     } else if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
-      processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || 0)).catch(err => console.error('Loyalty process error:', err));
+      processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || effectiveTotal)).catch(err => console.error('Loyalty process error:', err));
     }
 
     // Trigger Finance Income recording (Automated Data Stream)

@@ -141,7 +141,6 @@ export async function POST(request: NextRequest) {
         String(t.table_number).trim().toLowerCase() === leadPart
       );
       if (targetTable) {
-        const check = checkTableAssignment(targetTable, party_size || 1, {
         // If secondary merged table, map order to primary table
         const parentTable = targetTable.merged_into_table_id
           ? (tables.find(t => t.id === targetTable.merged_into_table_id) || targetTable)
