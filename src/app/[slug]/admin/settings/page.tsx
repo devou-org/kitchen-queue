@@ -1268,6 +1268,13 @@ export default function AdminSettings() {
                         ? 'All new incoming orders in Orders and POS will immediately trigger printing to your connected thermal printer.'
                         : 'New orders will update quietly in the kitchen queue without opening print jobs. Staff can still click print manually.'}
                     </p>
+                  </div>
+                </div>
+
+                <p style={{ fontSize: '11px', color: '#94A3B8', margin: 0 }}>
+                  Compatible with 58mm & 80mm Bluetooth ESC/POS printers, USB thermal hardware, and browser print dialogs.
+                </p>
+
                 {/* Minimal Counter Printers Hardware Configuration */}
                 {slug && (
                   <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '14px' }}>

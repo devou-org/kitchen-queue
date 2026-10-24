@@ -72,6 +72,7 @@ export async function autoQueueAndBroadcastKot(
       getCounters(restaurantId),
     ]);
     const restaurantName = restaurant?.name || 'QDINE';
+    const timezone = restaurant?.timezone || 'Asia/Kolkata';
 
     // Group items by counter
     const counterMap: Record<string, any[]> = {};
@@ -108,13 +109,14 @@ export async function autoQueueAndBroadcastKot(
 
       const kotData: KotPrintData = {
         restaurantName,
+        timezone,
         ticketNumber: order.ticket_number,
         orderType: order.order_type,
         tableNumber: order.table_number,
         customerName: order.customer_name || 'Walk-in',
         phone: order.phone || undefined,
         staffName: order.staff_name,
-        createdAt: new Date().toISOString(),
+        createdAt: options.isAddOn ? new Date().toISOString() : (order.created_at || new Date().toISOString()),
         counterName: cName,
         items: cItems,
         notes: order.notes,

@@ -48,6 +48,7 @@ export interface KotPrintItem {
 
 export interface KotPrintData {
   restaurantName?: string;
+  timezone?: string;
   ticketNumber: number | string;
   orderType?: string;
   tableNumber?: string;
@@ -116,18 +117,39 @@ export function buildKotEscposBuffer(data: KotPrintData): Buffer {
     addRaw(ESCPOS.BOLD_OFF);
   }
 
-  // Format date
-  const now = data.createdAt ? new Date(data.createdAt) : new Date();
-  const dateStr = now.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-  const timeStr = now.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  // Format date & time according to restaurant timezone
+  const parsedDate = data.createdAt ? new Date(data.createdAt) : new Date();
+  const now = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  const tz = data.timezone || 'Asia/Kolkata';
+  let dateStr: string;
+  let timeStr: string;
+  try {
+    dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: tz,
+    });
+    timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: tz,
+    });
+  } catch {
+    dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    });
+    timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
+  }
   addLine(padTwoCols(`DATE: ${dateStr}`, timeStr));
 
   if (data.customerName && data.customerName !== 'Guest') {
@@ -198,6 +220,7 @@ export interface BillPrintItem {
 
 export interface BillPrintData {
   restaurantName?: string;
+  timezone?: string;
   address?: string;
   phone?: string;
   gstNumber?: string;
@@ -265,17 +288,38 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
   const orderType = (data.orderType || (data.tableNumber ? 'Dine-in' : 'Takeaway')).replace('_', '-');
   const orderTypeDisplay = orderType.charAt(0).toUpperCase() + orderType.slice(1);
 
-  const now = data.createdAt ? new Date(data.createdAt) : new Date();
-  const dateStr = now.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-  const timeStr = now.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const parsedDate = data.createdAt ? new Date(data.createdAt) : new Date();
+  const now = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  const tz = data.timezone || 'Asia/Kolkata';
+  let dateStr: string;
+  let timeStr: string;
+  try {
+    dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: tz,
+    });
+    timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: tz,
+    });
+  } catch {
+    dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    });
+    timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
+  }
   const dateTimeStr = `${dateStr}, ${timeStr}`;
 
   addRaw(ESCPOS.BOLD_ON);
