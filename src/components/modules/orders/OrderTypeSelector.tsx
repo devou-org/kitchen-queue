@@ -7,6 +7,9 @@ interface OrderTypeSelectorProps {
   onChange: (value: OrderType) => void;
   disabled?: boolean;
   allowDelivery?: boolean;
+  hideLabel?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 const ORDER_TYPES: { id: OrderType; label: string; icon: React.ElementType; description: string }[] = [
@@ -35,6 +38,9 @@ export default function OrderTypeSelector({
   onChange,
   disabled = false,
   allowDelivery = true,
+  hideLabel = false,
+  className = '',
+  style = {},
 }: OrderTypeSelectorProps) {
   const typesToRender = allowDelivery ? ORDER_TYPES : ORDER_TYPES.filter(t => t.id !== 'DELIVERY');
 

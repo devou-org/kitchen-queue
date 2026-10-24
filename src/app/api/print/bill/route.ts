@@ -34,7 +34,7 @@ async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, printerName, orderData, slug } = body;
+    const { orderId, printerName, printerType, orderData, slug } = body;
 
     const restaurant = await resolveRestaurant(request, slug);
     if (!restaurant) {
@@ -64,8 +64,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const targetPrinter = printerName?.trim() || process.env.KOT_PRINTER_NAME || 'POS-80C';
+    const targetPrinter = printerName?.trim() || restaurant.bill_printer_name?.trim() || process.env.BILL_PRINTER_NAME || process.env.KOT_PRINTER_NAME || 'POS-80C';
     const isWindows = process.platform === 'win32';
+    const effPrinterType = (printerType || restaurant.bill_printer_type || 'DEFAULT').toUpperCase();
+    const isClientDirectHardware = effPrinterType === 'BLUETOOTH' || effPrinterType === 'USB';
 
     const restaurantInfo = {
       name: restaurant.name || (order as any).restaurant_name || 'Restaurant',
@@ -106,7 +108,20 @@ export async function POST(request: NextRequest) {
     // Also generate HTML representation for client preview/dialog
     const billHtml = generateBillTemplateHTML(order, restaurantInfo);
 
-    // 1. Direct hardware print on Windows (Local dev / Cashier PC) — exactly like KOT!
+    // If Bluetooth or USB is selected, send bytes directly to client browser
+    if (isClientDirectHardware) {
+      return NextResponse.json({
+        success: true,
+        mode: 'client',
+        message: `Bill #${String(order.ticket_number).padStart(3, '0')} ready for ${effPrinterType} print!`,
+        printer: targetPrinter,
+        printerType: effPrinterType,
+        base64Bytes,
+        billHtml,
+      });
+    }
+
+    // 1. Direct hardware print on Windows (Local dev / Cashier PC) — only if not Bluetooth / USB!
     if (isWindows) {
       const printResult = await sendRawPrintToWindowsPrinter(
         targetPrinter,

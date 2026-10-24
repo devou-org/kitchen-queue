@@ -43,6 +43,13 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     iconName: 'Boxes',
   },
   {
+    key: 'finance',
+    name: 'Finance & Accounts',
+    description: 'P&L summary, petty cash, till reconciliation, and tax tracking',
+    pathSegment: 'finance',
+    iconName: 'Landmark',
+  },
+  {
     key: 'loyalty',
     name: 'Loyalty',
     description: 'Customer loyalty program, rewards catalog, and points audit log',
