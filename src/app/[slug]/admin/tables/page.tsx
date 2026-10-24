@@ -20,6 +20,7 @@ import { DeleteTableModal } from '@/components/modules/tables/DeleteTableModal';
 import { UnmergeTableModal } from '@/components/modules/tables/UnmergeTableModal';
 import { MergeConfirmModal } from '@/components/modules/tables/MergeConfirmModal';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { Loading } from '@/components/ui/Loading';
 
 export default function AdminTablesPage() {
   const { slug } = useParams();
@@ -800,8 +801,8 @@ export default function AdminTablesPage() {
 
       {/* Tables Grid */}
       {loading ? (
-        <div style={{ padding: '60px', textAlign: 'center' }}>
-          <div className="loader" style={{ margin: '0 auto' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '350px', width: '100%' }}>
+          <div className="loader" />
         </div>
       ) : filteredTables.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '60px 20px', color: '#64748B' }}>

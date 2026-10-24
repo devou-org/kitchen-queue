@@ -70,8 +70,15 @@ function StaffLayoutInner({ children }: { children: React.ReactNode }) {
   }, [pathname, router, slug]);
 
   const loginPath = `/${slug}/staff/login`;
-  if (loading || pathname === loginPath) {
-    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>{loading ? null : children}</div>;
+  if (pathname === loginPath) {
+    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>{children}</div>;
+  }
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div className="loader" />
+      </div>
+    );
   }
 
   const handleLogout = () => {

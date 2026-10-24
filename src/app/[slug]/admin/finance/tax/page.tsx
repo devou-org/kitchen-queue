@@ -304,9 +304,8 @@ export default function TaxCompliancePage() {
         </div>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px 0', color: '#64748B' }}>
-            <Loader2 className="animate-spin" size={22} />
-            <span style={{ marginLeft: '10px', fontSize: '13.5px' }}>Computing tax liability...</span>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+            <div className="loader" />
           </div>
         ) : (
           <>

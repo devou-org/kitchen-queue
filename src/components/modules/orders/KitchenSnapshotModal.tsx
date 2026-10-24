@@ -546,18 +546,16 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
               {loading && items.length === 0 ? (
                 <div
                   style={{
-                    padding: '60px',
+                    padding: '60px 20px',
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '10px',
-                    color: '#64748B',
-                    fontSize: '13px',
+                    flex: 1,
+                    minHeight: '260px',
+                    width: '100%',
                   }}
                 >
-                  <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', color: '#94A3B8' }} />
-                  <span>Loading kitchen demand...</span>
+                  <div className="loader" />
                 </div>
               ) : filteredItems.length === 0 ? (
                 <div

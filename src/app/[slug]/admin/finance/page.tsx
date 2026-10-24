@@ -332,9 +332,8 @@ export default function FinanceOverviewPage() {
       <AdminContentWrapper>
         {/* Loading State */}
         {loading && !summary ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '80px 0', color: '#64748B' }}>
-            <Loader2 className="animate-spin" size={24} />
-            <span style={{ marginLeft: '10px', fontSize: '14px', fontWeight: 500 }}>Calculating financial performance...</span>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 220px)' }}>
+            <div className="loader" />
           </div>
         ) : (
           <>

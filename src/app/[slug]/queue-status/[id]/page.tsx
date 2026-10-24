@@ -184,9 +184,8 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', background: 'var(--bg-gradient)' }}>
-        <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
-        <p style={{ color: '#6B6667' }}>Fetching ticket...</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-gradient)' }}>
+        <div className="loader" />
       </div>
     );
   }

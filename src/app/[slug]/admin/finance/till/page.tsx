@@ -295,9 +295,8 @@ export default function TillReconciliationPage() {
           </p>
         </div>
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px 0', color: '#64748B' }}>
-            <Loader2 className="animate-spin" size={22} />
-            <span style={{ marginLeft: '10px', fontSize: '13.5px' }}>Loading drawer statistics...</span>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+            <div className="loader" />
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', alignItems: 'start' }}>

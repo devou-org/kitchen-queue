@@ -819,7 +819,7 @@ export default function StaffAdminPage() {
 
         <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
           {loading ? (
-            <div style={{ padding: '80px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ padding: '80px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
               <div className="loader" />
             </div>
           ) : activeTab === 'staff' ? (

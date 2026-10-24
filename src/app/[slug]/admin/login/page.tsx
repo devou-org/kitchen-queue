@@ -11,7 +11,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { restaurant } = useRestaurant();
+  const { restaurant, loading: resLoading } = useRestaurant();
 
   const getTargetRoute = (user: any) => {
     const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
@@ -72,6 +72,14 @@ export default function AdminLogin() {
       setLoading(false);
     }
   };
+
+  if (resLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="loader" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>

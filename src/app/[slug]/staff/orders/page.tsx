@@ -21,6 +21,7 @@ import { CustomSelect } from '@/components/ui/CustomSelect';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import OrderTypeFilter from '@/components/modules/orders/OrderTypeFilter';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { Loading } from '@/components/ui/Loading';
 
 function resolveRoleDefaultStatus(): string {
   if (typeof window === 'undefined') return 'PREPARING';
@@ -699,7 +700,9 @@ export default function StaffOrders() {
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {loading ? (
-            <div style={{ padding: '80px', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}><div className="loader" /></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 'calc(100vh - 220px)', width: '100%' }}>
+              <div className="loader" />
+            </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', height: displayedOrders.length === 0 ? '100%' : 'auto' }}>
               <OrderTableHeader />

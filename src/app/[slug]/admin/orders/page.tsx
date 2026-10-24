@@ -21,6 +21,7 @@ import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapsho
 import { useAdminLayout } from '@/context/AdminLayoutContext';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
+import { Loading } from '@/components/ui/Loading';
 
 interface OrderUpdateLog {
   id: string;
@@ -1039,7 +1040,9 @@ export default function AdminOrders() {
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {loading ? (
-            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}><div className="loader" /></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 'calc(100vh - 220px)', width: '100%' }}>
+              <div className="loader" />
+            </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', height: displayedOrders.length === 0 ? '100%' : 'auto' }}>
               <OrderTableHeader />

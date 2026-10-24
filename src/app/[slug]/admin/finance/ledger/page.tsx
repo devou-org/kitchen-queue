@@ -318,9 +318,8 @@ export default function FinanceLedgerPage() {
           }}
         >
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px 0', color: '#64748B' }}>
-              <Loader2 className="animate-spin" size={20} />
-              <span style={{ marginLeft: '8px', fontSize: '13px' }}>Loading ledger entries...</span>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '260px' }}>
+              <div className="loader" />
             </div>
           ) : transactions.length === 0 ? (
             <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
