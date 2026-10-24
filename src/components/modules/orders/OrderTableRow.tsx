@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { Order } from '@/types';
-import { formatPrice, formatDateTime } from '@/lib/format';
+import { formatPrice, formatTime } from '@/lib/format';
 import { Users } from 'lucide-react';
 import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
@@ -9,12 +9,19 @@ import OrderStatusBadge from './OrderStatusBadge';
 export function OrderTableHeader() {
   return (
     <thead>
+      <style>{`
+        @media (max-width: 768px) {
+          .orders-col-persons {
+            display: none !important;
+          }
+        }
+      `}</style>
       <tr style={{ borderBottom: '1px solid var(--border)', background: '#F8FAFC' }}>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Customer</th>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Ticket</th>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Order Type</th>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Table</th>
-        <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Persons</th>
+        <th className="orders-col-persons" style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Persons</th>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Subtotal</th>
       </tr>
@@ -65,7 +72,7 @@ export function OrderTableRow({ order, onClick, showCustomerPhone = false, isSel
           #{String(order.ticket_number).padStart(3, '0')}
         </div>
         <div style={{ fontSize: '12px', color: '#64748B', marginTop: '3px', whiteSpace: 'nowrap' }}>
-          {formatDateTime(order.created_at)}
+          {formatTime(order.created_at)}
           {order.staff_name && <span style={{ color: '#94A3B8' }}> · {order.staff_name.split(' ')[0]}</span>}
         </div>
       </td>
@@ -79,15 +86,15 @@ export function OrderTableRow({ order, onClick, showCustomerPhone = false, isSel
       <td style={{ padding: '18px 20px', verticalAlign: 'middle' }}>
         {order.table_number ? (
           <span style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap' }}>
-            {order.table_number.toLowerCase().startsWith('table') ? order.table_number : `Table ${order.table_number}`}
+            {order.table_number.replace(/^table\s*[-:]?\s*/i, '').trim() || order.table_number}
           </span>
         ) : (
           <span style={{ color: '#94A3B8', fontSize: '15px', fontWeight: 700 }}>—</span>
         )}
       </td>
 
-      {/* 5. Persons */}
-      <td style={{ padding: '18px 20px', verticalAlign: 'middle' }}>
+      {/* 5. Persons (hidden on mobile) */}
+      <td className="orders-col-persons" style={{ padding: '18px 20px', verticalAlign: 'middle' }}>
         <span style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -107,7 +114,7 @@ export function OrderTableRow({ order, onClick, showCustomerPhone = false, isSel
         <OrderStatusBadge status={order.status} />
       </td>
 
-      {/* 7. Subtotal */}
+      {/* 6. Subtotal */}
       <td style={{ padding: '18px 20px', verticalAlign: 'middle' }}>
         <span style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
           {formatPrice(order.total_price)}

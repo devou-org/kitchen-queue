@@ -909,7 +909,9 @@ tr:hover td {
     display: block !important;
   }
 
-
+  .orders-col-persons {
+    display: none !important;
+  }
 }
 
 @media (min-width: 769px) {

@@ -247,53 +247,17 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
               <ChefHat size={20} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2
-                  style={{
-                    fontSize: '17px',
-                    fontWeight: 800,
-                    color: '#0F172A',
-                    margin: 0,
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  Kitchen Demand Snapshot
-                </h2>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    color: '#059669',
-                    background: '#ECFDF5',
-                    border: '1px solid #A7F3D0',
-                    padding: '2px 7px',
-                    borderRadius: '8px',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: '#10B981',
-                      display: 'inline-block',
-                    }}
-                  />
-                  LIVE
-                </span>
-              </div>
-              <p
+              <h2
                 style={{
-                  fontSize: '12px',
-                  color: '#64748B',
-                  margin: '2px 0 0 0',
+                  fontSize: '17px',
+                  fontWeight: 800,
+                  color: '#0F172A',
+                  margin: 0,
+                  letterSpacing: '-0.01em',
                 }}
               >
-                Current consolidated demand vs available stock in real-time.
-              </p>
+                Kitchen Demand Snapshot
+              </h2>
             </div>
           </div>
 
@@ -304,17 +268,15 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
               disabled={loading}
               title="Refresh snapshot"
               style={{
+                width: '32px',
                 height: '32px',
-                padding: '0 10px',
                 borderRadius: '8px',
                 border: '1px solid #E2E8F0',
                 background: '#FFFFFF',
                 color: '#475569',
-                fontSize: '12px',
-                fontWeight: 600,
-                display: 'inline-flex',
+                display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                justifyContent: 'center',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.15s ease',
               }}
@@ -322,12 +284,11 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
               onMouseLeave={(e) => (e.currentTarget.style.background = '#FFFFFF')}
             >
               <RefreshCw
-                size={13}
+                size={14}
                 style={{
                   animation: loading ? 'spin 1s linear infinite' : 'none',
                 }}
               />
-              <span>Refresh</span>
             </button>
 
             <button
@@ -492,10 +453,10 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {(
               [
-                { id: 'ALL', label: `All (${items.length})` },
-                { id: 'PREPARING', label: `Preparing (${metrics.totalPreparing})` },
-                { id: 'PENDING', label: `Pending (${metrics.totalPending})` },
-                { id: 'LOW_STOCK', label: `Low Stock (${metrics.lowStockCount})` },
+                { id: 'ALL', label: 'All' },
+                { id: 'PREPARING', label: 'Preparing' },
+                { id: 'PENDING', label: 'Pending' },
+                { id: 'LOW_STOCK', label: 'Low Stock' },
               ] as const
             ).map((tab) => {
               const active = filterTab === tab.id;
@@ -661,44 +622,10 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '12px',
                           minWidth: 0,
                           paddingRight: '8px',
                         }}
                       >
-                        {item.image_url ? (
-                          <img
-                            src={item.image_url}
-                            alt={item.product_name}
-                            style={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: '8px',
-                              objectFit: 'cover',
-                              background: '#F1F5F9',
-                              flexShrink: 0,
-                              border: '1px solid #E2E8F0',
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: '8px',
-                              background: '#F1F5F9',
-                              border: '1px solid #E2E8F0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#64748B',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <UtensilsCrossed size={16} />
-                          </div>
-                        )}
-
                         <div style={{ minWidth: 0, overflow: 'hidden' }}>
                           <div
                             style={{
