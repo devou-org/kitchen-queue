@@ -16,6 +16,7 @@ import { CounterDrawer } from '@/components/CounterDrawer';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
 import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { Loading } from '@/components/ui/Loading';
 
 interface ExtractedProduct {
   id: string;
@@ -791,7 +792,9 @@ export default function AdminProducts() {
         {/* Desktop Table View */}
         <div className="table-wrapper products-table-viewport" style={{ border: 'none', borderRadius: 0, width: '100%', flex: 1, overflowX: 'auto' }}>
           {loading ? (
-            <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '350px', width: '100%' }}>
+              <div className="loader" />
+            </div>
           ) : (
             <table className="products-table">
               <thead>
@@ -913,7 +916,9 @@ export default function AdminProducts() {
         {/* Mobile Product Cards View */}
         <div className="products-mobile-card-list">
           {loading ? (
-            <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', width: '100%' }}>
+              <div className="loader" />
+            </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
               No products found matching your filters

@@ -137,6 +137,83 @@ export default function TaxCompliancePage() {
           gap: 8px;
           align-self: center;
         }
+
+        @media (max-width: 768px) {
+          .finance-page-header,
+          .finance-page-header.admin-page-header-container,
+          .finance-page-header .admin-page-header-container {
+            height: auto !important;
+            min-height: auto !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .finance-page-header .admin-header-left,
+          .finance-page-header .admin-header-search {
+            height: auto !important;
+            min-height: auto !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            width: 100% !important;
+            padding: 0 !important;
+          }
+          .finance-toolbar {
+            flex-direction: column !important;
+            height: auto !important;
+            width: 100% !important;
+            gap: 8px !important;
+            padding-bottom: 10px !important;
+          }
+          .finance-tabs-wrapper {
+            height: 48px !important;
+            min-height: 48px !important;
+            padding: 0 !important;
+            width: 100% !important;
+            border-bottom: 1px solid var(--border, #E2E8F0) !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          .finance-actions {
+            height: auto !important;
+            width: 100% !important;
+            padding: 0 14px !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            gap: 8px !important;
+          }
+          .tax-header-block {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+          .tax-filters-wrapper {
+            width: 100% !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .tax-presets-container {
+            width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            flex-wrap: nowrap !important;
+            scrollbar-width: none !important;
+          }
+          .tax-presets-container::-webkit-scrollbar {
+            display: none !important;
+          }
+          .tax-date-row {
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+          }
+          .tax-date-row input[type="date"] {
+            flex: 1 !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+        }
       `}</style>
 
       {/* Header Bar matching Analytics / Image 2 */}
@@ -202,19 +279,26 @@ export default function TaxCompliancePage() {
 
       <AdminContentWrapper>
         {/* Title inside page content */}
-        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div className="tax-header-block" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
               Tax & GST Compliance
             </h2>
             <p style={{ fontSize: '12.5px', color: '#64748B', margin: '2px 0 0 0' }}>
-              {startDate} to {endDate}
+              {startDate && endDate
+                ? `${startDate} to ${endDate}`
+                : startDate
+                ? `From ${startDate}`
+                : endDate
+                ? `Up to ${endDate}`
+                : 'Current Tax Period'}
             </p>
           </div>
 
           {/* Date Filter & Presets */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="tax-filters-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <div
+              className="tax-presets-container"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -261,7 +345,7 @@ export default function TaxCompliancePage() {
               })}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div className="tax-date-row" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <input
                 type="date"
                 value={startDate}
@@ -304,9 +388,8 @@ export default function TaxCompliancePage() {
         </div>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px 0', color: '#64748B' }}>
-            <Loader2 className="animate-spin" size={22} />
-            <span style={{ marginLeft: '10px', fontSize: '13.5px' }}>Computing tax liability...</span>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+            <div className="loader" />
           </div>
         ) : (
           <>

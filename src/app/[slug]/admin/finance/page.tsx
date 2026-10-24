@@ -200,27 +200,117 @@ export default function FinanceOverviewPage() {
           height: 68px !important;
         }
 
+        .finance-dates-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .finance-date-input-group {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .finance-btns-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
         @media (max-width: 768px) {
-          .finance-page-header {
+          .finance-page-header,
+          .finance-page-header.admin-page-header-container,
+          .finance-page-header .admin-page-header-container {
             height: auto !important;
+            min-height: auto !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .finance-page-header .admin-header-left,
+          .finance-page-header .admin-header-search {
+            height: auto !important;
+            min-height: auto !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            width: 100% !important;
             padding: 0 !important;
           }
           .finance-toolbar {
             flex-direction: column !important;
             height: auto !important;
+            width: 100% !important;
+            gap: 10px !important;
+            padding-bottom: 12px !important;
           }
           .finance-tabs-wrapper {
             width: 100% !important;
-            height: 44px !important;
+            height: 48px !important;
+            min-height: 48px !important;
+            padding: 0 !important;
             border-bottom: 1px solid var(--border, #E2E8F0) !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
           }
           .finance-actions {
             height: auto !important;
-            padding: 10px 14px !important;
-            margin-left: 0 !important;
+            padding: 0 14px !important;
+            margin: 0 !important;
             width: 100% !important;
             box-sizing: border-box !important;
-            flex-wrap: wrap !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 8px !important;
+          }
+          .finance-dates-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+            width: 100% !important;
+          }
+          .finance-date-input-group {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 4px !important;
+            width: 100% !important;
+          }
+          .finance-date-input-group input[type="date"] {
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .finance-btns-row {
+            display: flex !important;
+            gap: 8px !important;
+            width: 100% !important;
+          }
+          .finance-btns-row button:last-child {
+            flex: 1 !important;
+            justify-content: center !important;
+          }
+        }
+
+        .finance-performance-section {
+          background: #FFFFFF;
+          border-bottom: 1px solid var(--border, #E2E8F0);
+          padding: 20px 24px 24px 24px;
+          box-sizing: border-box;
+          width: 100%;
+        }
+
+        .finance-statement-section {
+          background: #FFFFFF;
+          padding: 24px;
+          box-sizing: border-box;
+          width: 100%;
+        }
+
+        @media (max-width: 768px) {
+          .finance-performance-section {
+            padding: 16px 14px 18px 14px !important;
+          }
+          .finance-statement-section {
+            padding: 16px 14px !important;
           }
         }
       `}</style>
@@ -237,118 +327,113 @@ export default function FinanceOverviewPage() {
             </div>
 
             <div className="finance-actions">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>From</span>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setDatePreset('custom');
-                    setStartDate(e.target.value);
-                  }}
-                  style={{
-                    height: '36px',
-                    width: '135px',
-                    padding: '0 8px',
-                    fontSize: '12px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    color: '#334155',
-                    outline: 'none',
-                    background: '#FFFFFF',
-                  }}
-                />
+              <div className="finance-dates-row">
+                <div className="finance-date-input-group">
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>From</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setDatePreset('custom');
+                      setStartDate(e.target.value);
+                    }}
+                    style={{
+                      height: '36px',
+                      width: '135px',
+                      padding: '0 8px',
+                      fontSize: '12px',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      color: '#334155',
+                      outline: 'none',
+                      background: '#FFFFFF',
+                    }}
+                  />
+                </div>
+
+                <div className="finance-date-input-group">
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>To</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setDatePreset('custom');
+                      setEndDate(e.target.value);
+                    }}
+                    style={{
+                      height: '36px',
+                      width: '135px',
+                      padding: '0 8px',
+                      fontSize: '12px',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      color: '#334155',
+                      outline: 'none',
+                      background: '#FFFFFF',
+                    }}
+                  />
+                </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>To</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    setDatePreset('custom');
-                    setEndDate(e.target.value);
-                  }}
+              <div className="finance-btns-row">
+                <button
+                  onClick={fetchSummary}
+                  disabled={loading}
+                  title="Refresh"
                   style={{
                     height: '36px',
-                    width: '135px',
-                    padding: '0 8px',
-                    fontSize: '12px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    color: '#334155',
-                    outline: 'none',
+                    padding: '0 10px',
                     background: '#FFFFFF',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '6px',
+                    color: '#334155',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
                   }}
-                />
+                >
+                  <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                </button>
+
+                <button
+                  onClick={handleExportCsv}
+                  style={{
+                    height: '36px',
+                    padding: '0 14px',
+                    background: 'var(--primary, #971345)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: '#FFFFFF',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+                    transition: 'opacity 0.15s ease',
+                  }}
+                >
+                  <Download size={13} />
+                  <span>Export</span>
+                </button>
               </div>
-
-              <button
-                onClick={fetchSummary}
-                disabled={loading}
-                title="Refresh"
-                style={{
-                  height: '36px',
-                  padding: '0 10px',
-                  background: '#FFFFFF',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  color: '#334155',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-              </button>
-
-              <button
-                onClick={handleExportCsv}
-                style={{
-                  height: '36px',
-                  padding: '0 14px',
-                  background: 'var(--primary, #971345)',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  color: '#FFFFFF',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
-                  transition: 'opacity 0.15s ease',
-                }}
-              >
-                <Download size={13} />
-                <span>Export</span>
-              </button>
             </div>
           </div>
         }
       />
 
-      <AdminContentWrapper>
+      <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
         {/* Loading State */}
         {loading && !summary ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '80px 0', color: '#64748B' }}>
-            <Loader2 className="animate-spin" size={24} />
-            <span style={{ marginLeft: '10px', fontSize: '14px', fontWeight: 500 }}>Calculating financial performance...</span>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 220px)' }}>
+            <div className="loader" />
           </div>
         ) : (
           <>
-            {/* Unified Performance Graph & Quick Stats Card (Matching Analytics Layout) */}
-            <div
-              style={{
-                background: '#FFFFFF',
-                border: '1px solid #F1F5F9',
-                borderRadius: '12px',
-                padding: '18px 20px',
-                marginBottom: '20px',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-              }}
-            >
+            {/* Unified Performance Graph & Quick Stats Section */}
+            <div className="finance-performance-section">
               {/* Card Header: Title + Date Subtitle & Pill Switcher Buttons */}
               <div
                 style={{
@@ -552,16 +637,8 @@ export default function FinanceOverviewPage() {
               )}
             </div>
 
-            {/* Profit & Loss Statement Table (Clean, reduced borders) */}
-            <div
-              style={{
-                background: '#FFFFFF',
-                border: '1px solid #F1F5F9',
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-              }}
-            >
+            {/* Profit & Loss Statement Table */}
+            <div className="finance-statement-section">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
                   Profit & Loss Statement

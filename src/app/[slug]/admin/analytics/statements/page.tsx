@@ -777,8 +777,8 @@ export default function AdminAnalyticsStatementsPage() {
           </div>
           <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
             {loading ? (
-              <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}>
-                <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', width: '100%' }}>
+                <div className="loader" />
               </div>
             ) : (
               <table className="statements-table" style={{ width: '100%', borderCollapse: 'collapse' }}>

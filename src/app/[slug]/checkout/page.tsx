@@ -444,7 +444,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   if (checkingActive) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="loader" style={{ width: 36, height: 36, borderWidth: 3 }} />
+        <div className="loader" />
       </div>
     );
   }

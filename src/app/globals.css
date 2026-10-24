@@ -909,7 +909,9 @@ tr:hover td {
     display: block !important;
   }
 
-
+  .orders-col-persons {
+    display: none !important;
+  }
 }
 
 @media (min-width: 769px) {
@@ -1008,13 +1010,64 @@ tr:hover td {
 }
 
 /* ===================== LOADER & SUCCESS ===================== */
+/* HTML: <div class="loader"></div> */
 .loader {
-  width: 24px;
-  height: 24px;
-  border: 3px solid rgba(151, 19, 69, 0.2);
-  border-top: 3px solid var(--primary);
+  width: 40px !important;
+  aspect-ratio: 1 !important;
+  height: 40px !important;
+  border: none !important;
+  border-radius: 0 !important;
+  --c: linear-gradient(var(--primary, #971345) 0 0);
+  --r1: radial-gradient(farthest-side at bottom, var(--primary, #971345) 93%, #0000);
+  --r2: radial-gradient(farthest-side at top   , var(--primary, #971345) 93%, #0000);
+  background: 
+    var(--c) ,var(--r1),var(--r2),
+    var(--c) ,var(--r1),var(--r2),
+    var(--c) ,var(--r1),var(--r2);
+  background-repeat: no-repeat;
+  animation: l1 1s infinite alternate;
+  margin: auto !important;
+  display: block !important;
+}
+
+.loader-center-container,
+.loader-centered {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: 280px;
+  margin: auto !important;
+}
+@keyframes l1 {
+  0%,10% {
+    background-size: 8px 0,8px 4px,8px 4px;
+    background-position: 0 50%,0 calc(50% - 2px),0 calc(50% + 2px),50% 50%,50% calc(50% - 2px),50% calc(50% + 2px),100% 50%,100% calc(50% - 2px),100% calc(50% + 2px);
+ }
+ 90%,100% {
+    background-size: 8px 100%,8px 4px, 8px 4px;
+    background-position: 0 50%,0 -2px,0 calc(100% + 2px),50% 50%,50% -2px,50% calc(100% + 2px),100% 50%,100% -2px,100% calc(100% + 2px);
+ }
+}
+
+/* Inline button spinner safeguard */
+span.loader,
+button .loader {
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: currentColor;
+  animation: devouSpin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0;
+}
+span.loader:before,
+span.loader:after,
+button .loader:before,
+button .loader:after {
+  display: none !important;
 }
 
 .success-check {
@@ -1041,6 +1094,52 @@ tr:hover td {
     transform: scale(1);
     opacity: 1;
   }
+}
+
+/* ===================== DEVOU LOADING ANIMATIONS ===================== */
+@keyframes devouSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes devouPulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.9); }
+  50% { opacity: 0.85; transform: scale(1.15); }
+}
+
+@keyframes devouRipple {
+  0% { transform: scale(0.7); opacity: 0.8; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+
+@keyframes devouFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes devouPing {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+@keyframes devouBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-8px); opacity: 1; }
+}
+
+@keyframes devouBar {
+  0% { left: -35%; width: 35%; }
+  50% { left: 25%; width: 60%; }
+  100% { left: 100%; width: 35%; }
+}
+
+@keyframes devouFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes devouScaleIn {
+  from { opacity: 0; transform: scale(0.94) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 /* ===================== MODAL BACKDROP ===================== */

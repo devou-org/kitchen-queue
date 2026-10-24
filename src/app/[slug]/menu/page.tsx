@@ -645,78 +645,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
   if (restaurantLoading || loading) {
     return (
-      <div style={{ background: '#f8fafc', minHeight: '100vh', padding: '0 0 80px', fontFamily: "'Inter', sans-serif" }}>
-        {/* Shimmer / Pulse inline style keyframes */}
-        <style dangerouslySetInnerHTML={{
-          __html: `
-          @keyframes skeleton-pulse {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 1; }
-          }
-          .skeleton-pulse {
-            animation: skeleton-pulse 1.6s ease-in-out infinite;
-          }
-        `}} />
-
-        {/* Skeleton Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '12px 16px', borderBottom: '1px solid #e2e8f0',
-          backgroundColor: '#ffffff', height: '57px', boxSizing: 'border-box'
-        }}>
-          <div className="skeleton-pulse" style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: '#e2e8f0' }} />
-          <div className="skeleton-pulse" style={{ width: '120px', height: '16px', borderRadius: '4px', backgroundColor: '#e2e8f0' }} />
-        </div>
-
-        <div style={{ maxWidth: '480px', margin: '0 auto', padding: '0' }}>
-          {/* Skeleton Hero Section */}
-          <div style={{ padding: '20px 16px 12px' }}>
-            <div className="skeleton-pulse" style={{ width: '180px', height: '28px', borderRadius: '6px', backgroundColor: '#e2e8f0', marginBottom: '8px' }} />
-            <div className="skeleton-pulse" style={{ width: '280px', height: '14px', borderRadius: '4px', backgroundColor: '#e2e8f0' }} />
-          </div>
-
-          {/* Skeleton Search Box */}
-          <div style={{ padding: '0 16px 12px' }}>
-            <div className="skeleton-pulse" style={{ width: '100%', height: '42px', borderRadius: '8px', backgroundColor: '#e2e8f0' }} />
-          </div>
-
-          {/* Skeleton Categories */}
-          <div style={{ padding: '0 16px 16px', display: 'flex', gap: '8px', overflowX: 'hidden' }}>
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="skeleton-pulse" style={{ width: '70px', height: '30px', borderRadius: '20px', backgroundColor: '#e2e8f0', flexShrink: 0 }} />
-            ))}
-          </div>
-
-          {/* Skeleton Product Container */}
-          {menuLayout === 'GRID' ? (
-            <div style={{ padding: '0 16px 320px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #f1f5f9', overflow: 'hidden', padding: '0 0 12px', display: 'flex', flexDirection: 'column' }}>
-                  <div className="skeleton-pulse" style={{ width: '100%', height: '140px', backgroundColor: '#f1f5f9' }} />
-                  <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div className="skeleton-pulse" style={{ width: '80%', height: '12px', borderRadius: '3px', backgroundColor: '#e2e8f0' }} />
-                    <div className="skeleton-pulse" style={{ width: '60%', height: '8px', borderRadius: '2px', backgroundColor: '#e2e8f0' }} />
-                    <div className="skeleton-pulse" style={{ width: '40%', height: '12px', borderRadius: '3px', backgroundColor: '#e2e8f0', marginTop: 'auto' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ padding: '0 16px 320px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: '16px', gap: '16px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #f1f5f9', minHeight: '120px', boxSizing: 'border-box' }}>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div className="skeleton-pulse" style={{ width: '60px', height: '12px', borderRadius: '3px', backgroundColor: '#e2e8f0' }} />
-                    <div className="skeleton-pulse" style={{ width: '140px', height: '16px', borderRadius: '4px', backgroundColor: '#e2e8f0' }} />
-                    <div className="skeleton-pulse" style={{ width: '100px', height: '12px', borderRadius: '3px', backgroundColor: '#e2e8f0' }} />
-                    <div className="skeleton-pulse" style={{ width: '50px', height: '16px', borderRadius: '4px', backgroundColor: '#e2e8f0' }} />
-                  </div>
-                  <div className="skeleton-pulse" style={{ width: '92px', height: '92px', borderRadius: '12px', backgroundColor: '#f1f5f9', flexShrink: 0 }} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+        <div className="loader" />
       </div>
     );
   }

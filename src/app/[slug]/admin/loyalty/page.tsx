@@ -1063,9 +1063,8 @@ export default function AdminLoyaltyPage() {
               <tbody>
                 {loadingCustomers ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
-                      <Loader2 size={22} className="animate-spin" style={{ margin: '0 auto 8px', color: primaryColor }} />
-                      <div style={{ fontSize: '13px', fontWeight: 500 }}>Loading customer records...</div>
+                    <td colSpan={7} style={{ padding: '60px 20px', textAlign: 'center' }}>
+                      <div className="loader" />
                     </td>
                   </tr>
                 ) : customers.length === 0 ? (
@@ -1731,9 +1730,8 @@ export default function AdminLoyaltyPage() {
               <tbody>
                 {loadingTx ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
-                      <Loader2 size={22} className="animate-spin" style={{ margin: '0 auto 8px', color: primaryColor }} />
-                      <div style={{ fontSize: '13px', fontWeight: 500 }}>Updating transactions audit log...</div>
+                    <td colSpan={6} style={{ padding: '60px 20px', textAlign: 'center' }}>
+                      <div className="loader" />
                     </td>
                   </tr>
                 ) : filteredTransactions.length === 0 ? (

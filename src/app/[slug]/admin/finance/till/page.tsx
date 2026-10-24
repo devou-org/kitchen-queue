@@ -203,26 +203,96 @@ export default function TillReconciliationPage() {
           height: 68px !important;
         }
 
-        @media (max-width: 768px) {
-          .finance-page-header {
-            height: auto !important;
-            padding: 0 !important;
+        .till-layout-grid {
+          display: grid;
+          grid-template-columns: 1.2fr 0.8fr;
+          gap: 20px;
+          align-items: start;
+        }
+
+        @media (max-width: 860px) {
+          .till-layout-grid {
+            grid-template-columns: 1fr !important;
           }
+        }
+
+        @media (max-width: 768px) {
+          .finance-page-header,
+          .finance-page-header.admin-page-header-container {
+            height: auto !important;
+            min-height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            border-bottom: 1px solid var(--border, #E2E8F0) !important;
+            background: #FFFFFF !important;
+          }
+
+          .finance-page-header .admin-page-header-container,
+          .finance-page-header .admin-header-left,
+          .finance-page-header .admin-header-search {
+            height: auto !important;
+            min-height: auto !important;
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            flex-wrap: wrap !important;
+          }
+
           .finance-toolbar {
             flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 0 !important;
             height: auto !important;
+            min-height: auto !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
+
           .finance-tabs-wrapper {
             width: 100% !important;
-            height: 44px !important;
+            height: 48px !important;
+            min-height: 48px !important;
+            padding: 0 !important;
             border-bottom: 1px solid var(--border, #E2E8F0) !important;
-          }
-          .finance-actions {
-            height: auto !important;
-            padding: 10px 14px !important;
-            margin-left: 0 !important;
-            width: 100% !important;
             box-sizing: border-box !important;
+            background: #FFFFFF !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+
+          .finance-actions {
+            width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            margin-left: 0 !important;
+            padding: 10px 14px !important;
+            background: #F8FAFC !important;
+            border-bottom: 1px solid var(--border, #E2E8F0) !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            align-items: center !important;
+            gap: 8px !important;
+          }
+
+          .till-actions-row {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            width: 100% !important;
+            gap: 8px !important;
+          }
+
+          .till-actions-row input {
+            flex: 1 !important;
+            width: auto !important;
           }
         }
       `}</style>
@@ -239,7 +309,7 @@ export default function TillReconciliationPage() {
             </div>
 
             <div className="finance-actions">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="till-actions-row" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>Date:</span>
                 <input
                   type="date"
@@ -256,29 +326,30 @@ export default function TillReconciliationPage() {
                     background: '#FFFFFF',
                   }}
                 />
-              </div>
 
-              <button
-                onClick={fetchTillData}
-                disabled={loading}
-                style={{
-                  height: '36px',
-                  padding: '0 12px',
-                  background: '#FFFFFF',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  fontSize: '12.5px',
-                  fontWeight: 500,
-                  color: '#334155',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                }}
-              >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                <span>Refresh</span>
-              </button>
+                <button
+                  onClick={fetchTillData}
+                  disabled={loading}
+                  style={{
+                    height: '36px',
+                    padding: '0 12px',
+                    background: '#FFFFFF',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '6px',
+                    fontSize: '12.5px',
+                    fontWeight: 500,
+                    color: '#334155',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                  <span>Refresh</span>
+                </button>
+              </div>
             </div>
           </div>
         }
@@ -295,12 +366,11 @@ export default function TillReconciliationPage() {
           </p>
         </div>
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px 0', color: '#64748B' }}>
-            <Loader2 className="animate-spin" size={22} />
-            <span style={{ marginLeft: '10px', fontSize: '13.5px' }}>Loading drawer statistics...</span>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+            <div className="loader" />
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', alignItems: 'start' }}>
+          <div className="till-layout-grid">
             {/* Left: Reconciliation Workspace */}
             <div
               style={{

@@ -500,35 +500,43 @@ export default function StaffMenuPage() {
         <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
       </div>
 
-      {/* Categories */}
-      <div style={{ paddingBottom: '16px', display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setCategory(cat)}
-            style={{
-              padding: '6px 16px',
-              borderRadius: 'var(--radius-full)',
-              border: '1.5px solid',
-              borderColor: cat === category ? 'var(--primary)' : 'var(--border)',
-              background: cat === category ? 'var(--primary)' : 'white',
-              color: cat === category ? 'white' : 'var(--text-secondary)',
-              fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
-            }}
-          >{cat}</button>
-        ))}
-      </div>
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 220px)' }}>
+          <div className="loader" />
+        </div>
+      ) : (
+        <>
+          {/* Categories */}
+          <div style={{ paddingBottom: '16px', display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: 'var(--radius-full)',
+                  border: '1.5px solid',
+                  borderColor: cat === category ? 'var(--primary)' : 'var(--border)',
+                  background: cat === category ? 'var(--primary)' : 'white',
+                  color: cat === category ? 'white' : 'var(--text-secondary)',
+                  fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
+                }}
+              >{cat}</button>
+            ))}
+          </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
-        {filtered.map(product => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            quantity={cart.get(product.id)?.quantity || 0}
-            onUpdate={handleUpdate}
-          />
-        ))}
-      </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+            {filtered.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                quantity={cart.get(product.id)?.quantity || 0}
+                onUpdate={handleUpdate}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {totalItems > 0 && (
         <div style={{ position: 'fixed', bottom: '80px', left: 0, right: 0, padding: '0 16px', zIndex: 40, display: 'flex', justifyContent: 'center' }}>

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import Script from 'next/script';
+import { GlobalLoadingScreen } from '@/components/ui/Loading';
 
 export const metadata: Metadata = {
   title: "Renjz Kitchen | Taste of Home in every bite",
@@ -65,6 +66,7 @@ export default function RootLayout({
             },
           }}
         />
+        <GlobalLoadingScreen />
       </body>
     </html>
   );
