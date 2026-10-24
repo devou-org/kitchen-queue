@@ -94,15 +94,54 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Customers (!isPos) must provide name AND phone, otherwise 400.
+    if (!isPos && (!customerName || !hasPhone)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Customer name and phone number are required'
+      }, { status: 400 });
+    }
+
+    // If a phone is provided (any caller), validate it with validatePhone.
+    if (hasPhone) {
+      const phoneValidation = validatePhone(cleanedPhone);
+      if (!phoneValidation.valid) {
+        return NextResponse.json({
+          success: false,
+          error: phoneValidation.message || 'Invalid phone number'
+        }, { status: 400 });
+      }
+    }
+
+    const cleanPhone = hasPhone ? cleanedPhone.replace(/\D/g, '').slice(-10) : '';
+
+    let effectiveTableNumber = table_number;
     if (order_type !== 'TAKEAWAY' && table_number) {
       const { TablesRepository } = await import('@/modules/tables/tables.repository');
       const { checkTableAssignment } = await import('@/lib/table-capacity');
       const tables = await TablesRepository.getTablesByRestaurant(restaurant.id);
-      const targetTable = tables.find(t => String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase());
+      const leadPart = String(table_number).split('+')[0].trim().toLowerCase();
+      const targetTable = tables.find(t =>
+        String(t.table_number).trim().toLowerCase() === String(table_number).trim().toLowerCase() ||
+        String(t.table_number).trim().toLowerCase() === leadPart
+      );
       if (targetTable) {
-        const check = checkTableAssignment(targetTable, party_size || 1, {
-          phone,
-          customerName: customer_name
+        // If secondary merged table, map order to primary table
+        const parentTable = targetTable.merged_into_table_id
+          ? (tables.find(t => t.id === targetTable.merged_into_table_id) || targetTable)
+          : targetTable;
+
+        if (String(table_number).includes('+')) {
+          effectiveTableNumber = String(table_number).trim();
+        } else if (parentTable.merged_table_numbers && parentTable.merged_table_numbers.length > 0) {
+          effectiveTableNumber = `${parentTable.table_number}+${parentTable.merged_table_numbers.join('+')}`;
+        } else if (targetTable.merged_into_table_id && parentTable) {
+          effectiveTableNumber = parentTable.table_number;
+        }
+
+        const check = checkTableAssignment(parentTable, party_size || 1, {
+          phone: hasPhone ? cleanedPhone : undefined,
+          customerName,
         });
         if (!check.allowed) {
           return NextResponse.json({
@@ -134,39 +173,50 @@ export async function POST(request: NextRequest) {
 
     total_price = Math.max(0, total_price - discount_amount);
 
-    const admin = await requireAdmin(request);
-    const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
-    // Explicit is_pos from POS terminal or authenticated staff/admin placing an order
-    const isPos = body.is_pos === true || hasAdminRights;
-    const isPaid = (hasAdminRights || body.is_pos === true) && Boolean(is_paid);
-    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : ((hasAdminRights || body.is_pos === true) && payment_method ? String(payment_method) : undefined);
+    let splitTotal: number | null = null;
+    if (payment_split && typeof payment_split === 'object') {
+      const sum = Object.values(payment_split).reduce((acc: number, val: any) => {
+        const num = parseFloat(val as string);
+        return !isNaN(num) ? acc + num : acc;
+      }, 0);
+      if (sum > 0) {
+        splitTotal = Math.round(sum * 100) / 100;
+        total_price = splitTotal;
+        if (gst_type !== 'REGULAR') {
+          subtotal = splitTotal;
+        }
+      }
+    }
 
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const isPaid = isPos && Boolean(is_paid);
+    const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : (isPos && payment_method ? String(payment_method) : undefined);
 
-    // 🛡️ ANTI-DUPLICATE CHECK: Prevent identical rapid duplicate orders within 15s (e.g. swipe bounce)
-    const recentDuplicate = await sql`
-      SELECT id, ticket_number, status, total_price, created_at, customer_name, phone, table_number
-      FROM orders
-      WHERE restaurant_id = ${restaurant.id}
-        AND (
-          phone = ${phone}
-          OR phone = ${'+91' + cleanPhone}
-          OR phone = ${cleanPhone}
-          OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
-        )
-        AND created_at > NOW() - INTERVAL '1 second'
-      ORDER BY created_at DESC
-      LIMIT 1
-    ` as any[];
+    // 🛡️ ANTI-DUPLICATE CHECK: Prevent identical rapid duplicate orders within 15s (runs ONLY when !isPos)
+    if (!isPos && hasPhone) {
+      const recentDuplicate = await sql`
+        SELECT id, ticket_number, status, total_price, created_at, customer_name, phone, table_number
+        FROM orders
+        WHERE restaurant_id = ${restaurant.id}
+          AND (
+            phone = ${cleanedPhone}
+            OR phone = ${'+91' + cleanPhone}
+            OR phone = ${cleanPhone}
+            OR RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\D', '', 'g'), 10) = ${cleanPhone}
+          )
+          AND created_at > NOW() - INTERVAL '15 seconds'
+        ORDER BY created_at DESC
+        LIMIT 1
+      ` as any[];
 
-    if (recentDuplicate[0]) {
-      console.log(`⚠️ Prevented duplicate order for ticket #${recentDuplicate[0].ticket_number}`);
-      return NextResponse.json({
-        success: true,
-        data: recentDuplicate[0],
-        message: 'Order already placed',
-        duplicate_prevented: true,
-      });
+      if (recentDuplicate[0]) {
+        console.log(`⚠️ Prevented duplicate order for ticket #${recentDuplicate[0].ticket_number}`);
+        return NextResponse.json({
+          success: true,
+          data: recentDuplicate[0],
+          message: 'Order already placed',
+          duplicate_prevented: true,
+        });
+      }
     }
 
     const { getCurrentBusinessDate } = require('@/lib/format');
@@ -231,7 +281,7 @@ export async function POST(request: NextRequest) {
       gst_type,
       notes,
       party_size: order_type === 'TAKEAWAY' ? 0 : (party_size || 1),
-      table_number: order_type === 'TAKEAWAY' ? null : table_number,
+      table_number: order_type === 'TAKEAWAY' ? null : effectiveTableNumber,
       order_type: order_type || 'DINE_IN',
       is_pos: isPos,
       is_paid: isPaid,
@@ -240,6 +290,7 @@ export async function POST(request: NextRequest) {
       payment_split: payment_split || null,
       staff_id: staffId,
       business_date,
+      loyalty_reward_id: (body.selected_reward_id || body.loyalty_reward_id)?.toString().trim() || null,
       items,
     });
 

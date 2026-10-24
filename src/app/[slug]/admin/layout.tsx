@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/app/services/auth.api';
-import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3, LogOut, PanelLeftClose, PanelLeftOpen, Gift } from 'lucide-react';
+import { ClipboardList, Wallet, UtensilsCrossed, Box, Settings, Receipt, Users, AlertTriangle, Sparkles, Bot, LayoutGrid, Boxes, Store, BarChart3, LogOut, PanelLeftClose, PanelLeftOpen, Gift, Landmark } from 'lucide-react';
 
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ServiceToggle } from '@/components/ServiceToggle';
 import { AIAnalystWidget } from '@/components/ai/AIAnalystWidget';
 import { AdminLayoutProvider, useAdminLayout } from '@/context/AdminLayoutContext';
+import { LogoutConfirmModal } from '@/components/ui/LogoutConfirmModal';
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -18,6 +19,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     try {
@@ -45,6 +48,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
   // Controlled via Super Admin Subscription Modules
   const showInventory = restaurant?.modules?.INVENTORY === true;
+  const showFinance = restaurant?.modules?.FINANCE_MANAGEMENT === true;
   const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM !== false;
 
   useEffect(() => {
@@ -92,6 +96,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     { key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
     { key: 'products', name: 'Menu', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
+    ...(showFinance ? [{ key: 'finance', name: 'Finance', href: `/${slug}/admin/finance`, icon: <Landmark size={20} strokeWidth={2.5} /> }] : []),
     ...(showLoyalty ? [{ key: 'loyalty', name: 'Loyalty', href: `/${slug}/admin/loyalty`, icon: <Gift size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'staff', name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
@@ -165,6 +170,17 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       }
     }
 
+    if (!resLoading && restaurant && restaurant.modules?.FINANCE_MANAGEMENT !== true) {
+      if (pathname.startsWith(`/${slug}/admin/finance`)) {
+        refresh().then((latest) => {
+          if (latest && latest.modules?.FINANCE_MANAGEMENT !== true) {
+            const target = showOrdering ? 'orders' : showQueue ? 'queue' : 'products';
+            router.replace(`/${slug}/admin/${target}`);
+          }
+        });
+      }
+    }
+
     if (!resLoading && restaurant && restaurant.modules?.LOYALTY_PROGRAM === false) {
       if (pathname.startsWith(`/${slug}/admin/loyalty`)) {
         refresh().then((latest) => {
@@ -182,53 +198,41 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     return <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>{children}</div>;
   }
 
-  // If loading auth or restaurant data, show skeleton
+  // If loading auth or restaurant data, show centered loader
   if (loading || resLoading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <div className="admin-layout" style={{ opacity: 0.6, pointerEvents: 'none' }}>
-          {/* Skeleton Sidebar */}
-          <aside className="sidebar open" style={{ borderRight: '1px solid var(--border)', background: 'white' }}>
-            <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#e2e8f0', animation: 'pulse 2s infinite' }} />
-              <div style={{ height: '20px', width: '120px', background: '#e2e8f0', borderRadius: '4px', animation: 'pulse 2s infinite' }} />
-            </div>
-            <nav className="sidebar-nav" style={{ marginTop: '30px' }}>
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} style={{ height: '44px', background: '#e2e8f0', borderRadius: '8px', marginBottom: '12px', animation: 'pulse 2s infinite' }} />
-              ))}
-            </nav>
-          </aside>
-          {/* Skeleton Main */}
-          <main className="admin-main" style={{ padding: '24px' }}>
-            <div style={{ height: '32px', width: '250px', background: '#e2e8f0', borderRadius: '8px', marginBottom: '32px', animation: 'pulse 2s infinite' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-              {[1, 2, 3].map(i => (
-                <div key={i} style={{ height: '120px', background: 'white', borderRadius: '8px', border: '1px solid var(--border)', animation: 'pulse 2s infinite' }} />
-              ))}
-            </div>
-            <div style={{ height: '500px', background: 'white', borderRadius: '8px', border: '1px solid var(--border)', animation: 'pulse 2s infinite' }} />
-          </main>
-        </div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div className="loader" />
       </div>
     );
   }
 
-  const handleLogout = async () => {
-    authService.logout('admin');
-    const slugStr = Array.isArray(slug) ? slug[0] : slug;
-    localStorage.removeItem(`kitchenQueue_liveAdditions_${slugStr}`);
-    document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'; document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setIsLoggingOut(true);
     try {
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'admin' })
-      });
-    } catch (err) {
-      console.error('Logout API failed:', err);
+      authService.logout('admin');
+      const slugStr = Array.isArray(slug) ? slug[0] : slug;
+      localStorage.removeItem(`kitchenQueue_liveAdditions_${slugStr}`);
+      document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      document.cookie = 'admin_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      try {
+        await fetch('/api/auth/logout', { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'admin' })
+        });
+      } catch (err) {
+        console.error('Logout API failed:', err);
+      }
+      setShowLogoutModal(false);
+      router.push(`/${slug}/admin/login`);
+    } finally {
+      setIsLoggingOut(false);
     }
-    router.push(`/${slug}/admin/login`);
   };
 
 
@@ -259,12 +263,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       <link rel="manifest" href={`/api/manifest?slug=${slug}&type=admin`} />
       <div className="admin-layout">
         <style dangerouslySetInnerHTML={{ __html: `
-          ${restaurant?.primary_color ? `
           :root {
+            ${restaurant?.primary_color ? `
             --primary: ${restaurant.primary_color};
             --primary-dark: ${restaurant.primary_color};
+            ` : ''}
+            --secondary: ${restaurant?.secondary_color || '#FFFFFF'};
+            --bg: ${restaurant?.secondary_color || '#FFFFFF'};
           }
-          ` : ''}
           .sidebar {
             width: 200px;
             transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
@@ -546,41 +552,53 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                   </div>
 
                   {/* User Details */}
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{
+                  <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span
+                      title={currentUser.name || 'Team Member'}
+                      style={{
                         fontWeight: 700,
                         fontSize: '12.5px',
                         color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                      }}>
-                        {currentUser.name || 'Team Member'}
-                      </span>
-                      <span style={{
-                        padding: '1px 5px',
-                        borderRadius: '999px',
-                        fontSize: '9.5px',
-                        fontWeight: 700,
-                        background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
-                        color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                        textTransform: 'capitalize',
-                      }}>
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {currentUser.name ? currentUser.name.trim().split(/\s+/)[0] : 'Team Member'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+                      <span
+                        style={{
+                          padding: '1px 5px',
+                          borderRadius: '999px',
+                          fontSize: '9.5px',
+                          fontWeight: 700,
+                          background: isSuperAdminOrOwner ? '#EEF2FF' : '#ECFDF5',
+                          color: isSuperAdminOrOwner ? '#4F46E5' : '#059669',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          textTransform: 'capitalize',
+                          lineHeight: 1.3,
+                        }}
+                      >
                         {isSuperAdminOrOwner ? 'Owner' : (currentUser.role || 'Staff')}
                       </span>
-                    </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: 'var(--text-secondary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      marginTop: '1px',
-                    }}>
-                      {currentUser.email}
+                      {currentUser.email && (
+                        <span
+                          title={currentUser.email}
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--text-secondary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            minWidth: 0,
+                          }}
+                        >
+                          {currentUser.email}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -644,9 +662,17 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         {children}
-        {!isMaximized && isSuperAdminOrOwner && !pathname.includes('/admin/orders') && <AIAnalystWidget />}
+        {!isMaximized && isSuperAdminOrOwner && !pathname.includes('/admin/orders') && !pathname.includes('/admin/tables') && <AIAnalystWidget />}
       </main>
     </div>
+
+    <LogoutConfirmModal
+      isOpen={showLogoutModal}
+      onClose={() => setShowLogoutModal(false)}
+      onConfirm={handleConfirmLogout}
+      loading={isLoggingOut}
+      userName={currentUser?.name || currentUser?.email}
+    />
     </>
   );
 }
