@@ -355,50 +355,22 @@ export function POSCheckoutDrawer({
 
     const items: any[] = [];
     for (const item of cart.values()) {
-      const isFree = Boolean(
-        item.is_free_reward ||
-        (freeProdId && (
-          item.product_id === freeProdId ||
-          (Array.isArray(selectedReward?.selected_product_ids) && selectedReward.selected_product_ids.includes(item.product_id))
-        ))
-      );
-
-      if (isFree) {
-        items.push({
-          product_id: item.product_id,
-          product_name: item.name,
-          name: item.name,
-          quantity: 1,
-          price_at_purchase: 0,
-          price: 0,
-        });
-        if (item.quantity > 1) {
-          items.push({
-            product_id: item.product_id,
-            product_name: item.name,
-            name: item.name,
-            quantity: item.quantity - 1,
-            price_at_purchase: item.price,
-            price: item.price,
-          });
-        }
-      } else {
-        items.push({
-          product_id: item.product_id,
-          product_name: item.name,
-          name: item.name,
-          quantity: item.quantity,
-          price_at_purchase: item.price,
-          price: item.price,
-        });
-      }
+      items.push({
+        product_id: item.product_id,
+        product_name: item.name,
+        name: item.name,
+        quantity: item.quantity,
+        price_at_purchase: item.price,
+        price: item.price,
+      });
     }
 
-    if (freeProdId && !items.some((i: any) => i.product_id === freeProdId && i.price === 0)) {
+    if (freeProdId) {
+      const displayName = cart.get(freeProdId)?.name || (selectedReward as any)?.product_name || selectedReward?.name || 'Free Item';
       items.push({
         product_id: freeProdId,
-        product_name: selectedReward?.product_name || selectedReward?.name || 'Free Gift Item',
-        name: selectedReward?.product_name || selectedReward?.name || 'Free Gift Item',
+        product_name: displayName,
+        name: displayName,
         quantity: 1,
         price_at_purchase: 0,
         price: 0,
@@ -529,7 +501,7 @@ export function POSCheckoutDrawer({
 
   const totalItems = useMemo(() => {
     let count = Array.from(cart.values()).reduce((sum, item) => sum + item.quantity, 0);
-    if (freeRewardProductId && !cart.has(freeRewardProductId)) {
+    if (freeRewardProductId) {
       count += 1;
     }
     return count;
@@ -538,22 +510,10 @@ export function POSCheckoutDrawer({
   const subtotal = useMemo(() => {
     let sum = 0;
     for (const item of cart.values()) {
-      const isFree = Boolean(
-        item.is_free_reward ||
-        (freeRewardProductId && (
-          item.product_id === freeRewardProductId ||
-          (Array.isArray(selectedReward?.selected_product_ids) && selectedReward.selected_product_ids.includes(item.product_id))
-        ))
-      );
-      if (isFree) {
-        const paidQty = Math.max(0, item.quantity - 1);
-        sum += paidQty * (item.original_price ?? item.price);
-      } else {
-        sum += item.price * item.quantity;
-      }
+      sum += item.price * item.quantity;
     }
     return sum;
-  }, [cart, freeRewardProductId, selectedReward]);
+  }, [cart]);
 
   // Compute discount amount (for percentage / fixed discount rewards)
   const loyaltyDiscountAmount = useMemo(() => {
@@ -1125,16 +1085,7 @@ export function POSCheckoutDrawer({
                     overflowY: 'auto',
                   }}
                 >
-                  {Array.from(cart.values()).map((item) => {
-                    const freeProdId = selectedReward?.product_id || (Array.isArray(selectedReward?.selected_product_ids) ? selectedReward.selected_product_ids[0] : null);
-                    const isFreeRewardItem = Boolean(
-                      item.is_free_reward ||
-                      (selectedReward?.reward_type === 'FREE_ITEM' && freeProdId && (
-                        item.product_id === freeProdId ||
-                        (Array.isArray(selectedReward.selected_product_ids) && selectedReward.selected_product_ids.includes(item.product_id))
-                      ))
-                    );
-                    return (
+                  {Array.from(cart.values()).map((item) => (
                     <div
                       key={item.product_id}
                       style={{
@@ -1142,10 +1093,8 @@ export function POSCheckoutDrawer({
                         flexDirection: 'column',
                         gap: '6px',
                         padding: '10px 12px',
-                        background: isFreeRewardItem ? '#F0FDF4' : '#FFFFFF',
-                        border: isFreeRewardItem
-                          ? '1.5px solid #86EFAC'
-                          : item.notes
+                        background: '#FFFFFF',
+                        border: item.notes
                           ? '1.5px solid #FCD34D'
                           : '1px solid #E2E8F0',
                         borderRadius: '8px',
@@ -1193,37 +1142,10 @@ export function POSCheckoutDrawer({
                             >
                               {item.name}
                             </span>
-                            {isFreeRewardItem && (
-                              <span
-                                style={{
-                                  marginLeft: '5px',
-                                  marginTop: '1px',
-                                  flexShrink: 0,
-                                  background: '#DCFCE7',
-                                  color: '#15803D',
-                                  border: '1px solid #86EFAC',
-                                  padding: '1px 5px',
-                                  borderRadius: '4px',
-                                  fontSize: '9.5px',
-                                  fontWeight: 800,
-                                }}
-                              >
-                                FREE
-                              </span>
-                            )}
                           </div>
 
                           <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px', whiteSpace: 'nowrap' }}>
-                            {isFreeRewardItem ? (
-                              <span>
-                                <span style={{ textDecoration: 'line-through', color: '#94A3B8', marginRight: '4px' }}>
-                                  {formatPrice(item.original_price || item.price)}
-                                </span>
-                                <strong style={{ color: '#16A34A' }}>₹0.00 (Free Reward)</strong>
-                              </span>
-                            ) : (
-                              `${formatPrice(item.price)} each`
-                            )}
+                            {formatPrice(item.price)} each
                           </div>
                         </div>
 
@@ -1322,11 +1244,7 @@ export function POSCheckoutDrawer({
                               textAlign: 'right',
                             }}
                           >
-                            {formatPrice(
-                              isFreeRewardItem
-                                ? Math.max(0, item.quantity - 1) * (item.original_price ?? item.price)
-                                : item.price * item.quantity
-                            )}
+                            {formatPrice(item.price * item.quantity)}
                           </span>
 
                           {/* Red Delete Button */}
@@ -1413,7 +1331,76 @@ export function POSCheckoutDrawer({
                         )}
                       </div>
                     </div>
-                  ); })}
+                  ))}
+
+                  {/* Free Reward line item */}
+                  {selectedReward?.reward_type === 'FREE_ITEM' && freeRewardProductId && (() => {
+                    const displayName = cart.get(freeRewardProductId)?.name || (selectedReward as any)?.product_name || selectedReward?.name || 'Free Item';
+                    return (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          padding: '8px 10px',
+                          background: '#F0FDF4',
+                          border: '1.5px solid #86EFAC',
+                          borderRadius: '8px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            minWidth: 0,
+                            flex: '1 1 auto',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              color: '#0F172A',
+                              lineHeight: 1.25,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <span>{displayName} × 1</span>
+                            <span
+                              style={{
+                                background: '#DCFCE7',
+                                color: '#15803D',
+                                border: '1px solid #86EFAC',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                fontSize: '9.5px',
+                                fontWeight: 800,
+                              }}
+                            >
+                              FREE
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#16A34A', marginTop: '2px', fontWeight: 600 }}>
+                            ₹0.00 (Loyalty Reward)
+                          </div>
+                        </div>
+
+                        <span
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            color: '#16A34A',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          FREE
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -1857,13 +1844,6 @@ export function POSCheckoutDrawer({
                             <button
                               type="button"
                               onClick={() => {
-                                const targetProductId = selectedReward.product_id || (Array.isArray(selectedReward.selected_product_ids) && selectedReward.selected_product_ids[0]);
-                                if (selectedReward.reward_type === 'FREE_ITEM' && targetProductId) {
-                                  const freeItemInCart = cart.get(targetProductId);
-                                  if (freeItemInCart) {
-                                    onUpdateCart(targetProductId, -1);
-                                  }
-                                }
                                 setSelectedReward(null);
                               }}
                               style={{
@@ -1983,27 +1963,13 @@ export function POSCheckoutDrawer({
                                   onClick={() => {
                                     if (isSelected) {
                                       setSelectedReward(null);
-                                      const targetProductId = reward.product_id || (Array.isArray(reward.selected_product_ids) && reward.selected_product_ids[0]);
-                                      if (reward.reward_type === 'FREE_ITEM' && targetProductId) {
-                                        const freeItemInCart = cart.get(targetProductId);
-                                        if (freeItemInCart) {
-                                          onUpdateCart(targetProductId, -1);
-                                        }
-                                      }
                                     } else {
                                       setSelectedReward(reward);
-                                      const targetProductId = reward.product_id || (Array.isArray(reward.selected_product_ids) && reward.selected_product_ids[0]);
-                                      if (reward.reward_type === 'FREE_ITEM' && targetProductId) {
-                                        const freeItemInCart = cart.get(targetProductId);
-                                        if (!freeItemInCart) {
-                                          onUpdateCart(targetProductId, 1);
-                                          toast.success(`Added ${reward.name} to order as free reward!`);
-                                        } else {
-                                          toast.success(`${reward.name} applied as free reward!`);
-                                        }
-                                      } else {
-                                        toast.success(`${reward.name} applied!`);
-                                      }
+                                      toast.success(
+                                        reward.reward_type === 'FREE_ITEM'
+                                          ? `${reward.name} applied as free reward!`
+                                          : `${reward.name} applied!`
+                                      );
                                     }
                                   }}
                                   style={{

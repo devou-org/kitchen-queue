@@ -568,38 +568,15 @@ export default function AdminPosPage() {
       const freeRewardProductId = orderForm.free_reward_product_id;
       const items: any[] = [];
       for (const item of cart.values()) {
-        const isFree = Boolean(
-          item.is_free_reward ||
-          (freeRewardProductId && item.product_id === freeRewardProductId)
-        );
-
-        const itemNote = item.notes?.trim() || undefined;
-        if (isFree) {
-          items.push({
-            product_id: item.product_id,
-            quantity: 1,
-            price_at_purchase: 0,
-            notes: itemNote,
-          });
-          if (item.quantity > 1) {
-            items.push({
-              product_id: item.product_id,
-              quantity: item.quantity - 1,
-              price_at_purchase: item.price,
-              notes: itemNote,
-            });
-          }
-        } else {
-          items.push({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            price_at_purchase: item.price,
-            notes: itemNote,
-          });
-        }
+        items.push({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price_at_purchase: item.price,
+          notes: item.notes?.trim() || undefined,
+        });
       }
 
-      if (freeRewardProductId && !items.some(i => i.product_id === freeRewardProductId && i.price_at_purchase === 0)) {
+      if (freeRewardProductId) {
         items.push({
           product_id: freeRewardProductId,
           quantity: 1,
