@@ -1017,121 +1017,133 @@ export async function getOrders(restaurantId: string, filters: {
   const offset = (page - 1) * per_page;
   const localTimezone = 'Asia/Kolkata';
 
+  const normalizeOrderRows = (rows: any[]) => {
+    return rows.map((r: any) => {
+      if (r.payment_split && typeof r.payment_split === 'object') {
+        const sum = (Number(r.payment_split.CASH) || 0) + (Number(r.payment_split.UPI) || 0) + (Number(r.payment_split.CARD) || 0);
+        if (sum > 0) {
+          return { ...r, total_price: sum };
+        }
+      }
+      return r;
+    });
+  };
+
   if (filters.date_from && filters.date_to) {
     if (filters.status) {
       if (sort === 'DESC') {
-        return await sql`
+        return normalizeOrderRows(await sql`
           SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status} 
+          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND (o.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND o.status = 'PAID')) 
             AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
           ORDER BY o.business_date DESC,
                    o.created_at DESC,
                    o.ticket_number DESC
           LIMIT ${per_page} OFFSET ${offset}
-        `;
+        `);
       }
-      return await sql`
+      return normalizeOrderRows(await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status} 
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND (o.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND o.status = 'PAID')) 
           AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
         ORDER BY o.business_date ASC,
                  o.created_at ASC,
                  o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
-      `;
+      `);
     } else if (filters.status_in) {
       const statuses = filters.status_in.split(',');
       if (sort === 'DESC') {
-        return await sql`
+        return normalizeOrderRows(await sql`
           SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
+          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
             AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
           ORDER BY o.business_date DESC,
                    o.created_at DESC,
                    o.ticket_number DESC
           LIMIT ${per_page} OFFSET ${offset}
-        `;
+        `);
       }
-      return await sql`
+      return normalizeOrderRows(await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
           AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
         ORDER BY o.business_date ASC,
                  o.created_at ASC,
                  o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
-      `;
+      `);
     } else {
       if (sort === 'DESC') {
-        return await sql`
+        return normalizeOrderRows(await sql`
           SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
+          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
           ORDER BY o.business_date DESC,
                    o.created_at DESC,
                    o.ticket_number DESC
           LIMIT ${per_page} OFFSET ${offset}
-        `;
+        `);
       }
-      return await sql`
+      return normalizeOrderRows(await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
         ORDER BY o.business_date ASC,
                  o.created_at ASC,
                  o.ticket_number ASC
         LIMIT ${per_page} OFFSET ${offset}
-      `;
+      `);
     }
   }
 
   if (filters.status) {
     if (sort === 'DESC') {
-      return await sql`
+      return normalizeOrderRows(await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status}
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND (o.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND o.status = 'PAID'))
         ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
-      `;
+      `);
     }
-    return await sql`
+    return normalizeOrderRows(await sql`
       SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-      FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ${filters.status}
+      FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND (o.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND o.status = 'PAID'))
       ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
-    `;
+    `);
   }
 
   if (filters.status_in) {
     const statuses = filters.status_in.split(',');
     if (sort === 'DESC') {
-      return await sql`
+      return normalizeOrderRows(await sql`
           SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
+          FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
           ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
-        `;
+        `);
     }
-    return await sql`
+    return normalizeOrderRows(await sql`
         SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
+        FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
         ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
-      `;
+      `);
   }
 
   if (sort === 'DESC') {
-    return await sql`
+    return normalizeOrderRows(await sql`
       SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-      FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
+      FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
       ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
-    `;
+    `);
   }
-  return await sql`
+  return normalizeOrderRows(await sql`
     SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
-    FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
+    FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
     ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
-  `;
+  `);
 }
 
 export async function getOrderStats(restaurantId: string, filters: {
@@ -1152,14 +1164,54 @@ export async function getOrderStats(restaurantId: string, filters: {
         SELECT 
           COUNT(*)::int as total_orders,
           COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
-        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND status = ${filters.status}
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
+          COALESCE(SUM(
+            (CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END) * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar OR orders.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (orders.payment_split IS NOT NULL AND jsonb_typeof(orders.payment_split) = 'object' AND (orders.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND status = ${filters.status}
           AND orders.business_date >= ${filters.date_from}::date
           AND orders.business_date <= ${filters.date_to}::date
       `;
@@ -1169,14 +1221,54 @@ export async function getOrderStats(restaurantId: string, filters: {
         SELECT 
           COUNT(*)::int as total_orders,
           COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
-        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND status = ANY(${statuses})
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
+          COALESCE(SUM(
+            (CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END) * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar OR orders.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (orders.payment_split IS NOT NULL AND jsonb_typeof(orders.payment_split) = 'object' AND (orders.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND status = ANY(${statuses})
           AND orders.business_date >= ${filters.date_from}::date
           AND orders.business_date <= ${filters.date_to}::date
       `;
@@ -1185,14 +1277,54 @@ export async function getOrderStats(restaurantId: string, filters: {
         SELECT 
           COUNT(*)::int as total_orders,
           COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
-        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND orders.business_date >= ${filters.date_from}::date
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
+          COALESCE(SUM(
+            (CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END) * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar OR orders.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (orders.payment_split IS NOT NULL AND jsonb_typeof(orders.payment_split) = 'object' AND (orders.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND orders.business_date >= ${filters.date_from}::date
           AND orders.business_date <= ${filters.date_to}::date
       `;
     }
@@ -1203,14 +1335,54 @@ export async function getOrderStats(restaurantId: string, filters: {
       SELECT 
           COUNT(*)::int as total_orders,
           COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
-        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND status = ${filters.status}
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
+          COALESCE(SUM(
+            (CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END) * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar OR orders.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (orders.payment_split IS NOT NULL AND jsonb_typeof(orders.payment_split) = 'object' AND (orders.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND (orders.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND orders.status = 'PAID'))
     `;
   }
 
@@ -1220,14 +1392,54 @@ export async function getOrderStats(restaurantId: string, filters: {
       SELECT 
           COUNT(*)::int as total_orders,
           COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
-        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND status = ANY(${statuses})
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
+          COALESCE(SUM(
+            (CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END) * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar OR orders.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (orders.payment_split IS NOT NULL AND jsonb_typeof(orders.payment_split) = 'object' AND (orders.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar) AND status = ANY(${statuses})
     `;
   }
 
@@ -1235,14 +1447,54 @@ export async function getOrderStats(restaurantId: string, filters: {
     SELECT 
           COUNT(*)::int as total_orders,
           COUNT(*) FILTER (WHERE is_paid = true AND status != 'CANCELLED')::int as paid_orders,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
-          COALESCE(SUM(total_price) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED'), 0) as total_revenue,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE is_paid = true AND status != 'CANCELLED'), 0) as total_paid_revenue,
           COALESCE(SUM(subtotal) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_subtotal,
           COALESCE(SUM(gst_amount) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'REGULAR'), 0) as total_regular_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
-          COALESCE(SUM(total_price * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
-          COALESCE(SUM(total_price) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
-        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar)
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_revenue,
+          COALESCE(SUM(
+            (CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END) * COALESCE(NULLIF(orders.gst_rate, 0), NULLIF(r.gst_rate, 0), 5) / 100
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'COMPOSITION'), 0) as total_composition_gst,
+          COALESCE(SUM(
+            CASE 
+              WHEN orders.payment_split IS NOT NULL 
+                AND jsonb_typeof(orders.payment_split) = 'object' 
+                AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+              THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+              ELSE orders.total_price
+            END
+          ) FILTER (WHERE status != 'CANCELLED' AND COALESCE(NULLIF(orders.gst_type, 'NONE'), r.gst_type, 'NONE') = 'NONE'), 0) as total_none_revenue
+        FROM orders JOIN restaurants r ON r.id = orders.restaurant_id WHERE orders.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR orders.payment_method = ${filters.payment_method || null}::varchar OR orders.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (orders.payment_split IS NOT NULL AND jsonb_typeof(orders.payment_split) = 'object' AND (orders.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR orders.order_type = ${filters.order_type || null}::varchar)
   `;
 }
 
@@ -1649,6 +1901,21 @@ export async function createOrder(data: {
     const paymentMethod = isPaid ? (data.payment_method || 'CASH') : (data.payment_method || null);
     const paymentSplit = data.payment_split ? JSON.stringify(data.payment_split) : null;
 
+    let finalTotalPrice = data.total_price;
+    let effectiveSubtotal = finalSubtotal;
+    if (data.payment_split && typeof data.payment_split === 'object') {
+      const sum = Object.values(data.payment_split).reduce((acc: number, val: any) => {
+        const num = parseFloat(val as string);
+        return !isNaN(num) ? acc + num : acc;
+      }, 0);
+      if (sum > 0) {
+        finalTotalPrice = Math.round(sum * 100) / 100;
+        if (!data.gst_type || data.gst_type === 'NONE') {
+          effectiveSubtotal = finalTotalPrice;
+        }
+      }
+    }
+
     const orderResult = await client.query(
       `
         INSERT INTO orders (
@@ -1659,12 +1926,36 @@ export async function createOrder(data: {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, CURRENT_DATE), $17, $18, $19, $20, $21, $22, $23, $24, $25, $26::jsonb, $27, $28)
         RETURNING id
       `,
-      [
-        data.restaurant_id, queueId, userId, data.customer_name || 'Walk-in', data.phone || null, data.total_price, defaultStatus,
-        isPaid, data.notes || null, data.party_size || 1, nextToken, data.table_number || null, tableId, tableSessionId, validStaffId,
-        data.business_date || null, finalSubtotal, data.gst_amount || 0, data.gst_rate || 0, data.gst_type || 'NONE',
-        pendingAt, preparingAt, data.order_type || 'DINE_IN', paidAt, paymentMethod, paymentSplit, discountVal, data.loyalty_reward_id || null
-      ]
+     [
+  data.restaurant_id,
+  queueId,
+  userId,
+  data.customer_name || 'Walk-in',
+  data.phone || null,
+  finalTotalPrice,
+  defaultStatus,
+  isPaid,
+  data.notes || null,
+  data.party_size || 1,
+  nextToken,
+  data.table_number || null,
+  tableId,
+  tableSessionId,
+  validStaffId,
+  data.business_date || null,
+  effectiveSubtotal,
+  data.gst_amount || 0,
+  data.gst_rate || 0,
+  data.gst_type || 'NONE',
+  pendingAt,
+  preparingAt,
+  data.order_type || 'DINE_IN',
+  paidAt,
+  paymentMethod,
+  paymentSplit,
+  discountVal,
+  data.loyalty_reward_id || null
+]
     );
 
     const orderId = orderResult.rows[0]?.id;
@@ -1701,7 +1992,7 @@ export async function createOrder(data: {
     if (isPaid) {
       try {
         const { BillingService } = await import('@/modules/billing/billing.service');
-        await BillingService.processOrderBilling(client, data.restaurant_id, orderId, Number(data.total_price));
+        await BillingService.processOrderBilling(client, data.restaurant_id, orderId, Number(finalTotalPrice));
       } catch (billErr) {
         console.error('Non-blocking billing processing error on createOrder:', billErr);
       }
@@ -1936,7 +2227,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
 
     // Fetch existing order to verify values
     const orderRes = await client.query(`
-      SELECT is_paid, status, total_price, ticket_number, table_number, table_id, table_session_id, party_size, order_type FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
+      SELECT is_paid, status, total_price, subtotal, gst_type, gst_rate, gst_amount, ticket_number, table_number, table_id, table_session_id, party_size, order_type FROM orders WHERE restaurant_id = $1 AND id = $2 FOR UPDATE
     `, [restaurantId, id]);
 
     if (orderRes.rows.length === 0) {
@@ -1979,6 +2270,17 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
 
     const splitJson = paymentSplit ? (typeof paymentSplit === 'string' ? paymentSplit : JSON.stringify(paymentSplit)) : null;
 
+    let splitTotal: number | null = null;
+    if (paymentSplit && typeof paymentSplit === 'object') {
+      const sum = Object.values(paymentSplit).reduce((acc: number, val: any) => {
+        const num = parseFloat(val as string);
+        return !isNaN(num) ? acc + num : acc;
+      }, 0);
+      if (sum > 0) {
+        splitTotal = Math.round(sum * 100) / 100;
+      }
+    }
+
     // Update order
     const updateRes = await client.query(`
       UPDATE orders
@@ -1989,13 +2291,15 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
           table_session_id = $5,
           payment_method = COALESCE($6, payment_method),
           payment_split = CASE WHEN $9::jsonb IS NOT NULL THEN $9::jsonb ELSE payment_split END,
+          total_price = CASE WHEN $10::numeric IS NOT NULL THEN $10::numeric ELSE total_price END,
+          subtotal = CASE WHEN $10::numeric IS NOT NULL AND (gst_type IS NULL OR gst_type = 'NONE') THEN $10::numeric ELSE subtotal END,
           paid_at = CASE WHEN $2 = true AND paid_at IS NULL THEN NOW() WHEN $2 = false THEN NULL ELSE paid_at END,
           closed_at = CASE WHEN $1::varchar = 'CLOSED' AND closed_at IS NULL THEN NOW() ELSE closed_at END,
           served_at = CASE WHEN ($1::varchar = 'SERVED' OR $1::varchar = 'CLOSED') AND served_at IS NULL THEN NOW() ELSE served_at END,
           updated_at = NOW()
       WHERE restaurant_id = $7 AND id = $8
-      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, is_paid, notes, party_size, ticket_number, created_at, payment_method, payment_split, paid_at, served_at, closed_at
-    `, [nextStatus, nextIsPaid, nextTableNumber, nextTableId, nextTableSessionId, paymentMethod || null, restaurantId, id, splitJson]);
+      RETURNING id, status, table_number, updated_at, customer_name, phone, total_price, subtotal, is_paid, notes, party_size, ticket_number, created_at, payment_method, payment_split, paid_at, served_at, closed_at
+    `, [nextStatus, nextIsPaid, nextTableNumber, nextTableId, nextTableSessionId, paymentMethod || null, restaurantId, id, splitJson, splitTotal]);
 
     const updatedOrder = updateRes.rows[0];
 
@@ -2008,10 +2312,12 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       await client.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]);
     }
 
+    const effectiveTotal = (nextIsPaid && splitTotal && splitTotal > 0) ? splitTotal : Number(existing.total_price);
+
     // Process billing if order is now paid/completed (and wasn't paid before)
     if (nextIsPaid && !existing.is_paid) {
       const { BillingService } = await import('@/modules/billing/billing.service');
-      await BillingService.processOrderBilling(client, restaurantId, id, Number(existing.total_price));
+      await BillingService.processOrderBilling(client, restaurantId, id, effectiveTotal);
     }
 
     await client.query('COMMIT');
@@ -2034,6 +2340,9 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
       }
     }
 
+    // Trigger Loyalty Points processing
+    if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
+      processLoyaltyForCompletedOrder(restaurantId, id, updatedOrder?.phone, Number(updatedOrder?.total_price || effectiveTotal)).catch(err => console.error('Loyalty process error:', err));
     // Trigger Loyalty Points processing: Cancellations take precedence
     if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
       processLoyaltyForCancelledOrder(restaurantId, id).catch(err => console.error('Loyalty cancel error:', err));
@@ -2646,7 +2955,15 @@ export async function getDailyAnalytics(restaurantId: string, dateFrom: string, 
     SELECT 
       business_date as date,
       COUNT(*) as total_orders,
-      SUM(total_price) as revenue,
+      COALESCE(SUM(
+        CASE 
+          WHEN orders.payment_split IS NOT NULL 
+            AND jsonb_typeof(orders.payment_split) = 'object' 
+            AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+          THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+          ELSE orders.total_price
+        END
+      ), 0) as revenue,
       AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as avg_wait_time,
       MODE() WITHIN GROUP (ORDER BY EXTRACT(HOUR FROM created_at)) as peak_hour
     FROM orders WHERE restaurant_id = ${restaurantId}
@@ -2663,7 +2980,15 @@ export async function getPeakHours(restaurantId: string, dateFrom: string, dateT
     SELECT 
       EXTRACT(HOUR FROM created_at) as hour,
       COUNT(*) as order_count,
-      SUM(total_price) as revenue
+      COALESCE(SUM(
+        CASE 
+          WHEN orders.payment_split IS NOT NULL 
+            AND jsonb_typeof(orders.payment_split) = 'object' 
+            AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+          THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+          ELSE orders.total_price
+        END
+      ), 0) as revenue
     FROM orders WHERE restaurant_id = ${restaurantId}
       AND business_date BETWEEN ${dateFrom} AND ${dateTo}
       AND is_paid = true AND status != 'CANCELLED'
@@ -2805,9 +3130,25 @@ export async function getPaymentMethodAnalytics(restaurantId: string, dateFrom: 
 export async function getDashboardStats(restaurantId: string) {
   const statsRows = await sql`
     SELECT 
-      COALESCE(SUM(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED'), 0) as revenue_today,
+      COALESCE(SUM(
+        CASE 
+          WHEN orders.payment_split IS NOT NULL 
+            AND jsonb_typeof(orders.payment_split) = 'object' 
+            AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+          THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+          ELSE orders.total_price
+        END
+      ) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED'), 0) as revenue_today,
       COUNT(*) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED') as orders_today,
-      COALESCE(AVG(total_price) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED'), 0) as avg_order_value,
+      COALESCE(AVG(
+        CASE 
+          WHEN orders.payment_split IS NOT NULL 
+            AND jsonb_typeof(orders.payment_split) = 'object' 
+            AND (SELECT COALESCE(SUM(value::numeric), 0) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$') > 0
+          THEN (SELECT SUM(value::numeric) FROM jsonb_each_text(orders.payment_split) WHERE value ~ '^[0-9]+(\\.[0-9]+)?$')
+          ELSE orders.total_price
+        END
+      ) FILTER (WHERE business_date = (SELECT DATE((CURRENT_TIMESTAMP AT TIME ZONE timezone) - rollover_time::interval) FROM restaurants WHERE id = ${restaurantId}) AND is_paid = true AND status != 'CANCELLED'), 0) as avg_order_value,
       COUNT(*) FILTER (WHERE status = 'PENDING') as pending_orders
     FROM orders WHERE restaurant_id = ${restaurantId}
   `;

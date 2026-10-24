@@ -15,6 +15,7 @@ import BillTemplate from '@/components/BillTemplate';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { getKitchenWorkflow } from '@/lib/kitchen-workflow';
 
 export default function AdminAnalyticsStatementsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -125,7 +126,8 @@ export default function AdminAnalyticsStatementsPage() {
   const gstPayable = totalCompositionGst || 0;
   const netRevenue = actualRevenue - gstPayable;
 
-  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
+  const workflow = getKitchenWorkflow(restaurant?.kitchen_mode);
+  const allStatuses = Array.from(new Set([...workflow.orderLifecycle, 'CANCELLED', 'EXPIRED']));
 
   const [expiring, setExpiring] = useState(false);
   const handleExpireOldOrders = async () => {
@@ -857,7 +859,9 @@ export default function AdminAnalyticsStatementsPage() {
                           className={`badge ${
                             order.status === 'CLOSED' || order.status === 'PAID'
                               ? 'badge-available'
-                              : order.status === 'CANCELLED'
+                              : order.status === 'SERVED' || order.status === 'READY'
+                              ? 'badge-ready'
+                              : order.status === 'CANCELLED' || order.status === 'EXPIRED'
                               ? 'badge-out-of-stock'
                               : 'badge-low-stock'
                           }`}

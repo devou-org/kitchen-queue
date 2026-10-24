@@ -26,6 +26,7 @@ import {
   Printer,
   Split,
   BadgeCheck,
+  AlertCircle,
   Info,
 } from 'lucide-react';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
@@ -625,27 +626,89 @@ export function POSCheckoutDrawer({
     }
   }, [orderForm.payment_method, orderForm.payment_split]);
 
-  // Helper to resolve any table number or composite name (e.g. T4+T3+t-09) to its lead table
-  const resolveTable = useCallback((tableNumOrValue?: string) => {
-    if (!tableNumOrValue || tables.length === 0) return null;
-    const s = String(tableNumOrValue).trim().toLowerCase();
-    const parts = s.split('+').map(p => p.trim());
-    const lead = parts[0];
+  const isSplitPayment = Boolean(
+    orderForm.is_paid &&
+    (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))
+  );
 
-    const found = tables.find((t: any) => {
-      const tNum = String(t.table_number).trim().toLowerCase();
-      if (tNum === s || tNum === lead) return true;
-      if (parts.includes(tNum)) return true;
-      if (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => parts.includes(String(m).trim().toLowerCase()))) return true;
-      return false;
-    });
+  const splitAllocated = Math.round(
+    ((posSplit.CASH || 0) + (posSplit.UPI || 0) + (posSplit.CARD || 0)) * 100
+  ) / 100;
+  const splitTarget = Math.round(totalPrice * 100) / 100;
+  const isSplitOvercharged = isSplitPayment && splitAllocated > splitTarget + 0.009;
+  const isSplitUndercharged = isSplitPayment && splitAllocated < splitTarget - 0.009;
+  const splitActiveMethodsCount = [posSplit.CASH, posSplit.UPI, posSplit.CARD].filter((v) => Number(v) > 0).length;
+  const hasExactlyTwoSplitMethods = splitActiveMethodsCount === 2;
 
-    if (!found) return null;
-    if (found.merged_into_table_id) {
-      return tables.find((t: any) => t.id === found.merged_into_table_id) || found;
+  let splitValidationError: string | null = null;
+  if (isSplitPayment) {
+    if (isSplitOvercharged) {
+      splitValidationError = `Overcharged by ${formatPrice(splitAllocated - splitTarget)}. Total cannot exceed ${formatPrice(splitTarget)}.`;
+    } else if (splitActiveMethodsCount < 2) {
+      splitValidationError = 'Split payment requires exactly two valid payment methods with amounts greater than ₹0.';
+    } else if (splitActiveMethodsCount > 2) {
+      splitValidationError = 'Split payment requires exactly two payment methods (currently 3 allocated).';
+    } else if (isSplitUndercharged) {
+      splitValidationError = `Split incomplete: ${formatPrice(splitTarget - splitAllocated)} remaining to be allocated.`;
     }
-    return found;
-  }, [tables]);
+  }
+
+  const isSplitValid = !isSplitPayment || (!isSplitOvercharged && hasExactlyTwoSplitMethods && !isSplitUndercharged);
+
+  // Auto-adjust complementary split method if totalPrice changes while drawer is open
+  const prevTotalRef = useRef(totalPrice);
+  useEffect(() => {
+    if (isSplitPayment && prevTotalRef.current !== totalPrice && totalPrice > 0) {
+      setPosSplit((prev) => {
+        const hasCard = (prev.CARD || 0) > 0;
+        const hasCash = (prev.CASH || 0) > 0;
+        const hasUpi = (prev.UPI || 0) > 0;
+
+        let m1: keyof SplitAmounts = 'CASH';
+        let m2: keyof SplitAmounts = 'UPI';
+        let inactive: keyof SplitAmounts = 'CARD';
+
+        if (hasCard && hasCash && !hasUpi) {
+          m1 = 'CASH';
+          m2 = 'CARD';
+          inactive = 'UPI';
+        } else if (hasCard && hasUpi && !hasCash) {
+          m1 = 'UPI';
+          m2 = 'CARD';
+          inactive = 'CASH';
+        }
+
+        const m1Val = prev[m1] || 0;
+        let newM1 = m1Val;
+        let newM2 = 0;
+
+        if (m1Val > 0 && m1Val < totalPrice) {
+          newM2 = Math.round((totalPrice - m1Val) * 100) / 100;
+        } else {
+          newM1 = Math.round((totalPrice / 2) * 100) / 100;
+          newM2 = Math.round((totalPrice - newM1) * 100) / 100;
+        }
+
+        const updated: SplitAmounts = {
+          CASH: 0,
+          UPI: 0,
+          CARD: 0,
+          [m1]: newM1,
+          [m2]: newM2,
+          [inactive]: 0,
+        };
+
+        setOrderForm((f) => ({
+          ...f,
+          payment_method: formatSplitSummary(updated),
+          payment_split: updated,
+        }));
+
+        return updated;
+      });
+    }
+    prevTotalRef.current = totalPrice;
+  }, [totalPrice, isSplitPayment, setOrderForm]);
 
   // Helper to calculate max free seats for a table
   const getTableFreeSeats = (table: any, partyContext?: { phone?: string; customerName?: string }): number => {
@@ -952,7 +1015,14 @@ export function POSCheckoutDrawer({
 
         {/* 2. Scrollable Body Form */}
         <form
-          onSubmit={onSubmitOrder}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (isSplitPayment && !isSplitValid) {
+              toast.error(splitValidationError || 'Please fix the split payment allocation before placing order.');
+              return;
+            }
+            onSubmitOrder(e);
+          }}
           style={{
             flex: 1,
             display: 'flex',
@@ -1292,19 +1362,7 @@ export function POSCheckoutDrawer({
 
             {!isTableDirected && (
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    color: '#64748B',
-                    marginBottom: '6px',
-                  }}
-                >
-                  Order Type
-                </label>
+             
                 <OrderTypeSelector
                   value={(orderForm.order_type as OrderType) || 'DINE_IN'}
                   onChange={(val) => {
@@ -2335,26 +2393,48 @@ export function POSCheckoutDrawer({
               flexShrink: 0,
             }}
           >
+            {/* Split validation warning banner */}
+            {isSplitPayment && splitValidationError && (
+              <div
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  background: isSplitOvercharged ? '#FEF2F2' : '#FFFBEB',
+                  border: isSplitOvercharged ? '1px solid #FCA5A5' : '1px solid #FDE68A',
+                  color: isSplitOvercharged ? '#DC2626' : '#B45309',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  lineHeight: 1.4,
+                }}
+              >
+                <AlertCircle size={15} style={{ flexShrink: 0, color: isSplitOvercharged ? '#DC2626' : '#B45309' }} />
+                <span>{splitValidationError}</span>
+              </div>
+            )}
+
             {/* Primary Action Button: Place Order */}
             <button
               type="submit"
-              disabled={submitting || cart.size === 0}
+              disabled={submitting || cart.size === 0 || !isSplitValid}
               style={{
                 width: '100%',
                 height: '46px',
                 borderRadius: '8px',
                 border: 'none',
-                background: 'var(--primary, #059669)',
+                background: !isSplitValid && isSplitPayment ? (isSplitOvercharged ? '#EF4444' : '#94A3B8') : 'var(--primary, #059669)',
                 color: '#FFFFFF',
                 fontSize: '15px',
                 fontWeight: 700,
-                cursor: submitting || cart.size === 0 ? 'not-allowed' : 'pointer',
-                opacity: submitting || cart.size === 0 ? 0.6 : 1,
+                cursor: submitting || cart.size === 0 || !isSplitValid ? 'not-allowed' : 'pointer',
+                opacity: submitting || cart.size === 0 || !isSplitValid ? 0.7 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
+                boxShadow: !isSplitValid ? 'none' : '0 2px 6px rgba(5, 150, 105, 0.25)',
                 transition: 'all 0.15s ease',
               }}
             >
@@ -2362,6 +2442,21 @@ export function POSCheckoutDrawer({
                 <>
                   <Loader2 size={16} className="animate-spin" />
                   <span>Placing Order...</span>
+                </>
+              ) : isSplitPayment && isSplitOvercharged ? (
+                <>
+                  <AlertCircle size={17} />
+                  <span>Cannot Place Order · Overcharged</span>
+                </>
+              ) : isSplitPayment && !hasExactlyTwoSplitMethods ? (
+                <>
+                  <AlertCircle size={17} />
+                  <span>Cannot Place Order · 2 Methods Required</span>
+                </>
+              ) : isSplitPayment && isSplitUndercharged ? (
+                <>
+                  <AlertCircle size={17} />
+                  <span>Cannot Place Order · Incomplete Split</span>
                 </>
               ) : (
                 <>
