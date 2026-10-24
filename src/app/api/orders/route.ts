@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { getOrders, getOrderStats, createOrder, createUser, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken, requireAdmin } from '@/lib/auth';
+import { validatePhone } from '@/lib/validators';
 import { pusherServer } from '@/lib/pusher';
 import { autoQueueAndBroadcastKot } from '@/lib/kot-auto-print';
 
@@ -73,6 +74,13 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
+    const admin = await requireAdmin(request);
+    if (admin && !admin.isSuperAdmin && admin.restaurantId && admin.restaurantId !== restaurant.id) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Wrong restaurant' }, { status: 403 });
+    }
+
+    const hasAdminRights = !!admin && (admin.isStaff || admin.isAdmin);
+
     // 1. Check Service Status FIRST
     const { default: sql } = await import('@/lib/db');
     const settings = await sql`SELECT is_service_active, service_message FROM restaurants WHERE id = ${restaurant.id} LIMIT 1` as {is_service_active: boolean, service_message: string}[];
@@ -86,11 +94,18 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { customer_name, phone, items, notes, party_size, table_number, order_type, is_paid, payment_method, payment_split } = body;
+    const isPos = hasAdminRights || body.is_pos === true;
 
-    if (!customer_name || !phone || !items || !items.length) {
+    const cleanedPhone = typeof phone === 'string' ? phone.trim() : '';
+    const hasPhone = cleanedPhone !== '';
+    const customerName = (typeof customer_name === 'string' ? customer_name.trim() : '') || (isPos ? 'Walk-in' : '');
+
+    // Validation:
+    // Items are required for everyone (must be a non-empty array).
+    if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'Customer name, phone, and items are required'
+        error: 'At least one valid item is required'
       }, { status: 400 });
     }
 
@@ -271,8 +286,8 @@ export async function POST(request: NextRequest) {
 
     const order = await createOrder({
       restaurant_id: restaurant.id,
-      customer_name: customer_name.trim(),
-      phone,
+      customer_name: customerName,
+      phone: hasPhone ? cleanedPhone : null,
       total_price,
       subtotal,
       discount_amount,
@@ -294,11 +309,13 @@ export async function POST(request: NextRequest) {
       items,
     });
 
-    // Persist the customer name back to the users table so checkout can auto-fill it next time
-    try {
-      await createUser(phone, customer_name.trim());
-    } catch {
-      // Non-critical — don't fail the order if this upsert fails
+    // Persist the customer name back to the users table only for customer orders with phone
+    if (hasPhone && !isPos) {
+      try {
+        await createUser(cleanedPhone, customerName);
+      } catch {
+        // Non-critical — don't fail the order if this upsert fails
+      }
     }
 
     try {
