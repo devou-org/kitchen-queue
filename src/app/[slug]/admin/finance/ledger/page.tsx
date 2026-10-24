@@ -122,6 +122,74 @@ export default function FinanceLedgerPage() {
           gap: 8px;
           align-self: center;
         }
+
+        @media (max-width: 768px) {
+          .finance-page-header,
+          .finance-page-header.admin-page-header-container,
+          .finance-page-header .admin-page-header-container {
+            height: auto !important;
+            min-height: auto !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .finance-page-header .admin-header-left,
+          .finance-page-header .admin-header-search {
+            height: auto !important;
+            min-height: auto !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            width: 100% !important;
+            padding: 0 !important;
+          }
+          .finance-toolbar {
+            flex-direction: column !important;
+            height: auto !important;
+            width: 100% !important;
+            gap: 8px !important;
+            padding-bottom: 10px !important;
+          }
+          .finance-tabs-wrapper {
+            height: 48px !important;
+            min-height: 48px !important;
+            padding: 0 !important;
+            width: 100% !important;
+            border-bottom: 1px solid var(--border, #E2E8F0) !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          .finance-actions {
+            height: auto !important;
+            width: 100% !important;
+            padding: 0 14px !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            gap: 8px !important;
+          }
+          .ledger-filters-bar {
+            padding: 12px !important;
+            gap: 10px !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .ledger-filter-item {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+          }
+          .ledger-date-row {
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+          }
+          .ledger-date-row input[type="date"] {
+            flex: 1 !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+        }
       `}</style>
 
       {/* Header Bar matching Analytics / Image 2 */}
@@ -187,12 +255,19 @@ export default function FinanceLedgerPage() {
             Financial Transactions Ledger
           </h2>
           <p style={{ fontSize: '12.5px', color: '#64748B', margin: '2px 0 0 0' }}>
-            {startDate} to {endDate}
+            {startDate && endDate
+              ? `${startDate} to ${endDate}`
+              : startDate
+              ? `From ${startDate}`
+              : endDate
+              ? `Up to ${endDate}`
+              : 'All recorded movements'}
           </p>
         </div>
 
         {/* Filters Bar */}
         <div
+          className="ledger-filters-bar"
           style={{
             background: '#FFFFFF',
             border: '1px solid #F1F5F9',
@@ -207,7 +282,7 @@ export default function FinanceLedgerPage() {
           }}
         >
           {/* Search */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 200px' }}>
+          <div className="ledger-filter-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 200px' }}>
             <Search size={14} style={{ color: '#64748B' }} />
             <input
               type="text"
@@ -228,7 +303,7 @@ export default function FinanceLedgerPage() {
           </div>
 
           {/* Type Filter */}
-          <div style={{ width: '160px' }}>
+          <div className="ledger-filter-item" style={{ width: '160px' }}>
             <CustomSelect
               value={entryType}
               onChange={(val) => setEntryType(val)}
@@ -242,7 +317,7 @@ export default function FinanceLedgerPage() {
           </div>
 
           {/* Source Filter */}
-          <div style={{ width: '190px' }}>
+          <div className="ledger-filter-item" style={{ width: '190px' }}>
             <CustomSelect
               value={source}
               onChange={(val) => setSource(val)}
@@ -257,7 +332,7 @@ export default function FinanceLedgerPage() {
           </div>
 
           {/* Payment Method Filter */}
-          <div style={{ width: '160px' }}>
+          <div className="ledger-filter-item" style={{ width: '160px' }}>
             <CustomSelect
               value={paymentMethod}
               onChange={(val) => setPaymentMethod(val)}
@@ -273,7 +348,7 @@ export default function FinanceLedgerPage() {
           </div>
 
           {/* Dates */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="ledger-filter-item ledger-date-row" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Calendar size={14} style={{ color: '#64748B' }} />
             <input
               type="date"
