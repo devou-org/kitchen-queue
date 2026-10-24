@@ -434,14 +434,15 @@ export default function AdminOrders() {
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
-  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string) => {
+  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string, pSplit?: any) => {
     setModalLoading(true);
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
         is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
-        payment_method: pMethod || undefined
+        payment_method: pMethod || undefined,
+        payment_split: pSplit || undefined,
       });
       if (data.success) {
         // Success feedback handled by Pusher event to avoid duplicates
@@ -453,6 +454,7 @@ export default function AdminOrders() {
             status: newStatus as Order['status'],
             table_number: tableNumber ?? o.table_number,
             payment_method: pMethod ?? o.payment_method,
+            payment_split: pSplit !== undefined ? pSplit : o.payment_split,
             is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
           } : o)
             .filter(o => {
@@ -465,6 +467,7 @@ export default function AdminOrders() {
           status: newStatus as Order['status'],
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
+          payment_split: pSplit !== undefined ? pSplit : prev.payment_split,
           is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });

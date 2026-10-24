@@ -1,5 +1,5 @@
 import React from 'react';
-import { Utensils, ShoppingBag /* , Truck */ } from 'lucide-react';
+import { Utensils, ShoppingBag, UtensilsCrossed /* , Truck */ } from 'lucide-react';
 import { OrderType } from '@/types';
 
 interface OrderTypeSelectorProps {
@@ -42,7 +42,9 @@ export default function OrderTypeSelector({
     <div className="card" style={{ marginBottom: '16px', padding: '16px' }}>
       <label
         style={{
-          display: 'block',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
           fontSize: '12px',
           fontWeight: 800,
           color: 'var(--text-secondary)',
@@ -51,7 +53,22 @@ export default function OrderTypeSelector({
           marginBottom: '12px',
         }}
       >
-        Select Order Type *
+         <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: '#64748B',
+                          marginBottom: '6px',
+                        }}
+                      >
+                        <UtensilsCrossed size={13} />
+                        <span>Order Type</span>
+                      </label>
       </label>
 
       {/* Segmented Control Container */}

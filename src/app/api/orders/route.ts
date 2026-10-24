@@ -170,6 +170,21 @@ export async function POST(request: NextRequest) {
 
     total_price = Math.max(0, total_price - discount_amount);
 
+    let splitTotal: number | null = null;
+    if (payment_split && typeof payment_split === 'object') {
+      const sum = Object.values(payment_split).reduce((acc: number, val: any) => {
+        const num = parseFloat(val as string);
+        return !isNaN(num) ? acc + num : acc;
+      }, 0);
+      if (sum > 0) {
+        splitTotal = Math.round(sum * 100) / 100;
+        total_price = splitTotal;
+        if (gst_type !== 'REGULAR') {
+          subtotal = splitTotal;
+        }
+      }
+    }
+
     const isPaid = isPos && Boolean(is_paid);
     const paymentMethod = isPaid ? (payment_method ? String(payment_method) : 'CASH') : (isPos && payment_method ? String(payment_method) : undefined);
 

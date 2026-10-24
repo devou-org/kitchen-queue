@@ -55,7 +55,7 @@ export default function AdminTablesPage() {
     setSelectedOrder(specificOrder || activeOrds[0]);
   };
 
-  const handleOrderStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string) => {
+  const handleOrderStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string, pSplit?: any) => {
     setOrderModalLoading(true);
     try {
       const res = await orderService.updateOrder(id, {
@@ -63,6 +63,7 @@ export default function AdminTablesPage() {
         is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
         payment_method: pMethod || undefined,
+        payment_split: pSplit || undefined,
       });
       if (res.success) {
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
@@ -72,6 +73,7 @@ export default function AdminTablesPage() {
           status: newStatus,
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
+          payment_split: pSplit !== undefined ? pSplit : prev.payment_split,
           is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid,
         } : null);
       } else {

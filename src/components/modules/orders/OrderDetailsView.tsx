@@ -46,7 +46,7 @@ interface OrderDetailsViewProps {
   allStatuses?: string[];
   onClose?: () => void;
   onBack?: () => void;
-  onStatusChange: (orderId: string, newStatus: string, tableNumber?: string, paymentMethod?: string) => Promise<void> | void;
+  onStatusChange: (orderId: string, newStatus: string, tableNumber?: string, paymentMethod?: string, paymentSplit?: any) => Promise<void> | void;
   loading?: boolean;
   onOrderUpdated?: (updatedOrder: Order) => void;
   tableOrders?: any[];
@@ -172,7 +172,7 @@ export function OrderDetailsView({
         pSplit = splitAmounts;
       }
 
-      await onStatusChange(order.id, statusToApply, tempTableNumber, pMethod);
+      await onStatusChange(order.id, statusToApply, tempTableNumber, pMethod, pSplit);
       setTempStatus(statusToApply as any);
       setOrder((prev) => ({
         ...prev,

@@ -9,7 +9,7 @@ import { orderService } from '@/app/services/orders.api';
 import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { useParams } from 'next/navigation';
-import { Search, Banknote, CreditCard, QrCode, Check, Printer, Split } from 'lucide-react';
+import { Search, Banknote, CreditCard, QrCode, Check, Printer, Split, AlertCircle } from 'lucide-react';
 import OrderTypeSelector from '@/components/modules/orders/OrderTypeSelector';
 import { OrderType } from '@/types';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
@@ -355,12 +355,56 @@ export default function StaffMenuPage() {
     setCart(newCart);
   };
 
+  const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
+  let subtotal = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
+  
+  let gstAmount = 0;
+  let totalPrice = subtotal;
+  if (restaurant?.gst_type === 'REGULAR') {
+    const rate = Number(restaurant.gst_rate) || 0;
+    gstAmount = Math.round((subtotal * rate / 100) * 100) / 100;
+    totalPrice = subtotal + gstAmount;
+  }
+
+  const isSplitPayment = Boolean(
+    orderForm.is_paid &&
+    (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))
+  );
+
+  const splitAllocated = Math.round(
+    ((menuSplit.CASH || 0) + (menuSplit.UPI || 0) + (menuSplit.CARD || 0)) * 100
+  ) / 100;
+  const splitTarget = Math.round(totalPrice * 100) / 100;
+  const isSplitOvercharged = isSplitPayment && splitAllocated > splitTarget + 0.009;
+  const isSplitUndercharged = isSplitPayment && splitAllocated < splitTarget - 0.009;
+  const splitActiveMethodsCount = [menuSplit.CASH, menuSplit.UPI, menuSplit.CARD].filter((v) => Number(v) > 0).length;
+  const hasExactlyTwoSplitMethods = splitActiveMethodsCount === 2;
+
+  let splitValidationError: string | null = null;
+  if (isSplitPayment) {
+    if (isSplitOvercharged) {
+      splitValidationError = `Overcharged by ${formatPrice(splitAllocated - splitTarget)}. Total cannot exceed ${formatPrice(splitTarget)}.`;
+    } else if (splitActiveMethodsCount < 2) {
+      splitValidationError = 'Split payment requires exactly two valid payment methods with amounts greater than ₹0.';
+    } else if (splitActiveMethodsCount > 2) {
+      splitValidationError = 'Split payment requires exactly two payment methods (currently 3 allocated).';
+    } else if (isSplitUndercharged) {
+      splitValidationError = `Split incomplete: ${formatPrice(splitTarget - splitAllocated)} remaining to be allocated.`;
+    }
+  }
+
+  const isSplitValid = !isSplitPayment || (!isSplitOvercharged && hasExactlyTwoSplitMethods && !isSplitUndercharged);
+
   const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.size === 0) return toast.error('Cart is empty');
     const isTakeaway = orderForm.order_type === 'TAKEAWAY';
     if (!isTakeaway && !orderForm.customer_name && !orderForm.table_number) {
       return toast.error('Please provide a Customer Name or Table Number');
+    }
+
+    if (isSplitPayment && !isSplitValid) {
+      return toast.error(splitValidationError || 'Please allocate exactly two payment methods totaling the bill.');
     }
 
     // Pre-validate cart items against current product stock
@@ -423,17 +467,6 @@ export default function StaffMenuPage() {
       setSubmitting(false);
     }
   };
-
-  const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
-  let subtotal = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
-  
-  let gstAmount = 0;
-  let totalPrice = subtotal;
-  if (restaurant?.gst_type === 'REGULAR') {
-    const rate = Number(restaurant.gst_rate) || 0;
-    gstAmount = Math.round((subtotal * rate / 100) * 100) / 100;
-    totalPrice = subtotal + gstAmount;
-  }
 
   const filtered = products
     .filter(p => {
@@ -794,13 +827,52 @@ export default function StaffMenuPage() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                {/* Split validation warning banner */}
+                {isSplitPayment && splitValidationError && (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: isSplitOvercharged ? '#FEF2F2' : '#FFFBEB',
+                      border: isSplitOvercharged ? '1px solid #FCA5A5' : '1px solid #FDE68A',
+                      color: isSplitOvercharged ? '#DC2626' : '#B45309',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <AlertCircle size={15} style={{ flexShrink: 0, color: isSplitOvercharged ? '#DC2626' : '#B45309' }} />
+                    <span>{splitValidationError}</span>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   className="btn btn-primary btn-lg"
-                  style={{ height: '46px', fontSize: '15px', fontWeight: 700 }}
-                  disabled={submitting}
+                  style={{
+                    height: '46px',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    background: !isSplitValid && isSplitPayment ? (isSplitOvercharged ? '#EF4444' : '#94A3B8') : undefined,
+                    cursor: submitting || !isSplitValid ? 'not-allowed' : 'pointer',
+                    opacity: submitting || !isSplitValid ? 0.7 : 1,
+                  }}
+                  disabled={submitting || !isSplitValid}
                 >
-                  {submitting ? 'Placing Order...' : `Place Order · ${formatPrice(totalPrice)}`}
+                  {submitting ? (
+                    'Placing Order...'
+                  ) : isSplitPayment && isSplitOvercharged ? (
+                    'Cannot Place Order · Overcharged'
+                  ) : isSplitPayment && !hasExactlyTwoSplitMethods ? (
+                    'Cannot Place Order · 2 Methods Required'
+                  ) : isSplitPayment && isSplitUndercharged ? (
+                    'Cannot Place Order · Incomplete Split'
+                  ) : (
+                    `Place Order · ${formatPrice(totalPrice)}`
+                  )}
                 </button>
               </div>
             </form>

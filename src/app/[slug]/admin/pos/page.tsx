@@ -468,6 +468,26 @@ export default function AdminPosPage() {
       return;
     }
 
+    if (orderForm.is_paid && (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))) {
+      const split = orderForm.payment_split || {};
+      const activeMethods = Object.entries(split).filter(([_, val]) => Number(val) > 0);
+      const allocated = Math.round(activeMethods.reduce((sum, [_, val]) => sum + Number(val), 0) * 100) / 100;
+      const target = Math.round(totalPrice * 100) / 100;
+
+      if (allocated > target + 0.009) {
+        toast.error(`Split payment is overcharged by ₹${(allocated - target).toFixed(2)}. Total cannot exceed ₹${target.toFixed(2)}.`);
+        return;
+      }
+      if (activeMethods.length !== 2) {
+        toast.error('Split payment requires exactly two valid payment methods with amounts greater than ₹0.');
+        return;
+      }
+      if (Math.abs(allocated - target) > 0.009) {
+        toast.error(`Split payment incomplete. ₹${(target - allocated).toFixed(2)} remaining to be allocated.`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const items = Array.from(cart.values()).map(item => ({
