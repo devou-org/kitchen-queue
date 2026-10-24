@@ -27,6 +27,7 @@ interface EditableOrderItem {
   quantity: number;
   product_name?: string;
   price?: number;
+  notes?: string;
 }
 
 export function EditOrderModal({
@@ -78,6 +79,7 @@ export function EditOrderModal({
         quantity: i.quantity || 1,
         product_name: i.product_name,
         price: i.price_at_purchase,
+        notes: i.notes || '',
       }));
       setItems(initialItems);
       setSearchQuery('');
@@ -216,6 +218,12 @@ export function EditOrderModal({
     setItems((prev) => prev.filter((item) => item.product_id !== productId));
   };
 
+  const handleUpdateItemNotes = (productId: string, notes: string) => {
+    setItems((prev) =>
+      prev.map((item) => (item.product_id === productId ? { ...item, notes } : item))
+    );
+  };
+
   const handleAddProduct = (product: Product) => {
     const existing = items.find((i) => i.product_id === product.id);
     if (existing) {
@@ -229,6 +237,7 @@ export function EditOrderModal({
           quantity: 1,
           product_name: product.name,
           price: product.price,
+          notes: '',
         },
       ]);
       toast.success(`Added ${product.name}`);
@@ -299,6 +308,7 @@ export function EditOrderModal({
         items: items.map((i) => ({
           product_id: i.product_id,
           quantity: i.quantity,
+          notes: i.notes?.trim() || undefined,
         })),
       };
 
@@ -1036,136 +1046,196 @@ export function EditOrderModal({
                         className="edit-order-item-row"
                         style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
+                          flexDirection: 'column',
+                          gap: '6px',
                           padding: '10px 14px',
                           background: '#FFFFFF',
-                          border: '1px solid #E2E8F0',
+                          border: item.notes ? '1.5px solid #FCD34D' : '1px solid #E2E8F0',
                           borderRadius: '8px',
-                          transition: 'background 0.15s ease',
+                          transition: 'all 0.15s ease',
                         }}
                       >
-                        {/* Item Name & Unit Price */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        {/* Upper row: Name, Price, Stepper, Subtotal, Delete */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                          }}
+                        >
+                          {/* Item Name & Unit Price */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: '13.5px',
+                                fontWeight: 600,
+                                color: '#0F172A',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {itemName}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>
+                              {formatPrice(unitPrice)} each
+                            </div>
+                          </div>
+
+                          {/* Quantity Stepper with 8px border radius */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQuantity(item.product_id, -1)}
+                              disabled={item.quantity <= 1}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '8px',
+                                border: '1px solid #CBD5E1',
+                                background: item.quantity <= 1 ? '#F8FAFC' : '#FFFFFF',
+                                color: item.quantity <= 1 ? '#CBD5E1' : '#0F172A',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title="Decrease quantity"
+                            >
+                              <Minus size={13} />
+                            </button>
+
+                            <span
+                              style={{
+                                minWidth: '28px',
+                                textAlign: 'center',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                color: '#0F172A',
+                              }}
+                            >
+                              {item.quantity}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQuantity(item.product_id, 1)}
+                              disabled={item.quantity >= 99}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '8px',
+                                border: '1px solid #CBD5E1',
+                                background: '#FFFFFF',
+                                color: '#0F172A',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: item.quantity >= 99 ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title="Increase quantity"
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+
+                          {/* Item Total */}
                           <div
                             style={{
+                              minWidth: '70px',
+                              textAlign: 'right',
                               fontSize: '13.5px',
-                              fontWeight: 600,
-                              color: '#0F172A',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {itemName}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>
-                            {formatPrice(unitPrice)} each
-                          </div>
-                        </div>
-
-                        {/* Quantity Stepper with 8px border radius */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item.product_id, -1)}
-                            disabled={item.quantity <= 1}
-                            style={{
-                              width: '30px',
-                              height: '30px',
-                              borderRadius: '8px',
-                              border: '1px solid #CBD5E1',
-                              background: item.quantity <= 1 ? '#F8FAFC' : '#FFFFFF',
-                              color: item.quantity <= 1 ? '#CBD5E1' : '#0F172A',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.15s ease',
-                            }}
-                            title="Decrease quantity"
-                          >
-                            <Minus size={13} />
-                          </button>
-
-                          <span
-                            style={{
-                              minWidth: '28px',
-                              textAlign: 'center',
-                              fontSize: '13px',
                               fontWeight: 700,
                               color: '#0F172A',
                             }}
                           >
-                            {item.quantity}
-                          </span>
+                            {formatPrice(itemSubtotal)}
+                          </div>
 
+                          {/* Delete Button with 8px border radius */}
                           <button
                             type="button"
-                            onClick={() => handleUpdateQuantity(item.product_id, 1)}
-                            disabled={item.quantity >= 99}
+                            onClick={() => handleRemoveItem(item.product_id)}
                             style={{
                               width: '30px',
                               height: '30px',
                               borderRadius: '8px',
-                              border: '1px solid #CBD5E1',
-                              background: '#FFFFFF',
-                              color: '#0F172A',
+                              border: '1px solid transparent',
+                              background: 'transparent',
+                              color: '#EF4444',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              cursor: item.quantity >= 99 ? 'not-allowed' : 'pointer',
+                              cursor: 'pointer',
                               transition: 'all 0.15s ease',
                             }}
-                            title="Increase quantity"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#FEE2E2';
+                              e.currentTarget.style.borderColor = '#FCA5A5';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.borderColor = 'transparent';
+                            }}
+                            title="Remove item"
                           >
-                            <Plus size={13} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
 
-                        {/* Item Total */}
+                        {/* Kitchen Note Row */}
                         <div
                           style={{
-                            minWidth: '70px',
-                            textAlign: 'right',
-                            fontSize: '13.5px',
-                            fontWeight: 700,
-                            color: '#0F172A',
-                          }}
-                        >
-                          {formatPrice(itemSubtotal)}
-                        </div>
-
-                        {/* Delete Button with 8px border radius */}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(item.product_id)}
-                          style={{
-                            width: '30px',
-                            height: '30px',
-                            borderRadius: '8px',
-                            border: '1px solid transparent',
-                            background: 'transparent',
-                            color: '#EF4444',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
+                            gap: '6px',
+                            background: item.notes ? '#FFFBEB' : '#F8FAFC',
+                            border: item.notes ? '1px solid #FCD34D' : '1px solid #E2E8F0',
+                            borderRadius: '6px',
+                            padding: '3px 8px',
                             transition: 'all 0.15s ease',
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#FEE2E2';
-                            e.currentTarget.style.borderColor = '#FCA5A5';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.borderColor = 'transparent';
-                          }}
-                          title="Remove item"
                         >
-                          <Trash2 size={14} />
-                        </button>
+                          <Utensils size={12} color={item.notes ? '#D97706' : '#94A3B8'} style={{ flexShrink: 0 }} />
+                          <input
+                            type="text"
+                            placeholder="Kitchen note (e.g. less spicy, no onions)..."
+                            value={item.notes || ''}
+                            onChange={(e) => handleUpdateItemNotes(item.product_id, e.target.value)}
+                            style={{
+                              width: '100%',
+                              border: 'none',
+                              background: 'transparent',
+                              fontSize: '11.5px',
+                              color: item.notes ? '#92400E' : '#334155',
+                              fontWeight: item.notes ? 600 : 400,
+                              outline: 'none',
+                              padding: '2px 0',
+                            }}
+                          />
+                          {item.notes && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateItemNotes(item.product_id, '')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: '0 2px',
+                                cursor: 'pointer',
+                                color: '#B45309',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                lineHeight: 1,
+                              }}
+                              title="Clear item note"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })
