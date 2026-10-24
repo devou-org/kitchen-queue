@@ -283,6 +283,7 @@ function escapeHtml(str: string): string {
 
 export interface BillPrintData {
   restaurantName?: string;
+  timezone?: string;
   logoUrl?: string;
   address?: string;
   phone?: string;
