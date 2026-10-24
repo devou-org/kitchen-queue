@@ -74,10 +74,12 @@ export async function POST(request: NextRequest) {
       phone: restaurant.phone || undefined,
       gst_number: restaurant.gst_number || undefined,
       primary_color: restaurant.primary_color || '#059669',
+      timezone: restaurant.timezone || 'Asia/Kolkata',
     };
 
     const billData: BillPrintData = {
       restaurantName: restaurantInfo.name,
+      timezone: restaurant.timezone || 'Asia/Kolkata',
       address: restaurantInfo.address,
       phone: restaurantInfo.phone,
       gstNumber: restaurantInfo.gst_number,

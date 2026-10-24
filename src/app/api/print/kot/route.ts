@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
 
     const targetPrinter = printerName?.trim() || process.env.KOT_PRINTER_NAME || 'POS-80C';
     const restaurantName = restaurant.name || 'QDINE';
+    const timezone = restaurant.timezone || 'Asia/Kolkata';
     const isWindows = process.platform === 'win32';
 
     // Check if cloud print agent is active on the cashier PC
@@ -101,6 +102,7 @@ export async function POST(request: NextRequest) {
 
       const kotData: KotPrintData = {
         restaurantName,
+        timezone,
         ticketNumber: order.ticket_number,
         orderType: order.order_type,
         tableNumber: order.table_number,
@@ -197,6 +199,7 @@ export async function POST(request: NextRequest) {
 
         const kotData: KotPrintData = {
           restaurantName,
+          timezone,
           ticketNumber: order.ticket_number,
           orderType: order.order_type,
           tableNumber: order.table_number,
@@ -264,6 +267,7 @@ export async function POST(request: NextRequest) {
     // Default: Single unified Master KOT with all items
     const kotData: KotPrintData = {
       restaurantName,
+      timezone,
       ticketNumber: order.ticket_number,
       orderType: order.order_type,
       tableNumber: order.table_number,

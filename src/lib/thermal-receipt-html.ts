@@ -11,17 +11,38 @@ export function generateThermalReceiptHtml(data: KotPrintData): string {
   const ticketPadded = `#${String(data.ticketNumber).padStart(3, '0')}`;
   const orderType = (data.orderType || 'DINE_IN').replace('_', '-').toUpperCase();
 
-  const now = data.createdAt ? new Date(data.createdAt) : new Date();
-  const dateStr = now.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-  const timeStr = now.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const parsedDate = data.createdAt ? new Date(data.createdAt) : new Date();
+  const now = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  const tz = data.timezone || 'Asia/Kolkata';
+  let dateStr: string;
+  let timeStr: string;
+  try {
+    dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: tz,
+    });
+    timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: tz,
+    });
+  } catch {
+    dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    });
+    timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
+  }
 
   const rawTable = data.tableNumber ? String(data.tableNumber).trim() : '';
   const tableDisplay = rawTable
@@ -300,6 +321,7 @@ export function generateBillReceiptHtml(data: BillPrintData): string {
     phone: data.restaurantPhone || data.phone,
     gst_number: data.gstNumber,
     primary_color: data.primaryColor || '#059669',
+    timezone: data.timezone || 'Asia/Kolkata',
   };
 
   const order: any = {
