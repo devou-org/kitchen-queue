@@ -148,12 +148,6 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // If a specific counter was targeted, it is strictly NOT connected.
-  // Never bleed through other counters' printers or stale localStorage!
-  if (counterId || counterName) {
-    return { connected: false, deviceName: null };
-  }
-
   // 3. Fallback only for generic global checks without counter ID or name
   const cleanPrinterName = printerName?.trim();
   if (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C' && activeBtConnections.has(cleanPrinterName)) {
@@ -165,8 +159,19 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  if (activeBluetoothDevice?.gatt?.connected) {
-    return { connected: true, deviceName: activeBluetoothDevice.name };
+  // 4. If counter is 'bill_printer', 'ALL', or generic fallback, or if only 1 global Bluetooth printer exists
+  const isGenericOrBill = !counterId || counterId === 'bill_printer' || counterId === 'ALL' || !counterName || counterName.toLowerCase() === 'bill printer';
+  if (isGenericOrBill) {
+    if (activeBluetoothDevice?.gatt?.connected) {
+      return { connected: true, deviceName: activeBluetoothDevice.name };
+    }
+    if (activeBtConnections.size > 0) {
+      for (const conn of activeBtConnections.values()) {
+        if (conn.device?.gatt?.connected) {
+          return { connected: true, deviceName: conn.name };
+        }
+      }
+    }
   }
 
   return { connected: false, deviceName: null };
@@ -398,16 +403,26 @@ export async function writeBytesToBluetooth(
     }
   }
 
-  // Only fall back to activeBluetoothDevice if NO specific counter/printer was requested
+  // Fall back to activeBluetoothDevice or connected printer if no specific counter/printer is bound
   const hasSpecificTarget = Boolean(
-    (counterId && counterId.trim()) ||
+    (counterId && counterId.trim() && counterId !== 'bill_printer' && counterId !== 'ALL') ||
     (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C') ||
-    (counterName && counterName.trim())
+    (counterName && counterName.trim() && counterName.toLowerCase() !== 'bill printer')
   );
 
-  if (!writeChar && !hasSpecificTarget && activeBluetoothChar && activeBluetoothDevice?.gatt?.connected) {
-    writeChar = activeBluetoothChar;
-    targetDevice = activeBluetoothDevice;
+  if (!writeChar && (!hasSpecificTarget || activeBtConnections.size === 1)) {
+    if (activeBluetoothChar && activeBluetoothDevice?.gatt?.connected) {
+      writeChar = activeBluetoothChar;
+      targetDevice = activeBluetoothDevice;
+    } else if (activeBtConnections.size > 0) {
+      for (const conn of activeBtConnections.values()) {
+        if (conn.device?.gatt?.connected && conn.char) {
+          writeChar = conn.char;
+          targetDevice = conn.device;
+          break;
+        }
+      }
+    }
   }
 
   if (!writeChar || !targetDevice?.gatt?.connected) {
@@ -1127,8 +1142,8 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
     counterName,
   } = options;
 
-  const targetCounterId = counterId || 'bill_printer';
-  const targetCounterName = counterName || 'Bill Printer';
+  const targetCounterId = counterId || (activeBtConnections.has('bill_printer') || (typeof window !== 'undefined' && localStorage.getItem('qdine_bt_counter_bill_printer')) ? 'bill_printer' : undefined);
+  const targetCounterName = counterName || (targetCounterId ? 'Bill Printer' : undefined);
 
   const ticketNumber = options.ticketNumber || billData?.ticketNumber || orderData?.ticket_number || '';
 

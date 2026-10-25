@@ -120,18 +120,18 @@ export default function AdminSettings() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
-      if (savedAutoPrint !== null) {
-        setAutoPrintKot(savedAutoPrint === 'true');
-      }
-      const savedStation = localStorage.getItem('qdine_is_print_station');
-      if (savedStation !== null) {
-        setIsPrintStation(savedStation === '1');
-      }
+      const savedStation = localStorage.getItem('qdine_is_print_station') === '1';
+      setIsPrintStation(savedStation);
+      const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot') === 'true';
+      setAutoPrintKot(savedStation && savedAutoPrint);
     }
   }, []);
 
   const handleToggleAutoPrint = () => {
+    if (!isPrintStation) {
+      toast.error('Designate this device as the print station hub first');
+      return;
+    }
     const nextVal = !autoPrintKot;
     setAutoPrintKot(nextVal);
     if (typeof window !== 'undefined') {
@@ -148,6 +148,12 @@ export default function AdminSettings() {
     setIsPrintStation(nextVal);
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_is_print_station', nextVal ? '1' : '0');
+      // If hub is turned off, auto-print is automatically disabled
+      if (!nextVal) {
+        setAutoPrintKot(false);
+        localStorage.setItem('qdine_auto_print_kot', 'false');
+        localStorage.setItem('qdine_auto_print_bill', 'false');
+      }
     }
     toast.success(nextVal ? 'This device is now the dedicated Print Station' : 'Print Station role disabled on this device');
   };
@@ -1123,19 +1129,19 @@ export default function AdminSettings() {
                       width: '6px',
                       height: '6px',
                       borderRadius: '50%',
-                      backgroundColor: autoPrintKot ? '#10B981' : '#94A3B8',
+                      backgroundColor: isPrintStation && autoPrintKot ? '#10B981' : '#94A3B8',
                     }}
                   />
-                  {autoPrintKot ? 'AUTO-PRINT ON' : 'AUTO-PRINT OFF'}
+                  {isPrintStation && autoPrintKot ? 'AUTO-PRINT ON' : 'AUTO-PRINT OFF'}
                 </span>
               }
               isCollapsed={!!collapsedSections['autoprint']}
               onToggle={() => toggleSection('autoprint')}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* Toggle Control Row */}
+                {/* 1. Print Station Designation Toggle (Hub) */}
                 <div
-                  onClick={handleToggleAutoPrint}
+                  onClick={handleTogglePrintStation}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1151,67 +1157,8 @@ export default function AdminSettings() {
                 >
                   <div style={{ minWidth: 0, flex: 1, paddingRight: '12px' }}>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
-                      Auto-Print (KOT & Customer Bills)
-                    </div>
-                  </div>
-
-                  <div
-                    role="switch"
-                    aria-checked={autoPrintKot}
-                    style={{
-                      width: '50px',
-                      height: '28px',
-                      borderRadius: '14px',
-                      backgroundColor: autoPrintKot ? 'var(--primary, #971345)' : '#CBD5E1',
-                      position: 'relative',
-                      transition: 'background-color 0.2s ease',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '50%',
-                        backgroundColor: '#FFFFFF',
-                        position: 'absolute',
-                        top: '3px',
-                        left: autoPrintKot ? '25px' : '3px',
-                        transition: 'left 0.2s ease',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Print Station Designation Toggle */}
-                <div
-                  onClick={handleTogglePrintStation}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px',
-                    backgroundColor: isPrintStation ? '#F0FDF4' : '#F8FAFC',
-                    borderRadius: '10px',
-                    border: `1px solid ${isPrintStation ? '#BBF7D0' : '#E2E8F0'}`,
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div style={{ minWidth: 0, flex: 1, paddingRight: '12px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       This device is the print station
-                      {isPrintStation && (
-                        <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#DCFCE7', color: '#166534' }}>
-                          ACTIVE STATION
-                        </span>
-                      )}
                     </div>
-                    <p style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0', lineHeight: 1.4 }}>
-                      Only designated print stations subscribe to automatic KOT print events. Prevents other waiters' phones from freezing or trying to print.
-                    </p>
                   </div>
 
                   <div
@@ -1221,7 +1168,7 @@ export default function AdminSettings() {
                       width: '50px',
                       height: '28px',
                       borderRadius: '14px',
-                      backgroundColor: isPrintStation ? '#16A34A' : '#CBD5E1',
+                      backgroundColor: isPrintStation ? 'var(--primary, #971345)' : '#CBD5E1',
                       position: 'relative',
                       transition: 'background-color 0.2s ease',
                       flexShrink: 0,
@@ -1243,31 +1190,56 @@ export default function AdminSettings() {
                   </div>
                 </div>
 
-                {/* Status Explanation Card */}
+                {/* 2. Auto-Print (KOT & Customer Bills) - Only enabled if device is print station hub */}
                 <div
+                  onClick={isPrintStation ? handleToggleAutoPrint : () => toast.error('Designate this device as the print station hub first')}
                   style={{
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: autoPrintKot ? '#F0FDF4' : '#F8FAFC',
-                    border: `1px solid ${autoPrintKot ? '#BBF7D0' : '#E2E8F0'}`,
-                    fontSize: '12px',
-                    color: autoPrintKot ? '#166534' : '#475569',
                     display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                    lineHeight: 1.5,
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '16px',
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: '10px',
+                    border: '1px solid #E2E8F0',
+                    cursor: isPrintStation ? 'pointer' : 'not-allowed',
+                    opacity: isPrintStation ? 1 : 0.45,
+                    userSelect: 'none',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <Printer size={16} style={{ color: autoPrintKot ? '#16A34A' : '#94A3B8', marginTop: '2px', flexShrink: 0 }} />
-                  <div>
-                    <span style={{ fontWeight: 700 }}>
-                      {autoPrintKot ? 'Auto-Printing is currently active' : 'Auto-Printing is paused'}
-                    </span>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', opacity: 0.9 }}>
-                      {autoPrintKot
-                        ? 'All new incoming orders in Orders and POS will immediately trigger printing to your connected thermal printer.'
-                        : 'New orders will update quietly in the kitchen queue without opening print jobs. Staff can still click print manually.'}
-                    </p>
+                  <div style={{ minWidth: 0, flex: 1, paddingRight: '12px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
+                      Auto-Print (KOT & Customer Bills)
+                    </div>
+                  </div>
+
+                  <div
+                    role="switch"
+                    aria-checked={isPrintStation && autoPrintKot}
+                    aria-disabled={!isPrintStation}
+                    style={{
+                      width: '50px',
+                      height: '28px',
+                      borderRadius: '14px',
+                      backgroundColor: (isPrintStation && autoPrintKot) ? 'var(--primary, #971345)' : '#CBD5E1',
+                      position: 'relative',
+                      transition: 'background-color 0.2s ease',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '50%',
+                        backgroundColor: '#FFFFFF',
+                        position: 'absolute',
+                        top: '3px',
+                        left: (isPrintStation && autoPrintKot) ? '25px' : '3px',
+                        transition: 'left 0.2s ease',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                      }}
+                    />
                   </div>
                 </div>
 

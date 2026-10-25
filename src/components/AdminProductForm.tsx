@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Layers, ArrowLeft, ArrowUpDown } from 'lucide-react';
+import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Layers, ArrowLeft, ArrowUpDown, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 import { ProductImageUploader } from '@/components/modules/products/ProductImageUploader';
@@ -323,15 +323,21 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           <button
             type="button"
             onClick={handleCancelClick}
+            disabled={loading}
             style={{
-              padding: '10px 18px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '38px',
+              padding: '0 18px',
               borderRadius: '8px',
               border: '1px solid #cbd5e1',
               backgroundColor: '#ffffff',
               color: '#334155',
               fontWeight: 600,
               fontSize: '13px',
-              cursor: 'pointer'
+              cursor: loading ? 'not-allowed' : 'pointer',
+              boxSizing: 'border-box'
             }}
           >
             Cancel
@@ -342,20 +348,24 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             style={{
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '8px',
-              padding: '10px 22px',
+              height: '38px',
+              padding: '0 22px',
               borderRadius: '8px',
               border: 'none',
               backgroundColor: 'var(--primary, #0f172a)',
               color: '#ffffff',
               fontWeight: 700,
               fontSize: '13px',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.85 : 1,
               boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              boxSizing: 'border-box'
             }}
           >
-            {loading ? <div className="loader" style={{ width: 16, height: 16, borderWidth: 2 }} /> : <Check size={16} />}
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
             {isEditing ? 'Update Item' : 'Save Item'}
           </button>
 

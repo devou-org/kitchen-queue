@@ -7,6 +7,7 @@ import { ServiceToggle } from '@/components/ServiceToggle';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { AdminLayoutProvider, useAdminLayout } from '@/context/AdminLayoutContext';
 import { LogoutConfirmModal } from '@/components/ui/LogoutConfirmModal';
+import { PrintStationListener } from '@/components/PrintStationListener';
 
 function parseToken(token: string) {
   try {
@@ -161,6 +162,8 @@ function StaffLayoutInner({ children }: { children: React.ReactNode }) {
       <main>
         {children}
       </main>
+
+      <PrintStationListener />
 
       {/* Bottom Nav for Staff */}
       {!isMaximized && (
