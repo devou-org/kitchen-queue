@@ -198,18 +198,14 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 5. Station fallback: For all kitchen tickets (unless explicitly checking bill printer),
-  // automatically route to the station's connected Bluetooth printer
-  const isBillPrinter = counterId === 'bill_printer' || cleanCName === 'bill printer';
-  if (!isBillPrinter) {
-    if (activeBluetoothDevice?.gatt?.connected) {
-      return { connected: true, deviceName: activeBluetoothDevice.name };
-    }
-    if (activeBtConnections.size > 0) {
-      for (const conn of activeBtConnections.values()) {
-        if (conn.device?.gatt?.connected) {
-          return { connected: true, deviceName: conn.name };
-        }
+  // 5. Station fallback: Automatically route to the station's connected Bluetooth printer
+  if (activeBluetoothDevice?.gatt?.connected) {
+    return { connected: true, deviceName: activeBluetoothDevice.name };
+  }
+  if (activeBtConnections.size > 0) {
+    for (const conn of activeBtConnections.values()) {
+      if (conn.device?.gatt?.connected) {
+        return { connected: true, deviceName: conn.name };
       }
     }
   }
@@ -309,6 +305,9 @@ export async function connectBluetoothPrinter(counterId?: string, counterName?: 
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_bt_printer_name', deviceName);
       localStorage.setItem('qdine_preferred_printer_type', 'bluetooth');
+      localStorage.setItem('qdine_is_print_station', '1');
+      localStorage.setItem('qdine_auto_print_kot', 'true');
+      localStorage.setItem('qdine_auto_print_bill', 'true');
     }
 
     // Auto-cleanup on disconnect
@@ -970,8 +969,9 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
       }
     }
 
-    // 0. Try QZ Tray first (100% silent, direct OS spooler/Windows/Mac/Linux or network IP)
-    if (base64Bytes) {
+    // 0. Try QZ Tray ONLY if actively connected (never probe QZ on Android or when QZ is closed, preventing 2-3s timeout lag)
+    const isAndroid = typeof window !== 'undefined' && /android/i.test(navigator.userAgent);
+    if (!isAndroid && base64Bytes && isQzConnected()) {
       try {
         const qzTarget = printerAddress?.trim() || printerName;
         const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes);
@@ -1392,8 +1392,9 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
       }
     }
 
-    // 4. QZ TRAY or DEFAULT SYSTEM MODE: Print via local QZ Tray spooler to target printer
-    if ((effType === 'QZ_TRAY' || effType === 'DEFAULT') && base64Bytes) {
+    // 4. QZ TRAY or DEFAULT SYSTEM MODE: Print via local QZ Tray spooler to target printer (skip on Android and when QZ is closed)
+    const isAndroidBill = typeof window !== 'undefined' && /android/i.test(navigator.userAgent);
+    if (!isAndroidBill && (effType === 'QZ_TRAY' || (effType === 'DEFAULT' && isQzConnected())) && base64Bytes) {
       try {
         const qzTarget = printerName || 'POS-80C';
         const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes);

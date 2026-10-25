@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -10,6 +10,22 @@ import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { useKeepAwake } from '@/hooks/useKeepAwake';
 
 /**
+ * Check if the current browser/device is acting as the Print Station / Hub
+ */
+export function isDevicePrintStation(): boolean {
+  if (typeof window === 'undefined') return false;
+  // 1. Explicitly designated as print station
+  if (localStorage.getItem('qdine_is_print_station') === '1') return true;
+  // 2. Local Bluetooth printer paired on this device (e.g. Android hub)
+  if (localStorage.getItem('qdine_bt_printer_name')) return true;
+  // 3. Local USB Serial printer paired on this device
+  if (localStorage.getItem('qdine_serial_printer_name')) return true;
+  // 4. Local KOT/Bill printer configured
+  if (localStorage.getItem('qdine_kot_printer_name')) return true;
+  return false;
+}
+
+/**
  * Global Print Station Listener
  * ============================================================
  * Mounted in AdminLayout & StaffLayout so that when a device is designated as
@@ -17,31 +33,41 @@ import { useKeepAwake } from '@/hooks/useKeepAwake';
  * across all pages (Orders, POS, Tables, Menu, Settings, etc.)
  * including manual prints requested from waiters' phones.
  *
- * Utilizes Web Locks API so that only 1 tab acts as the active Print Station
- * listener, preventing double/quadruple prints when multiple tabs are open!
+ * Utilizes cross-tab localStorage deduplication (checkAndMarkDuplicatePrint)
+ * to safely handle multiple tabs without deadlock on Android Chrome!
  * ============================================================
  */
 export function PrintStationListener() {
   const params = useParams();
   const slug = params?.slug as string;
   const { restaurant } = useRestaurant();
+  const [stationActive, setStationActive] = useState(false);
 
-  const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isStation = isDevicePrintStation();
+      setStationActive(isStation);
+      if (isStation) {
+        localStorage.setItem('qdine_is_print_station', '1');
+        // Default auto-print to enabled on hub if not explicitly disabled
+        if (localStorage.getItem('qdine_auto_print_kot') === null) {
+          localStorage.setItem('qdine_auto_print_kot', 'true');
+        }
+        if (localStorage.getItem('qdine_auto_print_bill') === null) {
+          localStorage.setItem('qdine_auto_print_bill', 'true');
+        }
+        tryAutoConnectBluetooth();
+      }
+    }
+  }, []);
 
   // Keep screen awake while this device is acting as the print station
-  useKeepAwake(isPrintStation);
-
-  // Attempt to reconnect to paired Bluetooth printer on station startup
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isPrintStation) {
-      tryAutoConnectBluetooth();
-    }
-  }, [isPrintStation]);
+  useKeepAwake(stationActive);
 
   useEffect(() => {
     if (!pusherClient || !restaurant) return;
 
-    const channelName = restaurant.pusher_channel;
+    const channelName = restaurant.pusher_channel || `queue-channel-${restaurant.id}`;
     const channel = pusherClient.subscribe(channelName);
 
     // 1. KOT Print Handler (Automatic order creation or Manual click from waiter/staff)
@@ -52,13 +78,14 @@ export function PrintStationListener() {
       }
 
       // Check if this device is designated as the print station
-      const currentIsStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+      const currentIsStation = isDevicePrintStation();
       if (!currentIsStation) {
         return;
       }
 
       // If it's an automatic order creation event, verify auto-print is enabled on this device.
       // On designated Print Station, default auto-print to enabled unless explicitly set to 'false'.
+      // If it's a manual print request from waiter/staff (data.is_manual), ALWAYS PRINT regardless of auto-print toggle!
       const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
       if (!data.is_manual && !autoPrint) {
         return;
@@ -151,7 +178,7 @@ export function PrintStationListener() {
         return;
       }
 
-      const currentIsStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+      const currentIsStation = isDevicePrintStation();
       if (!currentIsStation) {
         return;
       }
@@ -202,38 +229,13 @@ export function PrintStationListener() {
       }
     };
 
-    // Cross-tab Leader Election: Only 1 open tab holds the listener lock and binds Pusher events
-    const abortController = new AbortController();
-
-    const bindEvents = () => {
-      channel.bind('kot_auto_print', handleKotAutoPrint);
-      channel.bind('bill_print', handleBillPrint);
-    };
-
-    const unbindEvents = () => {
-      channel.unbind('kot_auto_print', handleKotAutoPrint);
-      channel.unbind('bill_print', handleBillPrint);
-    };
-
-    if (typeof navigator !== 'undefined' && 'locks' in navigator) {
-      navigator.locks.request('qdine_print_station_listener_leader', { signal: abortController.signal }, async () => {
-        bindEvents();
-        return new Promise<void>((resolve) => {
-          abortController.signal.addEventListener('abort', () => {
-            unbindEvents();
-            resolve();
-          });
-        });
-      }).catch(() => {
-        // Aborted cleanly on component unmount
-      });
-    } else {
-      bindEvents();
-    }
+    // Direct Pusher event bindings (No Web Lock deadlock on Android Chrome)
+    channel.bind('kot_auto_print', handleKotAutoPrint);
+    channel.bind('bill_print', handleBillPrint);
 
     return () => {
-      abortController.abort();
-      unbindEvents();
+      channel.unbind('kot_auto_print', handleKotAutoPrint);
+      channel.unbind('bill_print', handleBillPrint);
     };
   }, [restaurant, slug]);
 

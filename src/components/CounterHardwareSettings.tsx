@@ -314,6 +314,9 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
           localStorage.setItem('qdine_bill_printer_name', res.deviceName || 'POS-80C');
           localStorage.setItem('qdine_bill_printer_type', 'BLUETOOTH');
           localStorage.removeItem('qdine_bill_printer_address');
+          localStorage.setItem('qdine_is_print_station', '1');
+          localStorage.setItem('qdine_auto_print_kot', 'true');
+          localStorage.setItem('qdine_auto_print_bill', 'true');
         }
         await fetch('/api/admin/bill-printer', {
           method: 'PUT',
@@ -574,6 +577,11 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         toast.success(`Paired "${res.deviceName}" to ${counter.name}!`, { id: toastId });
         handleFieldChange(counter.id, 'printer_name', res.deviceName);
         handleFieldChange(counter.id, 'printer_type', 'BLUETOOTH');
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('qdine_is_print_station', '1');
+          localStorage.setItem('qdine_auto_print_kot', 'true');
+          localStorage.setItem('qdine_auto_print_bill', 'true');
+        }
 
         await fetch(`/api/counters/${counter.id}`, {
           method: 'PUT',
@@ -695,8 +703,9 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         throw new Error(data.error || 'Failed to generate test print buffer');
       }
 
-      // 1. Try QZ Tray directly for silent OS or network TCP printing
-      if (data.base64Bytes) {
+      // 1. Try QZ Tray ONLY if QZ Tray is configured or actively connected (never on Android or when QZ is closed)
+      const isAndroid = typeof window !== 'undefined' && /android/i.test(navigator.userAgent);
+      if (!isAndroid && data.base64Bytes && (form.printer_type === 'QZ_TRAY' || isQzConnected())) {
         const target = (form.printer_type === 'NETWORK' && form.printer_address?.trim())
           ? form.printer_address.trim()
           : pName;
