@@ -7,6 +7,11 @@ export interface RestaurantTable {
   capacity: number;
   status: 'AVAILABLE' | 'OCCUPIED';
   qr_code_url?: string;
+  merged_into_table_id?: string | null;
+  parent_table_number?: string | null;
+  effective_capacity?: number;
+  merged_table_numbers?: string[];
+  merged_table_ids?: string[];
   active_orders_count?: number;
   created_at?: string;
   updated_at?: string;
@@ -76,6 +81,52 @@ class TableService {
       return { success: false, error: 'Network error while fetching tables.' };
     }
   }
+
+  async mergeTables(primaryTableId: string, secondaryTableIds: string[]): Promise<ApiResponse<any>> {
+    try {
+      const headers = this.getAuthHeaders();
+      headers['Content-Type'] = 'application/json';
+
+      const res = await fetch('/api/tables/merge', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          primary_table_id: primaryTableId,
+          secondary_table_ids: secondaryTableIds
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        return { success: true, data: data.result, message: data.message };
+      }
+      return { success: false, error: data.error || 'Failed to merge tables' };
+    } catch {
+      return { success: false, error: 'Network error while merging tables.' };
+    }
+  }
+
+  async unmergeTable(tableId: string): Promise<ApiResponse<any>> {
+    try {
+      const headers = this.getAuthHeaders();
+      headers['Content-Type'] = 'application/json';
+
+      const res = await fetch('/api/tables/unmerge', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ table_id: tableId })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        return { success: true, data: data.result, message: data.message };
+      }
+      return { success: false, error: data.error || 'Failed to unmerge table' };
+    } catch {
+      return { success: false, error: 'Network error while unmerging table.' };
+    }
+  }
 }
 
 export const tableService = new TableService();
+

@@ -435,9 +435,8 @@ export default function PurchasesPage() {
         </div>
 
         {loading ? (
-          <div style={{ padding: '80px', textAlign: 'center', color: '#94A3B8' }}>
-            <Loader2 size={30} className="animate-spin" style={{ margin: '0 auto 10px' }} />
-            Loading purchase receipts...
+          <div style={{ padding: '60px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '260px' }}>
+            <div className="loader" />
           </div>
         ) : purchases.length === 0 ? (
           <div style={{ padding: '60px 20px', textAlign: 'center' }}>

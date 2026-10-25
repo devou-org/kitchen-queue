@@ -154,14 +154,8 @@ export default function BillingPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ height: '40px', width: '200px', backgroundColor: '#e2e8f0', borderRadius: '6px', marginBottom: '24px', animation: 'pulse 2s infinite' }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-          {[1, 2, 3].map((i) => (
-            <div key={i} style={{ height: '140px', backgroundColor: '#e2e8f0', borderRadius: '8px', animation: 'pulse 2s infinite' }} />
-          ))}
-        </div>
-        <div style={{ height: '300px', backgroundColor: '#e2e8f0', borderRadius: '8px', animation: 'pulse 2s infinite' }} />
+      <div style={{ minHeight: 'calc(100vh - 180px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="loader" />
       </div>
     );
   }

@@ -6,22 +6,46 @@ import { generateBillTemplateHTML } from './bill-template-html';
  * Formatted specifically for 80mm (3-inch) POS thermal roll printers like POS-80C.
  */
 export function generateThermalReceiptHtml(data: KotPrintData): string {
+  if (!data) {
+    return '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;text-align:center;"><h3>No Receipt Data</h3></body></html>';
+  }
   const restaurantName = data.restaurantName || 'QDINE';
   const counterTitle = (data.counterName || 'ALL COUNTERS').toUpperCase();
-  const ticketPadded = `#${String(data.ticketNumber).padStart(3, '0')}`;
+  const ticketPadded = `#${String(data.ticketNumber || '000').padStart(3, '0')}`;
   const orderType = (data.orderType || 'DINE_IN').replace('_', '-').toUpperCase();
 
-  const now = data.createdAt ? new Date(data.createdAt) : new Date();
-  const dateStr = now.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-  const timeStr = now.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const parsedDate = data.createdAt ? new Date(data.createdAt) : new Date();
+  const now = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  const tz = data.timezone || 'Asia/Kolkata';
+  let dateStr: string;
+  let timeStr: string;
+  try {
+    dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: tz,
+    });
+    timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: tz,
+    });
+  } catch {
+    dateStr = now.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    });
+    timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
+  }
 
   const rawTable = data.tableNumber ? String(data.tableNumber).trim() : '';
   const tableDisplay = rawTable
@@ -259,6 +283,7 @@ function escapeHtml(str: string): string {
 
 export interface BillPrintData {
   restaurantName?: string;
+  timezone?: string;
   logoUrl?: string;
   address?: string;
   phone?: string;
@@ -293,6 +318,9 @@ export interface BillPrintData {
  * Delegates to the unified generateBillTemplateHTML single source of truth.
  */
 export function generateBillReceiptHtml(data: BillPrintData): string {
+  if (!data) {
+    return '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;text-align:center;"><h3>No Bill Data</h3></body></html>';
+  }
   const restaurantInfo = {
     name: (data.restaurantName || 'Restaurant').trim(),
     logo_url: data.logoUrl,
@@ -300,6 +328,7 @@ export function generateBillReceiptHtml(data: BillPrintData): string {
     phone: data.restaurantPhone || data.phone,
     gst_number: data.gstNumber,
     primary_color: data.primaryColor || '#059669',
+    timezone: data.timezone || 'Asia/Kolkata',
   };
 
   const order: any = {

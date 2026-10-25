@@ -22,6 +22,8 @@ export interface ClientBillPrintOptions {
   orderData?: any;
   billData?: BillPrintData | any;
   printerName?: string;
+  printerAddress?: string;
+  printerType?: string;
   ticketNumber?: string | number;
   localBridgeUrl?: string;
   forceBrowser?: boolean;
@@ -110,7 +112,7 @@ export async function printKotFromBrowser(options: ClientPrintOptions): Promise<
  */
 export async function printBillFromBrowser(options: ClientBillPrintOptions): Promise<{
   success: boolean;
-  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser';
+  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser' | 'qz-tray';
   message?: string;
 }> {
   return await printUnifiedBill({
@@ -119,6 +121,8 @@ export async function printBillFromBrowser(options: ClientBillPrintOptions): Pro
     orderData: options.orderData,
     billData: options.billData,
     printerName: options.printerName,
+    printerAddress: options.printerAddress,
+    printerType: options.printerType,
     ticketNumber: options.ticketNumber,
     localBridgeUrl: options.localBridgeUrl,
     forceBrowser: options.forceBrowser,
