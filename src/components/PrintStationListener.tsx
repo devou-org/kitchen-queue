@@ -5,24 +5,35 @@ import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { pusherClient } from '@/lib/pusher-client';
-import { printUnifiedThermalTicket, printUnifiedBill, tryAutoConnectBluetooth, checkAndMarkDuplicatePrint } from '@/lib/hardware-printer';
+import {
+  printUnifiedThermalTicket,
+  printUnifiedBill,
+  tryAutoConnectBluetooth,
+  checkAndMarkDuplicatePrint,
+  clearPrintMark,
+} from '@/lib/hardware-printer';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { useKeepAwake } from '@/hooks/useKeepAwake';
 
 /**
- * Check if the current browser/device is acting as the Print Station / Hub
+ * Check if the current browser/device is acting as the Print Station / Hub.
+ * ONLY returns true when explicitly designated in settings ('qdine_is_print_station' === '1'),
+ * preventing waiter phones that pair a Bluetooth printer from hijacking station print traffic!
  */
 export function isDevicePrintStation(): boolean {
   if (typeof window === 'undefined') return false;
-  // 1. Explicitly designated as print station
-  if (localStorage.getItem('qdine_is_print_station') === '1') return true;
-  // 2. Local Bluetooth printer paired on this device (e.g. Android hub)
-  if (localStorage.getItem('qdine_bt_printer_name')) return true;
-  // 3. Local USB Serial printer paired on this device
-  if (localStorage.getItem('qdine_serial_printer_name')) return true;
-  // 4. Local KOT/Bill printer configured
-  if (localStorage.getItem('qdine_kot_printer_name')) return true;
-  return false;
+  return localStorage.getItem('qdine_is_print_station') === '1';
+}
+
+function getAuthHeaders(currentSlug: string) {
+  const token = typeof window !== 'undefined'
+    ? (localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || '')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    'x-restaurant-slug': currentSlug,
+    'Authorization': `Bearer ${token}`,
+  };
 }
 
 /**
@@ -32,9 +43,6 @@ export function isDevicePrintStation(): boolean {
  * the "Print Station", it listens for and prints incoming KOTs and Bills
  * across all pages (Orders, POS, Tables, Menu, Settings, etc.)
  * including manual prints requested from waiters' phones.
- *
- * Utilizes cross-tab localStorage deduplication (checkAndMarkDuplicatePrint)
- * to safely handle multiple tabs without deadlock on Android Chrome!
  * ============================================================
  */
 export function PrintStationListener() {
@@ -45,10 +53,15 @@ export function PrintStationListener() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // One-time cleanup of stale hub flags from previous pairing logic
+      if (!localStorage.getItem('qdine_station_v2')) {
+        localStorage.removeItem('qdine_is_print_station');
+        localStorage.setItem('qdine_station_v2', '1');
+      }
+
       const isStation = isDevicePrintStation();
       setStationActive(isStation);
       if (isStation) {
-        localStorage.setItem('qdine_is_print_station', '1');
         // Default auto-print to enabled on hub if not explicitly disabled
         if (localStorage.getItem('qdine_auto_print_kot') === null) {
           localStorage.setItem('qdine_auto_print_kot', 'true');
@@ -67,12 +80,13 @@ export function PrintStationListener() {
   useEffect(() => {
     if (!pusherClient || !restaurant) return;
 
-    const channelName = restaurant.pusher_channel || `queue-channel-${restaurant.id}`;
+    // Subscribe to standard channel pattern, ignoring deprecated pusher_channel column
+    const channelName = `queue-channel-${restaurant.id}`;
     const channel = pusherClient.subscribe(channelName);
 
     // 1. KOT Print Handler (Automatic order creation or Manual click from waiter/staff)
     const handleKotAutoPrint = async (data: any) => {
-      // Ignore test prints on PrintStationListener — test prints are handled directly by the Settings UI initiator
+      // Ignore test prints on PrintStationListener — test prints are handled directly by Settings UI
       if (data.is_test || data.ticket_number === 999 || String(data.order_id || '').startsWith('test-')) {
         return;
       }
@@ -84,8 +98,7 @@ export function PrintStationListener() {
       }
 
       // If it's an automatic order creation event, verify auto-print is enabled on this device.
-      // On designated Print Station, default auto-print to enabled unless explicitly set to 'false'.
-      // If it's a manual print request from waiter/staff (data.is_manual), ALWAYS PRINT regardless of auto-print toggle!
+      // If manual print request from waiter/staff (data.is_manual), ALWAYS PRINT regardless of auto-print toggle.
       const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
       if (!data.is_manual && !autoPrint) {
         return;
@@ -98,10 +111,24 @@ export function PrintStationListener() {
         return;
       }
 
-      // Pre-check duplicate print to prevent double toasts or parallel tab prints
-      if (checkAndMarkDuplicatePrint(data.ticket_number, data.counter_id, data.counter_name)) {
-        console.log(`[PrintStationListener] Duplicate suppressed for #${data.ticket_number} (${data.counter_name})`);
-        return;
+      // Compute distinct dedup ticket for add-on KOTs (they share the same ticket number and counter)
+      const dedupTicket = data.is_add_on
+        ? `${data.ticket_number}_addon_${data.timestamp || data.print_job_id || Date.now()}`
+        : data.ticket_number;
+
+      if (!data.is_manual) {
+        if (checkAndMarkDuplicatePrint(dedupTicket, data.counter_id, data.counter_name)) {
+          console.log(`[PrintStationListener] Duplicate suppressed for #${data.ticket_number} (${data.counter_name})`);
+          return;
+        }
+      } else {
+        // For manual reprint requests, notify if recently printed but never silently block
+        if (checkAndMarkDuplicatePrint(dedupTicket, data.counter_id, data.counter_name)) {
+          toast(`Reprinting KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+            icon: <PrinterIllustration size={22} status="printing" />,
+            duration: 3000,
+          });
+        }
       }
 
       console.time(`[Perf] KOT #${data.ticket_number} Total`);
@@ -113,12 +140,15 @@ export function PrintStationListener() {
         duration: 3000,
       });
 
+      const currentSlug = Array.isArray(slug) ? slug[0] : (slug || '');
+
       try {
         let base64Bytes = data.base64Bytes;
         if (!base64Bytes && data.print_job_id) {
           try {
-            const currentSlug = Array.isArray(slug) ? slug[0] : (slug || '');
-            const jobRes = await fetch(`/api/print/agent?jobId=${data.print_job_id}&slug=${encodeURIComponent(currentSlug)}`);
+            const jobRes = await fetch(`/api/print/agent?jobId=${data.print_job_id}&slug=${encodeURIComponent(currentSlug)}`, {
+              headers: getAuthHeaders(currentSlug),
+            });
             if (jobRes.ok) {
               const jobData = await jobRes.json();
               if (jobData.job?.raw_base64) {
@@ -130,13 +160,18 @@ export function PrintStationListener() {
           }
         }
 
-        const localKotPrinter = typeof window !== 'undefined' ? localStorage.getItem('qdine_kot_printer_name') : null;
+        // If payload is still missing, notify and clear mark so retry can proceed
+        if (!base64Bytes && !data.kotData) {
+          toast.error('Could not load print data');
+          clearPrintMark(dedupTicket, data.counter_id, data.counter_name);
+          return;
+        }
+
+        const localKotPrinter = typeof window !== 'undefined' ? (localStorage.getItem('qdine_kot_printer_name') || localStorage.getItem('qdine_bt_printer_name')) : null;
         const counterSavedDev = (typeof window !== 'undefined' && data.counter_name)
           ? localStorage.getItem(`qdine_bt_counter_${data.counter_name.trim().toLowerCase()}`)
           : null;
-        const targetKotPrinter = (data.printer_name && data.printer_name !== 'POS-80C')
-          ? data.printer_name
-          : (counterSavedDev || localKotPrinter || data.printer_name || 'POS-80C');
+        const targetKotPrinter = counterSavedDev || localKotPrinter || data.printer_name || 'POS-80C';
         const result = await printUnifiedThermalTicket({
           base64Bytes,
           kotData: data.kotData,
@@ -145,12 +180,8 @@ export function PrintStationListener() {
           counterId: data.counter_id,
           counterName: data.counter_name,
           isAutoPrint: true, // Print Station must always print silently; never open browser print dialog
+          skipDuplicateCheck: true, // PrintStationListener already deduplicated at entry!
         });
-
-        if (result.duplicate) {
-          console.log(`[PrintStationListener] Duplicate suppressed for #${data.ticket_number}`);
-          return;
-        }
 
         const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
@@ -158,13 +189,24 @@ export function PrintStationListener() {
             icon: <PrinterIllustration size={22} status="success" />,
             id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
           });
+
+          // Fire-and-forget mark print job complete on server
+          if (data.print_job_id) {
+            fetch('/api/print/agent', {
+              method: 'POST',
+              headers: getAuthHeaders(currentSlug),
+              body: JSON.stringify({ slug: currentSlug, action: 'complete', jobId: data.print_job_id }),
+            }).catch((err) => console.warn('Failed to mark print job complete:', err));
+          }
         } else {
+          clearPrintMark(dedupTicket, data.counter_id, data.counter_name);
           toast.error(result.message || '⚠️ Thermal printer not paired. Tap "Pair Printer" in Settings.', {
             id: `print-unpaired`,
             duration: 6000,
           });
         }
       } catch (err: any) {
+        clearPrintMark(dedupTicket, data.counter_id, data.counter_name);
         console.error('KOT print execution error:', err);
       } finally {
         console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
@@ -183,8 +225,10 @@ export function PrintStationListener() {
         return;
       }
 
+      const billTicketKey = `bill_${data.ticket_number}`;
+
       // Pre-check duplicate print for bills across tabs
-      if (checkAndMarkDuplicatePrint(`bill_${data.ticket_number}`, 'bill_printer', 'Bill Printer')) {
+      if (checkAndMarkDuplicatePrint(billTicketKey, 'bill_printer', 'Bill Printer')) {
         console.log(`[PrintStationListener] Duplicate bill suppressed for #${data.ticket_number}`);
         return;
       }
@@ -196,7 +240,7 @@ export function PrintStationListener() {
 
       try {
         const localBillType = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_type') : null;
-        const localBillPrinter = typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name')) : null;
+        const localBillPrinter = typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || localStorage.getItem('qdine_bt_printer_name')) : null;
         const localBillAddress = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_address') : null;
         const targetBillPrinter = (data.printer_name && data.printer_name !== 'POS-80C') ? data.printer_name : (localBillPrinter || data.printer_name || 'POS-80C');
 
@@ -211,6 +255,7 @@ export function PrintStationListener() {
           counterId: 'bill_printer',
           counterName: 'Bill Printer',
           isAutoPrint: true, // Print Station must always print silently; never open browser print dialog
+          skipDuplicateCheck: true, // PrintStationListener already deduplicated at entry!
         });
 
         if (result.success) {
@@ -219,23 +264,92 @@ export function PrintStationListener() {
             id: `bill-${data.order_id}-${Date.now()}`,
           });
         } else {
+          clearPrintMark(billTicketKey, 'bill_printer', 'Bill Printer');
           toast.error(result.message || '⚠️ Thermal printer not paired for Bill.', {
             id: `bill-unpaired`,
             duration: 6000,
           });
         }
       } catch (err: any) {
+        clearPrintMark(billTicketKey, 'bill_printer', 'Bill Printer');
         console.error('Bill print execution error on station:', err);
       }
     };
 
-    // Direct Pusher event bindings (No Web Lock deadlock on Android Chrome)
+    // 3. Missed Print Recovery: Check for unprinted jobs on tab focus or Pusher reconnect
+    const recoverMissedPrints = async () => {
+      if (!isDevicePrintStation()) return;
+      try {
+        const currentSlug = Array.isArray(slug) ? slug[0] : (slug || '');
+        const res = await fetch(`/api/print/agent?mode=pending&slug=${encodeURIComponent(currentSlug)}`, {
+          headers: getAuthHeaders(currentSlug),
+        });
+        if (!res.ok) return;
+        const resData = await res.json();
+        const pendingJobs = resData.jobs || [];
+        const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+
+        const validJobs = pendingJobs
+          .filter((j: any) => {
+            const created = new Date(j.created_at).getTime();
+            return !isNaN(created) && created > tenMinutesAgo;
+          })
+          .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        for (const job of validJobs) {
+          const ticketNo = job.ticket_number;
+          if (checkAndMarkDuplicatePrint(ticketNo, undefined, job.counter_name)) {
+            continue;
+          }
+
+          const localKotPrinter = typeof window !== 'undefined' ? (localStorage.getItem('qdine_kot_printer_name') || localStorage.getItem('qdine_bt_printer_name')) : null;
+          const counterSavedDev = (typeof window !== 'undefined' && job.counter_name)
+            ? localStorage.getItem(`qdine_bt_counter_${job.counter_name.trim().toLowerCase()}`)
+            : null;
+          const targetKotPrinter = counterSavedDev || localKotPrinter || job.printer_name || 'POS-80C';
+
+          const result = await printUnifiedThermalTicket({
+            base64Bytes: job.raw_base64,
+            kotData: { ticketNumber: ticketNo, counterName: job.counter_name } as any,
+            printerName: targetKotPrinter,
+            counterName: job.counter_name,
+            isAutoPrint: true,
+            skipDuplicateCheck: true,
+          });
+
+          if (result.success) {
+            fetch('/api/print/agent', {
+              method: 'POST',
+              headers: getAuthHeaders(currentSlug),
+              body: JSON.stringify({ slug: currentSlug, action: 'complete', jobId: job.id }),
+            }).catch(() => {});
+          } else {
+            clearPrintMark(ticketNo, undefined, job.counter_name);
+          }
+        }
+      } catch (err) {
+        console.warn('Missed print recovery check failed:', err);
+      }
+    };
+
+    // Direct Pusher event bindings
     channel.bind('kot_auto_print', handleKotAutoPrint);
     channel.bind('bill_print', handleBillPrint);
+
+    // Reconnection & visibility handlers for missed prints
+    pusherClient?.connection?.bind('connected', recoverMissedPrints);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        recoverMissedPrints();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       channel.unbind('kot_auto_print', handleKotAutoPrint);
       channel.unbind('bill_print', handleBillPrint);
+      pusherClient?.connection?.unbind('connected', recoverMissedPrints);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [restaurant, slug]);
 

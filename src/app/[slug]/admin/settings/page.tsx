@@ -120,11 +120,8 @@ export default function AdminSettings() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedStation = localStorage.getItem('qdine_is_print_station') === '1' || Boolean(localStorage.getItem('qdine_bt_printer_name'));
+      const savedStation = localStorage.getItem('qdine_is_print_station') === '1';
       setIsPrintStation(savedStation);
-      if (savedStation && localStorage.getItem('qdine_is_print_station') !== '1') {
-        localStorage.setItem('qdine_is_print_station', '1');
-      }
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot') !== 'false';
       setAutoPrintKot(savedStation && savedAutoPrint);
     }

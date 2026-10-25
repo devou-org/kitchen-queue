@@ -333,10 +333,14 @@ export async function POST(request: NextRequest) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
     }
 
-    // 🖨️ AUTO-PRINT KOT PER COUNTER: Trigger immediately so print station receives slip
-    if (order && (order.status === 'PREPARING' || order.status === 'PENDING')) {
+    // 🖨️ AUTO-PRINT KOT PER COUNTER: Trigger only for PREPARING orders when in KOT mode
+    const isKotMode = ((restaurant as any).kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+    if (order && order.status === 'PREPARING' && isKotMode) {
       try {
-        await autoQueueAndBroadcastKot(restaurant.id, order.id, true);
+        await Promise.race([
+          autoQueueAndBroadcastKot(restaurant.id, order.id, true),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('KOT broadcast timed out after 8s')), 8000)),
+        ]);
       } catch (kotErr) {
         console.error('❌ Automatic KOT print error on order creation:', kotErr);
       }
