@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getOrders, getOrderStats, createOrder, createUser, getRestaurantBySlug } from '@/lib/db';
 import { verifyToken, requireAdmin } from '@/lib/auth';
 import { validatePhone } from '@/lib/validators';
@@ -335,18 +335,10 @@ export async function POST(request: NextRequest) {
 
     // 🖨️ AUTO-PRINT KOT PER COUNTER: Trigger immediately so print station receives slip
     if (order && (order.status === 'PREPARING' || order.status === 'PENDING')) {
-      const runKot = async () => {
-        try {
-          await autoQueueAndBroadcastKot(restaurant.id, order.id, true);
-        } catch (kotErr) {
-          console.error('❌ Automatic KOT print error on order creation:', kotErr);
-        }
-      };
-
-      if (typeof after === 'function') {
-        after(runKot);
-      } else {
-        runKot();
+      try {
+        await autoQueueAndBroadcastKot(restaurant.id, order.id, true);
+      } catch (kotErr) {
+        console.error('❌ Automatic KOT print error on order creation:', kotErr);
       }
     }
 
