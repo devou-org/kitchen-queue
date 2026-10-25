@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Plus, LayoutGrid, Users, RefreshCw, QrCode, Search, X } from 'lucide-react';
+import { Plus, LayoutGrid, Users, RefreshCw, QrCode, Search, X, Merge, ShoppingBag, Utensils, Unlink, Check } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useRestaurant } from '@/hooks/useRestaurant';
@@ -12,11 +12,15 @@ import { TableCard } from '@/components/modules/tables/TableCard';
 import { OrderDetailsView } from '@/components/modules/orders/OrderDetailsView';
 import { orderService } from '@/app/services/orders.api';
 import { Order } from '@/types';
+import { formatPrice } from '@/lib/format';
 import { CreateTableModal } from '@/components/modules/tables/CreateTableModal';
 import { EditTableModal } from '@/components/modules/tables/EditTableModal';
 import { TableQRModal } from '@/components/modules/tables/TableQRModal';
 import { DeleteTableModal } from '@/components/modules/tables/DeleteTableModal';
+import { UnmergeTableModal } from '@/components/modules/tables/UnmergeTableModal';
+import { MergeConfirmModal } from '@/components/modules/tables/MergeConfirmModal';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
+import { Loading } from '@/components/ui/Loading';
 
 export default function AdminTablesPage() {
   const { slug } = useParams();
@@ -35,17 +39,34 @@ export default function AdminTablesPage() {
   const [orderModalLoading, setOrderModalLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addingTable, setAddingTable] = useState(false);
+  
+  // Merge Flow: Interactive Selection Mode + Confirm Popup
+  const [mergeSourceTable, setMergeSourceTable] = useState<RestaurantTable | null>(null);
+  const [mergeTargetTable, setMergeTargetTable] = useState<RestaurantTable | null>(null);
+  const [isConfirmMergeOpen, setIsConfirmMergeOpen] = useState(false);
+  const [mergeLoading, setMergeLoading] = useState(false);
+
   const [selectedEditTable, setSelectedEditTable] = useState<RestaurantTable | null>(null);
   const [selectedQRTable, setSelectedQRTable] = useState<RestaurantTable | null>(null);
   const [tableToDelete, setTableToDelete] = useState<RestaurantTable | null>(null);
   const [deletingTable, setDeletingTable] = useState(false);
+  const [tableToUnmerge, setTableToUnmerge] = useState<RestaurantTable | null>(null);
+  const [unmergingTable, setUnmergingTable] = useState(false);
 
   const router = useRouter();
   const selectedTable = selectedTableId ? (tables.find(t => t.id === selectedTableId) || null) : null;
 
-  const handleTakeOrder = (table: RestaurantTable) => {
+  const handleTakeOrder = (table: RestaurantTable, customMergedTableNumbers?: string[]) => {
     if (!slugStr) return;
-    router.push(`/${slugStr}/admin/pos?table=${encodeURIComponent(table.table_number)}`);
+    const targetTableNum = table.parent_table_number || table.table_number;
+    let url = `/${slugStr}/admin/pos?table=${encodeURIComponent(targetTableNum)}`;
+    const mergedList = (customMergedTableNumbers && customMergedTableNumbers.length > 0)
+      ? customMergedTableNumbers
+      : (table.merged_table_numbers || []);
+    if (mergedList && mergedList.length > 0) {
+      url += `&merged=${encodeURIComponent(mergedList.join('+'))}`;
+    }
+    router.push(url);
   };
 
   const handleSelectTable = (table: RestaurantTable, specificOrder?: any) => {
@@ -55,7 +76,7 @@ export default function AdminTablesPage() {
     setSelectedOrder(specificOrder || activeOrds[0]);
   };
 
-  const handleOrderStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string) => {
+  const handleOrderStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string, pSplit?: any) => {
     setOrderModalLoading(true);
     try {
       const res = await orderService.updateOrder(id, {
@@ -63,6 +84,7 @@ export default function AdminTablesPage() {
         is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
         payment_method: pMethod || undefined,
+        payment_split: pSplit || undefined,
       });
       if (res.success) {
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
@@ -72,6 +94,7 @@ export default function AdminTablesPage() {
           status: newStatus,
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
+          payment_split: pSplit !== undefined ? pSplit : prev.payment_split,
           is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid,
         } : null);
       } else {
@@ -122,7 +145,7 @@ export default function AdminTablesPage() {
       const res = await fetch('/api/tables', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ table_number: tableNumber, capacity })
+        body: JSON.stringify({ table_number: tableNumber, capacity: Math.min(14, Math.max(1, capacity)) })
       });
 
       const data = await res.json();
@@ -164,14 +187,128 @@ export default function AdminTablesPage() {
     }
   };
 
-  // Filtered tables list
+  const handleConfirmMerge = async () => {
+    if (!mergeSourceTable || !mergeTargetTable) return;
+    setMergeLoading(true);
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (slugStr) headers['x-restaurant-slug'] = slugStr;
+
+      const res = await fetch('/api/tables/merge', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          primary_table_id: mergeSourceTable.id,
+          secondary_table_ids: [mergeTargetTable.id]
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || `Table #${mergeSourceTable.table_number} and Table #${mergeTargetTable.table_number} merged!`);
+        setIsConfirmMergeOpen(false);
+        setMergeSourceTable(null);
+        setMergeTargetTable(null);
+        fetchTables();
+      } else {
+        toast.error(data.error || 'Failed to merge tables');
+      }
+    } catch {
+      toast.error('Network error merging tables');
+    } finally {
+      setMergeLoading(false);
+    }
+  };
+
+  const handleStartMergeMode = (table?: RestaurantTable) => {
+    if (table) {
+      setMergeSourceTable(table);
+    } else {
+      // User clicked "Merge Tables" button at the top header
+      setMergeSourceTable(null);
+    }
+  };
+
+  const handleCancelMergeMode = () => {
+    setMergeSourceTable(null);
+    setMergeTargetTable(null);
+    setIsConfirmMergeOpen(false);
+  };
+
+  const handleTableClickInMergeMode = (targetTable: RestaurantTable) => {
+    if (!mergeSourceTable) {
+      // This is the first table chosen
+      setMergeSourceTable(targetTable);
+      return;
+    }
+
+    if (mergeSourceTable.id === targetTable.id) {
+      // Same table clicked, cancel selection
+      setMergeSourceTable(null);
+      setMergeTargetTable(null);
+      setIsConfirmMergeOpen(false);
+      return;
+    }
+
+    const isSameGroup =
+      (mergeSourceTable.merged_into_table_id && mergeSourceTable.merged_into_table_id === targetTable.id) ||
+      (targetTable.merged_into_table_id && targetTable.merged_into_table_id === mergeSourceTable.id) ||
+      (mergeSourceTable.merged_into_table_id && targetTable.merged_into_table_id && mergeSourceTable.merged_into_table_id === targetTable.merged_into_table_id);
+
+    if (isSameGroup) {
+      toast.error('These tables are already part of the same merged group');
+      return;
+    }
+
+    // Immediately open merge confirmation popup for this second table
+    setMergeTargetTable(targetTable);
+    setIsConfirmMergeOpen(true);
+  };
+
+  const handleConfirmUnmerge = async (table: RestaurantTable) => {
+    setUnmergingTable(true);
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (slugStr) headers['x-restaurant-slug'] = slugStr;
+
+      const res = await fetch('/api/tables/unmerge', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ table_id: table.id })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || 'Table(s) unmerged successfully');
+        setTableToUnmerge(null);
+        fetchTables();
+      } else {
+        toast.error(data.error || 'Failed to unmerge tables');
+      }
+    } catch {
+      toast.error('Network error unmerging table');
+    } finally {
+      setUnmergingTable(false);
+    }
+  };
+
+  const handleUnmergeTable = (table: RestaurantTable) => {
+    setTableToUnmerge(table);
+  };
+
+  // All tables are displayed as individual cards
   const filteredTables = tables.filter(t => {
     if (filter === 'AVAILABLE' && t.status !== 'AVAILABLE') return false;
     if (filter === 'OCCUPIED' && t.status !== 'OCCUPIED') return false;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      const matchesTableNumber = String(t.table_number || '').toLowerCase().includes(q);
+      const matchesTableNumber = String(t.table_number || '').toLowerCase().includes(q) ||
+        (t.merged_table_numbers || []).some(n => String(n).toLowerCase().includes(q));
       const matchesCustomer = t.active_orders?.some(
         (o: any) =>
           (o.customer_name != null && String(o.customer_name).toLowerCase().includes(q)) ||
@@ -186,14 +323,51 @@ export default function AdminTablesPage() {
 
   const occupiedCount = tables.filter(t => t.status === 'OCCUPIED').length;
   const availableCount = tables.filter(t => t.status === 'AVAILABLE').length;
-  // const reservedCount = tables.filter((t: any) => t.status === 'RESERVED').length;
 
   const totalCapacity = tables.reduce((sum, t) => sum + (Number(t.capacity) || 0), 0);
-  const totalSeatedGuests = tables.reduce((sum, t) => {
-    const activeOrds = t.active_orders || [];
-    return sum + activeOrds.reduce((s: number, o: any) => s + (Number(o.party_size) || 1), 0);
-  }, 0);
+  const uniqueOrdersMap = new Map<string, any>();
+  for (const t of tables) {
+    for (const o of t.active_orders || []) {
+      const key = o.id || o.ticket_number;
+      if (key && !uniqueOrdersMap.has(key)) {
+        uniqueOrdersMap.set(key, o);
+      }
+    }
+  }
+  const totalSeatedGuests = Array.from(uniqueOrdersMap.values()).reduce(
+    (sum, o) => sum + (Number(o.party_size) || 1),
+    0
+  );
   const totalRemainingSeats = Math.max(0, totalCapacity - totalSeatedGuests);
+
+  // Group merged tables together so merged partner cards render side-by-side inside the combined outline
+  const renderedGroupKeys = new Set<string>();
+  const tableGroups: { key: string; isMergedGroup: boolean; groupTables: RestaurantTable[] }[] = [];
+
+  for (const table of filteredTables) {
+    const primaryId = table.merged_into_table_id || (table.merged_table_ids && table.merged_table_ids.length > 0 ? table.id : null);
+    
+    if (primaryId) {
+      if (renderedGroupKeys.has(primaryId)) continue;
+      renderedGroupKeys.add(primaryId);
+
+      // Find all tables that belong to this merged group that are in filteredTables
+      const members = filteredTables.filter(
+        t => t.id === primaryId || t.merged_into_table_id === primaryId
+      );
+      tableGroups.push({
+        key: `group-${primaryId}`,
+        isMergedGroup: true,
+        groupTables: members
+      });
+    } else {
+      tableGroups.push({
+        key: `single-${table.id}`,
+        isMergedGroup: false,
+        groupTables: [table]
+      });
+    }
+  }
 
   return (
     <AdminContentWrapper fullWidth style={{ paddingTop: 0, paddingLeft: 0, paddingRight: 0, maxWidth: '100%' }}>
@@ -209,6 +383,24 @@ export default function AdminTablesPage() {
           border-bottom: 1px solid var(--border) !important;
           background: #FFFFFF !important;
           box-sizing: border-box !important;
+        }
+
+        @media (max-width: 640px) {
+          .merged-table-group-wrapper {
+            grid-column: span 1 !important;
+          }
+          .merged-tables-subgrid {
+            grid-template-columns: 1fr !important;
+          }
+          .merged-subtable-card {
+            border-left: none !important;
+            border-top: 1px dashed #CBD5E1 !important;
+            border-radius: 0 !important;
+            padding: 12px 14px !important;
+          }
+          .merged-pos-left {
+            border-top: none !important;
+          }
         }
 
         .tables-page-header .admin-page-header-container {
@@ -416,6 +608,15 @@ export default function AdminTablesPage() {
             padding: 12px 14px !important;
           }
         }
+
+        .merged-table-group-wrapper,
+        .merged-subtable-card,
+        .tables-toolbar,
+        .tables-actions {
+          -webkit-touch-callout: none !important;
+          -webkit-user-select: none !important;
+          user-select: none !important;
+        }
       `}</style>
       <AdminPageHeader
         className="tables-page-header"
@@ -600,8 +801,8 @@ export default function AdminTablesPage() {
 
       {/* Tables Grid */}
       {loading ? (
-        <div style={{ padding: '60px', textAlign: 'center' }}>
-          <div className="loader" style={{ margin: '0 auto' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '350px', width: '100%' }}>
+          <div className="loader" />
         </div>
       ) : filteredTables.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '60px 20px', color: '#64748B' }}>
@@ -633,22 +834,458 @@ export default function AdminTablesPage() {
           ) : null}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-          {filteredTables.map(table => (
-            <TableCard
-              key={table.id}
-              table={table}
-              onSelect={(t, ord) => handleSelectTable(t, ord)}
-              onTakeOrder={(t) => handleTakeOrder(t)}
-              onEdit={(t) => setSelectedEditTable(t)}
-              onViewQR={(t) => setSelectedQRTable(t)}
-              onDelete={(t) => setTableToDelete(t)}
-              primaryColor={primaryColor}
-            />
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', alignItems: 'stretch' }}>
+          {tableGroups.map(group => {
+            if (group.isMergedGroup && group.groupTables.length > 1) {
+              const leadTable = group.groupTables.find(t => !t.merged_into_table_id) || group.groupTables[0];
+              const childTables = group.groupTables.filter(t => t.id !== leadTable.id);
+              const combinedHeading = `Table #${leadTable.table_number}+${childTables.map(c => c.table_number).join('+')}`;
+
+              // Combine and deduplicate active orders from the merged tables into one list
+              const allMergedOrdersMap = new Map<string, any>();
+              for (const t of group.groupTables) {
+                for (const o of t.active_orders || []) {
+                  const key = o.id || o.ticket_number;
+                  if (key && !allMergedOrdersMap.has(key)) {
+                    allMergedOrdersMap.set(key, o);
+                  }
+                }
+              }
+              const allMergedOrders = Array.from(allMergedOrdersMap.values());
+              const hasActiveOrders = allMergedOrders.length > 0;
+              const mergedCombinedTotal = allMergedOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0);
+              const totalMergedSeated = allMergedOrders.reduce((sum, o) => sum + (Number(o.party_size) || 1), 0);
+              const isSourceMergedGroup = Boolean(mergeSourceTable && group.groupTables.some(t => t.id === mergeSourceTable.id));
+              const isTargetMergedGroup = Boolean(mergeTargetTable && group.groupTables.some(t => t.id === mergeTargetTable.id));
+
+              return (
+                <div
+                  key={group.key}
+                  className="merged-table-group-wrapper"
+                  onClick={() => {
+                    if (mergeSourceTable && !isSourceMergedGroup) {
+                      handleTableClickInMergeMode(leadTable);
+                    }
+                  }}
+                  style={{
+                    gridColumn: group.groupTables.length >= 3 ? 'span 3' : 'span 2',
+                    border: (isSourceMergedGroup || isTargetMergedGroup) ? `2px solid ${primaryColor}` : `1.5px solid ${primaryColor}70`,
+                    borderRadius: '12px',
+                    padding: 0,
+                    background: '#FFFFFF',
+                    boxShadow: (isSourceMergedGroup || isTargetMergedGroup)
+                      ? `0 0 0 3px ${primaryColor}25, 0 8px 20px rgba(0, 0, 0, 0.08)`
+                      : `0 4px 14px ${primaryColor}12`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'visible',
+                    position: 'relative',
+                    cursor: mergeSourceTable && !isSourceMergedGroup ? 'pointer' : 'default',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    transform: (isSourceMergedGroup || isTargetMergedGroup) ? 'scale(1.01)' : 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                  }}
+                >
+                  {/* Unified Minimal Header for Merged Table Group */}
+                  <div
+                    style={{
+                      padding: '8px 14px 6px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      borderBottom: '1px solid #F1F5F9',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      <h3
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 800,
+                          color: '#0F172A',
+                          margin: 0,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={combinedHeading}
+                      >
+                        {combinedHeading}
+                      </h3>
+
+                      {/* Single Merged Badge */}
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '1px 6px',
+                          borderRadius: '5px',
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          background: '#FEF3C7',
+                          color: '#B45309',
+                          border: '1px solid #FDE68A',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Merge size={11} /> Merged ({group.groupTables.length})
+                      </span>
+                    </div>
+
+                    {/* Single Actions Pair: Merge another & Unmerge */}
+                    {!mergeSourceTable && (
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartMergeMode(leadTable);
+                          }}
+                          title="Merge with another table"
+                          style={{
+                            padding: '4px 6px',
+                            borderRadius: '6px',
+                            border: '1px solid #E2E8F0',
+                            background: '#F8FAFC',
+                            color: primaryColor,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#F1F5F9';
+                            e.currentTarget.style.borderColor = primaryColor;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#F8FAFC';
+                            e.currentTarget.style.borderColor = '#E2E8F0';
+                          }}
+                        >
+                          <Merge size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTableToUnmerge(leadTable);
+                          }}
+                          title="Unmerge table"
+                          style={{
+                            padding: '4px 6px',
+                            borderRadius: '6px',
+                            border: '1px solid #FEE2E2',
+                            background: '#FEF2F2',
+                            color: '#DC2626',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#FEE2E2';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#FEF2F2';
+                          }}
+                        >
+                          <Unlink size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Top: Side-by-side joined table cards */}
+                  <div
+                    className="merged-tables-subgrid"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(${group.groupTables.length}, minmax(0, 1fr))`,
+                      gap: 0,
+                      alignItems: 'stretch',
+                      width: '100%',
+                    }}
+                  >
+                    {group.groupTables.map((table, idx) => {
+                      const isFirst = idx === 0;
+                      const isLast = idx === group.groupTables.length - 1;
+                      const position: 'left' | 'right' | 'middle' = isFirst ? 'left' : isLast ? 'right' : 'middle';
+
+                      // Calculate seated guests for this specific table in the merged group
+                      let seatedGuestsForThisTable = 0;
+                      if (hasActiveOrders) {
+                        let priorCapacity = 0;
+                        for (let i = 0; i < idx; i++) {
+                          priorCapacity += Number(group.groupTables[i].capacity) || 0;
+                        }
+                        const tableCap = Number(table.capacity) || 0;
+                        const remainingToDistribute = Math.max(0, totalMergedSeated - priorCapacity);
+                        seatedGuestsForThisTable = Math.min(tableCap, remainingToDistribute);
+                      }
+
+                      return (
+                        <TableCard
+                          key={table.id}
+                          table={{
+                            ...table,
+                            status: hasActiveOrders ? 'OCCUPIED' : table.status,
+                            active_orders: allMergedOrders,
+                            active_orders_count: allMergedOrders.length,
+                          }}
+                          joinedCardPosition={position}
+                          displayTitle={isFirst ? combinedHeading : ''}
+                          hideHeader={true}
+                          hideActiveOrders={true}
+                          mergedOrdersContext={allMergedOrders}
+                          allocatedSeatedGuests={hasActiveOrders ? seatedGuestsForThisTable : undefined}
+                          onSelect={(t, ord) => {
+                            if (mergeSourceTable) {
+                              handleTableClickInMergeMode(t);
+                            } else {
+                              handleSelectTable(leadTable, ord || allMergedOrders[0]);
+                            }
+                          }}
+                          onTakeOrder={() => {
+                            if (mergeSourceTable) {
+                              handleTableClickInMergeMode(leadTable);
+                            } else {
+                              handleTakeOrder(leadTable, childTables.map(c => c.table_number));
+                            }
+                          }}
+                          onEdit={(t) => setSelectedEditTable(t)}
+                          onViewQR={(t) => setSelectedQRTable(t)}
+                          onDelete={(t) => setTableToDelete(t)}
+                          onUnmerge={() => setTableToUnmerge(leadTable)}
+                          onMerge={() => handleStartMergeMode(leadTable)}
+                          isMergeSource={mergeSourceTable?.id === table.id}
+                          isMergeTarget={mergeTargetTable?.id === table.id}
+                          isMergeSelectionMode={Boolean(mergeSourceTable)}
+                          onSelectForMerge={(t) => handleTableClickInMergeMode(t)}
+                          primaryColor={primaryColor}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Bottom: Single unified active orders tab for the merged table pair */}
+                  <div style={{ padding: '0 12px 10px 12px' }}>
+                    {hasActiveOrders ? (
+                      <div
+                        onClick={() => {
+                          if (mergeSourceTable) {
+                            handleTableClickInMergeMode(leadTable);
+                          } else {
+                            handleSelectTable(leadTable, allMergedOrders[0]);
+                          }
+                        }}
+                        style={{
+                          background: '#FFFBEB',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          border: '1px solid #FEF08A',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#F59E0B';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(245, 158, 11, 0.15)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#FEF08A';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                        title="Click to view merged active orders"
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#854D0E', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ShoppingBag size={12} /> Active Orders ({allMergedOrders.length})
+                          </span>
+                          <span style={{ fontSize: '12px', fontWeight: 900, color: '#A16207' }}>
+                            {formatPrice(mergedCombinedTotal)}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }}>
+                          {allMergedOrders.map((o: any, idx: number) => {
+                            const ticketNum = String(o.ticket_number || '').padStart(3, '0');
+                            const status = o.status || 'PENDING';
+                            return (
+                              <button
+                                key={o.id || idx}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectTable(leadTable, o);
+                                }}
+                                style={{
+                                  background: '#FFFFFF',
+                                  border: '1px solid #FEF08A',
+                                  borderRadius: '6px',
+                                  padding: '2px 6px',
+                                  fontSize: '10.5px',
+                                  fontWeight: 700,
+                                  color: '#854D0E',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = '#EAB308';
+                                  e.currentTarget.style.background = '#FEF9C3';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = '#FEF08A';
+                                  e.currentTarget.style.background = '#FFFFFF';
+                                }}
+                                title={`Click to view Order #${ticketNum}`}
+                              >
+                                #{ticketNum} ({status})
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (mergeSourceTable) {
+                            if (!isSourceMergedGroup) {
+                              handleTableClickInMergeMode(leadTable);
+                            }
+                          } else {
+                            handleTakeOrder(leadTable, childTables.map(c => c.table_number));
+                          }
+                        }}
+                        style={{
+                          background: isTargetMergedGroup ? `${primaryColor}15` : isSourceMergedGroup ? `${primaryColor}10` : '#F8FAFC',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          border: (isSourceMergedGroup || isTargetMergedGroup) ? `1.5px solid ${primaryColor}` : mergeSourceTable ? '1.5px dashed #CBD5E1' : '1px dashed #CBD5E1',
+                          color: (isSourceMergedGroup || isTargetMergedGroup) ? primaryColor : mergeSourceTable ? '#475569' : '#64748B',
+                          fontSize: '11.5px',
+                          textAlign: 'center',
+                          cursor: mergeSourceTable && isSourceMergedGroup ? 'default' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (mergeSourceTable && !isSourceMergedGroup && !isTargetMergedGroup) {
+                            e.currentTarget.style.borderColor = primaryColor;
+                            e.currentTarget.style.color = primaryColor;
+                            e.currentTarget.style.background = '#FFFFFF';
+                          } else if (!mergeSourceTable) {
+                            e.currentTarget.style.borderColor = primaryColor;
+                            e.currentTarget.style.color = primaryColor;
+                            e.currentTarget.style.background = '#FFFFFF';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (mergeSourceTable && !isSourceMergedGroup && !isTargetMergedGroup) {
+                            e.currentTarget.style.borderColor = '#CBD5E1';
+                            e.currentTarget.style.color = '#475569';
+                            e.currentTarget.style.background = '#F8FAFC';
+                          } else if (!mergeSourceTable) {
+                            e.currentTarget.style.borderColor = '#CBD5E1';
+                            e.currentTarget.style.color = '#64748B';
+                            e.currentTarget.style.background = '#F8FAFC';
+                          }
+                        }}
+                        title={
+                          isSourceMergedGroup
+                            ? `Table Group (Selected)`
+                            : isTargetMergedGroup
+                            ? `Selected to merge`
+                            : mergeSourceTable
+                            ? `Click to merge with Table Group #${leadTable.table_number}`
+                            : `Click to take order for merged Table #${leadTable.table_number}`
+                        }
+                      >
+                        {isSourceMergedGroup ? (
+                          <>
+                            <Merge size={13} color={primaryColor} />
+                            <span style={{ fontWeight: 700, color: primaryColor }}>Table Group (Selected)</span>
+                          </>
+                        ) : isTargetMergedGroup ? (
+                          <>
+                            <Check size={13} color={primaryColor} />
+                            <span style={{ fontWeight: 700, color: primaryColor }}>Selected to merge</span>
+                          </>
+                        ) : mergeSourceTable ? (
+                          <>
+                            <Merge size={13} color={primaryColor} />
+                            <span style={{ fontWeight: 700, color: '#0F172A' }}>Click to merge with this table group</span>
+                          </>
+                        ) : (
+                          <>
+                            <Utensils size={13} color={primaryColor} />
+                            <span>Available • Click to take order</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            const table = group.groupTables[0];
+            return (
+              <TableCard
+                key={table.id}
+                table={table}
+                onSelect={(t, ord) => {
+                  if (mergeSourceTable) {
+                    handleTableClickInMergeMode(t);
+                  } else {
+                    handleSelectTable(t, ord);
+                  }
+                }}
+                onTakeOrder={(t) => {
+                  if (mergeSourceTable) {
+                    handleTableClickInMergeMode(t);
+                  } else {
+                    handleTakeOrder(t);
+                  }
+                }}
+                onEdit={(t) => setSelectedEditTable(t)}
+                onViewQR={(t) => setSelectedQRTable(t)}
+                onDelete={(t) => setTableToDelete(t)}
+                onUnmerge={(t) => setTableToUnmerge(t)}
+                onMerge={(t) => handleStartMergeMode(t)}
+                isMergeSource={mergeSourceTable?.id === table.id}
+                isMergeTarget={mergeTargetTable?.id === table.id}
+                isMergeSelectionMode={Boolean(mergeSourceTable)}
+                onSelectForMerge={(t) => handleTableClickInMergeMode(t)}
+                primaryColor={primaryColor}
+              />
+            );
+          })}
         </div>
       )}
       </div>
+
+      {/* Merge Confirmation Modal (Triggered on clicking second table) */}
+      <MergeConfirmModal
+        isOpen={isConfirmMergeOpen}
+        onClose={handleCancelMergeMode}
+        onConfirm={handleConfirmMerge}
+        sourceTable={mergeSourceTable}
+        targetTable={mergeTargetTable}
+        loading={mergeLoading}
+        primaryColor={primaryColor}
+      />
 
       {/* Slide-over Order Details Drawer */}
       {selectedOrder && (
@@ -668,7 +1305,7 @@ export default function AdminTablesPage() {
         />
       )}
 
-      {/* Modals */}
+
       <CreateTableModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -699,6 +1336,13 @@ export default function AdminTablesPage() {
         onClose={() => setTableToDelete(null)}
         onConfirmDelete={handleConfirmDelete}
         loading={deletingTable}
+      />
+
+      <UnmergeTableModal
+        table={tableToUnmerge}
+        onClose={() => setTableToUnmerge(null)}
+        onConfirmUnmerge={handleConfirmUnmerge}
+        loading={unmergingTable}
       />
     </AdminContentWrapper>
   );

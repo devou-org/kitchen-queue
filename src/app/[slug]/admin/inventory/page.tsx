@@ -475,7 +475,9 @@ export default function InventoryDashboardPage() {
           </div>
 
           {loading ? (
-            <div style={{ padding: '30px', textAlign: 'center', color: '#94A3B8' }}>Loading...</div>
+            <div style={{ padding: '30px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '160px' }}>
+              <div className="loader" />
+            </div>
           ) : !data?.low_stock_items?.length ? (
             <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
               ✓ All ingredients are currently above minimum stock levels.
@@ -571,7 +573,9 @@ export default function InventoryDashboardPage() {
           </div>
 
           {loading ? (
-            <div style={{ padding: '30px', textAlign: 'center', color: '#94A3B8' }}>Loading...</div>
+            <div style={{ padding: '30px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '160px' }}>
+              <div className="loader" />
+            </div>
           ) : !data?.expiring_soon?.length ? (
             <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
               ✓ No batches expiring in the next 7 days.
@@ -654,7 +658,9 @@ export default function InventoryDashboardPage() {
           </div>
 
           {loading ? (
-            <div style={{ padding: '30px', textAlign: 'center', color: '#94A3B8' }}>Loading...</div>
+            <div style={{ padding: '30px 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '160px' }}>
+              <div className="loader" />
+            </div>
           ) : !data?.recent_movements?.length ? (
             <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
               No recent movements logged.

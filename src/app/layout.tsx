@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import Script from 'next/script';
+import { GlobalLoadingScreen } from '@/components/ui/Loading';
 
 export const metadata: Metadata = {
   title: "Renjz Kitchen | Taste of Home in every bite",
@@ -40,13 +41,14 @@ export default function RootLayout({
         {children}
         <Toaster
           position="top-right"
-          containerStyle={{ zIndex: 999999 }}
+          containerStyle={{ zIndex: 9999999 }}
           toastOptions={{
             duration: 1000,
             style: {
               fontFamily: 'Inter, sans-serif',
               fontSize: '14px',
               fontWeight: 500,
+              zIndex: 9999999,
             },
             success: {
               duration: 1000,
@@ -64,6 +66,7 @@ export default function RootLayout({
             },
           }}
         />
+        <GlobalLoadingScreen />
       </body>
     </html>
   );
