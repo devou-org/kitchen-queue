@@ -12,17 +12,29 @@ import {
   checkAndMarkDuplicatePrint,
   clearPrintMark,
 } from '@/lib/hardware-printer';
+import { isQzConnected, connectQzTray } from '@/lib/qz-printer';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { useKeepAwake } from '@/hooks/useKeepAwake';
 
 /**
  * Check if the current browser/device is acting as the Print Station / Hub.
- * ONLY returns true when explicitly designated in settings ('qdine_is_print_station' === '1'),
- * preventing waiter phones that pair a Bluetooth printer from hijacking station print traffic!
+ * Automatically true on desktop PCs running QZ Tray or designated in settings ('qdine_is_print_station' === '1').
+ * Guards against waiter mobile phones hijacking station print traffic.
  */
 export function isDevicePrintStation(): boolean {
   if (typeof window === 'undefined') return false;
-  return localStorage.getItem('qdine_is_print_station') === '1';
+  const explicit = localStorage.getItem('qdine_is_print_station');
+  if (explicit === '1') return true;
+  if (explicit === '0') return false;
+
+  // If QZ Tray is active or previously connected on this desktop PC, it IS the print station
+  if (isQzConnected() || localStorage.getItem('qdine_qz_active') === '1') {
+    return true;
+  }
+
+  // Desktop PCs default to true, while mobile phones default to false
+  const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+  return !isMobile;
 }
 
 function getAuthHeaders(currentSlug: string) {
@@ -53,10 +65,18 @@ export function PrintStationListener() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // One-time cleanup of stale hub flags from previous pairing logic
-      if (!localStorage.getItem('qdine_station_v2')) {
-        localStorage.removeItem('qdine_is_print_station');
-        localStorage.setItem('qdine_station_v2', '1');
+      const isAndroid = /android/i.test(navigator.userAgent);
+      if (!isAndroid) {
+        // Automatically connect to local QZ Tray on desktop so incoming orders can print immediately
+        connectQzTray(1)
+          .then((res) => {
+            if (res.success) {
+              localStorage.setItem('qdine_qz_active', '1');
+              localStorage.setItem('qdine_is_print_station', '1');
+              setStationActive(true);
+            }
+          })
+          .catch(() => {});
       }
 
       const isStation = isDevicePrintStation();
@@ -171,12 +191,13 @@ export function PrintStationListener() {
         const counterSavedDev = (typeof window !== 'undefined' && data.counter_name)
           ? localStorage.getItem(`qdine_bt_counter_${data.counter_name.trim().toLowerCase()}`)
           : null;
-        const targetKotPrinter = counterSavedDev || localKotPrinter || data.printer_name || 'POS-80C';
+        const targetKotPrinter = counterSavedDev || (data.printer_name && data.printer_name !== 'POS-80C' ? data.printer_name : null) || localKotPrinter || 'POS-80C';
         const result = await printUnifiedThermalTicket({
           base64Bytes,
           kotData: data.kotData,
           printerName: targetKotPrinter,
           printerAddress: data.printer_address,
+          printerType: data.printer_type,
           counterId: data.counter_id,
           counterName: data.counter_name,
           isAutoPrint: true, // Print Station must always print silently; never open browser print dialog
@@ -240,9 +261,9 @@ export function PrintStationListener() {
 
       try {
         const localBillType = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_type') : null;
-        const localBillPrinter = typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || localStorage.getItem('qdine_bt_printer_name')) : null;
+        const localBillPrinter = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_name') : null;
         const localBillAddress = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_address') : null;
-        const targetBillPrinter = (data.printer_name && data.printer_name !== 'POS-80C') ? data.printer_name : (localBillPrinter || data.printer_name || 'POS-80C');
+        const targetBillPrinter = (data.printer_name && data.printer_name !== 'POS-80C') ? data.printer_name : (localBillPrinter || 'POS-80C');
 
         const result = await printUnifiedBill({
           base64Bytes: data.base64Bytes,
@@ -306,12 +327,13 @@ export function PrintStationListener() {
           const counterSavedDev = (typeof window !== 'undefined' && job.counter_name)
             ? localStorage.getItem(`qdine_bt_counter_${job.counter_name.trim().toLowerCase()}`)
             : null;
-          const targetKotPrinter = counterSavedDev || localKotPrinter || job.printer_name || 'POS-80C';
+          const targetKotPrinter = counterSavedDev || (job.printer_name && job.printer_name !== 'POS-80C' ? job.printer_name : null) || localKotPrinter || 'POS-80C';
 
           const result = await printUnifiedThermalTicket({
             base64Bytes: job.raw_base64,
             kotData: { ticketNumber: ticketNo, counterName: job.counter_name } as any,
             printerName: targetKotPrinter,
+            printerType: job.printer_type,
             counterName: job.counter_name,
             isAutoPrint: true,
             skipDuplicateCheck: true,

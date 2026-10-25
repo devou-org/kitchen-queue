@@ -184,7 +184,11 @@ export function isBluetoothConnectedForCounter(
   printerName?: string,
   counterName?: string
 ): { connected: boolean; deviceName: string | null } {
-  // 1. Direct match by counter ID
+  const isBill = counterId === 'bill_printer' || (counterName || '').trim().toLowerCase() === 'bill printer';
+  const cleanCName = (counterName || '').trim().toLowerCase();
+  const cleanPrinterName = printerName?.trim();
+
+  // 1. Direct match by counter ID (e.g. UUID or 'bill_printer')
   if (counterId && activeBtConnections.has(counterId)) {
     const conn = activeBtConnections.get(counterId)!;
     if (conn.device?.gatt?.connected) {
@@ -194,8 +198,7 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 2. Direct match by counter name
-  const cleanCName = (counterName || '').trim().toLowerCase();
+  // 2. Direct match by counter name (e.g. 'bev', 'burger', 'main')
   if (cleanCName && activeBtConnections.has(cleanCName)) {
     const conn = activeBtConnections.get(cleanCName)!;
     if (conn.device?.gatt?.connected) {
@@ -205,48 +208,54 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 3. Direct match by printer device name (e.g. Printer001)
-  const cleanPrinterName = printerName?.trim();
-  if (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C' && activeBtConnections.has(cleanPrinterName)) {
-    const conn = activeBtConnections.get(cleanPrinterName)!;
-    if (conn.device?.gatt?.connected) {
-      return { connected: true, deviceName: conn.name };
-    } else {
-      activeBtConnections.delete(cleanPrinterName);
-    }
-  }
-
-  // 4. Match via localStorage counter mapping (e.g. qdine_bt_counter_bakery -> Printer001)
-  let savedName: string | null = null;
+  // 3. Match via counter-specific saved preference in localStorage
   if (typeof window !== 'undefined') {
-    savedName = (cleanCName ? localStorage.getItem(`qdine_bt_counter_${cleanCName}`) : null)
-      || (counterId ? localStorage.getItem(`qdine_bt_counter_${counterId}`) : null);
-    if (savedName && activeBtConnections.has(savedName)) {
-      const conn = activeBtConnections.get(savedName)!;
+    let savedDeviceForCounter: string | null = null;
+    if (isBill) {
+      savedDeviceForCounter = localStorage.getItem('qdine_bt_counter_bill_printer')
+        || localStorage.getItem('qdine_bt_counter_bill printer')
+        || localStorage.getItem('qdine_bill_printer_name');
+    } else {
+      savedDeviceForCounter = (cleanCName ? localStorage.getItem(`qdine_bt_counter_${cleanCName}`) : null)
+        || (counterId ? localStorage.getItem(`qdine_bt_counter_${counterId}`) : null);
+    }
+
+    if (savedDeviceForCounter && activeBtConnections.has(savedDeviceForCounter)) {
+      const conn = activeBtConnections.get(savedDeviceForCounter)!;
       if (conn.device?.gatt?.connected) {
         return { connected: true, deviceName: conn.name };
       }
     }
   }
 
-  // 5. Station fallback: ONLY use when no counter-specific printer mapping exists,
-  // or when only a single printer is configured across all counters.
-  const isBillPrinter = counterId === 'bill_printer' || cleanCName === 'bill printer';
-  const hasSpecificCounterMapping = Boolean(
-    savedName ||
-    (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C' && !isBillPrinter)
-  );
-
-  if (!hasSpecificCounterMapping || distinctSavedPrinters() <= 1) {
-    if (activeBluetoothDevice?.gatt?.connected) {
-      return { connected: true, deviceName: activeBluetoothDevice.name };
-    }
-    if (activeBtConnections.size > 0) {
-      for (const conn of activeBtConnections.values()) {
-        if (conn.device?.gatt?.connected) {
+  // 4. Match by explicit non-generic printer name (e.g. Printer001 or KPC307-UEWB-330C)
+  // Ensure that Bill Printer and Kitchen Counters remain strictly isolated
+  if (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C' && activeBtConnections.has(cleanPrinterName)) {
+    const conn = activeBtConnections.get(cleanPrinterName)!;
+    if (conn.device?.gatt?.connected) {
+      if (isBill) {
+        const billSaved = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_name') : null;
+        if (billSaved === cleanPrinterName || activeBtConnections.has('bill_printer')) {
+          return { connected: true, deviceName: conn.name };
+        }
+      } else {
+        // Kitchen counter: only match if this device is not solely a bill_printer connection
+        const isOnlyBillPrinter = activeBtConnections.get('bill_printer') === conn &&
+          !activeBtConnections.has(counterId || '') &&
+          !activeBtConnections.has(cleanCName);
+        if (!isOnlyBillPrinter) {
           return { connected: true, deviceName: conn.name };
         }
       }
+    } else {
+      activeBtConnections.delete(cleanPrinterName);
+    }
+  }
+
+  // Purely generic call without any counter context (rare standalone check)
+  if (!counterId && !cleanCName && (!cleanPrinterName || cleanPrinterName.toUpperCase() === 'POS-80C')) {
+    if (activeBluetoothDevice?.gatt?.connected) {
+      return { connected: true, deviceName: activeBluetoothDevice.name };
     }
   }
 
@@ -343,7 +352,12 @@ export async function connectBluetoothPrinter(counterId?: string, counterName?: 
     }
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem('qdine_bt_printer_name', deviceName);
+      if (counterId === 'bill_printer' || counterName?.trim().toLowerCase() === 'bill printer') {
+        localStorage.setItem('qdine_bill_printer_name', deviceName);
+        localStorage.setItem('qdine_bill_printer_type', 'BLUETOOTH');
+      } else if (!counterId && !counterName) {
+        localStorage.setItem('qdine_bt_printer_name', deviceName);
+      }
       localStorage.setItem('qdine_preferred_printer_type', 'bluetooth');
     }
 
@@ -389,8 +403,12 @@ export async function disconnectBluetoothPrinter(
   } else if (cleanCounterName && activeBtConnections.has(cleanCounterName)) {
     targetConn = activeBtConnections.get(cleanCounterName);
   } else if (cleanName && cleanName.toUpperCase() !== 'POS-80C' && activeBtConnections.has(cleanName)) {
-    targetConn = activeBtConnections.get(cleanName);
-  } else if (activeBluetoothDevice) {
+    const isBill = counterId === 'bill_printer' || cleanCounterName === 'bill printer';
+    const candidate = activeBtConnections.get(cleanName);
+    if (isBill || candidate !== activeBtConnections.get('bill_printer')) {
+      targetConn = candidate;
+    }
+  } else if (!counterId && !cleanCounterName && activeBluetoothDevice) {
     targetConn = { device: activeBluetoothDevice, char: activeBluetoothChar, name: activeBluetoothDevice.name };
   }
 
@@ -515,8 +533,9 @@ export async function writeBytesToBluetooth(
     }
   }
 
-  // Fall back to activeBluetoothDevice or any connected Bluetooth printer on this station ONLY when no targetDevice was resolved for this counter
-  if (!writeChar && !targetDevice) {
+  // Fall back to activeBluetoothDevice ONLY when no specific counter target was specified
+  const hasSpecificTarget = Boolean(counterId || counterName || (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C'));
+  if (!writeChar && !targetDevice && !hasSpecificTarget) {
     if (activeBluetoothDevice?.gatt?.connected) {
       targetDevice = activeBluetoothDevice;
       writeChar = activeBluetoothChar;
@@ -1028,6 +1047,7 @@ export interface UnifiedPrintOptions {
   kotData: KotPrintData;
   printerName?: string;
   printerAddress?: string;
+  printerType?: string;
   counterId?: string;
   counterName?: string;
   forceBrowser?: boolean;
@@ -1164,19 +1184,32 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
       }
     }
 
-    // 0. Try QZ Tray ONLY if actively connected (never probe QZ on Android or when QZ is closed, preventing 2-3s timeout lag)
+    // 0. Try QZ Tray if actively connected OR if counter/station is configured for QZ/Network/OS printing
     const isAndroid = typeof window !== 'undefined' && /android/i.test(navigator.userAgent);
-    if (!isAndroid && base64Bytes && isQzConnected()) {
+    const wantsQz = !isAndroid && Boolean(base64Bytes) && (
+      isQzConnected() ||
+      options.printerType === 'QZ_TRAY' ||
+      options.printerType === 'NETWORK' ||
+      Boolean(options.printerAddress) ||
+      (typeof window !== 'undefined' && (
+        localStorage.getItem('qdine_preferred_printer_type') === 'qz-tray' ||
+        localStorage.getItem('qdine_qz_active') === '1'
+      ))
+    );
+
+    if (wantsQz) {
       try {
         const qzTarget = printerAddress?.trim() || printerName;
-        const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes);
-        if (qzResult.success) {
-          endPerf();
-          return {
-            success: true,
-            method: 'qz-tray',
-            message: `Printed via QZ Tray to "${qzTarget}"!`,
-          };
+        if (qzTarget) {
+          const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes!);
+          if (qzResult.success) {
+            endPerf();
+            return {
+              success: true,
+              method: 'qz-tray',
+              message: `Printed via QZ Tray to "${qzTarget}"!`,
+            };
+          }
         }
       } catch (qzErr: any) {
         console.warn('QZ Tray print attempt failed, trying alternatives:', qzErr?.message);
@@ -1188,27 +1221,6 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     if (!btCheck.connected) {
       await tryAutoConnectBluetooth(printerName, counterId);
       btCheck = isBluetoothConnectedForCounter(counterId, printerName, counterName);
-    }
-
-    // Fall back to any active Bluetooth printer on this station if no dedicated counter printer is configured OR if single printer is configured
-    if (!btCheck.connected) {
-      const cleanC = (counterName || '').trim().toLowerCase();
-      const hasSpecificMapping = Boolean(
-        (typeof window !== 'undefined' && ((cleanC ? localStorage.getItem(`qdine_bt_counter_${cleanC}`) : null) || (counterId ? localStorage.getItem(`qdine_bt_counter_${counterId}`) : null))) ||
-        (printerName && printerName.trim().toUpperCase() !== 'POS-80C' && counterId !== 'bill_printer')
-      );
-      if (!hasSpecificMapping || distinctSavedPrinters() <= 1) {
-        if (activeBluetoothDevice?.gatt?.connected) {
-          btCheck = { connected: true, deviceName: activeBluetoothDevice.name };
-        } else if (activeBtConnections.size > 0) {
-          for (const conn of activeBtConnections.values()) {
-            if (conn.device?.gatt?.connected) {
-              btCheck = { connected: true, deviceName: conn.name };
-              break;
-            }
-          }
-        }
-      }
     }
 
     if (btCheck.connected) {
@@ -1623,10 +1635,17 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
 
     // 4. QZ TRAY or DEFAULT SYSTEM MODE: Print via local QZ Tray spooler to target printer (skip on Android and when QZ is closed)
     const isAndroidBill = typeof window !== 'undefined' && /android/i.test(navigator.userAgent);
-    if (!isAndroidBill && (effType === 'QZ_TRAY' || (effType === 'DEFAULT' && isQzConnected())) && base64Bytes) {
+    const wantsQzBill = !isAndroidBill && Boolean(base64Bytes) && (
+      effType === 'QZ_TRAY' ||
+      effType === 'NETWORK' ||
+      Boolean(effAddress) ||
+      isQzConnected() ||
+      (typeof window !== 'undefined' && localStorage.getItem('qdine_qz_active') === '1')
+    );
+    if (wantsQzBill) {
       try {
-        const qzTarget = printerName || 'POS-80C';
-        const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes);
+        const qzTarget = effAddress || printerName || 'POS-80C';
+        const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes!);
         if (qzResult.success) {
           return {
             success: true,

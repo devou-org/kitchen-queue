@@ -115,6 +115,11 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
       const conn = await connectQzTray();
       if (conn.success) {
         setQzActive(true);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('qdine_is_print_station', '1');
+          localStorage.setItem('qdine_qz_active', '1');
+          localStorage.setItem('qdine_auto_print_kot', 'true');
+        }
         toast.success(`Connected to QZ Tray v${conn.version || '2.2'}!`, { id: toastId });
         // Auto discover printers
         const pRes = await getQzPrinters();
@@ -555,6 +560,16 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         setSavedCounterId(counter.id);
         setTimeout(() => setSavedCounterId(null), 2000);
         setCounters(prev => prev.map(c => c.id === counter.id ? { ...c, ...form } : c));
+        if (typeof window !== 'undefined') {
+          if (form.printer_type === 'BLUETOOTH' && form.printer_name && form.printer_name !== 'POS-80C') {
+            localStorage.setItem(`qdine_bt_counter_${counter.id}`, form.printer_name.trim());
+            localStorage.setItem(`qdine_bt_counter_${counter.name.trim().toLowerCase()}`, form.printer_name.trim());
+          } else {
+            localStorage.removeItem(`qdine_bt_counter_${counter.id}`);
+            localStorage.removeItem(`qdine_bt_counter_${counter.name.trim().toLowerCase()}`);
+          }
+        }
+        setTick(t => t + 1);
       } else {
         toast.error(data.error || 'Failed to save printer settings');
       }
@@ -604,6 +619,10 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
       formStates[counter.id]?.printer_name || counter.printer_name || undefined,
       counter.name
     );
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`qdine_bt_counter_${counter.id}`);
+      localStorage.removeItem(`qdine_bt_counter_${counter.name.trim().toLowerCase()}`);
+    }
     setTick(t => t + 1);
     toast.success(`Disconnected Bluetooth printer from ${counter.name}`);
   };
