@@ -144,8 +144,8 @@ export async function autoQueueAndBroadcastKot(
         }
 
         // Keep Pusher payload safely under 10KB
-        // If base64Bytes is large (>7000 chars), omit raw bytes and send print_job_id for station to fetch
-        const isLarge = slip.base64Bytes.length > 7000;
+        // If base64Bytes is large (>3500 chars), omit raw bytes and send print_job_id for station to fetch
+        const isLarge = slip.base64Bytes.length > 3500;
         const pusherPayload: Record<string, any> = {
           order_id: order.id,
           ticket_number: order.ticket_number,
