@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { pusherClient } from '@/lib/pusher-client';
-import { printUnifiedThermalTicket, printUnifiedBill, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
+import { printUnifiedThermalTicket, printUnifiedBill, tryAutoConnectBluetooth, checkAndMarkDuplicatePrint } from '@/lib/hardware-printer';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { useKeepAwake } from '@/hooks/useKeepAwake';
 
@@ -16,6 +16,9 @@ import { useKeepAwake } from '@/hooks/useKeepAwake';
  * the "Print Station", it listens for and prints incoming KOTs and Bills
  * across all pages (Orders, POS, Tables, Menu, Settings, etc.)
  * including manual prints requested from waiters' phones.
+ *
+ * Utilizes Web Locks API so that only 1 tab acts as the active Print Station
+ * listener, preventing double/quadruple prints when multiple tabs are open!
  * ============================================================
  */
 export function PrintStationListener() {
@@ -68,6 +71,12 @@ export function PrintStationListener() {
         return;
       }
 
+      // Pre-check duplicate print to prevent double toasts or parallel tab prints
+      if (checkAndMarkDuplicatePrint(data.ticket_number, data.counter_id, data.counter_name)) {
+        console.log(`[PrintStationListener] Duplicate suppressed for #${data.ticket_number} (${data.counter_name})`);
+        return;
+      }
+
       console.time(`[Perf] KOT #${data.ticket_number} Total`);
       console.log(`[Perf] Pusher event received for ticket #${data.ticket_number} at ${new Date().toISOString()}`);
 
@@ -95,7 +104,12 @@ export function PrintStationListener() {
         }
 
         const localKotPrinter = typeof window !== 'undefined' ? localStorage.getItem('qdine_kot_printer_name') : null;
-        const targetKotPrinter = (data.printer_name && data.printer_name !== 'POS-80C') ? data.printer_name : (localKotPrinter || data.printer_name || 'POS-80C');
+        const counterSavedDev = (typeof window !== 'undefined' && data.counter_name)
+          ? localStorage.getItem(`qdine_bt_counter_${data.counter_name.trim().toLowerCase()}`)
+          : null;
+        const targetKotPrinter = (data.printer_name && data.printer_name !== 'POS-80C')
+          ? data.printer_name
+          : (counterSavedDev || localKotPrinter || data.printer_name || 'POS-80C');
         const result = await printUnifiedThermalTicket({
           base64Bytes,
           kotData: data.kotData,
@@ -142,6 +156,12 @@ export function PrintStationListener() {
         return;
       }
 
+      // Pre-check duplicate print for bills across tabs
+      if (checkAndMarkDuplicatePrint(`bill_${data.ticket_number}`, 'bill_printer', 'Bill Printer')) {
+        console.log(`[PrintStationListener] Duplicate bill suppressed for #${data.ticket_number}`);
+        return;
+      }
+
       toast(`Printing Bill #${String(data.ticket_number).padStart(3, '0')}...`, {
         icon: <PrinterIllustration size={22} status="printing" />,
         duration: 3000,
@@ -182,12 +202,38 @@ export function PrintStationListener() {
       }
     };
 
-    channel.bind('kot_auto_print', handleKotAutoPrint);
-    channel.bind('bill_print', handleBillPrint);
+    // Cross-tab Leader Election: Only 1 open tab holds the listener lock and binds Pusher events
+    const abortController = new AbortController();
 
-    return () => {
+    const bindEvents = () => {
+      channel.bind('kot_auto_print', handleKotAutoPrint);
+      channel.bind('bill_print', handleBillPrint);
+    };
+
+    const unbindEvents = () => {
       channel.unbind('kot_auto_print', handleKotAutoPrint);
       channel.unbind('bill_print', handleBillPrint);
+    };
+
+    if (typeof navigator !== 'undefined' && 'locks' in navigator) {
+      navigator.locks.request('qdine_print_station_listener_leader', { signal: abortController.signal }, async () => {
+        bindEvents();
+        return new Promise<void>((resolve) => {
+          abortController.signal.addEventListener('abort', () => {
+            unbindEvents();
+            resolve();
+          });
+        });
+      }).catch(() => {
+        // Aborted cleanly on component unmount
+      });
+    } else {
+      bindEvents();
+    }
+
+    return () => {
+      abortController.abort();
+      unbindEvents();
     };
   }, [restaurant, slug]);
 

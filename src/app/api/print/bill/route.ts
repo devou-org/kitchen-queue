@@ -8,7 +8,6 @@ import sql, {
 import { requireAdmin } from '@/lib/auth';
 import {
   buildBillEscposBuffer,
-  sendRawPrintToWindowsPrinter,
   BillPrintData,
 } from '@/lib/escpos';
 import { generateBillTemplateHTML } from '@/lib/bill-template-html';
@@ -74,7 +73,6 @@ export async function POST(request: NextRequest) {
     }
 
     const targetPrinter = printerName?.trim() || restaurant.bill_printer_name?.trim() || process.env.BILL_PRINTER_NAME || process.env.KOT_PRINTER_NAME || 'POS-80C';
-    const isWindows = process.platform === 'win32';
     const effPrinterType = (printerType || restaurant.bill_printer_type || 'DEFAULT').toUpperCase();
     const isClientDirectHardware = effPrinterType === 'BLUETOOTH' || effPrinterType === 'USB';
 
@@ -119,28 +117,7 @@ export async function POST(request: NextRequest) {
     // Also generate HTML representation for client preview/dialog
     const billHtml = generateBillTemplateHTML(order, restaurantInfo);
 
-    // 1. Direct hardware print on Windows (Local dev / Cashier PC) — only if station itself and Windows host
-    if (isStation && isWindows) {
-      const printResult = await sendRawPrintToWindowsPrinter(
-        targetPrinter,
-        buffer,
-        `Bill #${order.ticket_number}`
-      );
-
-      if (printResult.success) {
-        return NextResponse.json({
-          success: true,
-          mode: 'server',
-          message: `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${targetPrinter}!`,
-          printer: targetPrinter,
-          base64Bytes,
-          billHtml,
-        });
-      }
-      console.warn(`[Windows] Direct raw bill print to "${targetPrinter}" failed:`, printResult.error);
-    }
-
-    // 2. If caller IS the Print Station itself, or this is a test print, return bytes directly for local print
+    // 1. If caller IS the Print Station itself, or this is a test print, return bytes directly for local print
     if (isStation || isTestPrint) {
       return NextResponse.json({
         success: true,

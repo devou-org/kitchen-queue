@@ -399,6 +399,8 @@ export function OrderDetailsView({
           kotData: data.kotData,
           base64Bytes: data.base64Bytes,
           printerName: data.printer || targetPrinter,
+          counterId: data.counterId,
+          counterName: data.counterName || counterName,
           localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
         });
         if (clientRes.method === 'bluetooth') {

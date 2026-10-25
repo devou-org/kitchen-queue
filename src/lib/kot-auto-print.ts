@@ -12,7 +12,7 @@
  */
 
 import sql, { getOrderById, getRestaurantById, getCounters, createPrintJob } from '@/lib/db';
-import { buildKotEscposBuffer, KotPrintData, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
+import { buildKotEscposBuffer, KotPrintData } from '@/lib/escpos';
 import { pusherServer } from '@/lib/pusher';
 
 export interface AutoKotOptions {
@@ -95,8 +95,6 @@ export async function autoQueueAndBroadcastKot(
       }
     }
 
-    const isWindows = process.platform === 'win32';
-
     // Process each counter slip that has items
     const validCounterEntries = Object.entries(counterMap).filter(([_, items]) => items && items.length > 0);
 
@@ -128,29 +126,6 @@ export async function autoQueueAndBroadcastKot(
 
       return { cName, cItems, conf, kotData, buffer, base64Bytes };
     });
-
-    // 1. Direct hardware print if running on Windows (Cashier / Counter PC)
-    if (isWindows) {
-      for (const slip of slips) {
-        try {
-          const slipTitle = options.isAddOn
-            ? `RUNNING KOT #${order.ticket_number} - ${slip.cName} (ADD-ON)`
-            : `KOT #${order.ticket_number} - ${slip.cName}`;
-          const winRes = await sendRawPrintToWindowsPrinter(
-            slip.conf.printerName,
-            slip.buffer,
-            slipTitle
-          );
-          if (winRes.success) {
-            console.log(`🖨️ [Windows] Printed ${slipTitle} to "${slip.conf.printerName}"`);
-          } else {
-            console.warn(`⚠️ [Windows] Print failed for ${slip.cName} on "${slip.conf.printerName}": ${winRes.error}`);
-          }
-        } catch (winErr) {
-          console.error('Windows direct print error:', winErr);
-        }
-      }
-    }
 
     // 2 & 3. Run createPrintJob plus pusherServer.trigger for all counters in parallel with Promise.all
     await Promise.all(

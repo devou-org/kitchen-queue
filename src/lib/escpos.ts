@@ -1,6 +1,3 @@
-import path from 'path';
-import { spawn } from 'child_process';
-
 /**
  * Standard ESC/POS commands
  */
@@ -428,86 +425,17 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
 }
 
 /**
- * Send raw ESC/POS bytes directly to Windows Thermal Printer via winspool.drv PowerShell script
+ * @deprecated Windows Print Spooler has been completely disabled to prevent USB port lockouts and delayed queues.
+ * Use direct browser Web Bluetooth / Web Serial printing or the dedicated Print Agent.
  */
 export async function sendRawPrintToWindowsPrinter(
-  printerName: string,
-  bytes: Buffer,
-  docName = 'QDINE KOT'
+  _printerName: string,
+  _bytes: Buffer,
+  _docName = 'QDINE KOT'
 ): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    try {
-      const scriptPath = path.resolve(process.cwd(), 'scripts', 'print-kot.ps1');
-      const base64Bytes = bytes.toString('base64');
-
-      const args = [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        scriptPath,
-        '-PrinterName',
-        printerName,
-        '-Base64Bytes',
-        base64Bytes,
-        '-DocName',
-        docName,
-      ];
-
-      const ps = spawn('powershell.exe', args, {
-        windowsHide: true,
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      ps.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      ps.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      ps.on('close', (code) => {
-        if (code !== 0 && !stdout.trim()) {
-          resolve({
-            success: false,
-            error: stderr.trim() || `PowerShell exited with code ${code}`,
-          });
-          return;
-        }
-
-        try {
-          const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
-          const lastJsonLine = lines[lines.length - 1];
-          const parsed = JSON.parse(lastJsonLine);
-          resolve(parsed);
-        } catch (e: any) {
-          if (stdout.includes('"success":true')) {
-            resolve({ success: true });
-          } else {
-            resolve({
-              success: false,
-              error: stdout.trim() || stderr.trim() || 'Unknown printing error',
-            });
-          }
-        }
-      });
-
-      ps.on('error', (err) => {
-        resolve({
-          success: false,
-          error: `Failed to launch PowerShell: ${err.message}`,
-        });
-      });
-    } catch (err: any) {
-      resolve({
-        success: false,
-        error: err.message || 'Error initiating print job',
-      });
-    }
-  });
+  return {
+    success: false,
+    error: 'Windows Print Spooler has been disabled. Printing is routed directly to hardware in browser or print agent.',
+  };
 }
 
