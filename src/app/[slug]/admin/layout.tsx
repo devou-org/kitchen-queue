@@ -10,6 +10,7 @@ import { ServiceToggle } from '@/components/ServiceToggle';
 import { AIAnalystWidget } from '@/components/ai/AIAnalystWidget';
 import { AdminLayoutProvider, useAdminLayout } from '@/context/AdminLayoutContext';
 import { LogoutConfirmModal } from '@/components/ui/LogoutConfirmModal';
+import { PrintStationListener } from '@/components/PrintStationListener';
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -662,6 +663,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         {children}
+        <PrintStationListener />
         {!isMaximized && isSuperAdminOrOwner && !pathname.includes('/admin/orders') && !pathname.includes('/admin/tables') && <AIAnalystWidget />}
       </main>
     </div>

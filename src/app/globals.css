@@ -1053,15 +1053,17 @@ tr:hover td {
 /* Inline button spinner safeguard */
 span.loader,
 button .loader {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: currentColor;
-  animation: devouSpin 0.8s linear infinite;
-  display: inline-block;
-  vertical-align: middle;
-  margin: 0;
+  width: 18px !important;
+  height: 18px !important;
+  aspect-ratio: auto !important;
+  border-radius: 50% !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  border-top-color: currentColor !important;
+  animation: devouSpin 0.8s linear infinite !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  margin: 0 !important;
+  background: transparent !important;
 }
 span.loader:before,
 span.loader:after,

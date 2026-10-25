@@ -12,6 +12,7 @@ import {
   BillPrintData,
 } from '@/lib/escpos';
 import { generateBillTemplateHTML } from '@/lib/bill-template-html';
+import { pusherServer } from '@/lib/pusher';
 
 async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
   const admin = await requireAdmin(request);
@@ -34,7 +35,7 @@ async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, printerName, printerType, orderData, slug } = body;
+    const { orderId, printerName, printerType, orderData, slug, isStation } = body;
 
     const restaurant = await resolveRestaurant(request, slug);
     if (!restaurant) {
@@ -110,21 +111,8 @@ export async function POST(request: NextRequest) {
     // Also generate HTML representation for client preview/dialog
     const billHtml = generateBillTemplateHTML(order, restaurantInfo);
 
-    // If Bluetooth or USB is selected, send bytes directly to client browser
-    if (isClientDirectHardware) {
-      return NextResponse.json({
-        success: true,
-        mode: 'client',
-        message: `Bill #${String(order.ticket_number).padStart(3, '0')} ready for ${effPrinterType} print!`,
-        printer: targetPrinter,
-        printerType: effPrinterType,
-        base64Bytes,
-        billHtml,
-      });
-    }
-
-    // 1. Direct hardware print on Windows (Local dev / Cashier PC) — only if not Bluetooth / USB!
-    if (isWindows) {
+    // 1. Direct hardware print on Windows (Local dev / Cashier PC) — only if station itself and Windows host
+    if (isStation && isWindows) {
       const printResult = await sendRawPrintToWindowsPrinter(
         targetPrinter,
         buffer,
@@ -144,7 +132,21 @@ export async function POST(request: NextRequest) {
       console.warn(`[Windows] Direct raw bill print to "${targetPrinter}" failed:`, printResult.error);
     }
 
-    // 2. Queue for Cloud Print Agent on Cashier PC
+    // 2. If caller IS the Print Station itself, return bytes directly for local Bluetooth/USB/browser print
+    if (isStation) {
+      return NextResponse.json({
+        success: true,
+        mode: 'client',
+        message: `Bill #${String(order.ticket_number).padStart(3, '0')} ready for local print!`,
+        printer: targetPrinter,
+        printerType: effPrinterType,
+        base64Bytes,
+        billData,
+        billHtml,
+      });
+    }
+
+    // 3. Remote caller (e.g. Waiter Phone): Queue for Cloud Print Agent on Cashier PC
     await createPrintJob(restaurant.id, {
       order_id: order.id,
       ticket_number: Number(order.ticket_number) || undefined,
@@ -153,6 +155,24 @@ export async function POST(request: NextRequest) {
       raw_base64: base64Bytes,
     });
 
+    // 4. Remote caller: Broadcast Bill to designated Print Station via realtime socket
+    try {
+      await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'bill_print', {
+        order_id: order.id,
+        ticket_number: order.ticket_number,
+        printer_name: targetPrinter,
+        printer_type: effPrinterType,
+        printer_address: (printerType === 'NETWORK' ? (printerName || (restaurant as any).bill_printer_address) : undefined),
+        base64Bytes,
+        billData,
+        billHtml,
+        is_manual: true,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (pushErr) {
+      console.error('Pusher manual bill_print error:', pushErr);
+    }
+
     const agentHeartbeat = await getAgentHeartbeat(restaurant.id);
     const isAgentOnline = Boolean(agentHeartbeat?.is_online);
 
@@ -160,6 +180,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         mode: 'agent',
+        broadcasted: true,
         message: `Bill #${String(order.ticket_number).padStart(3, '0')} sent to Cashier ${targetPrinter}!`,
         printer: targetPrinter,
         base64Bytes,
@@ -167,11 +188,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 3. Fallback to client browser / local bridge
+    // 5. Return to remote caller (waiter phone) with broadcasted flag
     return NextResponse.json({
       success: true,
-      mode: 'client',
-      message: `Bill ready for ${targetPrinter}`,
+      mode: 'station',
+      broadcasted: true,
+      message: `Bill #${String(order.ticket_number).padStart(3, '0')} sent to Print Station!`,
       printer: targetPrinter,
       base64Bytes,
       billData,

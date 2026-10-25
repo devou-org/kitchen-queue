@@ -402,6 +402,8 @@ export function POSCheckoutDrawer({
     });
 
     try {
+      const isStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+
       const res = await fetch('/api/print/bill', {
         method: 'POST',
         headers: {
@@ -413,6 +415,7 @@ export function POSCheckoutDrawer({
           printerType: savedType,
           orderData: billOrderData,
           slug: targetSlug,
+          isStation,
         }),
       });
 
@@ -421,8 +424,8 @@ export function POSCheckoutDrawer({
         throw new Error(data.error || 'Failed to print bill');
       }
 
-      if (data.mode === 'server' || data.mode === 'agent') {
-        toast.success(data.message || 'Bill printed successfully!', { id: toastId });
+      if (data.mode === 'server' || data.mode === 'agent' || (!isStation && data.broadcasted)) {
+        toast.success(data.message || (data.broadcasted ? 'Bill sent to Print Station!' : 'Bill printed successfully!'), { id: toastId });
         return;
       }
 

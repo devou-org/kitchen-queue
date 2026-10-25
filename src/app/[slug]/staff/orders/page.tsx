@@ -8,7 +8,6 @@ import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ChefHat, Search, X, Printer, Store, Loader2 } from 'lucide-react';
-import { printUnifiedThermalTicket, getHardwarePrinterState, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
 import { useKeepAwake } from '@/hooks/useKeepAwake';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { OrderTableRow, OrderTableHeader } from '@/components/modules/orders/OrderTableRow';
@@ -103,8 +102,6 @@ export default function StaffOrders() {
         const defaultForRole = resolveRoleDefaultStatus();
         setStatusFilter(defaultForRole);
       }
-
-      tryAutoConnectBluetooth();
     }
   }, []);
 
@@ -262,90 +259,13 @@ export default function StaffOrders() {
       }
     };
 
-    const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
-
-    const handleKotAutoPrint = async (data: any) => {
-      console.time(`[Perf] KOT #${data.ticket_number} Total`);
-      console.log(`[Perf] Pusher event received for ticket #${data.ticket_number} at ${new Date().toISOString()}`);
-
-      // Check if auto-print is enabled on this device
-      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
-      if (!autoPrint) {
-        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
-        return;
-      }
-
-      // Only filter if this station is an explicitly locked dedicated KDS station
-      const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
-      if (dedicatedStation && dedicatedStation !== '' && dedicatedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
-        console.log(`[Auto-Print] Station is dedicated to "${dedicatedStation}"; skipping "${data.counter_name}" slip.`);
-        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
-        return;
-      }
-
-      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: <PrinterIllustration size={22} status="printing" />,
-        duration: 3000,
-      });
-
-      try {
-        let base64Bytes = data.base64Bytes;
-        // If payload was over 10KB, fetch the job from the server
-        if (!base64Bytes && data.print_job_id) {
-          try {
-            const jobRes = await fetch(`/api/print/agent?jobId=${data.print_job_id}&slug=${slug}`);
-            if (jobRes.ok) {
-              const jobData = await jobRes.json();
-              if (jobData.job?.raw_base64) {
-                base64Bytes = jobData.job.raw_base64;
-              }
-            }
-          } catch (fetchErr) {
-            console.error('Failed to fetch large print job payload:', fetchErr);
-          }
-        }
-
-        const result = await printUnifiedThermalTicket({
-          base64Bytes,
-          kotData: data.kotData,
-          printerName: data.printer_name,
-          printerAddress: data.printer_address,
-          counterId: data.counter_id,
-          counterName: data.counter_name,
-          isAutoPrint: true,
-        });
-        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
-        if (result.success) {
-          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
-            icon: <PrinterIllustration size={22} status="success" />,
-            id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
-          });
-        } else {
-          toast.error(result.message || '⚠️ Thermal printer not paired. Tap "Pair Printer" at the top.', {
-            id: `print-unpaired`,
-            duration: 6000,
-          });
-        }
-      } catch (err: any) {
-        console.error('Auto-print execution error:', err);
-      } finally {
-        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
-      }
-    };
-
     channel.bind('new_order', handleNewOrder);
     channel.bind('order_update', handleOrderUpdate);
-    if (isPrintStation) {
-      channel.bind('kot_auto_print', handleKotAutoPrint);
-    }
 
     return () => {
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       channel.unbind('new_order', handleNewOrder);
       channel.unbind('order_update', handleOrderUpdate);
-      if (isPrintStation) {
-        channel.unbind('kot_auto_print', handleKotAutoPrint);
-      }
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant, fetchTables]);
 

@@ -278,80 +278,11 @@ export default function AdminPosPage() {
       fetchTables();
     });
 
-    const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
-
-    const handleKotAutoPrint = async (data: any) => {
-      console.time(`[Perf] KOT #${data.ticket_number} Total`);
-      console.log(`[Perf] Pusher event received for ticket #${data.ticket_number} at ${new Date().toISOString()}`);
-
-      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
-      if (!autoPrint) {
-        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
-        return;
-      }
-
-      const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
-      if (dedicatedStation && dedicatedStation !== '' && dedicatedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
-        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
-        return;
-      }
-
-      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: <PrinterIllustration size={22} status="printing" />,
-        duration: 3000,
-      });
-
-      try {
-        let base64Bytes = data.base64Bytes;
-        if (!base64Bytes && data.print_job_id) {
-          try {
-            const jobRes = await fetch(`/api/print/agent?jobId=${data.print_job_id}&slug=${slug}`);
-            if (jobRes.ok) {
-              const jobData = await jobRes.json();
-              if (jobData.job?.raw_base64) {
-                base64Bytes = jobData.job.raw_base64;
-              }
-            }
-          } catch (fetchErr) {
-            console.error('Failed to fetch large print job payload:', fetchErr);
-          }
-        }
-
-        const result = await printUnifiedThermalTicket({
-          base64Bytes,
-          kotData: data.kotData,
-          printerName: data.printer_name,
-          printerAddress: data.printer_address,
-          counterId: data.counter_id,
-          counterName: data.counter_name,
-          isAutoPrint: true,
-        });
-        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
-        if (result.success) {
-          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
-            icon: <PrinterIllustration size={22} status="success" />,
-            id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
-          });
-        }
-      } catch (err: any) {
-        console.error('Auto-print execution error on admin POS menu:', err);
-      } finally {
-        console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
-      }
-    };
-
-    if (isPrintStation) {
-      channel.bind('kot_auto_print', handleKotAutoPrint);
-    }
-
     return () => {
       channel.unbind('product_updated');
       channel.unbind('product_deleted');
       channel.unbind('new_order');
       channel.unbind('order_update');
-      if (isPrintStation) {
-        channel.unbind('kot_auto_print', handleKotAutoPrint);
-      }
       pusherClient?.unsubscribe(channelName);
     };
   }, [restaurant, fetchTables]);
@@ -461,6 +392,8 @@ export default function AdminPosPage() {
       : undefined;
 
     try {
+      const isStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+
       const res = await fetch('/api/print/bill', {
         method: 'POST',
         headers: {
@@ -473,6 +406,7 @@ export default function AdminPosPage() {
           printerType: savedType,
           orderData: order,
           slug: restaurantSlug,
+          isStation,
         }),
       });
 
@@ -482,8 +416,8 @@ export default function AdminPosPage() {
         return;
       }
 
-      if (data.mode === 'server' || data.mode === 'agent') {
-        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, {
+      if (data.mode === 'server' || data.mode === 'agent' || (!isStation && data.broadcasted)) {
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to ${!isStation && data.broadcasted ? 'Print Station' : 'printer'}!`, {
           icon: <PrinterIllustration size={20} status="success" />,
         });
         return;

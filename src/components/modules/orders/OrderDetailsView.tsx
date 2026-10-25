@@ -341,6 +341,8 @@ export function OrderDetailsView({
       const targetPrinter = (savedPrinter || 'POS-80C').trim();
       const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : null;
 
+      const isStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+
       const res = await fetch('/api/print/kot', {
         method: 'POST',
         headers: {
@@ -354,6 +356,7 @@ export function OrderDetailsView({
           printerName: targetPrinter,
           orderData: order,
           slug,
+          isStation,
         }),
       });
 
@@ -362,15 +365,19 @@ export function OrderDetailsView({
         throw new Error(data.error || 'Failed to print KOT');
       }
 
-      // If server handled it directly (e.g. running on local Windows machine)
+      // If server handled it directly, or cloud print agent handled it, or broadcasted to Print Station (from non-station phone)
       if (data.mode === 'server') {
         toast.success(data.message || 'KOT printed to POS-80C!', { id: toastId });
         return;
       }
 
-      // If handled via Cloud Print Agent on Cashier PC
       if (data.mode === 'agent') {
         toast.success(data.message || `KOT sent directly to Cashier ${targetPrinter}!`, { id: toastId });
+        return;
+      }
+
+      if (!isStation && data.broadcasted) {
+        toast.success(data.message || 'KOT sent to Print Station!', { id: toastId });
         return;
       }
 
@@ -436,6 +443,8 @@ export function OrderDetailsView({
     });
 
     try {
+      const isStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+
       // Send print job directly to POS-80C thermal printer (1-click instant silent print)
       const res = await fetch('/api/print/bill', {
         method: 'POST',
@@ -449,6 +458,7 @@ export function OrderDetailsView({
           printerType: savedType,
           orderData: order,
           slug,
+          isStation,
         }),
       });
 
@@ -457,8 +467,8 @@ export function OrderDetailsView({
         throw new Error(data.error || 'Failed to print bill');
       }
 
-      if (data.mode === 'server' || data.mode === 'agent') {
-        toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} printed to ${savedPrinter}!`, { id: toastId });
+      if (data.mode === 'server' || data.mode === 'agent' || (!isStation && data.broadcasted)) {
+        toast.success(data.message || `Bill #${String(order.ticket_number).padStart(3, '0')} sent to Print Station!`, { id: toastId });
         return;
       }
 
