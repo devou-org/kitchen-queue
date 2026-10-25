@@ -205,18 +205,15 @@ export function StatementAnalyticsChart({
 
   // Status Breakdown
   const statusMap: Record<string, { name: string; count: number; revenue: number; color: string }> = {
-    CLOSED: { name: 'Closed', count: 0, revenue: 0, color: '#059669' },
-    SERVED: { name: 'Served', count: 0, revenue: 0, color: '#10B981' },
+    PAID: { name: 'Paid / Completed', count: 0, revenue: 0, color: '#059669' },
     READY: { name: 'Ready', count: 0, revenue: 0, color: '#2563EB' },
     PREPARING: { name: 'Preparing', count: 0, revenue: 0, color: '#EAB308' },
     PENDING: { name: 'Pending', count: 0, revenue: 0, color: '#F97316' },
     CANCELLED: { name: 'Cancelled', count: 0, revenue: 0, color: '#DC2626' },
-    EXPIRED: { name: 'Expired', count: 0, revenue: 0, color: '#64748B' },
   };
 
   orders.forEach((o) => {
-    const rawSt = (o.status || 'PENDING').toUpperCase();
-    const st = rawSt === 'PAID' ? 'CLOSED' : rawSt;
+    const st = (o.status || 'PENDING').toUpperCase();
     const target = statusMap[st] ? st : 'PENDING';
     statusMap[target].count += 1;
     statusMap[target].revenue += Number(o.total_price || 0);

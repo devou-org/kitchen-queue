@@ -101,43 +101,4 @@ export class TablesService {
   static async syncTableOccupancy(restaurantId: string, tableNumber: string): Promise<'AVAILABLE' | 'OCCUPIED'> {
     return await TablesRepository.reevaluateOccupancy(restaurantId, tableNumber);
   }
-
-  /**
-   * Merge one or more secondary tables into a primary table
-   */
-  static async mergeTables(
-    restaurantId: string,
-    primaryTableId: string,
-    secondaryTableIds: string[]
-  ): Promise<{ success: boolean; primaryTable: RestaurantTable; mergedTables: RestaurantTable[] }> {
-    if (!primaryTableId || !primaryTableId.trim()) {
-      throw new Error('Primary table is required');
-    }
-
-    if (!Array.isArray(secondaryTableIds) || secondaryTableIds.length === 0) {
-      throw new Error('Please select at least one table to merge with');
-    }
-
-    const uniqueSecIds = Array.from(new Set(secondaryTableIds.filter(id => id && id.trim())));
-    if (uniqueSecIds.includes(primaryTableId)) {
-      throw new Error('Cannot merge a table into itself');
-    }
-
-    return await TablesRepository.mergeTables(restaurantId, primaryTableId, uniqueSecIds);
-  }
-
-  /**
-   * Unmerge a table (detach secondary table or unmerge all secondary tables attached to primary)
-   */
-  static async unmergeTable(
-    restaurantId: string,
-    tableId: string
-  ): Promise<{ success: boolean; unmergedCount: number }> {
-    if (!tableId || !tableId.trim()) {
-      throw new Error('Table ID is required for unmerge');
-    }
-
-    return await TablesRepository.unmergeTable(restaurantId, tableId);
-  }
 }
-

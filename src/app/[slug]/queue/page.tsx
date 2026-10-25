@@ -13,7 +13,7 @@ export default function QueuePage() {
   if (loading) {
     return (
       <div style={{ background: '#f8fafc', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="loader" />
+        <p>Loading Waitlist...</p>
       </div>
     );
   }

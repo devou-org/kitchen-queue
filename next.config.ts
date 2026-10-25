@@ -8,19 +8,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    resolveAlias: {
-      lna: 'qz-lna',
-    },
-  },
-  webpack: (config) => {
-    config.resolve = config.resolve || {};
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      lna: 'qz-lna',
-    };
-    return config;
-  },
+  turbopack: {},
 };
 
 export default withPWA(nextConfig);

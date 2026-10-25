@@ -116,11 +116,7 @@ export default function RecentBillingOperations({
           <tbody>
             {txLoading ? (
               <tr>
-                <td colSpan={4} style={{ padding: '40px 20px', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '120px' }}>
-                    <div className="loader" />
-                  </div>
-                </td>
+                <td colSpan={4} style={styles.tdEmpty}>Loading transactions...</td>
               </tr>
             ) : transactions.length === 0 ? (
               <tr>

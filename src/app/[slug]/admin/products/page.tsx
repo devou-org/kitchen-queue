@@ -16,7 +16,6 @@ import { CounterDrawer } from '@/components/CounterDrawer';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
 import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
-import { Loading } from '@/components/ui/Loading';
 
 interface ExtractedProduct {
   id: string;
@@ -609,7 +608,7 @@ export default function AdminProducts() {
               />
               <input
                 type="text"
-                placeholder="Search items..."
+                placeholder="Search products..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{
@@ -735,7 +734,7 @@ export default function AdminProducts() {
                 <span>Counters</span>
               </button>
 
-              {/* Add Item */}
+              {/* Add Product */}
               <button
                 type="button"
                 onClick={() => {
@@ -759,7 +758,7 @@ export default function AdminProducts() {
                 }}
               >
                 <Plus size={15} />
-                <span>Add Item</span>
+                <span>Add Product</span>
               </button>
 
               {/* Maximize Layout Toggle */}
@@ -792,14 +791,12 @@ export default function AdminProducts() {
         {/* Desktop Table View */}
         <div className="table-wrapper products-table-viewport" style={{ border: 'none', borderRadius: 0, width: '100%', flex: 1, overflowX: 'auto' }}>
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '350px', width: '100%' }}>
-              <div className="loader" />
-            </div>
+            <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : (
             <table className="products-table">
               <thead>
                 <tr>
-                  <th>Item</th>
+                  <th>Product</th>
                   <th>Category</th>
                   <th>Counter</th>
                   <th>Price</th>
@@ -916,9 +913,7 @@ export default function AdminProducts() {
         {/* Mobile Product Cards View */}
         <div className="products-mobile-card-list">
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', width: '100%' }}>
-              <div className="loader" />
-            </div>
+            <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
               No products found matching your filters
@@ -1417,7 +1412,7 @@ export default function AdminProducts() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 'clamp(8px, 2.5vw, 20px)',
+          padding: '20px',
           overflowY: 'auto'
         }}>
           <div style={{
@@ -1425,10 +1420,10 @@ export default function AdminProducts() {
             borderRadius: '8px',
             maxWidth: '1050px',
             width: '100%',
-            maxHeight: '92vh',
+            maxHeight: '90vh',
             overflowY: 'auto',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            padding: 'clamp(14px, 3.5vw, 28px)',
+            padding: '28px',
             position: 'relative'
           }}>
             <AdminProductForm
@@ -1511,11 +1506,11 @@ export default function AdminProducts() {
             {/* Modal Body */}
             <div style={{ padding: '24px 24px 20px 24px', textAlign: 'center' }}>
               <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
-                Delete Item?
+                Delete Product?
               </h3>
               
               <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-                Are you sure you want to permanently delete this item? This cannot be undone.
+                Are you sure you want to permanently delete this product? This cannot be undone.
               </p>
 
               {/* Product Preview Card */}

@@ -26,7 +26,7 @@ export async function PATCH(
 
     const updatedTable = await TablesService.updateTable(id, restaurant.id, restaurant.slug, {
       table_number: table_number !== undefined ? String(table_number) : undefined,
-      capacity: capacity !== undefined ? Math.min(14, Math.max(1, parseInt(capacity, 10))) : undefined,
+      capacity: capacity !== undefined ? parseInt(capacity, 10) : undefined,
       status
     });
 

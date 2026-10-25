@@ -22,25 +22,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-
-    const { rewards, totalRecords, totalPages, currentPage, pageSize } = await getLoyaltyRewards(
-      restaurant.id,
-      page,
-      limit
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: rewards,
-      pagination: {
-        currentPage,
-        pageSize,
-        totalRecords,
-        totalPages,
-      },
-    });
+    const rewards = await getLoyaltyRewards(restaurant.id);
+    return NextResponse.json({ success: true, data: rewards });
   } catch (error: any) {
     console.error('Error fetching loyalty rewards:', error);
     return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
@@ -66,16 +49,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
     }
 
-    const isFreeItem = reward_type === 'FREE_ITEM';
-    if (isFreeItem && (!selected_product_ids || selected_product_ids.length === 0)) {
-      return NextResponse.json({ success: false, error: 'Please select at least one product for the Free Item reward' }, { status: 400 });
-    }
-
     const reward = await createLoyaltyReward(restaurant.id, {
       name,
       points_required: Number(points_required),
       reward_type,
-      discount_value: isFreeItem ? 0 : Number(discount_value || 0),
+      discount_value: Number(discount_value || 0),
       selected_product_ids: selected_product_ids || [],
       min_purchase_amount: Number(min_purchase_amount || 0),
       valid_until: valid_until || null
@@ -100,13 +78,6 @@ export async function PUT(request: Request) {
 
     if (!slug || !reward_id) {
       return NextResponse.json({ success: false, error: 'Slug and reward_id are required' }, { status: 400 });
-    }
-
-    if (rewardData.reward_type === 'FREE_ITEM') {
-      rewardData.discount_value = 0;
-      if (rewardData.selected_product_ids !== undefined && (!rewardData.selected_product_ids || rewardData.selected_product_ids.length === 0)) {
-        return NextResponse.json({ success: false, error: 'Please select at least one product for the Free Item reward' }, { status: 400 });
-      }
     }
 
     const restaurant = await getRestaurantBySlug(slug);

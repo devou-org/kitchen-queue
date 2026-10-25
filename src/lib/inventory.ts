@@ -800,14 +800,6 @@ export async function receivePurchaseStock(
     }
 
     await client.query('COMMIT');
-
-    // Automated Finance Stream: Record purchase expense if paid
-    if (data.payment_status === 'PAID') {
-      import('@/modules/finance/finance.service').then(({ FinanceService }) => {
-        FinanceService.recordPurchaseExpense(po.id).catch(err => console.error('Finance purchase record error:', err));
-      }).catch(() => {});
-    }
-
     return po;
   } catch (err) {
     await client.query('ROLLBACK');
@@ -815,27 +807,6 @@ export async function receivePurchaseStock(
   } finally {
     client.release();
   }
-}
-
-export async function updatePurchaseOrderPaymentStatus(
-  restaurantId: string,
-  purchaseOrderId: string,
-  paymentStatus: 'PAID' | 'UNPAID' | 'PARTIAL'
-): Promise<void> {
-  await pool.query(
-    `UPDATE purchase_orders
-     SET payment_status = $1,
-         updated_at = NOW()
-     WHERE id = $2 AND restaurant_id = $3`,
-    [paymentStatus, purchaseOrderId, restaurantId]
-  );
-
-  // Automated Finance Stream: Sync expense
-  import('@/modules/finance/finance.service').then(({ FinanceService }) => {
-    FinanceService.recordPurchaseExpense(purchaseOrderId).catch(err =>
-      console.error('Finance purchase record update error:', err)
-    );
-  }).catch(() => {});
 }
 
 export async function getPurchaseOrders(restaurantId: string): Promise<PurchaseOrder[]> {

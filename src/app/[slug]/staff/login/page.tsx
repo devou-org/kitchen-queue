@@ -13,7 +13,10 @@ export default function StaffLoginRedirect() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <div className="loader" />
+      <div style={{ textAlign: 'center' }}>
+        <div className="loader" style={{ margin: '0 auto 16px' }} />
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Redirecting to Unified Admin Portal...</p>
+      </div>
     </div>
   );
 }

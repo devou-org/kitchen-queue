@@ -62,15 +62,13 @@ export interface OrderItem {
   prepared_at?: string;
   ready_at?: string;
   served_at?: string;
-  notes?: string;
 }
 
 export interface Order {
   id: string;
   ticket_number: number;
   customer_name: string;
-  phone?: string | null;
-  user_id?: string | null;
+  phone: string;
   total_price: number;
   subtotal?: number;
   discount_amount?: number;
@@ -133,9 +131,6 @@ export interface CartItem {
   quantity: number;
   image_url: string;
   status: ProductStatus;
-  original_price?: number;
-  is_free_reward?: boolean;
-  notes?: string;
 }
 
 // API Response types

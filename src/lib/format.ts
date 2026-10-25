@@ -24,17 +24,10 @@ export function formatDateTime(date: string | Date): string {
 }
 
 export function formatTime(date: string | Date): string {
-  try {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-  } catch {
-    return '';
-  }
+  return new Date(date).toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function formatWaitTime(seconds: number): string {

@@ -50,7 +50,7 @@ export default function QueueBoardPage() {
   if (resLoading || loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-gradient)' }}>
-        <div className="loader" />
+        <div className="loader" style={{ width: 44, height: 44, borderWidth: 4 }} />
       </div>
     );
   }

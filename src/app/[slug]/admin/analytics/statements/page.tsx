@@ -15,7 +15,6 @@ import BillTemplate from '@/components/BillTemplate';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
-import { getKitchenWorkflow } from '@/lib/kitchen-workflow';
 
 export default function AdminAnalyticsStatementsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -88,8 +87,8 @@ export default function AdminAnalyticsStatementsPage() {
     const headers = ['Ticket', 'Customer', 'Phone', 'Items', 'Total', 'Paid', 'Status', 'Date'];
     const rows = orders.map((order) => [
       `#${String(order.ticket_number).padStart(3, '0')}`,
-      `"${order.customer_name || 'Walk-in'}"`,
-      `"${order.phone || '-'}"`,
+      `"${order.customer_name}"`,
+      `"${order.phone}"`,
       `"${(order.items || []).map((i) => `${i.product_name} (x${i.quantity})`).join('; ')}"`,
       order.total_price,
       order.is_paid ? `PAID${order.payment_method ? ` (${order.payment_method})` : ''}` : 'PENDING',
@@ -126,8 +125,7 @@ export default function AdminAnalyticsStatementsPage() {
   const gstPayable = totalCompositionGst || 0;
   const netRevenue = actualRevenue - gstPayable;
 
-  const workflow = getKitchenWorkflow(restaurant?.kitchen_mode);
-  const allStatuses = Array.from(new Set([...workflow.orderLifecycle, 'CANCELLED', 'EXPIRED']));
+  const allStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID', 'CANCELLED'];
 
   const [expiring, setExpiring] = useState(false);
   const handleExpireOldOrders = async () => {
@@ -777,8 +775,8 @@ export default function AdminAnalyticsStatementsPage() {
           </div>
           <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%' }}>
             {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', width: '100%' }}>
-                <div className="loader" />
+              <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}>
+                <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
               </div>
             ) : (
               <table className="statements-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -808,8 +806,8 @@ export default function AdminAnalyticsStatementsPage() {
                         #{String(order.ticket_number).padStart(3, '0')}
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{order.customer_name || 'Walk-in'}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{order.phone || '-'}</div>
+                        <div style={{ fontWeight: 600 }}>{order.customer_name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{order.phone}</div>
                       </td>
                       <td>
                         <div style={{ maxWidth: '300px', fontSize: '12px' }}>
@@ -859,9 +857,7 @@ export default function AdminAnalyticsStatementsPage() {
                           className={`badge ${
                             order.status === 'CLOSED' || order.status === 'PAID'
                               ? 'badge-available'
-                              : order.status === 'SERVED' || order.status === 'READY'
-                              ? 'badge-ready'
-                              : order.status === 'CANCELLED' || order.status === 'EXPIRED'
+                              : order.status === 'CANCELLED'
                               ? 'badge-out-of-stock'
                               : 'badge-low-stock'
                           }`}
