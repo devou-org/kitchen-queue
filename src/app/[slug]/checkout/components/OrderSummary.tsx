@@ -47,15 +47,20 @@ export default function OrderSummary({
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Your cart is empty. Go back to the menu to add items.</p>
       ) : (
         <>
-          {items.map(item => (
-            <div key={item.product_id} style={{
-              display: 'flex', justifyContent: 'space-between',
-              padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '14px',
-            }}>
-              <span>{item.name} × {item.quantity}</span>
-              <span style={{ fontWeight: 600 }}>{formatPrice(item.price * item.quantity)}</span>
-            </div>
-          ))}
+          {items.map(item => {
+            const isFreeReward = Boolean(freeRewardName && freeRewardProductId && item.product_id === freeRewardProductId);
+            const displayQty = isFreeReward ? Math.max(0, item.quantity - 1) : item.quantity;
+            if (displayQty === 0) return null;
+            return (
+              <div key={item.product_id} style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '14px',
+              }}>
+                <span>{item.name} × {displayQty}</span>
+                <span style={{ fontWeight: 600 }}>{formatPrice(item.price * displayQty)}</span>
+              </div>
+            );
+          })}
           {freeRewardName && (
             <div style={{
               display: 'flex', justifyContent: 'space-between',
