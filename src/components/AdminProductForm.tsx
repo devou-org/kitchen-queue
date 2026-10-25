@@ -5,11 +5,9 @@ import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Product } from '@/types';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Layers, ArrowLeft, ArrowUpDown, Loader2 } from 'lucide-react';
+import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Eye, Layers, ArrowLeft, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
 import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
-import { ProductImageUploader } from '@/components/modules/products/ProductImageUploader';
-import { CustomSelect } from '@/components/ui/CustomSelect';
 
 interface Category {
   id: string;
@@ -262,6 +260,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
         .form-card-inventory { order: 2; }
         .form-card-pricing { order: 3; }
         .form-card-image { order: 4; }
+        .form-card-preview { order: 5; }
 
         @media (min-width: 820px) {
           .product-form-container {
@@ -280,14 +279,8 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             flex-direction: column;
             gap: 24px;
           }
-          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-image {
+          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-image, .form-card-preview {
             order: unset;
-          }
-        }
-
-        @media (max-width: 640px) {
-          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-image {
-            padding: 16px !important;
           }
         }
       `}</style>
@@ -311,10 +304,10 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           )}
           <div>
             <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-              {isEditing ? `Edit Item: ${initialData.name}` : 'Add New Item'}
+              {isEditing ? `Edit Product: ${initialData.name}` : 'Add New Product'}
             </h1>
             <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
-              Configure item information, pricing, dietary preference, and stock inventory.
+              Configure product information, pricing, dietary preference, and stock inventory.
             </p>
           </div>
         </div>
@@ -323,21 +316,15 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           <button
             type="button"
             onClick={handleCancelClick}
-            disabled={loading}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '38px',
-              padding: '0 18px',
+              padding: '10px 18px',
               borderRadius: '8px',
               border: '1px solid #cbd5e1',
               backgroundColor: '#ffffff',
               color: '#334155',
               fontWeight: 600,
               fontSize: '13px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              boxSizing: 'border-box'
+              cursor: 'pointer'
             }}
           >
             Cancel
@@ -348,25 +335,21 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: '8px',
-              height: '38px',
-              padding: '0 22px',
+              padding: '10px 22px',
               borderRadius: '8px',
               border: 'none',
               backgroundColor: 'var(--primary, #0f172a)',
               color: '#ffffff',
               fontWeight: 700,
               fontSize: '13px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.85 : 1,
+              cursor: 'pointer',
               boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
-              transition: 'all 0.2s ease',
-              boxSizing: 'border-box'
+              transition: 'all 0.2s ease'
             }}
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-            {isEditing ? 'Update Item' : 'Save Item'}
+            {loading ? <div className="loader" style={{ width: 16, height: 16, borderWidth: 2 }} /> : <Check size={16} />}
+            {isEditing ? 'Update Product' : 'Save Product'}
           </button>
 
           {isModal && (
@@ -412,7 +395,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                Item Name <span style={{ color: '#ef4444' }}>*</span>
+                Product Name <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <input
                 type="text"
@@ -457,25 +440,29 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 </div>
               </div>
 
-              <CustomSelect
+              <select
                 value={form.category}
-                onChange={val => setForm(f => ({ ...f, category: val }))}
-                options={[
-                  ...(form.category && !categories.some(c => c.name.trim().toLowerCase() === form.category.trim().toLowerCase())
-                    ? [{ value: form.category, label: form.category }]
-                    : []),
-                  ...categories.map(cat => ({ value: cat.name, label: cat.name }))
-                ]}
-                placeholder="Select a Category"
-                buttonStyle={{
-                  height: '42px',
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                required
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
                   borderRadius: '8px',
                   border: '1px solid #cbd5e1',
                   fontSize: '14px',
                   color: '#0f172a',
                   backgroundColor: '#ffffff',
+                  outline: 'none'
                 }}
-              />
+              >
+                <option value="">Select a Category</option>
+                {form.category && !categories.some(c => c.name.trim().toLowerCase() === form.category.trim().toLowerCase()) && (
+                  <option value={form.category}>{form.category}</option>
+                )}
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
 
               {showAddCategory && (
                 <div style={{ marginTop: '10px', display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
@@ -513,26 +500,28 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 </button>
               </div>
 
-              <CustomSelect
+              <select
                 value={form.counter}
-                onChange={val => setForm(f => ({ ...f, counter: val }))}
-                options={[
-                  { value: '', label: 'Unassigned' },
-                  ...(form.counter && !counters.find(c => c.name === form.counter)
-                    ? [{ value: form.counter, label: form.counter }]
-                    : []),
-                  ...counters.map(c => ({ value: c.name, label: c.name }))
-                ]}
-                placeholder="Unassigned"
-                buttonStyle={{
-                  height: '42px',
+                onChange={e => setForm(f => ({ ...f, counter: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
                   borderRadius: '8px',
                   border: '1px solid #cbd5e1',
                   fontSize: '14px',
                   color: '#0f172a',
                   backgroundColor: '#ffffff',
+                  outline: 'none'
                 }}
-              />
+              >
+                <option value="">Unassigned</option>
+                {form.counter && !counters.find(c => c.name === form.counter) && (
+                  <option value={form.counter}>{form.counter}</option>
+                )}
+                {counters.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
 
               {showAddCounter && (
                 <div style={{ marginTop: '10px', display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
@@ -753,12 +742,79 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Product Image</h2>
           </div>
 
-          <ProductImageUploader
-            value={form.image_url}
-            onChange={(url) => setForm(f => ({ ...f, image_url: url }))}
-            folder={slug ? `/products/${(Array.isArray(slug) ? slug[0] : slug).replace(/[\[\]'"]/g, '').trim()}` : '/products'}
-            disabled={loading}
-          />
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+              Image URL
+            </label>
+            <input
+              type="url"
+              value={form.image_url}
+              onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
+              placeholder="https://images.unsplash.com/..."
+              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none' }}
+            />
+          </div>
+        </div>
+
+        {/* Card 5: Live Customer Menu Preview Card */}
+        <div className="form-card-preview" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <Eye size={16} style={{ color: '#64748b' }} />
+            <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Live Menu Card Preview</span>
+          </div>
+
+          {/* Menu Card Mock */}
+          <div style={{ borderRadius: '8px', border: '1px solid #f1f5f9', backgroundColor: '#fafafa', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
+            
+            {/* Card Image Display */}
+            <div style={{ width: '100%', height: '160px', backgroundColor: '#f1f5f9', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {form.image_url ? (
+                <img
+                  src={form.image_url}
+                  alt="Preview"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#94a3b8' }}>
+                  <ImageIcon size={32} />
+                  <span style={{ fontSize: '12px', marginTop: '6px' }}>No Image Provided</span>
+                </div>
+              )}
+
+              {/* Category Pill Tag */}
+              <div style={{ position: 'absolute', top: '10px', left: '10px', padding: '4px 10px', borderRadius: '8px', backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', color: '#ffffff', fontSize: '11px', fontWeight: 600 }}>
+                {form.category || 'Category'}
+              </div>
+            </div>
+
+            {/* Card Body */}
+            <div style={{ padding: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: '8px' }}>
+                
+                {/* Dietary Dot + Title */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '14px', height: '14px', borderRadius: '3px', border: `1.5px solid ${form.dietary_preference === 'VEG' ? '#16a34a' : '#dc2626'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: form.dietary_preference === 'VEG' ? '#16a34a' : '#dc2626' }} />
+                  </div>
+                  <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: 0, lineHeight: 1.2 }}>
+                    {form.name || 'Product Title'}
+                  </h3>
+                </div>
+
+                {/* Price */}
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#16a34a', flexShrink: 0 }}>
+                  ₹{parseFloat(form.price || '0').toFixed(2)}
+                </span>
+              </div>
+
+              {form.description && (
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '8px 0 0 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {form.description}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

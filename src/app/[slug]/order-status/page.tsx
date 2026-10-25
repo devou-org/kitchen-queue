@@ -151,8 +151,9 @@ export default function OrderStatusPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-gradient)' }}>
-        <div className="loader" />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', background: 'var(--bg-gradient)' }}>
+        <div className="loader" style={{ width: 44, height: 44, borderWidth: 4 }} />
+        <p style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Loading your orders...</p>
       </div>
     );
   }

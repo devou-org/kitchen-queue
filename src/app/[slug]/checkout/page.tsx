@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { CartItem, Order, OrderType } from '@/types';
@@ -132,18 +132,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   }, [checkAuth, checkActiveOrderForPhone, slug]);
 
   const items = Array.from(cart.values());
-  const freeRewardProductId = useMemo(() => {
-    if (!selectedReward || selectedReward.reward_type !== 'FREE_ITEM') return undefined;
-    return (selectedReward as any).product_id || (Array.isArray(selectedReward.selected_product_ids) ? selectedReward.selected_product_ids[0] : undefined);
-  }, [selectedReward]);
-
-  const subtotal = useMemo(() => {
-    let sum = 0;
-    for (const item of items) {
-      sum += item.price * item.quantity;
-    }
-    return sum;
-  }, [items]);
+  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   
   let gstAmount = 0;
   let total = subtotal;
@@ -259,18 +248,42 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       // Handle FREE_ITEM loyalty reward line item
       if (selectedReward && selectedReward.reward_type === 'FREE_ITEM') {
         let freeProductId: string | undefined = undefined;
-        if ((selectedReward as any).product_id) {
-          freeProductId = (selectedReward as any).product_id;
-        } else if (Array.isArray(selectedReward.selected_product_ids) && selectedReward.selected_product_ids.length > 0) {
+        if (Array.isArray(selectedReward.selected_product_ids) && selectedReward.selected_product_ids.length > 0) {
           freeProductId = selectedReward.selected_product_ids[0];
         }
 
         if (freeProductId) {
-          orderItems.push({
-            product_id: freeProductId,
-            quantity: 1,
-            price_at_purchase: 0,
-          });
+          const existingIdx = orderItems.findIndex(i => i.product_id === freeProductId);
+          if (existingIdx >= 0) {
+            if (orderItems[existingIdx].quantity > 1) {
+              orderItems[existingIdx].quantity -= 1;
+              orderItems.push({
+                product_id: freeProductId,
+                quantity: 1,
+                price_at_purchase: 0,
+              });
+            } else {
+              orderItems[existingIdx].price_at_purchase = 0;
+            }
+          } else {
+            orderItems.push({
+              product_id: freeProductId,
+              quantity: 1,
+              price_at_purchase: 0,
+            });
+          }
+        } else if (orderItems.length > 0) {
+          // If no specific product is linked to reward, set first item as free reward
+          if (orderItems[0].quantity > 1) {
+            orderItems[0].quantity -= 1;
+            orderItems.push({
+              product_id: orderItems[0].product_id,
+              quantity: 1,
+              price_at_purchase: 0,
+            });
+          } else {
+            orderItems[0].price_at_purchase = 0;
+          }
         }
       }
 
@@ -286,8 +299,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         table_number: isTakeaway ? undefined : storedTable,
         order_type: (form.order_type as OrderType) || 'DINE_IN',
         discount_amount: discountAmount,
-        loyalty_reward_id: selectedReward?.id,
-        selected_reward_id: selectedReward?.id,
       });
 
       if (data.success && data.data) {
@@ -301,7 +312,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 slug,
                 phone: form.phone,
                 reward_id: selectedReward.id,
-                order_id: data.data.id,
               }),
             });
           } catch (err) {
@@ -414,7 +424,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   if (checkingActive) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="loader" />
+        <div className="loader" style={{ width: 36, height: 36, borderWidth: 3 }} />
       </div>
     );
   }
@@ -490,8 +500,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
           gstType={restaurant?.gst_type}
           discountAmount={discountAmount}
           appliedRewardName={selectedReward?.name}
-          freeRewardName={selectedReward?.reward_type === 'FREE_ITEM' ? ((selectedReward as any).product_name || selectedReward.name) : undefined}
-          freeRewardProductId={freeRewardProductId}
           total={total}
           addToMode={addToMode}
           activeOrder={activeOrder}

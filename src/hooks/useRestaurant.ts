@@ -132,16 +132,14 @@ export function useRestaurant() {
       }
     };
 
-    const onRestaurantUpdated = () => fetchRestaurant(true);
-
     window.addEventListener('focus', revalidate);
-    window.addEventListener('restaurant-updated', onRestaurantUpdated);
+    window.addEventListener('restaurant-updated', () => fetchRestaurant(true));
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       listeners.delete(handler);
       window.removeEventListener('focus', revalidate);
-      window.removeEventListener('restaurant-updated', onRestaurantUpdated);
+      window.removeEventListener('restaurant-updated', () => fetchRestaurant(true));
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);

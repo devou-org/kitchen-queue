@@ -1,6 +1,6 @@
 'use client';
-import React, { useMemo, useState, useEffect } from 'react';
-import { Banknote, QrCode, CreditCard, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Banknote, QrCode, CreditCard, Sparkles, RotateCcw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
 export interface SplitAmounts {
@@ -8,8 +8,6 @@ export interface SplitAmounts {
   UPI: number;
   CARD: number;
 }
-
-export type SplitPair = 'CASH_UPI' | 'CASH_CARD' | 'UPI_CARD';
 
 export function formatSplitAmount(val: number): string {
   const num = Math.round(Number(val || 0) * 100) / 100;
@@ -59,138 +57,65 @@ interface SplitPaymentBreakdownProps {
   totalAmount: number;
   split: SplitAmounts;
   onChange: (newSplit: SplitAmounts, formattedSummary: string) => void;
-  onValidationChange?: (isValid: boolean, error?: string, isOvercharged?: boolean) => void;
   className?: string;
   theme?: 'light' | 'emerald';
 }
-
-const METHOD_DETAILS: Record<keyof SplitAmounts, { id: keyof SplitAmounts; label: string; icon: any; color: string }> = {
-  CASH: { id: 'CASH', label: 'Cash', icon: Banknote, color: '#16A34A' },
-  UPI: { id: 'UPI', label: 'UPI / QR', icon: QrCode, color: '#2563EB' },
-  CARD: { id: 'CARD', label: 'Card', icon: CreditCard, color: '#7C3AED' },
-};
-
-const PAIR_CONFIGS: Record<SplitPair, { m1: keyof SplitAmounts; m2: keyof SplitAmounts; inactive: keyof SplitAmounts; label: string }> = {
-  CASH_UPI: { m1: 'CASH', m2: 'UPI', inactive: 'CARD', label: 'Cash + UPI' },
-  CASH_CARD: { m1: 'CASH', m2: 'CARD', inactive: 'UPI', label: 'Cash + Card' },
-  UPI_CARD: { m1: 'UPI', m2: 'CARD', inactive: 'CASH', label: 'UPI + Card' },
-};
 
 export default function SplitPaymentBreakdown({
   totalAmount,
   split,
   onChange,
-  onValidationChange,
   className = '',
   theme = 'light',
 }: SplitPaymentBreakdownProps) {
   const roundedTotal = Math.round(Number(totalAmount || 0) * 100) / 100;
 
-  // Detect which pair is currently active based on existing amounts
-  const detectedPair: SplitPair = useMemo(() => {
-    if (split.CARD > 0 && split.CASH > 0 && (!split.UPI || split.UPI === 0)) return 'CASH_CARD';
-    if (split.CARD > 0 && split.UPI > 0 && (!split.CASH || split.CASH === 0)) return 'UPI_CARD';
-    return 'CASH_UPI';
-  }, [split.CASH, split.UPI, split.CARD]);
-
-  const [activePair, setActivePair] = useState<SplitPair>(detectedPair);
-
-  useEffect(() => {
-    setActivePair(detectedPair);
-  }, [detectedPair]);
-
-  const currentPairConfig = PAIR_CONFIGS[activePair];
-
   const allocated = useMemo(() => {
     return Math.round(((split.CASH || 0) + (split.UPI || 0) + (split.CARD || 0)) * 100) / 100;
-  }, [split.CASH, split.UPI, split.CARD]);
+  }, [split]);
 
   const difference = useMemo(() => {
     return Math.round((roundedTotal - allocated) * 100) / 100;
   }, [roundedTotal, allocated]);
 
-  const activeMethodsCount = useMemo(() => {
-    return [split.CASH, split.UPI, split.CARD].filter((v) => Number(v) > 0).length;
-  }, [split.CASH, split.UPI, split.CARD]);
+  const isExact = Math.abs(difference) < 0.01;
+  const isOver = difference < -0.01;
+  const isUnder = difference > 0.01;
 
-  const isExact = Math.abs(difference) <= 0.009;
-  const isOver = difference < -0.009;
-  const isUnder = difference > 0.009;
-  const hasExactlyTwoMethods = activeMethodsCount === 2;
-  const isValid = hasExactlyTwoMethods && isExact && !isOver;
-
-  let validationError: string | null = null;
-  if (isOver) {
-    validationError = `Overcharged by ${formatPrice(Math.abs(difference))}. Total allocated cannot exceed ${formatPrice(roundedTotal)}.`;
-  } else if (activeMethodsCount < 2) {
-    validationError = 'Split payment requires exactly two payment methods with amounts greater than ₹0.';
-  } else if (activeMethodsCount > 2) {
-    validationError = 'Split payment requires exactly two payment methods (currently 3 allocated).';
-  } else if (isUnder) {
-    validationError = `Remaining: ${formatPrice(difference)} to be allocated.`;
-  }
-
-  useEffect(() => {
-    onValidationChange?.(isValid, validationError || undefined, isOver);
-  }, [isValid, validationError, isOver, onValidationChange]);
-
-  // When switching between payment pairs (Cash+UPI vs Cash+Card vs UPI+Card)
-  const handleSelectPair = (newPair: SplitPair) => {
-    setActivePair(newPair);
-    const { m1, m2, inactive } = PAIR_CONFIGS[newPair];
-
-    const currentM1 = split[m1] || 0;
-    let newM1 = 0;
-    let newM2 = 0;
-
-    if (currentM1 > 0 && currentM1 < roundedTotal) {
-      newM1 = currentM1;
-      newM2 = Math.round((roundedTotal - currentM1) * 100) / 100;
-    } else {
-      newM1 = Math.round((roundedTotal / 2) * 100) / 100;
-      newM2 = Math.round((roundedTotal - newM1) * 100) / 100;
-    }
-
-    const newSplit: SplitAmounts = {
-      CASH: 0,
-      UPI: 0,
-      CARD: 0,
-      [m1]: newM1,
-      [m2]: newM2,
-      [inactive]: 0,
-    };
-    onChange(newSplit, formatSplitSummary(newSplit));
-  };
-
-  // When user edits an amount for one method, automatically calculate the partner method
-  const handleMethodAmountChange = (method: keyof SplitAmounts, value: number) => {
-    const { m1, m2, inactive } = PAIR_CONFIGS[activePair];
-    const partner = method === m1 ? m2 : m1;
+  const updateMethodAmount = (method: keyof SplitAmounts, value: number) => {
     const safeVal = Math.max(0, isNaN(value) ? 0 : Math.round(value * 100) / 100);
+    const newSplit = { ...split, [method]: safeVal };
+    onChange(newSplit, formatSplitSummary(newSplit));
+  };
 
-    let partnerVal = 0;
-    if (safeVal < roundedTotal) {
-      partnerVal = Math.round((roundedTotal - safeVal) * 100) / 100;
-    } else {
-      // Overcharged or exact - complementary method is 0
-      partnerVal = 0;
-    }
+  const handleFillRemaining = (method: keyof SplitAmounts) => {
+    const currentVal = split[method] || 0;
+    const targetVal = Math.max(0, currentVal + difference);
+    updateMethodAmount(method, targetVal);
+  };
 
+  const handleSplitFiftyFifty = (m1: keyof SplitAmounts, m2: keyof SplitAmounts) => {
+    const half = Math.round((roundedTotal / 2) * 100) / 100;
+    const otherHalf = Math.round((roundedTotal - half) * 100) / 100;
     const newSplit: SplitAmounts = {
       CASH: 0,
       UPI: 0,
       CARD: 0,
-      [method]: safeVal,
-      [partner]: partnerVal,
-      [inactive]: 0,
+      [m1]: half,
+      [m2]: otherHalf,
     };
     onChange(newSplit, formatSplitSummary(newSplit));
   };
 
-  // Only display the two active methods in the active pair
-  const activeRows = [
-    METHOD_DETAILS[currentPairConfig.m1],
-    METHOD_DETAILS[currentPairConfig.m2],
+  const handleReset = () => {
+    const empty: SplitAmounts = { CASH: 0, UPI: 0, CARD: 0 };
+    onChange(empty, formatSplitSummary(empty));
+  };
+
+  const rows: { id: keyof SplitAmounts; label: string; icon: any; color: string }[] = [
+    { id: 'CASH', label: 'Cash', icon: Banknote, color: '#16A34A' },
+    { id: 'UPI', label: 'UPI / QR', icon: QrCode, color: '#2563EB' },
+    { id: 'CARD', label: 'Card', icon: CreditCard, color: '#7C3AED' },
   ];
 
   return (
@@ -199,11 +124,11 @@ export default function SplitPaymentBreakdown({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '9px',
+        gap: '8px',
         background: theme === 'emerald' ? '#F0FDF4' : '#F8FAFC',
         border: theme === 'emerald' ? '1px solid #BBF7D0' : '1px solid #E2E8F0',
         borderRadius: '10px',
-        padding: '12px',
+        padding: '10px 12px',
         fontSize: '12px',
       }}
     >
@@ -214,7 +139,7 @@ export default function SplitPaymentBreakdown({
           <span style={{ color: '#0F172A', fontWeight: 800 }}>{formatPrice(roundedTotal)}</span>
         </div>
 
-        {isOver ? (
+        {isExact ? (
           <span
             style={{
               display: 'inline-flex',
@@ -222,25 +147,7 @@ export default function SplitPaymentBreakdown({
               gap: '4px',
               fontSize: '11px',
               fontWeight: 700,
-              padding: '2px 8px',
-              borderRadius: '6px',
-              background: '#FEE2E2',
-              color: '#DC2626',
-              border: '1px solid #FECACA',
-            }}
-          >
-            <AlertCircle size={12} />
-            <span>Over by {formatPrice(Math.abs(difference))}</span>
-          </span>
-        ) : isValid ? (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '11px',
-              fontWeight: 700,
-              padding: '2px 8px',
+              padding: '2px 7px',
               borderRadius: '6px',
               background: '#DCFCE7',
               color: '#15803D',
@@ -250,6 +157,24 @@ export default function SplitPaymentBreakdown({
             <CheckCircle2 size={12} />
             <span>Matched</span>
           </span>
+        ) : isOver ? (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '11px',
+              fontWeight: 700,
+              padding: '2px 7px',
+              borderRadius: '6px',
+              background: '#FEE2E2',
+              color: '#B91C1C',
+              border: '1px solid #FECACA',
+            }}
+          >
+            <AlertCircle size={12} />
+            <span>Over by {formatPrice(Math.abs(difference))}</span>
+          </span>
         ) : (
           <span
             style={{
@@ -258,7 +183,7 @@ export default function SplitPaymentBreakdown({
               gap: '4px',
               fontSize: '11px',
               fontWeight: 700,
-              padding: '2px 8px',
+              padding: '2px 7px',
               borderRadius: '6px',
               background: '#FEF3C7',
               color: '#B45309',
@@ -270,52 +195,11 @@ export default function SplitPaymentBreakdown({
         )}
       </div>
 
-      {/* Method Pair Selector (Enforces exactly two valid methods) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748B' }}>
-          Select 2 payment methods to split:
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px' }}>
-          {(Object.keys(PAIR_CONFIGS) as SplitPair[]).map((p) => {
-            const isSelected = activePair === p;
-            const cfg = PAIR_CONFIGS[p];
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => handleSelectPair(p)}
-                style={{
-                  height: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
-                  borderRadius: '6px',
-                  border: isSelected ? '1.5px solid #059669' : '1px solid #CBD5E1',
-                  background: isSelected ? '#ECFDF5' : '#FFFFFF',
-                  color: isSelected ? '#065F46' : '#475569',
-                  fontSize: '11px',
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  padding: '0 4px',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {isSelected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#059669' }} />}
-                <span>{cfg.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Input Rows for the two selected methods */}
+      {/* Inputs per method */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {activeRows.map((row) => {
+        {rows.map((row) => {
           const Icon = row.icon;
           const currentVal = split[row.id] || 0;
-
           return (
             <div
               key={row.id}
@@ -324,9 +208,9 @@ export default function SplitPaymentBreakdown({
                 alignItems: 'center',
                 gap: '8px',
                 background: '#FFFFFF',
-                border: isOver ? '1.5px solid #FCA5A5' : '1px solid #CBD5E1',
+                border: '1px solid #CBD5E1',
                 borderRadius: '8px',
-                padding: '5px 8px',
+                padding: '4px 8px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
               }}
             >
@@ -335,7 +219,7 @@ export default function SplitPaymentBreakdown({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  width: '95px',
+                  width: '90px',
                   flexShrink: 0,
                   fontWeight: 600,
                   fontSize: '11.5px',
@@ -355,36 +239,160 @@ export default function SplitPaymentBreakdown({
                   background: '#F8FAFC',
                   borderRadius: '6px',
                   border: '1px solid #E2E8F0',
-                  padding: '0 8px',
-                  height: '32px',
+                  padding: '0 6px',
+                  height: '30px',
                 }}
               >
                 <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#94A3B8', marginRight: '4px' }}>₹</span>
                 <input
                   type="number"
                   min="0"
-                  max={roundedTotal}
                   step="any"
                   placeholder="0"
                   value={currentVal > 0 ? currentVal : ''}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    handleMethodAmountChange(row.id, raw === '' ? 0 : parseFloat(raw));
-                  }}
+                  onChange={(e) => updateMethodAmount(row.id, parseFloat(e.target.value))}
                   style={{
                     width: '100%',
                     border: 'none',
                     background: 'transparent',
                     outline: 'none',
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     fontWeight: 700,
-                    color: isOver ? '#DC2626' : '#0F172A',
+                    color: '#0F172A',
                   }}
                 />
               </div>
+
+              {/* Quick Fill / Clear Buttons */}
+              {isUnder && (
+                <button
+                  type="button"
+                  onClick={() => handleFillRemaining(row.id)}
+                  title={`Fill remaining ${formatPrice(difference)} into ${row.label}`}
+                  style={{
+                    height: '28px',
+                    padding: '0 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #CBD5E1',
+                    background: '#F1F5F9',
+                    color: '#475569',
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#E2E8F0';
+                    e.currentTarget.style.color = '#0F172A';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#F1F5F9';
+                    e.currentTarget.style.color = '#475569';
+                  }}
+                >
+                  + Fill
+                </button>
+              )}
+
+              {currentVal > 0 && (
+                <button
+                  type="button"
+                  onClick={() => updateMethodAmount(row.id, 0)}
+                  title="Clear"
+                  style={{
+                    height: '24px',
+                    width: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: '#F1F5F9',
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#FEE2E2';
+                    e.currentTarget.style.color = '#DC2626';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#F1F5F9';
+                    e.currentTarget.style.color = '#94A3B8';
+                  }}
+                >
+                  ×
+                </button>
+              )}
             </div>
           );
         })}
+      </div>
+
+      {/* Quick Presets */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', paddingTop: '2px' }}>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <button
+            type="button"
+            onClick={() => handleSplitFiftyFifty('CASH', 'UPI')}
+            style={{
+              padding: '3px 8px',
+              borderRadius: '5px',
+              border: '1px solid #E2E8F0',
+              background: '#FFFFFF',
+              color: '#475569',
+              fontSize: '10.5px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Sparkles size={11} style={{ color: '#059669' }} />
+            <span>50/50 Cash+UPI</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSplitFiftyFifty('CASH', 'CARD')}
+            style={{
+              padding: '3px 8px',
+              borderRadius: '5px',
+              border: '1px solid #E2E8F0',
+              background: '#FFFFFF',
+              color: '#475569',
+              fontSize: '10.5px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <span>50/50 Cash+Card</span>
+          </button>
+        </div>
+
+        {allocated > 0 && (
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{
+              padding: '3px 6px',
+              border: 'none',
+              background: 'transparent',
+              color: '#94A3B8',
+              fontSize: '10.5px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+            }}
+          >
+            <RotateCcw size={10} />
+            <span>Reset</span>
+          </button>
+        )}
       </div>
     </div>
   );

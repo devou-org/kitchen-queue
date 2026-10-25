@@ -76,28 +76,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
   const [showSurveyTip, setShowSurveyTip] = useState(false);
   const [showBill, setShowBill] = useState(false);
   const [stages, setStages] = useState(isKdsMode ? DEFAULT_STAGES_KDS : DEFAULT_STAGES_KOT);
-  const [loyaltySettings, setLoyaltySettings] = useState<any>(null);
-  const [loyaltyEnabled, setLoyaltyEnabled] = useState(
-    () => restaurant?.modules?.LOYALTY_PROGRAM !== false
-  );
-
-  useEffect(() => {
-    if (restaurant?.modules?.LOYALTY_PROGRAM === false) {
-      setLoyaltyEnabled(false);
-      setLoyaltySettings(null);
-      return;
-    }
-    if (!slug) return;
-    fetch(`/api/admin/loyalty/settings?slug=${slug}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success && json.data) {
-          setLoyaltySettings(json.data);
-          setLoyaltyEnabled(json.data.is_enabled !== false && restaurant?.modules?.LOYALTY_PROGRAM !== false);
-        }
-      })
-      .catch(() => {});
-  }, [slug, restaurant?.modules?.LOYALTY_PROGRAM]);
 
   useEffect(() => {
     const isKds = (restaurant?.kitchen_mode || 'KOT').toUpperCase() === 'KDS';
@@ -185,8 +163,53 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
 
   if (loading) {
     return (
-      <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="loader" />
+      <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh', paddingBottom: '120px' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'white' }}>
+          <div style={{ width: 24, height: 24, background: '#f3f4f6', borderRadius: '50%' }} />
+          <div style={{ width: 120, height: 16, background: '#f3f4f6', borderRadius: '8px' }} />
+          <div style={{ width: 32, height: 32, background: '#f3f4f6', borderRadius: '50%' }} />
+        </header>
+
+        <main style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
+          <div style={{ width: '80%', height: 14, background: '#f3f4f6', borderRadius: '4px', margin: '0 auto 24px' }} />
+
+          {/* Ticket Card Skeleton */}
+          <div style={{ background: 'white', borderRadius: '24px', padding: '32px 24px', textAlign: 'center', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ width: 140, height: 14, background: '#f3f4f6', borderRadius: '4px', margin: '0 auto 8px' }} />
+            <div style={{ width: 180, height: 60, background: '#f3f4f6', borderRadius: '12px', margin: '8px auto' }} />
+            <div style={{ width: 120, height: 40, background: '#f3f4f6', borderRadius: '16px', margin: '16px auto 0' }} />
+          </div>
+
+          {/* Progress Card Skeleton */}
+          <div style={{ background: 'white', borderRadius: '24px', padding: '24px', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ width: 120, height: 20, background: '#f3f4f6', borderRadius: '6px', marginBottom: '24px' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: '20px', left: '10%', right: '10%', height: '2px', background: '#f3f4f6' }} />
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 1 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f3f4f6' }} />
+                  <div style={{ width: 40, height: 8, background: '#f3f4f6', borderRadius: '4px' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Details Card Skeleton */}
+          <div style={{ background: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ width: 120, height: 20, background: '#f3f4f6', borderRadius: '6px', marginBottom: '20px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {[1, 2].map((i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ width: 100, height: 16, background: '#f3f4f6', borderRadius: '4px' }} />
+                    <div style={{ width: 60, height: 12, background: '#f3f4f6', borderRadius: '4px' }} />
+                  </div>
+                  <div style={{ width: 60, height: 16, background: '#f3f4f6', borderRadius: '4px' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -215,25 +238,24 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
   const displayPosition = position || 1;
 
   return (
-    <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh', paddingBottom: '40px' }}>
+    <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh', paddingBottom: '120px' }}>
       {/* Header */}
       <header style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '14px 16px',
+        padding: '16px 20px',
         background: 'white',
         position: 'sticky',
         top: 0,
-        zIndex: 20,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+        zIndex: 10
       }}>
-        <button onClick={() => router.push(`/${slug}/menu`)} aria-label="Back to menu" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => router.push(`/${slug}/menu`)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
           <ChevronLeft size={24} color="var(--primary)" />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Circle size={8} fill={isLive ? "#06A77D" : "#FFA500"} color={isLive ? "#06A77D" : "#FFA500"} />
-          <span style={{ fontSize: '12px', fontWeight: 700, color: isLive ? '#06A77D' : '#FFA500', letterSpacing: '0.04em' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: isLive ? '#06A77D' : '#FFA500', letterSpacing: '0.02em' }}>
             {isLive ? 'LIVE STATUS UPDATE' : 'CONNECTING...'}
           </span>
         </div>
@@ -263,16 +285,16 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
           {showSurveyTip && (
             <div style={{
               position: 'absolute',
-              top: '38px',
+              top: '40px',
               right: '0',
               background: '#33322F',
               color: 'white',
-              padding: '6px 10px',
+              padding: '8px 12px',
               borderRadius: '8px',
               fontSize: '11px',
               fontWeight: 600,
               whiteSpace: 'nowrap',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               zIndex: 50,
               display: 'flex',
               alignItems: 'center',
@@ -287,7 +309,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
                 background: '#33322F',
                 transform: 'rotate(45deg)'
               }} />
-              <span>Help us get better! 🚀</span>
+              <span> Help us get better! 🚀</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -315,17 +337,17 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
         </div>
       </header>
 
-      <main style={{ maxWidth: '480px', margin: '0 auto', padding: '14px 16px 32px' }}>
+      <main style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
 
         {/* Edit Order Info at Top */}
         <p style={{
           textAlign: 'center',
           color: '#9CA3AF',
-          fontSize: '11.5px',
-          margin: '0 auto 14px',
+          fontSize: '12px',
+          marginBottom: '24px',
           fontWeight: 500,
-          padding: '0 12px',
-          lineHeight: 1.45
+          padding: '0 20px',
+          lineHeight: 1.5
         }}>
           If you want to edit the order, please contact nearby staff.
         </p>
@@ -333,17 +355,17 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
         {/* Ticket Card */}
         <div style={{
           background: 'white',
-          borderRadius: '20px',
-          padding: '22px 16px',
+          borderRadius: '24px',
+          padding: '32px 24px',
           textAlign: 'center',
-          marginBottom: '14px',
+          marginBottom: '20px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
           border: '1px solid rgba(0,0,0,0.02)'
         }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.06em', marginBottom: '4px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#9CA3AF', letterSpacing: '0.05em', marginBottom: '8px' }}>
             YOUR TICKET NUMBER
           </p>
-          <h1 style={{ fontSize: 'clamp(48px, 13vw, 64px)', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.05, margin: '4px 0' }}>
+          <h1 style={{ fontSize: '72px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1, margin: '8px 0' }}>
             #{String(order.ticket_number).padStart(3, '0')}
           </h1>
 
@@ -353,18 +375,18 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
+              gap: '12px',
               background: 'rgba(0,0,0,0.03)',
-              padding: '10px 18px',
-              borderRadius: '14px',
-              marginTop: '12px'
+              padding: '12px 24px',
+              borderRadius: '16px',
+              marginTop: '16px'
             }}>
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '9.5px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   QUEUE POSITION
                 </p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '2px' }}>
-                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#33322F', lineHeight: 1.1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
+                  <span style={{ fontSize: '28px', fontWeight: 800, color: '#33322F' }}>
                     {formatOrdinal(displayPosition)}
                   </span>
                 </div>
@@ -381,13 +403,13 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               gap: '8px',
               background: '#ECFDF5',
               border: '1px solid #A7F3D0',
-              padding: '8px 16px',
-              borderRadius: '14px',
-              marginTop: '12px'
+              padding: '10px 20px',
+              borderRadius: '16px',
+              marginTop: '16px'
             }}>
-              <Utensils size={16} color="var(--primary)" />
+              <Utensils size={18} color="var(--primary)" />
               <div style={{ textAlign: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--primary)', letterSpacing: '0.04em' }}>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)', letterSpacing: '0.04em' }}>
                   TABLE #{order.table_number}
                 </span>
               </div>
@@ -395,102 +417,56 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
           )}
         </div>
 
-        {/* Loyalty Points Earned / Minimum Spend Notification Card */}
-        {loyaltyEnabled && restaurant?.modules?.LOYALTY_PROGRAM !== false && order && order.total_price > 0 && (() => {
-          const minOrderAmount = Number(loyaltySettings?.min_order_amount || 0);
-          const rate = Number(loyaltySettings?.points_earning_rate ?? 0.1);
-          const isPunchMode = loyaltySettings?.loyalty_mode === 'PUNCH_CARD';
-          const meetsMinSpend = minOrderAmount <= 0 || order.total_price >= minOrderAmount;
-          const pointsEarned = Math.floor(order.total_price * rate);
-          const spendDiff = Math.max(0, minOrderAmount - order.total_price);
-          const isPaidOrClosed = order.is_paid || (order.status || '').toUpperCase() === 'CLOSED';
-
-          if (meetsMinSpend) {
-            return (
-              <div style={{
-                background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
-                borderRadius: '18px',
-                padding: '12px 14px',
-                marginBottom: '14px',
-                border: '1px solid #6EE7B7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '10px',
-                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.08)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 auto' }}>
-                  <div style={{ background: '#059669', color: 'white', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Gift size={20} />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '13px', color: '#065F46', lineHeight: 1.25 }}>
-                      {isPaidOrClosed ? 'Loyalty Points Earned!' : 'Loyalty Points For This Order'}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#047857', marginTop: '2px', fontWeight: 600, lineHeight: 1.3 }}>
-                      {isPaidOrClosed ? 'Credited to your CRM balance' : 'Will be credited upon payment completion'}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ background: '#059669', color: 'white', padding: '6px 12px', borderRadius: '16px', fontWeight: 800, fontSize: '13.5px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                  {isPunchMode ? '+1 Stamp' : `+${pointsEarned} pts`}
-                </div>
+        {/* Loyalty Points Earned Card */}
+        {order && order.total_price > 0 && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+            borderRadius: '20px',
+            padding: '16px 20px',
+            marginBottom: '20px',
+            border: '1px solid #6EE7B7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 4px 12px rgba(5, 150, 105, 0.08)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: '#059669', color: 'white', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Gift size={22} />
               </div>
-            );
-          }
-
-          // Does not meet minimum order spend requirement
-          return (
-            <div style={{
-              background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
-              borderRadius: '18px',
-              padding: '12px 14px',
-              marginBottom: '14px',
-              border: '1px solid #FCD34D',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px',
-              boxShadow: '0 4px 12px rgba(217, 119, 6, 0.08)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 auto' }}>
-                <div style={{ background: '#D97706', color: 'white', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Gift size={20} />
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '14px', color: '#065F46' }}>
+                  {order.is_paid || (order.status || '').toUpperCase() === 'CLOSED' ? 'Loyalty Points Earned!' : 'Loyalty Points For This Order'}
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: '13px', color: '#92400E', lineHeight: 1.25 }}>
-                    Min. ₹{minOrderAmount} to Earn Points
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#B45309', marginTop: '2px', fontWeight: 600, lineHeight: 1.3 }}>
-                    Spend ₹{spendDiff.toFixed(0)} more on future orders to earn loyalty rewards ({rate} pt{rate === 1 ? '' : 's'}/₹1)
-                  </div>
+                <div style={{ fontSize: '12px', color: '#047857', marginTop: '2px', fontWeight: 600 }}>
+                  {order.is_paid || (order.status || '').toUpperCase() === 'CLOSED' ? 'Credited to your CRM balance' : 'Will be credited upon payment completion'}
                 </div>
-              </div>
-              <div style={{ background: '#D97706', color: 'white', padding: '6px 10px', borderRadius: '14px', fontWeight: 800, fontSize: '12px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                Min ₹{minOrderAmount}
               </div>
             </div>
-          );
-        })()}
+            <div style={{ background: '#059669', color: 'white', padding: '6px 14px', borderRadius: '20px', fontWeight: 800, fontSize: '15px' }}>
+              +{Math.floor(order.total_price * 0.1)} pts
+            </div>
+          </div>
+        )}
 
         {/* Notification Banner - For PENDING & WAITING statuses */}
         {['PENDING', 'WAITING'].includes((order.status || '').trim().toUpperCase()) && (
           <div style={{
             background: '#EEF6FF',
-            borderRadius: '16px',
-            padding: '12px 14px',
+            borderRadius: '18px',
+            padding: '16px',
             display: 'flex',
-            gap: '10px',
+            gap: '12px',
             alignItems: 'flex-start',
-            marginBottom: '14px',
+            marginBottom: '20px',
             border: '1px solid #DBEAFE'
           }}>
-            <div style={{ padding: '2px', flexShrink: 0 }}>
-              <Bell size={18} color="#FBBF24" fill="#FBBF24" />
+            <div style={{ padding: '4px' }}>
+              <Bell size={20} color="#FBBF24" fill="#FBBF24" />
             </div>
             <div>
-              <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#1E40AF', marginBottom: '2px' }}>Please approach the counter</h4>
-              <p style={{ fontSize: '11.5px', color: '#3B82F6', lineHeight: 1.35, fontWeight: 500 }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#1E40AF', marginBottom: '2px' }}>Please approach the counter</h4>
+              <p style={{ fontSize: '12px', color: '#3B82F6', lineHeight: 1.4, fontWeight: 500 }}>
                 Receive your table assignment and enjoy your visit.
               </p>
             </div>
@@ -500,22 +476,22 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
         {['CANCELLED', 'EXPIRED'].includes((order.status || '').trim().toUpperCase()) && (
           <div style={{
             background: '#FEF2F2',
-            borderRadius: '16px',
-            padding: '12px 14px',
+            borderRadius: '18px',
+            padding: '16px',
             display: 'flex',
-            gap: '10px',
+            gap: '12px',
             alignItems: 'flex-start',
-            marginBottom: '14px',
+            marginBottom: '20px',
             border: '1px solid #FCA5A5'
           }}>
-            <div style={{ padding: '2px', flexShrink: 0 }}>
-              <Info size={18} color="#EF4444" />
+            <div style={{ padding: '4px' }}>
+              <Info size={20} color="#EF4444" />
             </div>
             <div>
-              <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#991B1B', marginBottom: '2px', textTransform: 'capitalize' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#991B1B', marginBottom: '2px', textTransform: 'capitalize' }}>
                 Order {order.status.toLowerCase()}
               </h4>
-              <p style={{ fontSize: '11.5px', color: '#B91C1C', lineHeight: 1.35, fontWeight: 500 }}>
+              <p style={{ fontSize: '12px', color: '#B91C1C', lineHeight: 1.4, fontWeight: 500 }}>
                 This order is no longer active. Please contact staff for assistance.
               </p>
             </div>
@@ -526,117 +502,104 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
         {!['CANCELLED', 'EXPIRED'].includes((order.status || '').trim().toUpperCase()) && (
           <div style={{
             background: 'white',
-            borderRadius: '20px',
-            padding: '18px 14px',
-            marginBottom: '14px',
+            borderRadius: '24px',
+            padding: '24px',
+            marginBottom: '20px',
             boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-              <h3 style={{ fontWeight: 800, fontSize: '15px', color: '#33322F' }}>Queue Progress</h3>
-            </div>
-
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              {/* Connecting Lines dynamically aligned with centers of first and last circles */}
-              {(() => {
-                const stepOffset = stages.length > 0 ? (100 / (stages.length * 2)) : 10;
-                const span = 100 - (stepOffset * 2);
-                const progressWidth = stages.length > 1 ? (stageIndex / (stages.length - 1)) * span : 0;
-                return (
-                  <>
-                    <div style={{
-                      position: 'absolute',
-                      top: '18px',
-                      left: `${stepOffset}%`,
-                      right: `${stepOffset}%`,
-                      height: '2px',
-                      background: '#F3F4F6',
-                      zIndex: 0
-                    }} />
-                    <div style={{
-                      position: 'absolute',
-                      top: '18px',
-                      left: `${stepOffset}%`,
-                      width: `${progressWidth}%`,
-                      height: '2px',
-                      background: 'var(--primary)',
-                      zIndex: 0,
-                      transition: 'width 0.5s ease'
-                    }} />
-                  </>
-                );
-              })()}
-
-              {stages.map((stage, i) => {
-                const Icon = stage.icon;
-                const isTerminalCompleted = stage.key === 'CLOSED' || stage.key === 'PAID';
-                const isCompleted = stageIndex > i || (stageIndex === i && isTerminalCompleted);
-                const isCurrent = stageIndex === i && !isTerminalCompleted;
-                const isPending = stageIndex < i;
-
-                return (
-                  <div key={stage.key} style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      background: isPending ? 'white' : (isCurrent ? 'white' : 'var(--primary)'),
-                      border: isPending ? '1px solid #F3F4F6' : (isCurrent ? '2px solid var(--primary)' : 'none'),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: isPending ? '#D1D5DB' : (isCurrent ? 'var(--primary)' : 'white'),
-                      boxShadow: isCurrent ? '0 0 0 4px rgba(0, 0, 0, 0.04)' : 'none',
-                      transition: 'all 0.3s ease',
-                      flexShrink: 0
-                    }}>
-                      {isCompleted ? <CheckCircle2 size={18} /> : <Icon size={18} strokeWidth={isCurrent ? 2.5 : 2} />}
-                    </div>
-                    <span style={{
-                      fontSize: 'clamp(8px, 2.1vw, 9.5px)',
-                      fontWeight: 800,
-                      color: isPending ? '#9CA3AF' : 'var(--primary)',
-                      letterSpacing: '0.01em',
-                      textAlign: 'center',
-                      lineHeight: 1.2,
-                      wordBreak: 'break-word',
-                      maxWidth: '100%'
-                    }}>
-                      {stage.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F' }}>Queue Progress</h3>
           </div>
+
+          <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Connecting Lines */}
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              left: '10%',
+              right: '10%',
+              height: '2px',
+              background: '#F3F4F6',
+              zIndex: 0
+            }} />
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              left: '10%',
+              width: `${stages.length > 1 ? (stageIndex / (stages.length - 1)) * 80 : 0}%`,
+              height: '2px',
+              background: 'var(--primary)',
+              zIndex: 0,
+              transition: 'width 0.5s ease'
+            }} />
+
+            {stages.map((stage, i) => {
+              const Icon = stage.icon;
+              const isTerminalCompleted = stage.key === 'CLOSED' || stage.key === 'PAID';
+              const isCompleted = stageIndex > i || (stageIndex === i && isTerminalCompleted);
+              const isCurrent = stageIndex === i && !isTerminalCompleted;
+              const isPending = stageIndex < i;
+
+              return (
+                <div key={stage.key} style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flex: 1 }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: isPending ? 'white' : (isCurrent ? 'white' : 'var(--primary)'),
+                    border: isPending ? '1px solid #F3F4F6' : (isCurrent ? '2px solid var(--primary)' : 'none'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isPending ? '#D1D5DB' : (isCurrent ? 'var(--primary)' : 'white'),
+                    boxShadow: isCurrent ? '0 0 0 4px rgba(0, 0, 0, 0.04)' : 'none',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />}
+                  </div>
+                  <span style={{
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    color: isPending ? '#9CA3AF' : 'var(--primary)',
+                    letterSpacing: '0.02em',
+                    textAlign: 'center'
+                  }}>
+                    {stage.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
         )}
 
         {/* Order Details Card */}
         <div style={{
           background: 'white',
-          borderRadius: '20px',
-          padding: '18px 16px',
+          borderRadius: '24px',
+          padding: '24px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
         }}>
-          <h3 style={{ fontWeight: 800, fontSize: '15px', color: '#33322F', marginBottom: '16px' }}>Order Details</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F', marginBottom: '20px' }}>Order Details</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {(order.items || []).map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <p style={{ fontWeight: 700, fontSize: '14px', color: '#33322F', wordBreak: 'break-word', lineHeight: 1.3 }}>{item.product_name}</p>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>Quantity: {item.quantity}</p>
+              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: '15px', color: '#33322F' }}>{item.product_name}</p>
+                  <p style={{ fontSize: '13px', color: '#9CA3AF', marginTop: '2px' }}>Quantity: {item.quantity}</p>
                 </div>
-                <span style={{ fontWeight: 700, fontSize: '14px', color: '#33322F', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                <span style={{ fontWeight: 700, fontSize: '15px', color: '#33322F' }}>
                   {formatPrice(item.price_at_purchase * item.quantity)}
                 </span>
               </div>
             ))}
 
-            <div style={{ borderTop: '1px dashed #E5E7EB', margin: '4px 0' }} />
+            <div style={{ borderTop: '1px dashed #E5E7EB', margin: '8px 0' }} />
 
             {/* Subtotal */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13.5px', color: '#6B6667', fontWeight: 500 }}>Subtotal</span>
-              <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#33322F' }}>
+              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Subtotal</span>
+              <span style={{ fontWeight: 700, fontSize: '14px', color: '#33322F' }}>
                 {formatPrice(order.subtotal ?? (order.items || []).reduce((sum, item) => sum + item.price_at_purchase * item.quantity, 0))}
               </span>
             </div>
@@ -645,27 +608,27 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             {((order as any).gst_type === 'REGULAR' || (restaurant?.gst_type === 'REGULAR' && (order as any).gst_type !== 'NONE' && (order as any).gst_type !== 'COMPOSITION')) && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12.5px', color: '#6B6667', fontWeight: 500 }}>
+                  <span style={{ fontSize: '13px', color: '#6B6667', fontWeight: 500 }}>
                     CGST {((order as any).gst_rate || restaurant?.gst_rate || 0) / 2}%
                   </span>
-                  <span style={{ fontWeight: 600, fontSize: '12.5px', color: '#4B5563' }}>
+                  <span style={{ fontWeight: 600, fontSize: '13px', color: '#4B5563' }}>
                     {formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12.5px', color: '#6B6667', fontWeight: 500 }}>
+                  <span style={{ fontSize: '13px', color: '#6B6667', fontWeight: 500 }}>
                     SGST {((order as any).gst_rate || restaurant?.gst_rate || 0) / 2}%
                   </span>
-                  <span style={{ fontWeight: 600, fontSize: '12.5px', color: '#4B5563' }}>
+                  <span style={{ fontWeight: 600, fontSize: '13px', color: '#4B5563' }}>
                     {formatPrice(Math.round(((order as any).gst_amount || 0) / 2 * 100) / 100)}
                   </span>
                 </div>
-                <div style={{ borderTop: '1px dashed #E5E7EB', margin: '2px 0' }} />
+                <div style={{ borderTop: '1px dashed #E5E7EB', margin: '4px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13.5px', color: '#33322F', fontWeight: 600 }}>
+                  <span style={{ fontSize: '14px', color: '#33322F', fontWeight: 600 }}>
                     Total GST {((order as any).gst_rate || restaurant?.gst_rate || 0)}%
                   </span>
-                  <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#33322F' }}>
+                  <span style={{ fontWeight: 700, fontSize: '14px', color: '#33322F' }}>
                     {formatPrice((order as any).gst_amount || 0)}
                   </span>
                 </div>
@@ -674,21 +637,21 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
 
             {order.discount_amount && Number(order.discount_amount) > 0 ? (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13.5px', color: '#16a34a', fontWeight: 600 }}>Discount</span>
-                <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#16a34a' }}>
+                <span style={{ fontSize: '14px', color: '#16a34a', fontWeight: 600 }}>Discount</span>
+                <span style={{ fontWeight: 700, fontSize: '14px', color: '#16a34a' }}>
                   -{formatPrice(order.discount_amount)}
                 </span>
               </div>
             ) : null}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13.5px', color: '#6B6667', fontWeight: 500 }}>Status</span>
+              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Status</span>
               <OrderStatusBadge status={order.status} />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px' }}>
-              <span style={{ fontSize: '16px', fontWeight: 800, color: '#33322F' }}>Grand Total</span>
-              <span style={{ fontSize: '17px', fontWeight: 900, color: 'var(--primary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '18px', fontWeight: 800, color: '#33322F' }}>Grand Total</span>
+              <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--primary)' }}>
                 {formatPrice(order.total_price)}
               </span>
             </div>

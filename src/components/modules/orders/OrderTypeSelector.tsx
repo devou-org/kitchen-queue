@@ -1,5 +1,5 @@
 import React from 'react';
-import { Utensils, ShoppingBag, UtensilsCrossed /* , Truck */ } from 'lucide-react';
+import { Utensils, ShoppingBag /* , Truck */ } from 'lucide-react';
 import { OrderType } from '@/types';
 
 interface OrderTypeSelectorProps {
@@ -7,9 +7,6 @@ interface OrderTypeSelectorProps {
   onChange: (value: OrderType) => void;
   disabled?: boolean;
   allowDelivery?: boolean;
-  hideLabel?: boolean;
-  className?: string;
-  style?: React.CSSProperties;
 }
 
 const ORDER_TYPES: { id: OrderType; label: string; icon: React.ElementType; description: string }[] = [
@@ -38,42 +35,24 @@ export default function OrderTypeSelector({
   onChange,
   disabled = false,
   allowDelivery = true,
-  hideLabel = false,
-  className = '',
-  style = {},
 }: OrderTypeSelectorProps) {
   const typesToRender = allowDelivery ? ORDER_TYPES : ORDER_TYPES.filter(t => t.id !== 'DELIVERY');
 
   return (
-    <div
-      className={className}
-      style={{
-        background: '#FFFFFF',
-        border: '1px solid #E2E8F0',
-        borderRadius: '8px',
-        padding: '10px 12px',
-        marginBottom: 0,
-        ...style,
-      }}
-    >
-      {!hideLabel && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '11px',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            color: '#64748B',
-            marginBottom: '8px',
-          }}
-        >
-          <UtensilsCrossed size={13} />
-          <span>Order Type</span>
-        </div>
-      )}
+    <div className="card" style={{ marginBottom: '16px', padding: '16px' }}>
+      <label
+        style={{
+          display: 'block',
+          fontSize: '12px',
+          fontWeight: 800,
+          color: 'var(--text-secondary)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          marginBottom: '12px',
+        }}
+      >
+        Select Order Type *
+      </label>
 
       {/* Segmented Control Container */}
       <div
@@ -101,26 +80,26 @@ export default function OrderTypeSelector({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '7px 8px',
-                borderRadius: '6px',
+                padding: '12px 8px',
+                borderRadius: '8px',
                 border: 'none',
                 background: isSelected ? 'white' : 'transparent',
                 color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
                 fontWeight: isSelected ? 800 : 600,
-                fontSize: '12.5px',
+                fontSize: '13px',
                 cursor: disabled ? 'not-allowed' : 'pointer',
-                boxShadow: isSelected ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 opacity: disabled ? 0.6 : 1,
               }}
             >
               <Icon
-                size={16}
+                size={20}
                 style={{
-                  marginBottom: '2px',
+                  marginBottom: '4px',
                   color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
-                  transition: 'transform 0.15s ease',
-                  transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'transform 0.2s ease',
+                  transform: isSelected ? 'scale(1.1)' : 'scale(1)',
                 }}
               />
               <span>{t.label}</span>

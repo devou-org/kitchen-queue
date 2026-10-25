@@ -612,8 +612,8 @@ export default function AdminSalesAnalyticsPage() {
         </div>
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%', margin: 0 }}>
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', width: '100%' }}>
-              <div className="loader" />
+            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}>
+              <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
             </div>
           ) : (
             <table className="sales-table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
@@ -11,8 +11,8 @@ import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Search, X, MapPin } from 'lucide-react';
+import { OrderType } from '@/types';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
-import { useKeepAwake } from '@/hooks/useKeepAwake';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
@@ -108,7 +108,6 @@ export default function AdminPosPage() {
   const searchParams = useSearchParams();
   const slug = (params?.slug as string) || restaurant?.slug || '';
   const tableParam = searchParams?.get('table') || searchParams?.get('table_number') || '';
-  const mergedParam = searchParams?.get('merged') || '';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
@@ -118,9 +117,6 @@ export default function AdminPosPage() {
   const [categories, setCategories] = useState<string[]>(['All']);
 
   const [mounted, setMounted] = useState(false);
-  const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
-  useKeepAwake(isPrintStation);
-
   useEffect(() => {
     setMounted(true);
     tryAutoConnectBluetooth();
@@ -146,41 +142,23 @@ export default function AdminPosPage() {
 
   useEffect(() => {
     if (tableParam) {
-      const matched = tables.find(
-        (t: any) =>
-          String(t.table_number).trim().toLowerCase() === String(tableParam).trim().toLowerCase() ||
-          (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => String(m).trim().toLowerCase() === String(tableParam).trim().toLowerCase()))
+      const matchedTable = tables.find(
+        (t: any) => String(t.table_number) === String(tableParam)
       );
-
-      let displayName = tableParam;
-      if (mergedParam) {
-        displayName = `${tableParam}+${mergedParam}`;
-      } else if (matched) {
-        if (matched.merged_table_numbers && matched.merged_table_numbers.length > 0) {
-          displayName = `${matched.table_number}+${matched.merged_table_numbers.join('+')}`;
-        } else if (matched.parent_table_number) {
-          displayName = `${matched.parent_table_number}+${matched.table_number}`;
-        }
-      }
-
-      const maxPartySize = matched
-        ? Number(matched.effective_capacity || matched.capacity) || 1
-        : 1;
-
+      const cap = matchedTable ? (Number(matchedTable.capacity) || 1) : 1;
       setOrderForm(prev => ({
         ...prev,
-        table_number: displayName,
-        party_size: maxPartySize > 1 ? maxPartySize : (prev.party_size || 1),
+        table_number: tableParam,
         order_type: 'DINE_IN',
+        party_size: cap > 1 ? cap : (prev.party_size || 1),
         is_paid: false,
       }));
-
-      if (toastedTableRef.current !== displayName) {
-        toastedTableRef.current = displayName;
-        toast.success(`Table #${displayName} selected for order`, { id: `pos-table-param` });
+      if (toastedTableRef.current !== tableParam) {
+        toastedTableRef.current = tableParam;
+        toast.success(`Table #${tableParam} selected for order`, { id: `pos-table-param` });
       }
     }
-  }, [tableParam, mergedParam, tables]);
+  }, [tableParam, tables]);
 
   useEffect(() => {
     if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
@@ -278,11 +256,49 @@ export default function AdminPosPage() {
       fetchTables();
     });
 
+    const handleKotAutoPrint = async (data: any) => {
+      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
+      if (!autoPrint) return;
+
+      const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
+      if (dedicatedStation && dedicatedStation !== '' && dedicatedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
+        return;
+      }
+
+      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
+        icon: <PrinterIllustration size={22} status="printing" />,
+        duration: 3000,
+      });
+
+      try {
+        const result = await printUnifiedThermalTicket({
+          base64Bytes: data.base64Bytes,
+          kotData: data.kotData,
+          printerName: data.printer_name,
+          counterId: data.counter_id,
+          counterName: data.counter_name,
+          isAutoPrint: true,
+        });
+        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
+        if (result.success) {
+          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
+            icon: <PrinterIllustration size={22} status="success" />,
+            id: data.is_add_on ? `kot-auto-${data.ticket_number}-${data.counter_name}-${Date.now()}` : `kot-auto-${data.ticket_number}-${data.counter_name}`,
+          });
+        }
+      } catch (err: any) {
+        console.error('Auto-print execution error on admin POS menu:', err);
+      }
+    };
+
+    channel.bind('kot_auto_print', handleKotAutoPrint);
+
     return () => {
       channel.unbind('product_updated');
       channel.unbind('product_deleted');
       channel.unbind('new_order');
       channel.unbind('order_update');
+      channel.unbind('kot_auto_print', handleKotAutoPrint);
       pusherClient?.unsubscribe(channelName);
     };
   }, [restaurant, fetchTables]);
@@ -362,38 +378,17 @@ export default function AdminPosPage() {
         quantity: Math.min(newQty, 50), // allow staff/admin to order more
         image_url: product.image_url,
         status: product.status,
-        notes: existing?.notes,
       });
     }
     setCart(newCart);
-  };
-
-  const handleUpdateNotes = (id: string, notes: string) => {
-    setCart(prev => {
-      const newCart = new Map(prev);
-      const existing = newCart.get(id);
-      if (existing) {
-        newCart.set(id, { ...existing, notes });
-      }
-      return newCart;
-    });
   };
 
   const triggerAutoPrintBill = async (order: any, restaurantSlug: string) => {
     const savedPrinter = typeof window !== 'undefined'
       ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name') || 'POS-80C')
       : 'POS-80C';
-    const savedType = typeof window !== 'undefined'
-      ? (localStorage.getItem('qdine_bill_printer_type') || 'DEFAULT')
-      : 'DEFAULT';
-    const isNetwork = savedType === 'NETWORK';
-    const savedAddress = (isNetwork && typeof window !== 'undefined')
-      ? (localStorage.getItem('qdine_bill_printer_address') || undefined)
-      : undefined;
 
     try {
-      const isStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
-
       const res = await fetch('/api/print/bill', {
         method: 'POST',
         headers: {
@@ -403,10 +398,8 @@ export default function AdminPosPage() {
         body: JSON.stringify({
           orderId: order.id,
           printerName: savedPrinter,
-          printerType: savedType,
           orderData: order,
           slug: restaurantSlug,
-          isStation,
         }),
       });
 
@@ -416,8 +409,8 @@ export default function AdminPosPage() {
         return;
       }
 
-      if (data.mode === 'server' || data.mode === 'agent' || (!isStation && data.broadcasted)) {
-        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to ${!isStation && data.broadcasted ? 'Print Station' : 'printer'}!`, {
+      if (data.mode === 'server' || data.mode === 'agent') {
+        toast.success(`Bill #${String(order.ticket_number).padStart(3, '0')} sent to printer!`, {
           icon: <PrinterIllustration size={20} status="success" />,
         });
         return;
@@ -431,8 +424,6 @@ export default function AdminPosPage() {
         orderData: order,
         billData: data.billData,
         printerName: data.printer || savedPrinter,
-        printerAddress: savedAddress,
-        printerType: savedType,
         ticketNumber: order.ticket_number,
         localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
       });
@@ -477,49 +468,17 @@ export default function AdminPosPage() {
       return;
     }
 
-    if (orderForm.is_paid && (orderForm.payment_method === 'SPLIT' || orderForm.payment_method?.toUpperCase().startsWith('SPLIT'))) {
-      const split = orderForm.payment_split || {};
-      const activeMethods = Object.entries(split).filter(([_, val]) => Number(val) > 0);
-      const allocated = Math.round(activeMethods.reduce((sum, [_, val]) => sum + Number(val), 0) * 100) / 100;
-      const target = Math.round(totalPrice * 100) / 100;
-
-      if (allocated > target + 0.009) {
-        toast.error(`Split payment is overcharged by ₹${(allocated - target).toFixed(2)}. Total cannot exceed ₹${target.toFixed(2)}.`);
-        return;
-      }
-      if (activeMethods.length !== 2) {
-        toast.error('Split payment requires exactly two valid payment methods with amounts greater than ₹0.');
-        return;
-      }
-      if (Math.abs(allocated - target) > 0.009) {
-        toast.error(`Split payment incomplete. ₹${(target - allocated).toFixed(2)} remaining to be allocated.`);
-        return;
-      }
-    }
-
     setSubmitting(true);
     try {
-      const freeRewardProductId = orderForm.free_reward_product_id;
-      const items: any[] = [];
-      for (const item of cart.values()) {
-        items.push({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          price_at_purchase: item.price,
-          notes: item.notes?.trim() || undefined,
-        });
-      }
+      const items = Array.from(cart.values()).map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price_at_purchase: item.price
+      }));
 
-      if (freeRewardProductId) {
-        items.push({
-          product_id: freeRewardProductId,
-          quantity: 1,
-          price_at_purchase: 0,
-        });
-      }
-
-      const phoneToUse = orderForm.phone && orderForm.phone.trim() ? orderForm.phone.trim() : undefined;
-      const nameToUse = orderForm.customer_name && orderForm.customer_name.trim() ? orderForm.customer_name.trim() : (isTakeaway ? 'Takeaway Customer' : (orderForm.table_number ? `Table ${orderForm.table_number}` : 'Walk-in'));
+      // Generate a mock phone if not provided for admin/staff orders
+      const phoneToUse = orderForm.phone || `+910000000000`;
+      const nameToUse = orderForm.customer_name || (isTakeaway ? 'Takeaway Customer' : `Table ${orderForm.table_number}`);
 
       const discountAmount = Math.max(0, Number(orderForm.discount_amount) || 0);
 
@@ -536,8 +495,6 @@ export default function AdminPosPage() {
         payment_method: orderForm.is_paid ? (orderForm.payment_method || 'CASH') : undefined,
         payment_split: orderForm.is_paid ? orderForm.payment_split : undefined,
         discount_amount: discountAmount,
-        loyalty_reward_id: orderForm.selected_reward_id,
-        selected_reward_id: orderForm.selected_reward_id,
       });
 
       if (res.success && res.data) {
@@ -547,25 +504,15 @@ export default function AdminPosPage() {
         if (orderForm.selected_reward_id && orderForm.phone) {
           try {
             const slugStr = Array.isArray(slug) ? slug[0] : slug;
-            const redeemRes = await fetch('/api/admin/loyalty/redeem', {
+            await fetch('/api/admin/loyalty/redeem', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 slug: slugStr,
                 phone: orderForm.phone.trim(),
                 reward_id: orderForm.selected_reward_id,
-                order_id: createdOrder.id,
               }),
             });
-            const redeemJson = await redeemRes.json();
-            if (redeemRes.ok && redeemJson.success) {
-              const pts = Number(redeemJson.data?.reward?.points_required || 0);
-              if (pts > 0) {
-                toast.success(`Redeemed ${pts} loyalty points!`);
-              }
-            } else {
-              console.error('Loyalty reward redemption failed:', redeemJson.error);
-            }
           } catch (err) {
             console.error('Loyalty reward redemption call error:', err);
           }
@@ -593,7 +540,6 @@ export default function AdminPosPage() {
           payment_method: 'UPI',
           discount_amount: 0,
           selected_reward_id: undefined,
-          free_reward_product_id: undefined,
           auto_print_bill: willPrintBill,
         });
         await fetchTables();
@@ -607,37 +553,16 @@ export default function AdminPosPage() {
     }
   };
 
-  const totalItems = useMemo(() => {
-    let count = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
-    if (orderForm.free_reward_product_id && !cart.has(orderForm.free_reward_product_id)) {
-      count += 1;
-    }
-    return count;
-  }, [cart, orderForm.free_reward_product_id]);
-
-  const subtotal = useMemo(() => {
-    let sum = 0;
-    for (const item of cart.values()) {
-      const isFree = Boolean(
-        item.is_free_reward ||
-        (orderForm.free_reward_product_id && item.product_id === orderForm.free_reward_product_id)
-      );
-      if (isFree) {
-        sum += Math.max(0, item.quantity - 1) * item.price;
-      } else {
-        sum += item.price * item.quantity;
-      }
-    }
-    return sum;
-  }, [cart, orderForm.free_reward_product_id]);
+  const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
+  let subtotal = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
   
   let gstAmount = 0;
   let totalPrice = subtotal;
   if (restaurant?.gst_type === 'REGULAR') {
     const rate = Number(restaurant.gst_rate) || 0;
     gstAmount = Math.round((subtotal * rate / 100) * 100) / 100;
+    totalPrice = subtotal + gstAmount;
   }
-  totalPrice = Math.max(0, subtotal + gstAmount - (Number(orderForm.discount_amount) || 0));
 
   const filtered = products
     .filter(p => {
@@ -835,58 +760,49 @@ export default function AdminPosPage() {
 
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: '20px' }}>
 
-      {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 220px)' }}>
-          <div className="loader" />
-        </div>
-      ) : (
-        <>
-          {/* Categories */}
-          <div style={{ paddingBottom: '16px', display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                style={{
-                  padding: '6px 16px',
-                  borderRadius: 'var(--radius-full)',
-                  border: '1.5px solid',
-                  borderColor: cat === category ? 'var(--primary)' : 'var(--border)',
-                  background: cat === category ? 'var(--primary)' : 'white',
-                  color: cat === category ? 'white' : 'var(--text-secondary)',
-                  fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
-                }}
-              >{cat}</button>
-            ))}
-          </div>
+      {/* Categories */}
+      <div style={{ paddingBottom: '16px', display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {categories.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setCategory(cat)}
+            style={{
+              padding: '6px 16px',
+              borderRadius: 'var(--radius-full)',
+              border: '1.5px solid',
+              borderColor: cat === category ? 'var(--primary)' : 'var(--border)',
+              background: cat === category ? 'var(--primary)' : 'white',
+              color: cat === category ? 'white' : 'var(--text-secondary)',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
+            }}
+          >{cat}</button>
+        ))}
+      </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', paddingBottom: totalItems > 0 ? '90px' : '24px' }}>
-            {filtered.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                quantity={cart.get(product.id)?.quantity || 0}
-                onUpdate={handleUpdate}
-              />
-            ))}
-          </div>
-        </>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', paddingBottom: totalItems > 0 ? '90px' : '24px' }}>
+        {filtered.map(product => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            quantity={cart.get(product.id)?.quantity || 0}
+            onUpdate={handleUpdate}
+          />
+        ))}
+      </div>
 
       {mounted && totalItems > 0 && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
-            bottom: 'clamp(14px, 3vw, 24px)',
+            bottom: '24px',
             left: 0,
             right: 0,
-            padding: '0 clamp(10px, 3vw, 20px)',
+            padding: '0 20px',
             zIndex: 99999,
             pointerEvents: 'none',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            boxSizing: 'border-box',
           }}
         >
           <button
@@ -904,7 +820,7 @@ export default function AdminPosPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '0 clamp(12px, 2.5vw, 20px)',
+              padding: '0 20px',
               boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)',
               cursor: 'pointer',
               border: 'none',
@@ -912,9 +828,6 @@ export default function AdminPosPage() {
               color: '#FFFFFF',
               letterSpacing: '-0.01em',
               transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-              boxSizing: 'border-box',
-              minWidth: 0,
-              gap: '8px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
@@ -925,25 +838,21 @@ export default function AdminPosPage() {
               e.currentTarget.style.boxShadow = '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.5vw, 10px)', minWidth: 0, overflow: 'hidden', flexShrink: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span
                 style={{
                   background: 'rgba(255, 255, 255, 0.25)',
                   padding: '3px 10px',
                   borderRadius: '999px',
-                  fontSize: 'clamp(11.5px, 1.5vw, 13px)',
+                  fontSize: '13px',
                   fontWeight: 900,
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
                 }}
               >
                 {totalItems} {totalItems === 1 ? 'item' : 'items'}
               </span>
-              <span style={{ fontSize: 'clamp(13px, 1.8vw, 15px)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                View Cart &amp; Checkout
-              </span>
+              <span style={{ fontSize: '15px', fontWeight: 800 }}>View Cart &amp; Checkout</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1vw, 8px)', fontSize: 'clamp(14px, 1.8vw, 16px)', fontWeight: 900, flexShrink: 0, whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 900 }}>
               <span>{formatPrice(totalPrice)}</span>
               <span style={{ fontSize: '19px', lineHeight: 1 }}>→</span>
             </div>
@@ -957,7 +866,6 @@ export default function AdminPosPage() {
         onClose={() => setCheckoutOpen(false)}
         cart={cart}
         onUpdateCart={handleUpdate}
-        onUpdateCartNotes={handleUpdateNotes}
         tables={tables}
         restaurant={restaurant}
         orderForm={orderForm}

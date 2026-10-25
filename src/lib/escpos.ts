@@ -1,3 +1,6 @@
+import path from 'path';
+import { spawn } from 'child_process';
+
 /**
  * Standard ESC/POS commands
  */
@@ -45,7 +48,6 @@ export interface KotPrintItem {
 
 export interface KotPrintData {
   restaurantName?: string;
-  timezone?: string;
   ticketNumber: number | string;
   orderType?: string;
   tableNumber?: string;
@@ -114,39 +116,18 @@ export function buildKotEscposBuffer(data: KotPrintData): Buffer {
     addRaw(ESCPOS.BOLD_OFF);
   }
 
-  // Format date & time according to restaurant timezone
-  const parsedDate = data.createdAt ? new Date(data.createdAt) : new Date();
-  const now = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-  const tz = data.timezone || 'Asia/Kolkata';
-  let dateStr: string;
-  let timeStr: string;
-  try {
-    dateStr = now.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      timeZone: tz,
-    });
-    timeStr = now.toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: tz,
-    });
-  } catch {
-    dateStr = now.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'Asia/Kolkata',
-    });
-    timeStr = now.toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata',
-    });
-  }
+  // Format date
+  const now = data.createdAt ? new Date(data.createdAt) : new Date();
+  const dateStr = now.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+  const timeStr = now.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
   addLine(padTwoCols(`DATE: ${dateStr}`, timeStr));
 
   if (data.customerName && data.customerName !== 'Guest') {
@@ -217,7 +198,6 @@ export interface BillPrintItem {
 
 export interface BillPrintData {
   restaurantName?: string;
-  timezone?: string;
   address?: string;
   phone?: string;
   gstNumber?: string;
@@ -285,38 +265,17 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
   const orderType = (data.orderType || (data.tableNumber ? 'Dine-in' : 'Takeaway')).replace('_', '-');
   const orderTypeDisplay = orderType.charAt(0).toUpperCase() + orderType.slice(1);
 
-  const parsedDate = data.createdAt ? new Date(data.createdAt) : new Date();
-  const now = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-  const tz = data.timezone || 'Asia/Kolkata';
-  let dateStr: string;
-  let timeStr: string;
-  try {
-    dateStr = now.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      timeZone: tz,
-    });
-    timeStr = now.toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: tz,
-    });
-  } catch {
-    dateStr = now.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'Asia/Kolkata',
-    });
-    timeStr = now.toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata',
-    });
-  }
+  const now = data.createdAt ? new Date(data.createdAt) : new Date();
+  const dateStr = now.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+  const timeStr = now.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
   const dateTimeStr = `${dateStr}, ${timeStr}`;
 
   addRaw(ESCPOS.BOLD_ON);
@@ -348,10 +307,9 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
 
   let calcSubtotal = 0;
   for (const item of data.items) {
+    const name = (item.product_name || item.name || 'Item').trim().toUpperCase();
     const qty = Number(item.quantity) || 1;
     const price = Number(item.price_at_purchase ?? item.price ?? 0);
-    const isFree = price === 0;
-    const name = (item.product_name || item.name || 'Item').trim().toUpperCase() + (isFree ? ' [FREE]' : '');
     const itemTotal = qty * price;
     calcSubtotal += itemTotal;
 
@@ -425,17 +383,86 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
 }
 
 /**
- * @deprecated Windows Print Spooler has been completely disabled to prevent USB port lockouts and delayed queues.
- * Use direct browser Web Bluetooth / Web Serial printing or the dedicated Print Agent.
+ * Send raw ESC/POS bytes directly to Windows Thermal Printer via winspool.drv PowerShell script
  */
 export async function sendRawPrintToWindowsPrinter(
-  _printerName: string,
-  _bytes: Buffer,
-  _docName = 'QDINE KOT'
+  printerName: string,
+  bytes: Buffer,
+  docName = 'QDINE KOT'
 ): Promise<{ success: boolean; error?: string }> {
-  return {
-    success: false,
-    error: 'Windows Print Spooler has been disabled. Printing is routed directly to hardware in browser or print agent.',
-  };
+  return new Promise((resolve) => {
+    try {
+      const scriptPath = path.resolve(process.cwd(), 'scripts', 'print-kot.ps1');
+      const base64Bytes = bytes.toString('base64');
+
+      const args = [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        scriptPath,
+        '-PrinterName',
+        printerName,
+        '-Base64Bytes',
+        base64Bytes,
+        '-DocName',
+        docName,
+      ];
+
+      const ps = spawn('powershell.exe', args, {
+        windowsHide: true,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      ps.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      ps.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ps.on('close', (code) => {
+        if (code !== 0 && !stdout.trim()) {
+          resolve({
+            success: false,
+            error: stderr.trim() || `PowerShell exited with code ${code}`,
+          });
+          return;
+        }
+
+        try {
+          const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+          const lastJsonLine = lines[lines.length - 1];
+          const parsed = JSON.parse(lastJsonLine);
+          resolve(parsed);
+        } catch (e: any) {
+          if (stdout.includes('"success":true')) {
+            resolve({ success: true });
+          } else {
+            resolve({
+              success: false,
+              error: stdout.trim() || stderr.trim() || 'Unknown printing error',
+            });
+          }
+        }
+      });
+
+      ps.on('error', (err) => {
+        resolve({
+          success: false,
+          error: `Failed to launch PowerShell: ${err.message}`,
+        });
+      });
+    } catch (err: any) {
+      resolve({
+        success: false,
+        error: err.message || 'Error initiating print job',
+      });
+    }
+  });
 }
 

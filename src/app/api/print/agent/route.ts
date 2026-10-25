@@ -4,18 +4,8 @@ import {
   getAgentHeartbeat,
   updateAgentHeartbeat,
   getPendingPrintJobs,
-  getPrintJobById,
   completePrintJob,
 } from '@/lib/db';
-import { requireAdmin } from '@/lib/auth';
-
-let hasWarnedSecret = false;
-function warnSecretMissingOnce() {
-  if (!hasWarnedSecret) {
-    hasWarnedSecret = true;
-    console.warn('⚠️ PRINT_AGENT_SECRET is not set in environment. Allowing agent poll/heartbeat without secret.');
-  }
-}
 
 async function resolveRestaurant(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -28,10 +18,8 @@ async function resolveRestaurant(request: NextRequest) {
 
 /**
  * GET /api/print/agent
- * - Used by UI to check agent status (heartbeat) - Public (non-sensitive health status)
- * - Used by agent to poll pending print jobs - Requires x-print-agent-secret
- * - Used by hub to fetch pending print jobs - Requires admin/staff auth
- * - Used by print station to fetch large print job payload - Requires admin/staff auth
+ * - Used by UI to check agent status (heartbeat)
+ * - Used by agent to poll pending print jobs
  */
 export async function GET(request: NextRequest) {
   try {
@@ -41,39 +29,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const jobId = searchParams.get('jobId');
+    const mode = searchParams.get('mode'); // 'poll' or 'status'
 
-    // If fetching a specific print job by id: requires admin/staff auth
-    if (jobId) {
-      const admin = await requireAdmin(request);
-      if (!admin) {
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-      }
-      if (!admin.isSuperAdmin && admin.restaurantId && admin.restaurantId !== restaurant.id) {
-        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-      }
-
-      const job = await getPrintJobById(restaurant.id, jobId);
-      return NextResponse.json({
-        success: true,
-        job,
-      });
-    }
-
-    const mode = searchParams.get('mode'); // 'poll' | 'pending' | 'status'
-
-    // If agent is polling for jobs: requires x-print-agent-secret
+    // If agent is polling for jobs
     if (mode === 'poll') {
-      const secret = process.env.PRINT_AGENT_SECRET;
-      if (secret) {
-        const clientSecret = request.headers.get('x-print-agent-secret');
-        if (clientSecret !== secret) {
-          return NextResponse.json({ success: false, error: 'Unauthorized agent secret' }, { status: 401 });
-        }
-      } else {
-        warnSecretMissingOnce();
-      }
-
       const printerName = searchParams.get('printer') || 'POS-80C';
       const ip = request.headers.get('x-forwarded-for') || '';
       await updateAgentHeartbeat(restaurant.id, printerName, ip);
@@ -85,24 +44,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // If print hub is querying pending jobs for missed-print recovery: requires admin/staff auth
-    if (mode === 'pending') {
-      const admin = await requireAdmin(request);
-      if (!admin) {
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-      }
-      if (!admin.isSuperAdmin && admin.restaurantId && admin.restaurantId !== restaurant.id) {
-        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-      }
-
-      const jobs = await getPendingPrintJobs(restaurant.id);
-      return NextResponse.json({
-        success: true,
-        jobs: jobs || [],
-      });
-    }
-
-    // Otherwise return agent health status for UI (Public, non-sensitive)
+    // Otherwise return agent health status for UI
     const heartbeat = await getAgentHeartbeat(restaurant.id);
     return NextResponse.json({
       success: true,
@@ -118,8 +60,8 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/print/agent
- * - Heartbeat from agent (Requires x-print-agent-secret)
- * - Complete job from agent or hub (Requires admin/staff auth)
+ * - Heartbeat from agent
+ * - Complete job from agent
  */
 export async function POST(request: NextRequest) {
   try {
@@ -132,30 +74,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'heartbeat') {
-      const secret = process.env.PRINT_AGENT_SECRET;
-      if (secret) {
-        const clientSecret = request.headers.get('x-print-agent-secret');
-        if (clientSecret !== secret) {
-          return NextResponse.json({ success: false, error: 'Unauthorized agent secret' }, { status: 401 });
-        }
-      } else {
-        warnSecretMissingOnce();
-      }
-
       const ip = request.headers.get('x-forwarded-for') || '';
       const updated = await updateAgentHeartbeat(restaurant.id, printerName || 'POS-80C', ip);
       return NextResponse.json({ success: true, data: updated });
     }
 
     if (action === 'complete' && jobId) {
-      const admin = await requireAdmin(request);
-      if (!admin) {
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-      }
-      if (!admin.isSuperAdmin && admin.restaurantId && admin.restaurantId !== restaurant.id) {
-        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-      }
-
       await completePrintJob(restaurant.id, jobId);
       return NextResponse.json({ success: true, completed: jobId });
     }

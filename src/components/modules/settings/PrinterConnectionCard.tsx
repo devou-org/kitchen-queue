@@ -168,7 +168,6 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
           printerName: printerName.trim(),
           orderData: testOrder,
           slug,
-          isTest: true,
         }),
       });
 
@@ -182,7 +181,6 @@ export function PrinterConnectionCard({ restaurantName = 'QDINE', slug }: Printe
         base64Bytes: data.base64Bytes,
         kotData: data.kotData,
         printerName: printerName.trim(),
-        isTest: true,
       });
 
       if (printResult.method === 'bluetooth') {

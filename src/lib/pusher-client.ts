@@ -157,25 +157,6 @@ class SocketClientWrapper {
       this.channels.delete(channelName);
     }
   }
-
-  public get connection() {
-    return {
-      bind: (event: string, callback: (...args: any[]) => void) => {
-        if (!this.socket) return;
-        const targetEvent = event === 'connected' ? 'connect' : event;
-        this.socket.on(targetEvent, callback);
-      },
-      unbind: (event: string, callback?: (...args: any[]) => void) => {
-        if (!this.socket) return;
-        const targetEvent = event === 'connected' ? 'connect' : event;
-        if (callback) {
-          this.socket.off(targetEvent, callback);
-        } else {
-          this.socket.off(targetEvent);
-        }
-      },
-    };
-  }
 }
 
 export const pusherClient = typeof window !== 'undefined' ? new SocketClientWrapper() : null;

@@ -27,15 +27,14 @@ export default function SwipeButton({
   const containerRef = useRef<HTMLDivElement>(null);
   const hasConfirmed = useRef(false); // Guard against duplicate submissions
   const prevLoading = useRef(false);  // Track loading transitions
-  const loadingRef = useRef(loading);
-  loadingRef.current = loading;
-  const successRef = useRef(success);
-  successRef.current = success;
   const isCompleted = confirmed || success;
 
   useEffect(() => {
     // Only reset if loading just finished (true→false) without success.
     // This handles failed requests (e.g. network error) so the user can retry.
+    // We deliberately do NOT reset on isDragging change — that caused the
+    // immediate-reset glitch (effect saw !loading && !success && !isDragging
+    // all true right after handleConfirm set isDragging=false).
     if (prevLoading.current && !loading && !success) {
       setConfirmed(false);
       setSliderWidth(0);
@@ -100,16 +99,7 @@ export default function SwipeButton({
          hasConfirmed.current = false;
          return;
       }
-      
-      // Safety auto-reset: if loading never started (e.g. form validation stopped submission),
-      // reset the slider after 500ms so the button does not get stuck.
-      setTimeout(() => {
-        if (!loadingRef.current && !successRef.current) {
-          setConfirmed(false);
-          setSliderWidth(0);
-          hasConfirmed.current = false;
-        }
-      }, 500);
+      // Note: If request fails, useEffect handles reset when loading flips true -> false without success.
     } catch (err) {
       setConfirmed(false);
       setSliderWidth(0);
@@ -174,7 +164,7 @@ export default function SwipeButton({
         userSelect: 'none',
       }}
     >
-      {/* Translucent swipe fill that preserves primary color instead of turning opaque white */}
+      {/* The white background fill that expands as we swipe */}
       <div
         style={{
           position: 'absolute',
@@ -182,7 +172,7 @@ export default function SwipeButton({
           top: 0,
           bottom: 0,
           width: `calc(56px + (100% - 56px) * (${sliderWidth} / 100))`,
-          backgroundColor: 'rgba(255, 255, 255, 0.25)',
+          backgroundColor: 'white',
           borderRadius: '999px',
           transition: isDragging ? 'none' : 'width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
           zIndex: 1,
@@ -201,21 +191,7 @@ export default function SwipeButton({
           color: 'white',
           fontWeight: 700
         }}>
-          <svg
-            style={{
-              width: '18px',
-              height: '18px',
-              animation: 'devouSpin 0.8s linear infinite',
-              marginRight: '8px',
-              flexShrink: 0
-            }}
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle cx="12" cy="12" r="10" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="3" />
-            <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
-          </svg>
-          <span>Processing...</span>
+          <span className="loader" style={{ width: 18, height: 18, borderWidth: 2, marginRight: '8px' }} /> Processing...
         </div>
       )}
 
@@ -240,14 +216,14 @@ export default function SwipeButton({
         style={{
           position: 'relative',
           zIndex: 2,
-          color: 'white',
+          color: sliderWidth > 50 ? color : 'white',
           fontWeight: 700,
+          transition: 'color 0.2s',
           pointerEvents: 'none',
           opacity: isCompleted || loading ? 0 : 1,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          transition: 'opacity 0.2s'
+          gap: '8px'
         }}
       >
         {text}

@@ -404,8 +404,9 @@ export default function RecipesPage() {
 
       {/* Menu Products & Recipes List */}
       {loading ? (
-        <div style={{ padding: '60px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '260px' }}>
-          <div className="loader" />
+        <div style={{ padding: '80px', textAlign: 'center', color: '#94A3B8' }}>
+          <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 10px' }} />
+          Loading menu recipes...
         </div>
       ) : filteredProducts.length === 0 ? (
         <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>
