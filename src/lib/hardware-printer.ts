@@ -49,15 +49,41 @@ let activeUsbEndpoint: number = 1;
 // Deduplication map to prevent double-printing within 5 seconds
 const recentPrintJobs = new Map<string, number>();
 
-function checkAndMarkDuplicatePrint(ticketNumber?: string | number, counterId?: string, counterName?: string, isTest?: boolean): boolean {
-  if (!ticketNumber || isTest || ticketNumber === 999 || ticketNumber === '999') return false;
-  const key = `${ticketNumber}_${counterId || counterName || 'all'}`;
+export function checkAndMarkDuplicatePrint(
+  ticketNumber?: string | number,
+  counterId?: string,
+  counterName?: string,
+  isTest?: boolean
+): boolean {
+  if (!ticketNumber) return false;
+  const cleanCounter = (counterName || counterId || 'all').trim().toLowerCase();
+  const isTestTicket = Boolean(isTest || ticketNumber === 999 || ticketNumber === '999');
+  const threshold = isTestTicket ? 2000 : 6000;
   const now = Date.now();
-  const lastTime = recentPrintJobs.get(key);
-  if (lastTime && now - lastTime < 5000) {
+
+  // 1. Cross-tab deduplication via localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const lsKey = `qdine_print_dup_${ticketNumber}_${cleanCounter}`;
+      const lastStr = localStorage.getItem(lsKey);
+      if (lastStr) {
+        const lastTime = parseInt(lastStr, 10);
+        if (!isNaN(lastTime) && now - lastTime < threshold) {
+          return true;
+        }
+      }
+      localStorage.setItem(lsKey, String(now));
+    } catch {}
+  }
+
+  // 2. In-memory deduplication for current tab
+  const memKey = `${ticketNumber}_${cleanCounter}`;
+  const lastTime = recentPrintJobs.get(memKey);
+  if (lastTime && now - lastTime < threshold) {
     return true;
   }
-  recentPrintJobs.set(key, now);
+  recentPrintJobs.set(memKey, now);
+
   // Housekeep old entries
   if (recentPrintJobs.size > 100) {
     for (const [k, time] of recentPrintJobs.entries()) {
@@ -139,16 +165,17 @@ export function isBluetoothConnectedForCounter(
   }
 
   // 2. Direct match by counter name
-  if (counterName && activeBtConnections.has(counterName.trim().toLowerCase())) {
-    const conn = activeBtConnections.get(counterName.trim().toLowerCase())!;
+  const cleanCName = (counterName || '').trim().toLowerCase();
+  if (cleanCName && activeBtConnections.has(cleanCName)) {
+    const conn = activeBtConnections.get(cleanCName)!;
     if (conn.device?.gatt?.connected) {
       return { connected: true, deviceName: conn.name };
     } else {
-      activeBtConnections.delete(counterName.trim().toLowerCase());
+      activeBtConnections.delete(cleanCName);
     }
   }
 
-  // 3. Fallback only for generic global checks without counter ID or name
+  // 3. Direct match by printer device name (e.g. Printer001)
   const cleanPrinterName = printerName?.trim();
   if (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C' && activeBtConnections.has(cleanPrinterName)) {
     const conn = activeBtConnections.get(cleanPrinterName)!;
@@ -159,10 +186,22 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // 4. If counter is 'bill_printer', 'ALL', or generic fallback, or if only 1 global Bluetooth printer exists
-  const cleanCName = (counterName || '').trim().toUpperCase();
-  const isGenericOrBill = !counterId || counterId === 'bill_printer' || counterId === 'ALL' || !counterName || counterName.toLowerCase() === 'bill printer' || cleanCName === 'ALL';
-  if (isGenericOrBill) {
+  // 4. Match via localStorage counter mapping (e.g. qdine_bt_counter_bakery -> Printer001)
+  if (typeof window !== 'undefined') {
+    const savedName = (cleanCName && localStorage.getItem(`qdine_bt_counter_${cleanCName}`))
+      || (counterId && localStorage.getItem(`qdine_bt_counter_${counterId}`));
+    if (savedName && activeBtConnections.has(savedName)) {
+      const conn = activeBtConnections.get(savedName)!;
+      if (conn.device?.gatt?.connected) {
+        return { connected: true, deviceName: conn.name };
+      }
+    }
+  }
+
+  // 5. Station fallback: For all kitchen tickets (unless explicitly checking bill printer),
+  // automatically route to the station's connected Bluetooth printer
+  const isBillPrinter = counterId === 'bill_printer' || cleanCName === 'bill printer';
+  if (!isBillPrinter) {
     if (activeBluetoothDevice?.gatt?.connected) {
       return { connected: true, deviceName: activeBluetoothDevice.name };
     }
@@ -310,10 +349,8 @@ export async function disconnectBluetoothPrinter(
     targetConn = activeBtConnections.get(cleanCounterName);
   } else if (cleanName && cleanName.toUpperCase() !== 'POS-80C' && activeBtConnections.has(cleanName)) {
     targetConn = activeBtConnections.get(cleanName);
-  } else if (!counterId && !cleanCounterName) {
-    targetConn = activeBluetoothDevice
-      ? { device: activeBluetoothDevice, char: activeBluetoothChar, name: activeBluetoothDevice.name }
-      : undefined;
+  } else if (activeBluetoothDevice) {
+    targetConn = { device: activeBluetoothDevice, char: activeBluetoothChar, name: activeBluetoothDevice.name };
   }
 
   // Delete all counter-specific bindings
@@ -329,12 +366,28 @@ export async function disconnectBluetoothPrinter(
       localStorage.removeItem(`qdine_bt_counter_${cleanCounterName}`);
     }
   }
+  if (counterId === 'bill_printer' || cleanCounterName === 'bill printer') {
+    activeBtConnections.delete('bill_printer');
+    activeBtConnections.delete('bill printer');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('qdine_bt_counter_bill_printer');
+      localStorage.removeItem('qdine_bt_counter_bill printer');
+    }
+  }
 
   // Check if any other counter is still using this physical Bluetooth device
   let otherCounterUsingDevice = false;
   if (targetConn?.device) {
     for (const [key, conn] of activeBtConnections.entries()) {
-      if (conn.device === targetConn.device && key !== targetConn.name && key !== cleanName) {
+      if (
+        conn.device === targetConn.device &&
+        key !== targetConn.name &&
+        key !== cleanName &&
+        key !== counterId &&
+        key !== cleanCounterName &&
+        key !== 'bill_printer' &&
+        key !== 'bill printer'
+      ) {
         otherCounterUsingDevice = true;
         break;
       }
@@ -362,8 +415,10 @@ export async function disconnectBluetoothPrinter(
     }
   }
 
-  if (!counterId && !cleanCounterName && typeof window !== 'undefined') {
-    localStorage.removeItem('qdine_bt_printer_name');
+  if (typeof window !== 'undefined') {
+    if (!counterId || counterId === 'bill_printer') {
+      localStorage.removeItem('qdine_bt_printer_name');
+    }
   }
 }
 
@@ -404,15 +459,22 @@ export async function writeBytesToBluetooth(
     }
   }
 
-  // Fall back to activeBluetoothDevice or connected printer if no specific counter/printer is bound
-  const cleanCounterUpper = (counterName || '').trim().toUpperCase();
-  const hasSpecificTarget = Boolean(
-    (counterId && counterId.trim() && counterId !== 'bill_printer' && counterId !== 'ALL') ||
-    (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C') ||
-    (counterName && counterName.trim() && counterName.toLowerCase() !== 'bill printer' && cleanCounterUpper !== 'ALL')
-  );
+  // Match via localStorage counter mapping
+  if (!writeChar && typeof window !== 'undefined') {
+    const cleanC = (counterName || '').trim().toLowerCase();
+    const savedName = (cleanC && localStorage.getItem(`qdine_bt_counter_${cleanC}`))
+      || (counterId && localStorage.getItem(`qdine_bt_counter_${counterId}`));
+    if (savedName && activeBtConnections.has(savedName)) {
+      const conn = activeBtConnections.get(savedName)!;
+      if (conn.device?.gatt?.connected && conn.char) {
+        writeChar = conn.char;
+        targetDevice = conn.device;
+      }
+    }
+  }
 
-  if (!writeChar && (!hasSpecificTarget || cleanCounterUpper === 'ALL' || counterId === 'ALL' || activeBtConnections.size === 1)) {
+  // Fall back to activeBluetoothDevice or any connected Bluetooth printer on this station
+  if (!writeChar) {
     if (activeBluetoothChar && activeBluetoothDevice?.gatt?.connected) {
       writeChar = activeBluetoothChar;
       targetDevice = activeBluetoothDevice;
@@ -611,6 +673,9 @@ export function isSerialConnectedForCounter(
   }
 
   if (hasSpecificTarget) {
+    if (counterId !== 'bill_printer' && activeSerialPort && activeSerialPort.readable) {
+      return { connected: true, deviceName: cleanName || 'USB Serial Printer' };
+    }
     return { connected: false, deviceName: null };
   }
 
@@ -671,30 +736,36 @@ export async function connectSerialPrinter(counterId?: string): Promise<{ succes
  */
 export async function disconnectSerialPrinter(counterId?: string, printerName?: string): Promise<void> {
   const cleanName = printerName?.trim();
+  let portToClose: any = null;
+
   if (counterId && activeSerialPorts.has(counterId)) {
-    const p = activeSerialPorts.get(counterId);
-    try {
-      await p?.close();
-    } catch {}
+    portToClose = activeSerialPorts.get(counterId);
     activeSerialPorts.delete(counterId);
     if (typeof window !== 'undefined') {
       localStorage.removeItem(`qdine_serial_counter_${counterId}`);
     }
   } else if (cleanName && cleanName.toUpperCase() !== 'POS-80C' && activeSerialPorts.has(cleanName)) {
-    const p = activeSerialPorts.get(cleanName);
-    try {
-      await p?.close();
-    } catch {}
+    portToClose = activeSerialPorts.get(cleanName);
     activeSerialPorts.delete(cleanName);
-  } else if (!counterId && (!cleanName || cleanName.toUpperCase() === 'POS-80C')) {
-    if (activeSerialPort) {
-      try {
-        await activeSerialPort.close();
-      } catch {}
-      activeSerialPort = null;
+  } else if (activeSerialPort) {
+    portToClose = activeSerialPort;
+    activeSerialPort = null;
+  }
+
+  if (portToClose) {
+    try {
+      await portToClose.close();
+    } catch {}
+  }
+
+  if (counterId === 'bill_printer') {
+    activeSerialPorts.delete('bill_printer');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('qdine_serial_counter_bill_printer');
     }
   }
-  if (!counterId && typeof window !== 'undefined') {
+
+  if ((!counterId || counterId === 'bill_printer') && typeof window !== 'undefined') {
     localStorage.removeItem('qdine_serial_printer_name');
   }
 }
@@ -703,7 +774,15 @@ export async function disconnectSerialPrinter(counterId?: string, printerName?: 
  * Write raw ESC/POS bytes to Serial / USB printer
  */
 export async function writeBytesToSerial(bytes: Uint8Array, counterId?: string): Promise<void> {
-  const port = (counterId && activeSerialPorts.get(counterId)) || activeSerialPort;
+  let port = (counterId && activeSerialPorts.get(counterId)) || activeSerialPort;
+  if (!port && activeSerialPorts.size > 0) {
+    for (const p of activeSerialPorts.values()) {
+      if (p?.writable) {
+        port = p;
+        break;
+      }
+    }
+  }
   if (!port || !port.writable) {
     throw new Error('USB / Serial printer not connected. Tap "Connect USB" on this counter.');
   }
@@ -840,7 +919,7 @@ export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise
     String(options.kotData?.customerName || '').toLowerCase().includes('test')
   );
 
-  if (!isTest && !isAddOn && ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName, isTest)) {
+  if (!isAddOn && ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName, isTest)) {
     console.warn(`[HardwarePrinter] Duplicate print suppressed for Ticket #${ticketNo} (${options.counterName || options.counterId || 'ALL'})`);
     return Promise.resolve({
       success: false,
@@ -915,6 +994,20 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
       btCheck = isBluetoothConnectedForCounter(counterId, printerName, counterName);
     }
 
+    // Fall back to any active Bluetooth printer on this station if no dedicated counter printer is configured
+    if (!btCheck.connected) {
+      if (activeBluetoothDevice?.gatt?.connected) {
+        btCheck = { connected: true, deviceName: activeBluetoothDevice.name };
+      } else if (activeBtConnections.size > 0) {
+        for (const conn of activeBtConnections.values()) {
+          if (conn.device?.gatt?.connected) {
+            btCheck = { connected: true, deviceName: conn.name };
+            break;
+          }
+        }
+      }
+    }
+
     if (btCheck.connected) {
       try {
         await writeBytesToBluetooth(rawBytes, printerName, counterId, counterName);
@@ -930,7 +1023,20 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     }
 
     // 2. Try Serial / USB if active
-    const serialCheck = isSerialConnectedForCounter(counterId, printerName);
+    let serialCheck = isSerialConnectedForCounter(counterId, printerName);
+    if (!serialCheck.connected && !btCheck.connected) {
+      if (activeSerialPort?.readable) {
+        serialCheck = { connected: true, deviceName: 'USB Serial Printer' };
+      } else if (activeSerialPorts.size > 0) {
+        for (const p of activeSerialPorts.values()) {
+          if (p?.readable) {
+            serialCheck = { connected: true, deviceName: 'USB Serial Printer' };
+            break;
+          }
+        }
+      }
+    }
+
     if (serialCheck.connected) {
       try {
         await writeBytesToSerial(rawBytes, counterId);
@@ -945,51 +1051,57 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
       }
     }
 
-    // When preferred type is Bluetooth, skip RawBT WebSocket and Local HTTP Bridge to avoid timeout lag
-    if (preferredType !== 'bluetooth') {
-      // 3. Try RawBT WebSocket on Android (Port 40213 - 100% silent background printing)
-      try {
-        const rawBtWsOk = await printViaRawBtWebSocket(rawBytes);
-        if (rawBtWsOk) {
-          console.timeEnd('[Perf] Print execution');
-          return {
-            success: true,
-            method: 'rawbt',
-            message: `Printed silently via RawBT Android Print Service!`,
-          };
-        }
-      } catch {}
-
-      // 4. Try Local HTTP Bridge on Windows (Port 9123 - 100% silent background printing)
-      try {
-        const localBridgeUrl = (typeof window !== 'undefined' && localStorage.getItem('qdine_printer_bridge_url')) || 'http://127.0.0.1:9123/print';
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-
-        const bridgeRes = await fetch(localBridgeUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            printerName,
-            base64Bytes,
-            docName: `KOT #${kotData.ticketNumber} - ${counterName || kotData.counterName || 'Counter'}`,
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        if (bridgeRes.ok) {
-          const bridgeData = await bridgeRes.json();
-          if (bridgeData.success) {
+    // When preferred type is Bluetooth or USB, skip network/RawBT to avoid timeout lag
+    if (preferredType !== 'bluetooth' && preferredType !== 'usb') {
+      const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+      if (isAndroid) {
+        // 3. Try RawBT WebSocket on Android (Port 40213 - 100% silent background printing)
+        try {
+          const rawBtWsOk = await printViaRawBtWebSocket(rawBytes);
+          if (rawBtWsOk) {
             console.timeEnd('[Perf] Print execution');
             return {
               success: true,
-              method: 'serial',
-              message: `Printed silently via local bridge to ${printerName}!`,
+              method: 'rawbt',
+              message: `Printed silently via RawBT Android Print Service!`,
             };
           }
-        }
-      } catch {}
+        } catch {}
+      }
+
+      // 4. Try Local HTTP Bridge on Windows (Port 9123) only if explicitly configured
+      const hasBridgeConfig = typeof window !== 'undefined' && Boolean(localStorage.getItem('qdine_printer_bridge_url') || localStorage.getItem('qdine_use_printer_bridge') === '1');
+      if (hasBridgeConfig) {
+        try {
+          const localBridgeUrl = localStorage.getItem('qdine_printer_bridge_url') || 'http://127.0.0.1:9123/print';
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 800);
+
+          const bridgeRes = await fetch(localBridgeUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              printerName,
+              base64Bytes,
+              docName: `KOT #${kotData.ticketNumber} - ${counterName || kotData.counterName || 'Counter'}`,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          if (bridgeRes.ok) {
+            const bridgeData = await bridgeRes.json();
+            if (bridgeData.success) {
+              console.timeEnd('[Perf] Print execution');
+              return {
+                success: true,
+                method: 'serial',
+                message: `Printed silently via local bridge to ${printerName}!`,
+              };
+            }
+          }
+        } catch {}
+      }
     }
   }
 

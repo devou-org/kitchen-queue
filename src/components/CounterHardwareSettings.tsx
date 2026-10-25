@@ -336,9 +336,33 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
   };
 
   const handleDisconnectBillBluetooth = async () => {
-    await disconnectBluetoothPrinter('bill_printer', billPrinter.printer_name, 'Bill Printer');
-    setTick(t => t + 1);
-    toast.success('Disconnected Bluetooth bill printer');
+    try {
+      await disconnectBluetoothPrinter('bill_printer', billPrinter.printer_name, 'Bill Printer');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('qdine_bt_counter_bill_printer');
+        localStorage.removeItem('qdine_bt_counter_bill printer');
+        localStorage.removeItem('qdine_bill_printer_name');
+        localStorage.removeItem('qdine_bt_printer_name');
+      }
+      setBillPrinter(prev => ({
+        ...prev,
+        printer_name: 'POS-80C',
+      }));
+      await fetch('/api/admin/bill-printer', {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          bill_printer_name: 'POS-80C',
+          bill_printer_type: billPrinter.printer_type,
+          bill_printer_address: null,
+        }),
+      }).catch(() => {});
+      setTick(t => t + 1);
+      toast.success('Disconnected Bluetooth bill printer');
+    } catch (err: any) {
+      console.error('Failed to disconnect Bluetooth bill printer:', err);
+      toast.error('Failed to disconnect bill printer');
+    }
   };
 
   const handleConnectBillUsb = async () => {
@@ -381,9 +405,32 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
   };
 
   const handleDisconnectBillUsb = async () => {
-    await disconnectSerialPrinter('bill_printer', billPrinter.printer_name);
-    setTick(t => t + 1);
-    toast.success('Disconnected USB bill printer');
+    try {
+      await disconnectSerialPrinter('bill_printer', billPrinter.printer_name);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('qdine_serial_counter_bill_printer');
+        localStorage.removeItem('qdine_bill_printer_name');
+        localStorage.removeItem('qdine_serial_printer_name');
+      }
+      setBillPrinter(prev => ({
+        ...prev,
+        printer_name: 'POS-80C',
+      }));
+      await fetch('/api/admin/bill-printer', {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          bill_printer_name: 'POS-80C',
+          bill_printer_type: billPrinter.printer_type,
+          bill_printer_address: null,
+        }),
+      }).catch(() => {});
+      setTick(t => t + 1);
+      toast.success('Disconnected USB bill printer');
+    } catch (err: any) {
+      console.error('Failed to disconnect USB bill printer:', err);
+      toast.error('Failed to disconnect bill printer');
+    }
   };
 
   const handleTestPrintBill = async () => {
@@ -433,9 +480,8 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         throw new Error(data.error || 'Failed to generate test bill buffer');
       }
 
-      // If server printed (e.g. Windows Spooler in DEFAULT mode)
       if (data.mode === 'server') {
-        toast.success(data.message || `Test bill sent to ${pName} via OS Spooler!`, { id: toastId });
+        toast.success(data.message || `Test bill sent to ${pName}!`, { id: toastId });
         return;
       }
 
@@ -661,9 +707,8 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         }
       }
 
-      // 2. If printed directly via server spooler
       if (data.mode === 'server') {
-        toast.success(data.message || `Test print sent to ${pName} via OS Spooler!`, { id: toastId });
+        toast.success(data.message || `Test print sent to ${pName}!`, { id: toastId });
         return;
       }
 
