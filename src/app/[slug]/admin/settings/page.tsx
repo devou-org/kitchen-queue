@@ -148,8 +148,12 @@ export default function AdminSettings() {
     setIsPrintStation(nextVal);
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_is_print_station', nextVal ? '1' : '0');
-      // If hub is turned off, auto-print is automatically disabled
-      if (!nextVal) {
+      // When hub is enabled, turn on auto-print by default; if disabled, turn off
+      if (nextVal) {
+        setAutoPrintKot(true);
+        localStorage.setItem('qdine_auto_print_kot', 'true');
+        localStorage.setItem('qdine_auto_print_bill', 'true');
+      } else {
         setAutoPrintKot(false);
         localStorage.setItem('qdine_auto_print_kot', 'false');
         localStorage.setItem('qdine_auto_print_bill', 'false');

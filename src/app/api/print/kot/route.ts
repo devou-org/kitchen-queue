@@ -32,7 +32,15 @@ async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, counterName, printerName, orderData, separateSlips, slug, isStation } = body;
+    const { orderId, counterName, printerName, orderData, separateSlips, slug, isStation, isTest } = body;
+    const isTestPrint = Boolean(
+      isTest ||
+      orderData?.ticket_number === 999 ||
+      orderData?.ticket_number === '999' ||
+      String(orderId || '').startsWith('test-') ||
+      String(orderData?.id || '').startsWith('test-') ||
+      String(orderData?.customer_name || '').toLowerCase().includes('test')
+    );
 
     const restaurant = await resolveRestaurant(request, slug);
     if (!restaurant) {
@@ -143,6 +151,19 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // For test prints, return compiled buffer directly to caller without queuing or Pusher broadcast
+      if (isTestPrint) {
+        return NextResponse.json({
+          success: true,
+          mode: 'client',
+          message: `Test print buffer generated for ${counterName}`,
+          printer: counterTargetPrinter,
+          itemCount: filteredItems.length,
+          kotData,
+          base64Bytes,
+        });
+      }
+
       // 2. Queue for Cloud Print Agent
       await createPrintJob(restaurant.id, {
         order_id: order.id,
@@ -244,13 +265,24 @@ export async function POST(request: NextRequest) {
         const base64Bytes = buffer.toString('base64');
         slips.push({ kotData, base64Bytes, printerName: slipPrinter, counterId: conf.id });
 
-        // Queue each slip to its dedicated counter printer
-        await createPrintJob(restaurant.id, {
-          order_id: order.id,
-          ticket_number: Number(order.ticket_number) || undefined,
-          counter_name: cName,
-          printer_name: slipPrinter,
-          raw_base64: base64Bytes,
+        if (!isTestPrint) {
+          // Queue each slip to its dedicated counter printer
+          await createPrintJob(restaurant.id, {
+            order_id: order.id,
+            ticket_number: Number(order.ticket_number) || undefined,
+            counter_name: cName,
+            printer_name: slipPrinter,
+            raw_base64: base64Bytes,
+          });
+        }
+      }
+
+      if (isTestPrint) {
+        return NextResponse.json({
+          success: true,
+          mode: 'client',
+          message: `Test print slips generated for ${slips.length} counter(s)`,
+          slips,
         });
       }
 
@@ -350,6 +382,19 @@ export async function POST(request: NextRequest) {
           base64Bytes,
         });
       }
+    }
+
+    // If test print: return buffer directly without cloud queuing or Pusher broadcast
+    if (isTestPrint) {
+      return NextResponse.json({
+        success: true,
+        mode: 'client',
+        message: `Test Master KOT buffer ready`,
+        printer: targetPrinter,
+        itemCount: allItems.length,
+        kotData,
+        base64Bytes,
+      });
     }
 
     // Queue job
