@@ -43,6 +43,11 @@ export function PrintStationListener() {
 
     // 1. KOT Print Handler (Automatic order creation or Manual click from waiter/staff)
     const handleKotAutoPrint = async (data: any) => {
+      // Ignore test prints on PrintStationListener — test prints are handled directly by the Settings UI initiator
+      if (data.is_test || data.ticket_number === 999 || String(data.order_id || '').startsWith('test-')) {
+        return;
+      }
+
       // Check if this device is designated as the print station
       const currentIsStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
       if (!currentIsStation) {
@@ -50,8 +55,8 @@ export function PrintStationListener() {
       }
 
       // If it's an automatic order creation event, verify auto-print is enabled on this device.
-      // If it's a manual click from a waiter phone (is_manual: true), always print!
-      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
+      // On designated Print Station, default auto-print to enabled unless explicitly set to 'false'.
+      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
       if (!data.is_manual && !autoPrint) {
         return;
       }
@@ -90,15 +95,21 @@ export function PrintStationListener() {
         }
 
         const localKotPrinter = typeof window !== 'undefined' ? localStorage.getItem('qdine_kot_printer_name') : null;
+        const targetKotPrinter = (data.printer_name && data.printer_name !== 'POS-80C') ? data.printer_name : (localKotPrinter || data.printer_name || 'POS-80C');
         const result = await printUnifiedThermalTicket({
           base64Bytes,
           kotData: data.kotData,
-          printerName: localKotPrinter || data.printer_name,
+          printerName: targetKotPrinter,
           printerAddress: data.printer_address,
           counterId: data.counter_id,
           counterName: data.counter_name,
-          isAutoPrint: !data.is_manual,
+          isAutoPrint: true, // Print Station must always print silently; never open browser print dialog
         });
+
+        if (result.duplicate) {
+          console.log(`[PrintStationListener] Duplicate suppressed for #${data.ticket_number}`);
+          return;
+        }
 
         const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
         if (result.success) {
@@ -121,6 +132,11 @@ export function PrintStationListener() {
 
     // 2. Bill Print Handler (Manual click from waiter/staff phone)
     const handleBillPrint = async (data: any) => {
+      // Ignore test bills on PrintStationListener
+      if (data.is_test || data.ticket_number === 999 || String(data.order_id || '').startsWith('test-')) {
+        return;
+      }
+
       const currentIsStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
       if (!currentIsStation) {
         return;
@@ -135,15 +151,19 @@ export function PrintStationListener() {
         const localBillType = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_type') : null;
         const localBillPrinter = typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_name') || localStorage.getItem('qdine_kot_printer_name')) : null;
         const localBillAddress = typeof window !== 'undefined' ? localStorage.getItem('qdine_bill_printer_address') : null;
+        const targetBillPrinter = (data.printer_name && data.printer_name !== 'POS-80C') ? data.printer_name : (localBillPrinter || data.printer_name || 'POS-80C');
 
         const result = await printUnifiedBill({
           base64Bytes: data.base64Bytes,
           billData: data.billData,
           billHtml: data.billHtml,
-          printerName: localBillPrinter || data.printer_name,
-          printerType: localBillType || data.printer_type,
+          printerName: targetBillPrinter,
+          printerType: localBillType || data.printer_type || 'DEFAULT',
           printerAddress: localBillAddress || data.printer_address,
           ticketNumber: data.ticket_number,
+          counterId: 'bill_printer',
+          counterName: 'Bill Printer',
+          isAutoPrint: true, // Print Station must always print silently; never open browser print dialog
         });
 
         if (result.success) {

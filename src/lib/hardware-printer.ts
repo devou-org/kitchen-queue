@@ -49,8 +49,8 @@ let activeUsbEndpoint: number = 1;
 // Deduplication map to prevent double-printing within 5 seconds
 const recentPrintJobs = new Map<string, number>();
 
-function checkAndMarkDuplicatePrint(ticketNumber?: string | number, counterId?: string, counterName?: string): boolean {
-  if (!ticketNumber) return false;
+function checkAndMarkDuplicatePrint(ticketNumber?: string | number, counterId?: string, counterName?: string, isTest?: boolean): boolean {
+  if (!ticketNumber || isTest || ticketNumber === 999 || ticketNumber === '999') return false;
   const key = `${ticketNumber}_${counterId || counterName || 'all'}`;
   const now = Date.now();
   const lastTime = recentPrintJobs.get(key);
@@ -160,7 +160,8 @@ export function isBluetoothConnectedForCounter(
   }
 
   // 4. If counter is 'bill_printer', 'ALL', or generic fallback, or if only 1 global Bluetooth printer exists
-  const isGenericOrBill = !counterId || counterId === 'bill_printer' || counterId === 'ALL' || !counterName || counterName.toLowerCase() === 'bill printer';
+  const cleanCName = (counterName || '').trim().toUpperCase();
+  const isGenericOrBill = !counterId || counterId === 'bill_printer' || counterId === 'ALL' || !counterName || counterName.toLowerCase() === 'bill printer' || cleanCName === 'ALL';
   if (isGenericOrBill) {
     if (activeBluetoothDevice?.gatt?.connected) {
       return { connected: true, deviceName: activeBluetoothDevice.name };
@@ -404,13 +405,14 @@ export async function writeBytesToBluetooth(
   }
 
   // Fall back to activeBluetoothDevice or connected printer if no specific counter/printer is bound
+  const cleanCounterUpper = (counterName || '').trim().toUpperCase();
   const hasSpecificTarget = Boolean(
     (counterId && counterId.trim() && counterId !== 'bill_printer' && counterId !== 'ALL') ||
     (cleanPrinterName && cleanPrinterName.toUpperCase() !== 'POS-80C') ||
-    (counterName && counterName.trim() && counterName.toLowerCase() !== 'bill printer')
+    (counterName && counterName.trim() && counterName.toLowerCase() !== 'bill printer' && cleanCounterUpper !== 'ALL')
   );
 
-  if (!writeChar && (!hasSpecificTarget || activeBtConnections.size === 1)) {
+  if (!writeChar && (!hasSpecificTarget || cleanCounterUpper === 'ALL' || counterId === 'ALL' || activeBtConnections.size === 1)) {
     if (activeBluetoothChar && activeBluetoothDevice?.gatt?.connected) {
       writeChar = activeBluetoothChar;
       targetDevice = activeBluetoothDevice;
@@ -785,6 +787,7 @@ export interface UnifiedPrintOptions {
   counterName?: string;
   forceBrowser?: boolean;
   isAutoPrint?: boolean; // When true, NEVER open the browser built-in print dialog/tab!
+  isTest?: boolean;
 }
 
 // ============================================================
@@ -825,14 +828,24 @@ export function printUnifiedThermalTicket(options: UnifiedPrintOptions): Promise
   success: boolean;
   method: HardwarePrinterType;
   message?: string;
+  duplicate?: boolean;
 }> {
   const ticketNo = options.kotData?.ticketNumber;
   const isAddOn = Boolean(options.kotData?.isAddOn);
-  if (!isAddOn && ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName)) {
+  const isTest = Boolean(
+    options.isTest ||
+    ticketNo === 999 ||
+    ticketNo === '999' ||
+    String(ticketNo).toLowerCase().includes('test') ||
+    String(options.kotData?.customerName || '').toLowerCase().includes('test')
+  );
+
+  if (!isTest && !isAddOn && ticketNo && checkAndMarkDuplicatePrint(ticketNo, options.counterId, options.counterName || options.kotData?.counterName, isTest)) {
     console.warn(`[HardwarePrinter] Duplicate print suppressed for Ticket #${ticketNo} (${options.counterName || options.counterId || 'ALL'})`);
     return Promise.resolve({
-      success: true,
-      method: 'serial' as HardwarePrinterType,
+      success: false,
+      duplicate: true,
+      method: 'browser' as HardwarePrinterType,
       message: `Ticket #${ticketNo} already processed. Duplicate suppressed.`,
     });
   }
@@ -1104,6 +1117,8 @@ export interface UnifiedBillPrintOptions {
   forceBrowser?: boolean;
   counterId?: string;
   counterName?: string;
+  isAutoPrint?: boolean;
+  isTest?: boolean;
 }
 
 /**
@@ -1138,6 +1153,7 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
     printerAddress = (typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_address') || undefined) : undefined),
     printerType = (typeof window !== 'undefined' ? (localStorage.getItem('qdine_bill_printer_type') || 'DEFAULT') : 'DEFAULT'),
     forceBrowser = false,
+    isAutoPrint = false,
     counterId,
     counterName,
   } = options;
@@ -1183,8 +1199,8 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
       }
     }
 
-    // 1. BLUETOOTH MODE: Print exclusively to Bluetooth
-    if (effType === 'BLUETOOTH') {
+    // 1. BLUETOOTH MODE: Try Bluetooth if explicitly selected or if in DEFAULT mode with active Bluetooth connection
+    if (effType === 'BLUETOOTH' || effType === 'DEFAULT') {
       let btCheck = isBluetoothConnectedForCounter(targetCounterId, printerName, targetCounterName);
       if (!btCheck.connected) {
         await tryAutoConnectBluetooth(printerName, targetCounterId);
@@ -1201,13 +1217,15 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
           };
         } catch (err: any) {
           console.warn('Bluetooth bill print failed:', err.message);
-          return {
-            success: false,
-            method: 'bluetooth',
-            message: `Failed to print to Bluetooth printer (${printerName}): ${err.message}`,
-          };
+          if (effType === 'BLUETOOTH') {
+            return {
+              success: false,
+              method: 'bluetooth',
+              message: `Failed to print to Bluetooth printer (${printerName}): ${err.message}`,
+            };
+          }
         }
-      } else {
+      } else if (effType === 'BLUETOOTH') {
         return {
           success: false,
           method: 'bluetooth',
@@ -1216,8 +1234,8 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
       }
     }
 
-    // 2. USB MODE: Print exclusively to USB / Serial
-    if (effType === 'USB') {
+    // 2. USB MODE: Try USB / Serial if explicitly selected or if in DEFAULT mode with active USB connection
+    if (effType === 'USB' || effType === 'DEFAULT') {
       const serialCheck = isSerialConnectedForCounter(targetCounterId, printerName);
       if (serialCheck.connected) {
         try {
@@ -1229,13 +1247,15 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
           };
         } catch (err: any) {
           console.warn('USB bill print failed:', err.message);
-          return {
-            success: false,
-            method: 'serial',
-            message: `Failed to print to USB printer (${printerName}): ${err.message}`,
-          };
+          if (effType === 'USB') {
+            return {
+              success: false,
+              method: 'serial',
+              message: `Failed to print to USB printer (${printerName}): ${err.message}`,
+            };
+          }
         }
-      } else {
+      } else if (effType === 'USB') {
         return {
           success: false,
           method: 'serial',
@@ -1324,6 +1344,16 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
   }
 
   // 5. Fallback: Browser 80mm Thermal Receipt (via hidden iframe)
+  // When isAutoPrint is true and forceBrowser is false, NEVER open the browser print dialog!
+  if (isAutoPrint && !forceBrowser) {
+    console.warn(`[HardwarePrinter] Silent printer not reachable for bill. Browser print dialog suppressed for auto-print.`);
+    return {
+      success: false,
+      method: 'browser',
+      message: `Silent printer not connected for bill. Check printer connection in Settings.`,
+    };
+  }
+
   let htmlToPrint = billHtml;
   if (!htmlToPrint && orderData) {
     htmlToPrint = generateBillTemplateHTML(orderData, {

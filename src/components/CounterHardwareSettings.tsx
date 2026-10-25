@@ -424,6 +424,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
           printerType: billPrinter.printer_type,
           orderData: testBillOrder,
           slug,
+          isTest: true,
         }),
       });
 
@@ -450,6 +451,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         ticketNumber: 999,
         counterId: 'bill_printer',
         counterName: 'Bill Printer',
+        isTest: true,
       });
 
       if (printResult.method === 'bluetooth') {
@@ -638,6 +640,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
           printerName: pName,
           orderData: testOrder,
           slug,
+          isTest: true,
         }),
       });
 
@@ -682,8 +685,10 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         base64Bytes: data.base64Bytes,
         kotData: fallbackKotData,
         printerName: pName,
+        printerAddress: form.printer_type === 'NETWORK' ? form.printer_address?.trim() : undefined,
         counterId: counter.id,
         counterName: counter.name,
+        isTest: true,
       });
 
       if (printResult.method === 'qz-tray') {

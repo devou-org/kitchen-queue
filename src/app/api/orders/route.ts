@@ -333,15 +333,21 @@ export async function POST(request: NextRequest) {
       console.error('Pusher trigger failed, but order was created:', pushErr);
     }
 
-    // 🖨️ AUTO-PRINT KOT PER COUNTER: Run in after() so the waiter receives response immediately
-    if (order && order.status === 'PREPARING') {
-      after(async () => {
+    // 🖨️ AUTO-PRINT KOT PER COUNTER: Trigger immediately so print station receives slip
+    if (order && (order.status === 'PREPARING' || order.status === 'PENDING')) {
+      const runKot = async () => {
         try {
-          await autoQueueAndBroadcastKot(restaurant.id, order.id);
+          await autoQueueAndBroadcastKot(restaurant.id, order.id, true);
         } catch (kotErr) {
           console.error('❌ Automatic KOT print error on order creation:', kotErr);
         }
-      });
+      };
+
+      if (typeof after === 'function') {
+        after(runKot);
+      } else {
+        runKot();
+      }
     }
 
     return NextResponse.json({

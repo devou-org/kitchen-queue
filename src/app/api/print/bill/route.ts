@@ -35,7 +35,15 @@ async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, printerName, printerType, orderData, slug, isStation } = body;
+    const { orderId, printerName, printerType, orderData, slug, isStation, isTest } = body;
+    const isTestPrint = Boolean(
+      isTest ||
+      orderData?.ticket_number === 999 ||
+      orderData?.ticket_number === '999' ||
+      String(orderId || '').startsWith('test-') ||
+      String(orderData?.id || '').startsWith('test-') ||
+      String(orderData?.customer_name || '').toLowerCase().includes('verification')
+    );
 
     const restaurant = await resolveRestaurant(request, slug);
     if (!restaurant) {
@@ -132,8 +140,8 @@ export async function POST(request: NextRequest) {
       console.warn(`[Windows] Direct raw bill print to "${targetPrinter}" failed:`, printResult.error);
     }
 
-    // 2. If caller IS the Print Station itself, return bytes directly for local Bluetooth/USB/browser print
-    if (isStation) {
+    // 2. If caller IS the Print Station itself, or this is a test print, return bytes directly for local print
+    if (isStation || isTestPrint) {
       return NextResponse.json({
         success: true,
         mode: 'client',
