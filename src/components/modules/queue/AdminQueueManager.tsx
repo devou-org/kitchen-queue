@@ -161,7 +161,7 @@ export default function AdminQueueManager({ restaurantId }: { restaurantId: stri
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', minHeight: '400px' }}>
           {loading ? (
-            <div style={{ padding: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><div className="loader" /></div>
+            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center' }}><div className="loader" /></div>
           ) : (
             <table>
               <thead>

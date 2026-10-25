@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { Power, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export function checkOperatingHours(
   openTime?: string, 
@@ -185,6 +185,9 @@ export const ServiceToggle = ({
           <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
             Online Ordering & Service Status
           </div>
+          <p style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+            Accept incoming customer orders from digital menu QR codes and POS terminal. Turn off when taking a kitchen break.
+          </p>
           {!isOperatingHours && (
             <span style={{ display: 'inline-block', fontSize: '11px', color: '#EF4444', marginTop: '4px', fontWeight: 600 }}>
               ⚠️ Currently outside scheduled operating hours
@@ -219,6 +222,36 @@ export const ServiceToggle = ({
               boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
             }}
           />
+        </div>
+      </div>
+
+      {/* Status Explanation Card - Matching Auto-Print */}
+      <div
+        style={{
+          padding: '12px 14px',
+          borderRadius: '8px',
+          backgroundColor: isActive ? '#F0FDF4' : '#FFFBEB',
+          border: `1px solid ${isActive ? '#BBF7D0' : '#FED7AA'}`,
+          fontSize: '12px',
+          color: isActive ? '#166534' : '#9A3412',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px',
+          lineHeight: 1.5,
+        }}
+      >
+        <Power size={16} style={{ color: isActive ? '#16A34A' : '#EA580C', marginTop: '2px', flexShrink: 0 }} />
+        <div>
+          <span style={{ fontWeight: 700 }}>
+            {isActive ? 'Online Ordering is currently active' : 'Kitchen service is paused (Offline)'}
+          </span>
+          <p style={{ margin: '2px 0 0 0', fontSize: '11px', opacity: 0.9 }}>
+            {isActive
+              ? 'Customers can browse your digital menu and place live orders. Table orders and POS remain fully operational.'
+              : message
+              ? `Store is showing offline to customers: "${message}". Orders cannot be placed online until enabled.`
+              : 'Store is showing offline to customers. Orders cannot be placed online until enabled.'}
+          </p>
         </div>
       </div>
 

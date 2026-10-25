@@ -8,10 +8,9 @@ export interface BillRestaurantInfo {
   phone?: string;
   gst_number?: string;
   primary_color?: string;
-  timezone?: string;
 }
 
-export function formatInvoiceDate(dateStr?: string | Date, timezone: string = 'Asia/Kolkata'): string {
+export function formatInvoiceDate(dateStr?: string | Date): string {
   try {
     const d = dateStr ? new Date(dateStr) : new Date();
     if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-IN');
@@ -22,7 +21,7 @@ export function formatInvoiceDate(dateStr?: string | Date, timezone: string = 'A
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: timezone || 'Asia/Kolkata',
+      timeZone: 'Asia/Kolkata',
     }).format(d);
   } catch {
     return String(dateStr || '');
@@ -42,8 +41,7 @@ export function escapeHtml(str: string): string {
 export function generateBillTemplateContentHTML(order: Order, restaurant?: BillRestaurantInfo): string {
   const rawTicket = String(order.ticket_number ?? '');
   const ticketNum = /^\d+$/.test(rawTicket) ? rawTicket.padStart(3, '0') : (rawTicket || '000');
-  const tz = restaurant?.timezone || (order as any).timezone || 'Asia/Kolkata';
-  const invoiceDate = formatInvoiceDate(order.created_at, tz);
+  const invoiceDate = formatInvoiceDate(order.created_at);
   const items = (order.items || []).filter((i: any) => (i.quantity || 0) > 0);
   const restName = restaurant?.name || (order as any).restaurant_name || 'Restaurant';
 
@@ -66,7 +64,7 @@ export function generateBillTemplateContentHTML(order: Order, restaurant?: BillR
         })()
       : 'Takeaway';
 
-  const customerDisplay = order.customer_name || 'Walk-in';
+  const customerDisplay = order.customer_name || 'Guest';
   const rawTable = order.table_number ? String(order.table_number).trim() : '';
   const tableDisplay = rawTable || (ticketNum ? `#${ticketNum}` : '-');
 

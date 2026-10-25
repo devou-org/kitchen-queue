@@ -5,7 +5,7 @@ import {
   Plus, Trash2, Edit2, ShieldAlert, Key, UserCheck, UserX, 
   Smartphone, Mail, Shield, CheckSquare, Square, Store, ClipboardList, 
   LayoutGrid, UtensilsCrossed, Boxes, Gift, BarChart3, Users, Receipt, Settings,
-  CheckCircle2, Info, Search, X, Landmark
+  CheckCircle2, Info, Search, X
 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
@@ -29,7 +29,6 @@ const MODULE_ICONS: Record<string, any> = {
   tables: LayoutGrid,
   products: UtensilsCrossed,
   inventory: Boxes,
-  finance: Landmark,
   loyalty: Gift,
   analytics: BarChart3,
   staff: Users,
@@ -819,7 +818,7 @@ export default function StaffAdminPage() {
 
         <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
           {loading ? (
-            <div style={{ padding: '80px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
+            <div style={{ padding: '80px', display: 'flex', justifyContent: 'center' }}>
               <div className="loader" />
             </div>
           ) : activeTab === 'staff' ? (

@@ -388,8 +388,9 @@ export default function SuppliersPage() {
 
       {/* Suppliers Grid */}
       {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', width: '100%' }}>
-          <div className="loader" />
+        <div style={{ padding: '80px', textAlign: 'center', color: '#94A3B8' }}>
+          <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 10px' }} />
+          Loading suppliers...
         </div>
       ) : filteredSuppliers.length === 0 ? (
         <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>

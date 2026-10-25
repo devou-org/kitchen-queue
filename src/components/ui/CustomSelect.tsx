@@ -110,9 +110,9 @@ export function CustomSelect<T extends string = string>({
           ...buttonStyle,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {OptionIcon && <OptionIcon size={16} style={{ color: iconColor, flexShrink: 0 }} />}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </div>

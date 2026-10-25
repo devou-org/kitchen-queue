@@ -52,11 +52,6 @@ export function EditTableModal({
       return;
     }
 
-    if (numCapacity > 14) {
-      toast.error('Seating capacity cannot exceed 14 seats');
-      return;
-    }
-
     setLoading(true);
     try {
       const slug = window.location.pathname.split('/')[1] || 'demo';
@@ -191,7 +186,7 @@ export function EditTableModal({
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
               min="1"
-              max="14"
+              max="50"
               required
               disabled={loading}
               style={{ height: '42px', width: '100%' }}

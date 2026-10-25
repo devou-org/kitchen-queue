@@ -6,11 +6,7 @@ export default function AdminQueuePage() {
   const { restaurant, loading } = useRestaurant();
 
   if (loading || !restaurant) {
-    return (
-      <div style={{ minHeight: 'calc(100vh - 180px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="loader" />
-      </div>
-    );
+    return <div className="p-8 text-gray-500">Loading Queue Manager...</div>;
   }
 
   return (
