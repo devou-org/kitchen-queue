@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { normalizePem } from '@/lib/qz-security';
 
 export async function GET() {
   try {
     // 1. Check env variable first
     if (process.env.QZ_CERTIFICATE) {
-      return new NextResponse(process.env.QZ_CERTIFICATE.replace(/\\n/g, '\n'), {
-        headers: { 'Content-Type': 'text/plain' },
-      });
+      const cert = normalizePem(process.env.QZ_CERTIFICATE);
+      if (cert) {
+        return new NextResponse(cert, {
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      }
     }
 
     // 2. Check certs directory
@@ -21,10 +25,13 @@ export async function GET() {
 
     for (const file of certCandidates) {
       if (fs.existsSync(file)) {
-        const cert = fs.readFileSync(file, 'utf8');
-        return new NextResponse(cert, {
-          headers: { 'Content-Type': 'text/plain' },
-        });
+        const raw = fs.readFileSync(file, 'utf8');
+        const cert = normalizePem(raw);
+        if (cert) {
+          return new NextResponse(cert, {
+            headers: { 'Content-Type': 'text/plain' },
+          });
+        }
       }
     }
 
