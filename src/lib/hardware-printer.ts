@@ -203,10 +203,15 @@ export function isBluetoothConnectedForCounter(
     }
   }
 
-  // Purely generic call without any counter context (rare standalone check)
-  if (!counterId && !cleanCName && (!cleanPrinterName || cleanPrinterName.toUpperCase() === 'POS-80C')) {
+  // Generic fallback: if target is generic (POS-80C), route to active Bluetooth connection
+  if (!cleanPrinterName || cleanPrinterName.toUpperCase() === 'POS-80C') {
     if (activeBluetoothDevice?.gatt?.connected) {
       return { connected: true, deviceName: activeBluetoothDevice.name };
+    }
+    for (const conn of activeBtConnections.values()) {
+      if (conn.device?.gatt?.connected) {
+        return { connected: true, deviceName: conn.name };
+      }
     }
   }
 
@@ -826,7 +831,11 @@ export function isSerialConnectedForCounter(
   }
 
   if (hasSpecificTarget) {
-    if (counterId !== 'bill_printer' && activeSerialPort && activeSerialPort.readable) {
+    if (counterId && activeSerialPorts.has(counterId)) {
+      const p = activeSerialPorts.get(counterId);
+      if (p?.readable) return { connected: true, deviceName: cleanName || 'USB Serial Printer' };
+    }
+    if (activeSerialPort && activeSerialPort.readable) {
       return { connected: true, deviceName: cleanName || 'USB Serial Printer' };
     }
     return { connected: false, deviceName: null };
@@ -1105,6 +1114,8 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
   console.time('[Perf] Print execution');
   console.log('[Perf] Print start for ticket:', options.kotData?.ticketNumber);
 
+  let qzFailureError: string | null = null;
+
   if (!forceBrowser && rawBytes) {
     const preferredType = typeof window !== 'undefined' ? localStorage.getItem('qdine_preferred_printer_type') : null;
 
@@ -1121,13 +1132,66 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
       }
     }
 
-    // 0. Try QZ Tray if actively connected OR if counter/station is configured for QZ/Network/OS printing
+    const effType = (options.printerType || '').toUpperCase();
+    const isNetwork = effType === 'NETWORK';
+    const isBluetoothExplicit = effType === 'BLUETOOTH';
+    const isUsbExplicit = effType === 'USB';
+    const isQzExplicit = effType === 'QZ_TRAY';
+
+    // IMPORTANT: Only use printerAddress as IP socket if connection type is explicitly NETWORK!
+    const effectiveAddress = isNetwork ? (options.printerAddress?.trim() || '') : '';
+    const qzTarget = effectiveAddress || printerName || 'POS-80C';
+
+    // 1. If explicitly configured as Web Bluetooth, try direct Web Bluetooth first
+    if (isBluetoothExplicit) {
+      let btCheck = isBluetoothConnectedForCounter(counterId, printerName, counterName);
+      if (!btCheck.connected) {
+        await tryAutoConnectBluetooth(printerName, counterId, counterName);
+        btCheck = isBluetoothConnectedForCounter(counterId, printerName, counterName);
+      }
+
+      if (btCheck.connected) {
+        try {
+          await writeBytesToBluetooth(rawBytes, printerName, counterId, counterName);
+          endPerf();
+          return {
+            success: true,
+            method: 'bluetooth',
+            message: `Printed instantly to ${btCheck.deviceName || printerName || 'Bluetooth Printer'}!`,
+          };
+        } catch (err: any) {
+          console.warn('Bluetooth print failed, attempting alternatives:', err.message);
+        }
+      }
+    }
+
+    // 2. If explicitly configured as Web Serial / USB, try direct Web Serial first
+    if (isUsbExplicit) {
+      let serialCheck = isSerialConnectedForCounter(counterId, printerName);
+      if (!serialCheck.connected && activeSerialPort?.readable) {
+        serialCheck = { connected: true, deviceName: 'USB Serial Printer' };
+      }
+      if (serialCheck.connected) {
+        try {
+          await writeBytesToSerial(rawBytes, counterId);
+          endPerf();
+          return {
+            success: true,
+            method: 'serial',
+            message: `Printed instantly to USB Printer (${printerName})!`,
+          };
+        } catch (err: any) {
+          console.warn('USB print failed, attempting alternatives:', err.message);
+        }
+      }
+    }
+
+    // 3. Try QZ Tray (Handles QZ_TRAY mode, NETWORK Wi-Fi mode, or acts as fallback for Windows Bluetooth/USB printers)
     const isAndroid = typeof window !== 'undefined' && /android/i.test(navigator.userAgent);
     const wantsQz = !isAndroid && Boolean(base64Bytes) && (
+      isQzExplicit ||
+      (isNetwork && Boolean(effectiveAddress)) ||
       isQzConnected() ||
-      options.printerType === 'QZ_TRAY' ||
-      options.printerType === 'NETWORK' ||
-      Boolean(options.printerAddress) ||
       (typeof window !== 'undefined' && (
         localStorage.getItem('qdine_preferred_printer_type') === 'qz-tray' ||
         localStorage.getItem('qdine_qz_active') === '1'
@@ -1136,7 +1200,6 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
 
     if (wantsQz) {
       try {
-        const qzTarget = printerAddress?.trim() || printerName;
         if (qzTarget) {
           const qzResult = await printRawEscposViaQz(qzTarget, base64Bytes!);
           if (qzResult.success) {
@@ -1146,37 +1209,37 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
               method: 'qz-tray',
               message: `Printed via QZ Tray to "${qzTarget}"!`,
             };
+          } else {
+            qzFailureError = qzResult.error || `Failed to print to "${qzTarget}" via QZ Tray`;
           }
         }
       } catch (qzErr: any) {
+        qzFailureError = qzErr?.message || 'QZ Tray connection error';
         console.warn('QZ Tray print attempt failed, trying alternatives:', qzErr?.message);
       }
     }
 
-    // 1. Try Bluetooth if active or attempt silent auto-reconnect
-    let btCheck = isBluetoothConnectedForCounter(counterId, printerName, counterName);
-    if (!btCheck.connected) {
-      await tryAutoConnectBluetooth(printerName, counterId, counterName);
-      btCheck = isBluetoothConnectedForCounter(counterId, printerName, counterName);
-    }
-
-    if (btCheck.connected) {
-      try {
-        await writeBytesToBluetooth(rawBytes, printerName, counterId, counterName);
-        endPerf();
-        return {
-          success: true,
-          method: 'bluetooth',
-          message: `Printed instantly to ${btCheck.deviceName || printerName || 'Bluetooth Printer'}!`,
-        };
-      } catch (err: any) {
-        console.warn('Bluetooth print failed, trying alternatives:', err.message);
+    // 4. Fallback: If not explicit Bluetooth above, try Web Bluetooth if active
+    if (!isBluetoothExplicit) {
+      let btCheck = isBluetoothConnectedForCounter(counterId, printerName, counterName);
+      if (btCheck.connected) {
+        try {
+          await writeBytesToBluetooth(rawBytes, printerName, counterId, counterName);
+          endPerf();
+          return {
+            success: true,
+            method: 'bluetooth',
+            message: `Printed instantly to ${btCheck.deviceName || printerName || 'Bluetooth Printer'}!`,
+          };
+        } catch (err: any) {
+          console.warn('Bluetooth print fallback failed:', err.message);
+        }
       }
     }
 
     // 2. Try Serial / USB if active
     let serialCheck = isSerialConnectedForCounter(counterId, printerName);
-    if (!serialCheck.connected && !btCheck.connected) {
+    if (!serialCheck.connected) {
       if (activeSerialPort?.readable) {
         serialCheck = { connected: true, deviceName: 'USB Serial Printer' };
       } else if (activeSerialPorts.size > 0) {
@@ -1266,11 +1329,14 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
     localStorage.getItem('qdine_auto_print_browser') === 'true'
   );
   if (isAutoPrint && !forceBrowser && !allowBrowserAutoPrint) {
-    console.warn(`[HardwarePrinter] Silent printer not reachable for "${printerName}". Browser print dialog suppressed for auto-print.`);
+    const errorMsg = qzFailureError
+      ? `QZ Tray (${printerAddress || printerName}): ${qzFailureError}`
+      : `Silent printer not connected for "${printerName}". Tap "Pair Bluetooth" in Settings, connect USB, or enable Browser Printing.`;
+    console.warn(`[HardwarePrinter] Silent printer not reachable for "${printerName}":`, errorMsg);
     return {
       success: false,
       method: 'browser',
-      message: `Silent printer not connected for "${printerName}". Tap "Pair Bluetooth" in Settings, connect USB, or enable Browser Printing.`,
+      message: errorMsg,
     };
   }
 
@@ -1456,6 +1522,8 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
     localStorage.removeItem('qdine_bill_printer_address');
   }
 
+  let qzBillFailureError: string | null = null;
+
   if (!forceBrowser && rawBytes) {
     const preferredType = typeof window !== 'undefined' ? localStorage.getItem('qdine_preferred_printer_type') : null;
 
@@ -1571,8 +1639,11 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
             method: 'qz-tray',
             message: `Bill #${ticketNumber} printed via QZ Tray to "${qzTarget}"!`,
           };
+        } else {
+          qzBillFailureError = qzResult.error || `Failed to print bill to "${qzTarget}" via QZ Tray`;
         }
       } catch (qzErr: any) {
+        qzBillFailureError = qzErr?.message || 'QZ Tray bill print error';
         console.warn('QZ Tray bill print attempt failed, trying alternatives:', qzErr?.message);
       }
     }
@@ -1636,11 +1707,14 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
     localStorage.getItem('qdine_auto_print_browser') === 'true'
   );
   if (isAutoPrint && !forceBrowser && !allowBrowserAutoPrintBill) {
-    console.warn(`[HardwarePrinter] Silent printer not reachable for bill. Browser print dialog suppressed for auto-print.`);
+    const errorMsg = qzBillFailureError
+      ? `QZ Tray (${effAddress || printerName}): ${qzBillFailureError}`
+      : `Silent printer not connected for bill. Tap "Pair Bluetooth" in Settings, connect USB, or enable Browser Printing.`;
+    console.warn(`[HardwarePrinter] Silent printer not reachable for bill:`, errorMsg);
     return {
       success: false,
       method: 'browser',
-      message: `Silent printer not connected for bill. Tap "Pair Bluetooth" in Settings, connect USB, or enable Browser Printing.`,
+      message: errorMsg,
     };
   }
 

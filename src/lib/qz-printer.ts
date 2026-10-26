@@ -3,6 +3,10 @@
  * ============================================================
  * Provides direct, silent, raw ESC/POS printing to any Windows,
  * macOS, or Linux printer via local QZ Tray WebSocket.
+ * Supports:
+ * - USB / Spooler Printers (e.g., "POS-80C", "POS-80C (copy 1)")
+ * - Network (Wi-Fi / LAN) Printers (e.g., "192.168.1.100:9100")
+ * ============================================================
  */
 
 import qz from 'qz-tray';
@@ -113,7 +117,7 @@ export async function connectQzTray(retries = 1): Promise<{ success: boolean; ve
   }
 
   if (isConnecting) {
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 600));
     if (qz.websocket.isActive()) {
       return { success: true, version: getQzVersion() };
     }
@@ -225,8 +229,33 @@ export async function printRawEscposViaQz(
         };
         label = `${targetConfig.host}:${targetConfig.port}`;
       } else {
-        targetConfig = str;
-        label = str;
+        // String printer name - smart lookup to handle "POS-80C (copy 1)" or similar variations
+        let matchedName = str;
+        try {
+          const found = await qz.printers.find(str);
+          if (found) {
+            matchedName = Array.isArray(found) ? found[0] : found;
+          }
+        } catch {
+          // If direct find failed, search all printers for best case-insensitive match
+          try {
+            const allList = await qz.printers.find();
+            const list = Array.isArray(allList) ? allList : [allList].filter(Boolean);
+            const lowerStr = str.toLowerCase();
+            const foundMatch = list.find(
+              (p: string) =>
+                p.toLowerCase() === lowerStr ||
+                p.toLowerCase().includes(lowerStr) ||
+                lowerStr.includes(p.toLowerCase())
+            );
+            if (foundMatch) {
+              matchedName = foundMatch;
+            }
+          } catch {}
+        }
+
+        targetConfig = matchedName;
+        label = matchedName;
       }
     }
 

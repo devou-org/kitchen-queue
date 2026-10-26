@@ -213,24 +213,42 @@ export async function POST(request: NextRequest) {
         counterMap[c].push(item);
       }
 
-      const slips: Array<{ kotData: KotPrintData; base64Bytes: string; printerName: string; counterId?: string }> = [];
+      const slips: Array<{
+        kotData: KotPrintData;
+        base64Bytes: string;
+        printerName: string;
+        counterId?: string;
+        printerAddress?: string;
+        printerType?: string;
+      }> = [];
 
       // Look up all counter printer configurations
-      const counterPrinterMap: Record<string, { id?: string; printerName: string }> = {};
+      const counterPrinterMap: Record<
+        string,
+        { id?: string; printerName: string; printerAddress?: string; printerType?: string }
+      > = {};
       try {
         const countersList = await getCounters(restaurant.id);
         for (const c of countersList) {
           if (c.name) {
+            const isNetwork = (c.printer_type || '').toUpperCase() === 'NETWORK';
             counterPrinterMap[c.name.trim().toLowerCase()] = {
               id: c.id,
               printerName: (c.printer_name || targetPrinter).trim(),
+              printerAddress: isNetwork ? (c.printer_address?.trim() || undefined) : undefined,
+              printerType: c.printer_type || 'DEFAULT',
             };
           }
         }
       } catch { }
 
       for (const [cName, cItems] of Object.entries(counterMap)) {
-        const conf = counterPrinterMap[cName.trim().toLowerCase()] || { id: undefined, printerName: targetPrinter };
+        const conf = counterPrinterMap[cName.trim().toLowerCase()] || {
+          id: undefined,
+          printerName: targetPrinter,
+          printerAddress: undefined,
+          printerType: 'DEFAULT',
+        };
         const slipPrinter = conf.printerName;
 
         const kotData: KotPrintData = {
@@ -250,7 +268,14 @@ export async function POST(request: NextRequest) {
 
         const buffer = buildKotEscposBuffer(kotData);
         const base64Bytes = buffer.toString('base64');
-        slips.push({ kotData, base64Bytes, printerName: slipPrinter, counterId: conf.id });
+        slips.push({
+          kotData,
+          base64Bytes,
+          printerName: slipPrinter,
+          counterId: conf.id,
+          printerAddress: conf.printerAddress,
+          printerType: conf.printerType,
+        });
 
         if (!isTestPrint) {
           // Queue each slip to its dedicated counter printer
@@ -283,6 +308,8 @@ export async function POST(request: NextRequest) {
             counter_id: slip.counterId,
             counter_name: slip.kotData.counterName,
             printer_name: slip.printerName,
+            printer_address: slip.printerAddress,
+            printer_type: slip.printerType,
             kotData: slip.kotData,
             base64Bytes: slip.base64Bytes,
             is_manual: true,
@@ -314,6 +341,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Default: Single unified Master KOT with all items
+    let masterPrinterAddress: string | undefined = undefined;
+    let masterPrinterType: string = 'DEFAULT';
+    let masterPrinterName: string = targetPrinter;
+
+    if (restaurant.bill_printer_name && restaurant.bill_printer_name.trim()) {
+      masterPrinterName = restaurant.bill_printer_name.trim();
+    }
+    if (restaurant.bill_printer_type) {
+      masterPrinterType = restaurant.bill_printer_type.toUpperCase();
+    }
+    // Only attach masterPrinterAddress if the master printer is explicitly in NETWORK mode!
+    if (masterPrinterType === 'NETWORK' && restaurant.bill_printer_address && restaurant.bill_printer_address.trim()) {
+      masterPrinterAddress = restaurant.bill_printer_address.trim();
+    }
+
     const kotData: KotPrintData = {
       restaurantName,
       timezone,
@@ -332,27 +374,31 @@ export async function POST(request: NextRequest) {
     const buffer = buildKotEscposBuffer(kotData);
     const base64Bytes = buffer.toString('base64');
 
+    if (!isTestPrint) {
+      // ALWAYS queue Master KOT into print_jobs table so it appears in Print Job Queue!
+      await createPrintJob(restaurant.id, {
+        order_id: order.id,
+        ticket_number: Number(order.ticket_number) || undefined,
+        counter_name: 'ALL',
+        printer_name: masterPrinterName,
+        raw_base64: base64Bytes,
+      });
+    }
+
     // For station or test prints, return buffer directly for client printing without Pusher broadcast
     if (isStation || isTestPrint) {
       return NextResponse.json({
         success: true,
         mode: 'client',
         message: `Master KOT buffer ready`,
-        printer: targetPrinter,
+        printer: masterPrinterName,
+        printerAddress: masterPrinterAddress,
+        printerType: masterPrinterType,
         itemCount: allItems.length,
         kotData,
         base64Bytes,
       });
     }
-
-    // Queue job
-    await createPrintJob(restaurant.id, {
-      order_id: order.id,
-      ticket_number: Number(order.ticket_number) || undefined,
-      counter_name: 'ALL',
-      printer_name: targetPrinter,
-      raw_base64: base64Bytes,
-    });
 
     // Broadcast Master KOT to Print Station
     try {
@@ -360,7 +406,9 @@ export async function POST(request: NextRequest) {
         order_id: order.id,
         ticket_number: order.ticket_number,
         counter_name: 'ALL',
-        printer_name: targetPrinter,
+        printer_name: masterPrinterName,
+        printer_address: masterPrinterAddress,
+        printer_type: masterPrinterType,
         kotData,
         base64Bytes,
         is_manual: true,
