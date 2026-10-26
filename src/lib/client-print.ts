@@ -9,6 +9,8 @@ export interface ClientPrintOptions {
   kotData: KotPrintData;
   base64Bytes?: string;
   printerName?: string;
+  printerAddress?: string;
+  printerType?: string;
   counterId?: string;
   counterName?: string;
   localBridgeUrl?: string; // fallback if local bridge is running
@@ -33,28 +35,47 @@ export interface ClientBillPrintOptions {
  * Print KOT thermal ticket from the client browser.
  * 1. Direct Web Bluetooth (if paired)
  * 2. Direct Web Serial / USB (if connected)
- * 3. Local bridge endpoint (if active)
- * 4. 80mm hidden iframe thermal print (Compatible with Chrome Kiosk mode)
+ * 3. QZ Tray (Network/USB)
+ * 4. Local bridge endpoint (if active)
+ * 5. 80mm hidden iframe thermal print (Compatible with Chrome Kiosk mode)
  */
 export async function printKotFromBrowser(options: ClientPrintOptions): Promise<{
   success: boolean;
-  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser';
+  method: 'bluetooth' | 'serial' | 'rawbt' | 'bridge' | 'browser' | 'qz-tray';
   message?: string;
 }> {
-  const { kotData, base64Bytes, printerName = 'POS-80C', counterId, counterName = kotData?.counterName, localBridgeUrl = 'http://127.0.0.1:9123/print', isAutoPrint = false, forceBrowser = false } = options;
+  const {
+    kotData,
+    base64Bytes,
+    printerName = 'POS-80C',
+    printerAddress,
+    printerType,
+    counterId,
+    counterName = kotData?.counterName,
+    localBridgeUrl = 'http://127.0.0.1:9123/print',
+    isAutoPrint = false,
+    forceBrowser = false,
+  } = options;
 
-  // 1. Try Direct Hardware (Bluetooth, RawBT, or USB Serial)
+  // 1. Try Direct Hardware (QZ Tray, Bluetooth, RawBT, or USB Serial)
   const hardwareResult = await printUnifiedThermalTicket({
     kotData,
     base64Bytes,
     printerName,
+    printerAddress,
+    printerType,
     counterId,
     counterName,
     isAutoPrint,
     forceBrowser,
   });
 
-  if (hardwareResult.method === 'bluetooth' || hardwareResult.method === 'serial' || hardwareResult.method === 'rawbt') {
+  if (
+    hardwareResult.method === 'bluetooth' ||
+    hardwareResult.method === 'serial' ||
+    hardwareResult.method === 'rawbt' ||
+    hardwareResult.method === 'qz-tray'
+  ) {
     return {
       success: true,
       method: hardwareResult.method,

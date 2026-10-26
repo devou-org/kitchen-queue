@@ -172,7 +172,7 @@ export function PrintStationListener() {
           : null;
         const isMasterKot = !data.counter_name || data.counter_name.trim().toUpperCase() === 'ALL' || data.counter_name.trim().toUpperCase() === 'ALL ITEMS' || data.counter_name.trim().toUpperCase() === 'MASTER';
 
-        let targetKotPrinter = counterSavedDev || (data.printer_name && data.printer_name !== 'POS-80C' ? data.printer_name : null) || localKotPrinter;
+        let targetKotPrinter = (data.printer_name && data.printer_name !== 'POS-80C' ? data.printer_name : null) || counterSavedDev || localKotPrinter;
 
         if (!targetKotPrinter && isMasterKot && typeof window !== 'undefined') {
           targetKotPrinter = localStorage.getItem('qdine_bill_printer_name');

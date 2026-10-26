@@ -525,13 +525,17 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
   };
 
   const handleFieldChange = (counterId: string, field: keyof CounterFormState, value: string) => {
-    setFormStates(prev => ({
-      ...prev,
-      [counterId]: {
-        ...(prev[counterId] || { printer_name: 'POS-80C', printer_type: 'DEFAULT', printer_address: '' }),
-        [field]: value
+    setFormStates(prev => {
+      const current = prev[counterId] || { printer_name: 'POS-80C', printer_type: 'DEFAULT', printer_address: '' };
+      const updated = { ...current, [field]: value };
+      if (field === 'printer_type' && value !== 'NETWORK') {
+        updated.printer_address = '';
       }
-    }));
+      return {
+        ...prev,
+        [counterId]: updated,
+      };
+    });
   };
 
   const handleSaveCounter = async (counter: Counter) => {
@@ -540,6 +544,9 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
       printer_type: counter.printer_type || 'DEFAULT',
       printer_address: counter.printer_address || ''
     };
+
+    const isNetwork = form.printer_type === 'NETWORK';
+    const cleanAddress = isNetwork ? (form.printer_address.trim() || null) : null;
 
     setSavingCounterId(counter.id);
     try {
@@ -550,7 +557,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
           name: counter.name,
           printer_name: form.printer_name.trim() || 'POS-80C',
           printer_type: form.printer_type,
-          printer_address: form.printer_address.trim() || null,
+          printer_address: cleanAddress,
           is_active: counter.is_active !== false,
         })
       });
@@ -559,7 +566,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         toast.success(`Printer saved for ${counter.name}`);
         setSavedCounterId(counter.id);
         setTimeout(() => setSavedCounterId(null), 2000);
-        setCounters(prev => prev.map(c => c.id === counter.id ? { ...c, ...form } : c));
+        setCounters(prev => prev.map(c => c.id === counter.id ? { ...c, ...form, printer_address: cleanAddress || '' } : c));
         if (typeof window !== 'undefined') {
           if (form.printer_type === 'BLUETOOTH' && form.printer_name && form.printer_name !== 'POS-80C') {
             localStorage.setItem(`qdine_bt_counter_${counter.id}`, form.printer_name.trim());
