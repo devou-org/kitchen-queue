@@ -9,8 +9,6 @@ import {
   printUnifiedThermalTicket,
   printUnifiedBill,
   tryAutoConnectBluetooth,
-  checkAndMarkDuplicatePrint,
-  clearPrintMark,
 } from '@/lib/hardware-printer';
 import { isQzConnected, connectQzTray } from '@/lib/qz-printer';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
@@ -114,6 +112,7 @@ export function PrintStationListener() {
       // Check if this device is designated as the print station
       const currentIsStation = isDevicePrintStation();
       if (!currentIsStation) {
+        console.warn(`[PrintStationListener] Ignored KOT #${data.ticket_number} (${data.counter_name}): device is not registered as print station (qdine_is_print_station=${localStorage.getItem('qdine_is_print_station')})`);
         return;
       }
 
@@ -121,6 +120,7 @@ export function PrintStationListener() {
       // If manual print request from waiter/staff (data.is_manual), ALWAYS PRINT regardless of auto-print toggle.
       const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') !== 'false') : true;
       if (!data.is_manual && !autoPrint) {
+        console.warn(`[PrintStationListener] Ignored KOT #${data.ticket_number}: auto-print disabled (qdine_auto_print_kot=${localStorage.getItem('qdine_auto_print_kot')})`);
         return;
       }
 
@@ -131,28 +131,8 @@ export function PrintStationListener() {
         return;
       }
 
-      // Compute distinct dedup ticket for add-on KOTs (they share the same ticket number and counter)
-      const dedupTicket = data.is_add_on
-        ? `${data.ticket_number}_addon_${data.timestamp || data.print_job_id || Date.now()}`
-        : data.ticket_number;
-
-      if (!data.is_manual) {
-        if (checkAndMarkDuplicatePrint(dedupTicket, data.counter_id, data.counter_name)) {
-          console.log(`[PrintStationListener] Duplicate suppressed for #${data.ticket_number} (${data.counter_name})`);
-          return;
-        }
-      } else {
-        // For manual reprint requests, notify if recently printed but never silently block
-        if (checkAndMarkDuplicatePrint(dedupTicket, data.counter_id, data.counter_name)) {
-          toast(`Reprinting KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-            icon: <PrinterIllustration size={22} status="printing" />,
-            duration: 3000,
-          });
-        }
-      }
-
       console.time(`[Perf] KOT #${data.ticket_number} Total`);
-      console.log(`[Perf] Pusher event received for ticket #${data.ticket_number} at ${new Date().toISOString()}`);
+      console.log(`[Perf] Pusher event received for ticket #${data.ticket_number} at ${new Date().toISOString()}`, data);
 
       const printLabel = data.is_manual ? 'Printing KOT' : 'Auto-printing KOT';
       toast(`${printLabel} #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
@@ -180,10 +160,9 @@ export function PrintStationListener() {
           }
         }
 
-        // If payload is still missing, notify and clear mark so retry can proceed
+        // If payload is still missing, notify and return
         if (!base64Bytes && !data.kotData) {
           toast.error('Could not load print data');
-          clearPrintMark(dedupTicket, data.counter_id, data.counter_name);
           return;
         }
 
@@ -220,14 +199,12 @@ export function PrintStationListener() {
             }).catch((err) => console.warn('Failed to mark print job complete:', err));
           }
         } else {
-          clearPrintMark(dedupTicket, data.counter_id, data.counter_name);
           toast.error(result.message || '⚠️ Thermal printer not paired. Tap "Pair Printer" in Settings.', {
             id: `print-unpaired`,
             duration: 6000,
           });
         }
       } catch (err: any) {
-        clearPrintMark(dedupTicket, data.counter_id, data.counter_name);
         console.error('KOT print execution error:', err);
       } finally {
         console.timeEnd(`[Perf] KOT #${data.ticket_number} Total`);
@@ -243,14 +220,7 @@ export function PrintStationListener() {
 
       const currentIsStation = isDevicePrintStation();
       if (!currentIsStation) {
-        return;
-      }
-
-      const billTicketKey = `bill_${data.ticket_number}`;
-
-      // Pre-check duplicate print for bills across tabs
-      if (checkAndMarkDuplicatePrint(billTicketKey, 'bill_printer', 'Bill Printer')) {
-        console.log(`[PrintStationListener] Duplicate bill suppressed for #${data.ticket_number}`);
+        console.warn(`[PrintStationListener] Ignored Bill #${data.ticket_number}: device is not registered as print station (qdine_is_print_station=${localStorage.getItem('qdine_is_print_station')})`);
         return;
       }
 
@@ -285,14 +255,12 @@ export function PrintStationListener() {
             id: `bill-${data.order_id}-${Date.now()}`,
           });
         } else {
-          clearPrintMark(billTicketKey, 'bill_printer', 'Bill Printer');
           toast.error(result.message || '⚠️ Thermal printer not paired for Bill.', {
             id: `bill-unpaired`,
             duration: 6000,
           });
         }
       } catch (err: any) {
-        clearPrintMark(billTicketKey, 'bill_printer', 'Bill Printer');
         console.error('Bill print execution error on station:', err);
       }
     };
@@ -319,9 +287,6 @@ export function PrintStationListener() {
 
         for (const job of validJobs) {
           const ticketNo = job.ticket_number;
-          if (checkAndMarkDuplicatePrint(ticketNo, undefined, job.counter_name)) {
-            continue;
-          }
 
           const localKotPrinter = typeof window !== 'undefined' ? (localStorage.getItem('qdine_kot_printer_name') || localStorage.getItem('qdine_bt_printer_name')) : null;
           const counterSavedDev = (typeof window !== 'undefined' && job.counter_name)
@@ -345,8 +310,6 @@ export function PrintStationListener() {
               headers: getAuthHeaders(currentSlug),
               body: JSON.stringify({ slug: currentSlug, action: 'complete', jobId: job.id }),
             }).catch(() => { });
-          } else {
-            clearPrintMark(ticketNo, undefined, job.counter_name);
           }
         }
       } catch (err) {

@@ -1229,14 +1229,18 @@ async function executePrintUnifiedThermalTicket(options: UnifiedPrintOptions): P
 
   endPerf();
 
-  // 5. Fallback: Browser 80mm Thermal Receipt (Manual print only; never on auto-print)
-  // When isAutoPrint is true and forceBrowser is false, NEVER open the browser print dialog!
-  if (isAutoPrint && !forceBrowser) {
+  // 5. Fallback: Browser 80mm Thermal Receipt (Manual print only; never on auto-print unless configured or kiosk)
+  const allowBrowserAutoPrint = typeof window !== 'undefined' && (
+    localStorage.getItem('qdine_allow_browser_autoprint') === '1' ||
+    localStorage.getItem('qdine_preferred_printer_type') === 'browser' ||
+    localStorage.getItem('qdine_auto_print_browser') === 'true'
+  );
+  if (isAutoPrint && !forceBrowser && !allowBrowserAutoPrint) {
     console.warn(`[HardwarePrinter] Silent printer not reachable for "${printerName}". Browser print dialog suppressed for auto-print.`);
     return {
       success: false,
       method: 'browser',
-      message: `Silent printer not connected for "${printerName}". Start print-agent or connect via USB/Bluetooth.`,
+      message: `Silent printer not connected for "${printerName}". Tap "Pair Bluetooth" in Settings, connect USB, or enable Browser Printing.`,
     };
   }
 
@@ -1596,13 +1600,17 @@ async function executePrintUnifiedBill(options: UnifiedBillPrintOptions): Promis
   }
 
   // 5. Fallback: Browser 80mm Thermal Receipt (via hidden iframe)
-  // When isAutoPrint is true and forceBrowser is false, NEVER open the browser print dialog!
-  if (isAutoPrint && !forceBrowser) {
+  const allowBrowserAutoPrintBill = typeof window !== 'undefined' && (
+    localStorage.getItem('qdine_allow_browser_autoprint') === '1' ||
+    localStorage.getItem('qdine_preferred_printer_type') === 'browser' ||
+    localStorage.getItem('qdine_auto_print_browser') === 'true'
+  );
+  if (isAutoPrint && !forceBrowser && !allowBrowserAutoPrintBill) {
     console.warn(`[HardwarePrinter] Silent printer not reachable for bill. Browser print dialog suppressed for auto-print.`);
     return {
       success: false,
       method: 'browser',
-      message: `Silent printer not connected for bill. Check printer connection in Settings.`,
+      message: `Silent printer not connected for bill. Tap "Pair Bluetooth" in Settings, connect USB, or enable Browser Printing.`,
     };
   }
 

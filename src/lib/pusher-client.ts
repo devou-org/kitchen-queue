@@ -4,14 +4,29 @@ class ChannelWrapper {
   public channelName: string;
   private socket: Socket | null;
   private callbacks: Map<string, Set<Function>> = new Map();
+  private refCount = 0;
 
   constructor(channelName: string, socket: Socket | null) {
     this.channelName = channelName;
     this.socket = socket;
   }
 
+  retain() {
+    this.refCount++;
+    return this.refCount;
+  }
+
+  release() {
+    this.refCount = Math.max(0, this.refCount - 1);
+    return this.refCount;
+  }
+
+  getRefCount() {
+    return this.refCount;
+  }
+
   bind(event: string, callback: Function) {
-    console.log(`[Socket.io Client] Binding event "${event}" on channel "${this.channelName}"`);
+    console.log(`[Socket.io Client] Binding event "${event}" on channel "${this.channelName}" (active listeners: ${(this.callbacks.get(event)?.size || 0) + 1})`);
     if (!this.callbacks.has(event)) {
       this.callbacks.set(event, new Set());
     }
@@ -47,14 +62,19 @@ class ChannelWrapper {
     return this;
   }
 
-  unbind_all() {
-    console.log(`[Socket.io Client] Unbinding all events on channel "${this.channelName}"`);
-    this.callbacks.clear();
+  unbind_all(event?: string) {
+    if (event) {
+      console.log(`[Socket.io Client] Unbinding event "${event}" on channel "${this.channelName}"`);
+      this.callbacks.delete(event);
+    } else {
+      console.log(`[Socket.io Client] Unbinding all events on channel "${this.channelName}"`);
+      this.callbacks.clear();
+    }
     return this;
   }
 
   unsubscribe() {
-    console.log(`[Socket.io Client] Channel unsubscribed itself: "${this.channelName}"`);
+    console.log(`[Socket.io Client] Channel unsubscribed: "${this.channelName}"`);
     if (pusherClient) {
       pusherClient.unsubscribe(this.channelName);
     }
@@ -62,7 +82,7 @@ class ChannelWrapper {
 
   dispatch(event: string, data: any) {
     const set = this.callbacks.get(event);
-    if (set) {
+    if (set && set.size > 0) {
       set.forEach(cb => {
         try {
           cb(data);
@@ -70,6 +90,8 @@ class ChannelWrapper {
           console.error(`[Socket.io Client Dispatch Error] Error in callback for event "${event}":`, err);
         }
       });
+    } else {
+      console.warn(`[Socket.io Client] Event "${event}" received on channel "${this.channelName}", but no active callbacks registered! Registered events:`, Array.from(this.callbacks.keys()));
     }
   }
 }
@@ -115,10 +137,10 @@ class SocketClientWrapper {
         const channelWrapper = this.channels.get(channel);
         if (channelWrapper) {
           channelWrapper.dispatch(event, data);
+        } else {
+          console.warn(`[Socket.io Client] Channel "${channel}" not found in registered channels:`, Array.from(this.channels.keys()));
         }
       });
-
-      // Fallback events removed to prevent double-firing because the server emits both `channel-event` and the specific event.
     }
   }
 
@@ -128,33 +150,36 @@ class SocketClientWrapper {
       return new ChannelWrapper('', null);
     }
 
-    console.log(`[Socket.io Client] Subscribing to channel: "${channelName}"`);
-
-    if (this.socket && this.socket.connected) {
-      this.socket.emit('join-channel', channelName);
-    }
-
     let channelWrapper = this.channels.get(channelName);
     if (!channelWrapper) {
+      console.log(`[Socket.io Client] Subscribing new channel: "${channelName}"`);
       channelWrapper = new ChannelWrapper(channelName, this.socket);
       this.channels.set(channelName, channelWrapper);
+      if (this.socket && this.socket.connected) {
+        this.socket.emit('join-channel', channelName);
+      }
     }
 
+    channelWrapper.retain();
     return channelWrapper;
   }
 
   unsubscribe(channelName: string) {
     if (!channelName) return;
-    console.log(`[Socket.io Client] Unsubscribing from channel: "${channelName}"`);
-
-    if (this.socket) {
-      this.socket.emit('leave-channel', channelName);
-    }
 
     const channelWrapper = this.channels.get(channelName);
     if (channelWrapper) {
-      channelWrapper.unbind_all();
-      this.channels.delete(channelName);
+      const remaining = channelWrapper.release();
+      if (remaining <= 0) {
+        console.log(`[Socket.io Client] Unsubscribing channel (0 subscribers remaining): "${channelName}"`);
+        if (this.socket) {
+          this.socket.emit('leave-channel', channelName);
+        }
+        channelWrapper.unbind_all();
+        this.channels.delete(channelName);
+      } else {
+        console.log(`[Socket.io Client] Decremented channel subscriber count for "${channelName}" (${remaining} still active)`);
+      }
     }
   }
 
