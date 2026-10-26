@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { normalizePem } from '@/lib/qz-security';
 
 function getPrivateKey(): string | null {
   if (process.env.QZ_PRIVATE_KEY) {
-    return process.env.QZ_PRIVATE_KEY.replace(/\\n/g, '\n');
+    const key = normalizePem(process.env.QZ_PRIVATE_KEY);
+    if (key) return key;
   }
 
   const keyCandidates = [
@@ -16,7 +18,9 @@ function getPrivateKey(): string | null {
 
   for (const file of keyCandidates) {
     if (fs.existsSync(file)) {
-      return fs.readFileSync(file, 'utf8');
+      const raw = fs.readFileSync(file, 'utf8');
+      const key = normalizePem(raw);
+      if (key) return key;
     }
   }
 
@@ -26,7 +30,7 @@ function getPrivateKey(): string | null {
 function signRequest(toSign: string): string {
   const privateKey = getPrivateKey();
   if (!privateKey) {
-    throw new Error('Private key not found in certs directory or env variable');
+    throw new Error('Private key not found in certs directory or QZ_PRIVATE_KEY env variable');
   }
 
   const signer = crypto.createSign('SHA512');
