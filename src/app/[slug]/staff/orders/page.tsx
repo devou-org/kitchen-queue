@@ -34,7 +34,7 @@ function resolveRoleDefaultStatus(): string {
       const parsed = JSON.parse(userStr);
       userRole = parsed.role || (parsed.is_admin ? 'ADMIN' : '');
       roleDefaultStatus = parsed.default_order_status || parsed.role_default_order_status || '';
-    } catch {}
+    } catch { }
   }
 
   if (roleDefaultStatus) {
@@ -92,7 +92,7 @@ export default function StaffOrders() {
       const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
       let uRole = '';
       if (userStr) {
-        try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch {}
+        try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch { }
       }
       const roleKey = `qdine_orders_status_filter_${uRole || 'default'}`;
       const savedStatus = localStorage.getItem(roleKey);
@@ -136,7 +136,7 @@ export default function StaffOrders() {
           setTables(data.tables);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [slug]);
 
   const fetchCounters = useCallback(() => {
@@ -154,7 +154,7 @@ export default function StaffOrders() {
           setCounters(data.data);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [slug]);
 
   useEffect(() => {
@@ -243,7 +243,7 @@ export default function StaffOrders() {
           return o;
         }).filter(o => {
           if (statusFilter && statusFilter !== 'ALL') {
-             return o.status === statusFilter;
+            return o.status === statusFilter;
           }
           return true;
         });
@@ -255,7 +255,7 @@ export default function StaffOrders() {
             const updated: Order = res.data;
             setSelectedOrder(prev => (prev?.id === data.order_id) ? updated : prev);
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
     };
 
@@ -325,7 +325,7 @@ export default function StaffOrders() {
   ];
 
   const queryTerm = searchQuery.trim().toLowerCase();
-  
+
   let filteredOrders = orders;
   if (counterFilter) {
     filteredOrders = filteredOrders.map(order => {
@@ -517,7 +517,7 @@ export default function StaffOrders() {
                     const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
                     let uRole = '';
                     if (userStr) {
-                      try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch {}
+                      try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch { }
                     }
                     localStorage.setItem(`qdine_orders_status_filter_${uRole || 'default'}`, nextVal);
                   }
