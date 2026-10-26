@@ -82,7 +82,7 @@ class SocketClientWrapper {
     if (typeof window !== 'undefined') {
       const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
       console.log(`[Socket.io Client] Connecting to websocket server at ${socketUrl}...`);
-      
+
       this.socket = io(socketUrl, {
         transports: ['websocket', 'polling'],
         autoConnect: true,
@@ -93,7 +93,7 @@ class SocketClientWrapper {
 
       this.socket.on('connect', () => {
         console.log('[Socket.io Client] Websocket connection established successfully.');
-        
+
         // Re-join all active channels on reconnection
         for (const channelName of this.channels.keys()) {
           console.log(`[Socket.io Client] Re-joining channel room: "${channelName}"`);
@@ -117,7 +117,7 @@ class SocketClientWrapper {
           channelWrapper.dispatch(event, data);
         }
       });
-      
+
       // Fallback events removed to prevent double-firing because the server emits both `channel-event` and the specific event.
     }
   }
@@ -127,9 +127,9 @@ class SocketClientWrapper {
       console.warn('[Socket.io Client] subscribe called with empty channelName');
       return new ChannelWrapper('', null);
     }
-    
+
     console.log(`[Socket.io Client] Subscribing to channel: "${channelName}"`);
-    
+
     if (this.socket && this.socket.connected) {
       this.socket.emit('join-channel', channelName);
     }
@@ -146,11 +146,11 @@ class SocketClientWrapper {
   unsubscribe(channelName: string) {
     if (!channelName) return;
     console.log(`[Socket.io Client] Unsubscribing from channel: "${channelName}"`);
-    
+
     if (this.socket) {
       this.socket.emit('leave-channel', channelName);
     }
-    
+
     const channelWrapper = this.channels.get(channelName);
     if (channelWrapper) {
       channelWrapper.unbind_all();

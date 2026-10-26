@@ -577,10 +577,10 @@ export default function AdminSettings() {
 
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: '24px 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px', alignItems: 'start' }}>
-          
+
           {/* Left Column: Service Status, Profile, Menu, Hours */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
+
             {/* 0. Store Service Status Card */}
             <CollapsibleCard
               id="service_status"
@@ -615,8 +615,8 @@ export default function AdminSettings() {
               isCollapsed={!!collapsedSections['service_status']}
               onToggle={() => toggleSection('service_status')}
             >
-              <ServiceToggle 
-                primaryColor={primaryColor} 
+              <ServiceToggle
+                primaryColor={primaryColor}
                 onStatusChange={(online) => setIsServiceOnline(online)}
                 openingTime={openingTime}
                 closingTime={closingTime}
@@ -634,7 +634,7 @@ export default function AdminSettings() {
               onToggle={() => toggleSection('profile')}
             >
               <p style={{ ...S.cardDesc, marginBottom: '16px' }}>Configure restaurant name, logo, phone number, and physical address.</p>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <label style={S.label}>Restaurant Name *</label>
@@ -706,7 +706,7 @@ export default function AdminSettings() {
               onToggle={() => toggleSection('menu')}
             >
               <p style={{ ...S.cardDesc, marginBottom: '16px' }}>Configure customer-facing header text, layout style, and brand colors.</p>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <label style={S.label}>Menu Header Title</label>

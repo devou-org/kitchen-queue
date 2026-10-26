@@ -48,7 +48,7 @@ function resolveRoleDefaultStatus(): string {
       const parsed = JSON.parse(userStr);
       userRole = parsed.role || (parsed.is_admin ? 'ADMIN' : '');
       roleDefaultStatus = parsed.default_order_status || parsed.role_default_order_status || '';
-    } catch {}
+    } catch { }
   }
 
   if (roleDefaultStatus) {
@@ -112,7 +112,7 @@ export default function AdminOrders() {
       const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
       let uRole = '';
       if (userStr) {
-        try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch {}
+        try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch { }
       }
       const roleKey = `qdine_orders_status_filter_${uRole || 'default'}`;
       const savedStatus = localStorage.getItem(roleKey);
@@ -158,7 +158,7 @@ export default function AdminOrders() {
       .then(data => {
         if (data.success && data.data) setCounters(data.data);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [slug]);
 
   useEffect(() => {
@@ -463,19 +463,19 @@ export default function AdminOrders() {
   const queryTerm = readySearch.trim().toLowerCase();
   const displayedOrders = queryTerm
     ? filteredOrders.filter(order => {
-        const ticket = String(order.ticket_number).padStart(3, '0').toLowerCase();
-        const rawTicket = String(order.ticket_number).toLowerCase();
-        const customer = (order.customer_name || '').toLowerCase();
-        const phone = (order.phone || '').toLowerCase();
-        const table = (order.table_number || '').toLowerCase();
-        const hasItem = (order.items || []).some(item => (item.product_name || '').toLowerCase().includes(queryTerm));
-        return ticket.includes(queryTerm)
-          || rawTicket.includes(queryTerm)
-          || customer.includes(queryTerm)
-          || phone.includes(queryTerm)
-          || table.includes(queryTerm)
-          || hasItem;
-      })
+      const ticket = String(order.ticket_number).padStart(3, '0').toLowerCase();
+      const rawTicket = String(order.ticket_number).toLowerCase();
+      const customer = (order.customer_name || '').toLowerCase();
+      const phone = (order.phone || '').toLowerCase();
+      const table = (order.table_number || '').toLowerCase();
+      const hasItem = (order.items || []).some(item => (item.product_name || '').toLowerCase().includes(queryTerm));
+      return ticket.includes(queryTerm)
+        || rawTicket.includes(queryTerm)
+        || customer.includes(queryTerm)
+        || phone.includes(queryTerm)
+        || table.includes(queryTerm)
+        || hasItem;
+    })
     : filteredOrders;
 
   const openOrderModal = (order: Order) => {
@@ -660,7 +660,7 @@ export default function AdminOrders() {
                     const userStr = localStorage.getItem('admin_user') || localStorage.getItem('user');
                     let uRole = '';
                     if (userStr) {
-                      try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch {}
+                      try { uRole = JSON.parse(userStr).role || (JSON.parse(userStr).is_admin ? 'ADMIN' : ''); } catch { }
                     }
                     localStorage.setItem(`qdine_orders_status_filter_${uRole || 'default'}`, nextVal);
                   }
@@ -1049,8 +1049,8 @@ export default function AdminOrders() {
                           margin: '0 0 6px 0',
                           letterSpacing: '-0.01em',
                         }}>
-                          {readySearch || statusFilter || orderTypeFilter || counterFilter 
-                            ? 'No matching orders found' 
+                          {readySearch || statusFilter || orderTypeFilter || counterFilter
+                            ? 'No matching orders found'
                             : 'No active orders'}
                         </h3>
 

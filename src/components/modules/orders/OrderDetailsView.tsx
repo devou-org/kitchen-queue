@@ -332,8 +332,8 @@ export function OrderDetailsView({
       counterName && counterName !== 'ALL'
         ? `Preparing KOT for ${counterName}...`
         : separateSlips
-        ? `Preparing ${uniqueCounters.length} KOT slips...`
-        : `Preparing Master KOT...`
+          ? `Preparing ${uniqueCounters.length} KOT slips...`
+          : `Preparing Master KOT...`
     );
 
     try {
@@ -517,7 +517,8 @@ export function OrderDetailsView({
 
   return createPortal(
     <>
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
@@ -1037,753 +1038,753 @@ export function OrderDetailsView({
           </div>
         </div>
 
-      {/* 2. SCROLLABLE CONTENT BODY */}
-      <div
-        className="order-details-body"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          paddingBottom: '80px',
-        }}
-      >
+        {/* 2. SCROLLABLE CONTENT BODY */}
+        <div
+          className="order-details-body"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            paddingBottom: '80px',
+          }}
+        >
 
 
 
-        {/* SECTION: KITCHEN WORKFLOW LIFECYCLE CONTROLS */}
-        {(() => {
-          const isKot = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
-          const currentSt = (order.status || 'PENDING').toUpperCase();
+          {/* SECTION: KITCHEN WORKFLOW LIFECYCLE CONTROLS */}
+          {(() => {
+            const isKot = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+            const currentSt = (order.status || 'PENDING').toUpperCase();
 
-          let nextTargetStatus: string | null = null;
-          let nextButtonLabel = '';
-          let buttonBg = primaryColor;
+            let nextTargetStatus: string | null = null;
+            let nextButtonLabel = '';
+            let buttonBg = primaryColor;
 
-          if (currentSt === 'PENDING') {
-            nextTargetStatus = 'PREPARING';
-            nextButtonLabel = 'Start Preparing (Kitchen)';
-            buttonBg = primaryColor;
-          } else if (currentSt === 'PREPARING') {
-            if (isKot) {
+            if (currentSt === 'PENDING') {
+              nextTargetStatus = 'PREPARING';
+              nextButtonLabel = 'Start Preparing (Kitchen)';
+              buttonBg = primaryColor;
+            } else if (currentSt === 'PREPARING') {
+              if (isKot) {
+                nextTargetStatus = 'SERVED';
+                nextButtonLabel = 'Mark Order as Served';
+                buttonBg = primaryColor;
+              } else {
+                nextTargetStatus = 'READY';
+                nextButtonLabel = 'Mark Order as Ready';
+                buttonBg = primaryColor;
+              }
+            } else if (currentSt === 'READY') {
               nextTargetStatus = 'SERVED';
               nextButtonLabel = 'Mark Order as Served';
               buttonBg = primaryColor;
-            } else {
-              nextTargetStatus = 'READY';
-              nextButtonLabel = 'Mark Order as Ready';
-              buttonBg = primaryColor;
+            } else if (currentSt === 'SERVED') {
+              nextTargetStatus = 'CLOSED';
+              const selectedMethodLabel = paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split' : (paymentMethod || order.payment_method || 'UPI');
+              nextButtonLabel = `Close Order & Complete (${selectedMethodLabel})`;
+              buttonBg = '#0F172A';
             }
-          } else if (currentSt === 'READY') {
-            nextTargetStatus = 'SERVED';
-            nextButtonLabel = 'Mark Order as Served';
-            buttonBg = primaryColor;
-          } else if (currentSt === 'SERVED') {
-            nextTargetStatus = 'CLOSED';
-            const selectedMethodLabel = paymentMethod?.toUpperCase().startsWith('SPLIT') ? 'Split' : (paymentMethod || order.payment_method || 'UPI');
-            nextButtonLabel = `Close Order & Complete (${selectedMethodLabel})`;
-            buttonBg = '#0F172A';
-          }
 
-          if (!nextTargetStatus && currentSt !== 'CLOSED') {
-            return null;
-          }
+            if (!nextTargetStatus && currentSt !== 'CLOSED') {
+              return null;
+            }
 
-          return (
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
-              {/* Action Button */}
-              {nextTargetStatus && currentSt !== 'CANCELLED' && currentSt !== 'EXPIRED' && (
-                <button
-                  type="button"
-                  disabled={isAnyActionBusy}
-                  onClick={() => handleUpdateStatus(nextTargetStatus!)}
-                  style={{
-                    width: '100%',
-                    height: '36px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: buttonBg,
-                    color: '#FFFFFF',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
-                    opacity: isAnyActionBusy && !isStatusUpdating ? 0.7 : 1,
-                    boxShadow: `0 2px 8px ${primaryBorder}`,
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {isStatusUpdating ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={14} />
-                  )}
-                  <span>{isStatusUpdating ? 'Updating Status...' : nextButtonLabel}</span>
-                </button>
-              )}
-
-              {currentSt === 'CLOSED' && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', background: '#F1F5F9', borderRadius: '8px', color: '#475569', fontSize: '12px', fontWeight: 700 }}>
-                  <Check size={14} style={{ color: '#16A34A' }} />
-                  <span>Order is Closed & Completed</span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* SECTION: ORDER ITEMS (COUNTER ROUTED & PER-ITEM STATUS) */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Utensils size={13} />
-              Order Items ({totalItemsCount})
-            </span>
-            {uniqueCounters.length > 1 && (
-              <span style={{ fontSize: '10px', fontWeight: 700, color: '#4F46E5', background: '#EEF2FF', padding: '2px 8px', borderRadius: '12px', border: '1px solid #E0E7FF' }}>
-                {uniqueCounters.length} Counters
-              </span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {uniqueCounters.length > 0 ? (
-              uniqueCounters.map((cName) => {
-                const itemsInCounter = counterGroups[cName] || [];
-                const isKot = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
-                const targetCompletionStatus = isKot ? 'SERVED' : 'READY';
-                const completionLabel = isKot ? 'Served' : 'Ready';
-
-                const readyCount = itemsInCounter.filter((i: any) => {
-                  const st = (i.status || 'PENDING').toUpperCase();
-                  return isKot ? st === 'SERVED' : ['READY', 'SERVED'].includes(st);
-                }).length;
-                const isAllReady = itemsInCounter.length > 0 && readyCount === itemsInCounter.length;
-                const isCounterUpdating = Boolean(updatingCounters[cName]);
-
-                return (
-                  <div
-                    key={cName}
+            return (
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
+                {/* Action Button */}
+                {nextTargetStatus && currentSt !== 'CANCELLED' && currentSt !== 'EXPIRED' && (
+                  <button
+                    type="button"
+                    disabled={isAnyActionBusy}
+                    onClick={() => handleUpdateStatus(nextTargetStatus!)}
                     style={{
+                      width: '100%',
+                      height: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
                       borderRadius: '8px',
-                      border: '1px solid #E2E8F0',
-                      background: '#FFFFFF',
-                      overflow: 'hidden',
+                      border: 'none',
+                      background: buttonBg,
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
+                      opacity: isAnyActionBusy && !isStatusUpdating ? 0.7 : 1,
+                      boxShadow: `0 2px 8px ${primaryBorder}`,
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    {/* Counter Station Header */}
+                    {isStatusUpdating ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={14} />
+                    )}
+                    <span>{isStatusUpdating ? 'Updating Status...' : nextButtonLabel}</span>
+                  </button>
+                )}
+
+                {currentSt === 'CLOSED' && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', background: '#F1F5F9', borderRadius: '8px', color: '#475569', fontSize: '12px', fontWeight: 700 }}>
+                    <Check size={14} style={{ color: '#16A34A' }} />
+                    <span>Order is Closed & Completed</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* SECTION: ORDER ITEMS (COUNTER ROUTED & PER-ITEM STATUS) */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Utensils size={13} />
+                Order Items ({totalItemsCount})
+              </span>
+              {uniqueCounters.length > 1 && (
+                <span style={{ fontSize: '10px', fontWeight: 700, color: '#4F46E5', background: '#EEF2FF', padding: '2px 8px', borderRadius: '12px', border: '1px solid #E0E7FF' }}>
+                  {uniqueCounters.length} Counters
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {uniqueCounters.length > 0 ? (
+                uniqueCounters.map((cName) => {
+                  const itemsInCounter = counterGroups[cName] || [];
+                  const isKot = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
+                  const targetCompletionStatus = isKot ? 'SERVED' : 'READY';
+                  const completionLabel = isKot ? 'Served' : 'Ready';
+
+                  const readyCount = itemsInCounter.filter((i: any) => {
+                    const st = (i.status || 'PENDING').toUpperCase();
+                    return isKot ? st === 'SERVED' : ['READY', 'SERVED'].includes(st);
+                  }).length;
+                  const isAllReady = itemsInCounter.length > 0 && readyCount === itemsInCounter.length;
+                  const isCounterUpdating = Boolean(updatingCounters[cName]);
+
+                  return (
                     <div
+                      key={cName}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        background: '#F8FAFC',
-                        borderBottom: '1px solid #E2E8F0',
+                        borderRadius: '8px',
+                        border: '1px solid #E2E8F0',
+                        background: '#FFFFFF',
+                        overflow: 'hidden',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '22px',
-                            height: '22px',
-                            borderRadius: '5px',
-                            background: primarySoftBg,
-                            color: primaryColor,
-                          }}
-                        >
-                          <ChefHat size={13} />
-                        </span>
-                        <div>
-                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
-                            {cName}
-                          </span>
-                          <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>
-                            ({readyCount}/{itemsInCounter.length} {completionLabel})
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Station Bulk Action */}
-                      <div>
-                        {isAllReady ? (
+                      {/* Counter Station Header */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          background: '#F8FAFC',
+                          borderBottom: '1px solid #E2E8F0',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              color: '#475569',
-                              background: '#F1F5F9',
-                              border: '1px solid #E2E8F0',
-                              padding: '3px 8px',
-                              borderRadius: '6px',
-                            }}
-                          >
-                            <Check size={12} /> All {completionLabel}
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={isCounterUpdating}
-                            onClick={() => handleCounterStatusChange(cName, targetCompletionStatus)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              color: primaryColor,
+                              justifyContent: 'center',
+                              width: '22px',
+                              height: '22px',
+                              borderRadius: '5px',
                               background: primarySoftBg,
-                              border: `1px solid ${primaryBorder}`,
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              cursor: isCounterUpdating ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.15s ease',
+                              color: primaryColor,
                             }}
-                            title={`Mark all items for ${cName} as ${completionLabel}`}
                           >
-                            {isCounterUpdating ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <CheckCircle2 size={12} />
-                            )}
-                            Mark {cName} {completionLabel}
-                          </button>
-                        )}
+                            <ChefHat size={13} />
+                          </span>
+                          <div>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                              {cName}
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>
+                              ({readyCount}/{itemsInCounter.length} {completionLabel})
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Station Bulk Action */}
+                        <div>
+                          {isAllReady ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                color: '#475569',
+                                background: '#F1F5F9',
+                                border: '1px solid #E2E8F0',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                              }}
+                            >
+                              <Check size={12} /> All {completionLabel}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isCounterUpdating}
+                              onClick={() => handleCounterStatusChange(cName, targetCompletionStatus)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                color: primaryColor,
+                                background: primarySoftBg,
+                                border: `1px solid ${primaryBorder}`,
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                cursor: isCounterUpdating ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title={`Mark all items for ${cName} as ${completionLabel}`}
+                            >
+                              {isCounterUpdating ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <CheckCircle2 size={12} />
+                              )}
+                              Mark {cName} {completionLabel}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Counter Items List */}
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      {itemsInCounter.map((item: any, idx: number) => {
-                        const statusConfig = getItemStatusBadgeConfig(item.status);
+                      {/* Counter Items List */}
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {itemsInCounter.map((item: any, idx: number) => {
+                          const statusConfig = getItemStatusBadgeConfig(item.status);
 
-                        return (
-                          <div
-                            key={item.id || idx}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              padding: '9px 12px',
-                              borderBottom: idx < itemsInCounter.length - 1 ? '1px solid #F1F5F9' : 'none',
-                              background: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  minWidth: '32px',
-                                  height: '30px',
-                                  padding: '0 6px',
-                                  borderRadius: '6px',
-                                  background: '#F1F5F9',
-                                  border: '1.5px solid #CBD5E1',
-                                  color: '#0F172A',
-                                  fontWeight: 800,
-                                  fontSize: '14px',
-                                  letterSpacing: '-0.2px',
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {item.quantity}×
-                              </span>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div
-                                  style={{
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    color: '#0F172A',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {item.product_name}
-                                </div>
-                                {item.notes && (
-                                  <div
-                                    style={{
-                                      fontSize: '11.5px',
-                                      color: '#B45309',
-                                      fontWeight: 600,
-                                      marginTop: '2px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                    }}
-                                  >
-                                    <Utensils size={11} color="#D97706" style={{ flexShrink: 0 }} />
-                                    <span>Note: {item.notes}</span>
-                                  </div>
-                                )}
-                                <div style={{ fontSize: '11px', color: '#64748B' }}>
-                                  {Number(item.price_at_purchase || 0) === 0 ? (
-                                    <span style={{ color: '#16A34A', fontWeight: 700 }}>₹0.00 (FREE)</span>
-                                  ) : (
-                                    `${formatPrice(item.price_at_purchase)} each`
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Item Status (Static Badge) & Price */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '11px',
-                                  fontWeight: 700,
-                                  color: statusConfig.text,
-                                  background: statusConfig.bg,
-                                  border: `1px solid ${statusConfig.border}`,
-                                  padding: '3px 8px',
-                                  borderRadius: '6px',
-                                  userSelect: 'none',
-                                }}
-                              >
+                          return (
+                            <div
+                              key={item.id || idx}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '9px 12px',
+                                borderBottom: idx < itemsInCounter.length - 1 ? '1px solid #F1F5F9' : 'none',
+                                background: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                                 <span
                                   style={{
-                                    width: '6px',
-                                    height: '6px',
-                                    borderRadius: '50%',
-                                    backgroundColor: statusConfig.text,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minWidth: '32px',
+                                    height: '30px',
+                                    padding: '0 6px',
+                                    borderRadius: '6px',
+                                    background: '#F1F5F9',
+                                    border: '1.5px solid #CBD5E1',
+                                    color: '#0F172A',
+                                    fontWeight: 800,
+                                    fontSize: '14px',
+                                    letterSpacing: '-0.2px',
+                                    flexShrink: 0,
                                   }}
-                                />
-                                {statusConfig.label}
-                              </span>
+                                >
+                                  {item.quantity}×
+                                </span>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <div
+                                    style={{
+                                      fontSize: '14px',
+                                      fontWeight: 600,
+                                      color: '#0F172A',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {item.product_name}
+                                  </div>
+                                  {item.notes && (
+                                    <div
+                                      style={{
+                                        fontSize: '11.5px',
+                                        color: '#B45309',
+                                        fontWeight: 600,
+                                        marginTop: '2px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                      }}
+                                    >
+                                      <Utensils size={11} color="#D97706" style={{ flexShrink: 0 }} />
+                                      <span>Note: {item.notes}</span>
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: '11px', color: '#64748B' }}>
+                                    {Number(item.price_at_purchase || 0) === 0 ? (
+                                      <span style={{ color: '#16A34A', fontWeight: 700 }}>₹0.00 (FREE)</span>
+                                    ) : (
+                                      `${formatPrice(item.price_at_purchase)} each`
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
 
-                              <div
-                                style={{
-                                  fontSize: '13px',
-                                  fontWeight: 700,
-                                  color: Number(item.price_at_purchase || 0) === 0 ? '#16A34A' : '#0F172A',
-                                  fontVariantNumeric: 'tabular-nums',
-                                  minWidth: '60px',
-                                  textAlign: 'right',
-                                }}
-                              >
-                                {Number(item.price_at_purchase || 0) === 0 ? '₹0.00' : formatPrice(item.price_at_purchase * item.quantity)}
+                              {/* Item Status (Static Badge) & Price */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    color: statusConfig.text,
+                                    background: statusConfig.bg,
+                                    border: `1px solid ${statusConfig.border}`,
+                                    padding: '3px 8px',
+                                    borderRadius: '6px',
+                                    userSelect: 'none',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: '6px',
+                                      height: '6px',
+                                      borderRadius: '50%',
+                                      backgroundColor: statusConfig.text,
+                                    }}
+                                  />
+                                  {statusConfig.label}
+                                </span>
+
+                                <div
+                                  style={{
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    color: Number(item.price_at_purchase || 0) === 0 ? '#16A34A' : '#0F172A',
+                                    fontVariantNumeric: 'tabular-nums',
+                                    minWidth: '60px',
+                                    textAlign: 'right',
+                                  }}
+                                >
+                                  {Number(item.price_at_purchase || 0) === 0 ? '₹0.00' : formatPrice(item.price_at_purchase * item.quantity)}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div style={{ padding: '16px 0', textAlign: 'center', color: '#94A3B8', fontSize: '12px' }}>
-                No items recorded.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* SECTION: FINANCIAL SUMMARY */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
-              <span>Subtotal</span>
-              <span style={{ fontWeight: 600, color: '#334155', fontVariantNumeric: 'tabular-nums' }}>
-                {formatPrice(
-                  (order.items && order.items.length > 0)
-                    ? order.items.reduce((acc, item) => acc + (Number(item.price_at_purchase || 0) * Number(item.quantity || 0)), 0)
-                    : (order.subtotal || (order.gst_amount ? order.total_price - order.gst_amount : order.total_price))
-                )}
-              </span>
-            </div>
-
-            {order.gst_amount && Number(order.gst_amount) > 0 ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
-                <span>GST ({order.gst_rate || 5}%)</span>
-                <span style={{ fontWeight: 600, color: '#334155', fontVariantNumeric: 'tabular-nums' }}>
-                  {formatPrice(order.gst_amount)}
-                </span>
-              </div>
-            ) : null}
-
-            {order.discount_amount && Number(order.discount_amount) > 0 ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#16a34a', fontWeight: 700 }}>
-                <span>Loyalty Discount</span>
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  -{formatPrice(order.discount_amount)}
-                </span>
-              </div>
-            ) : null}
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                paddingTop: '8px',
-                marginTop: '4px',
-                borderTop: '1px dashed #CBD5E1',
-              }}
-            >
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
-                Total
-              </div>
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 800,
-                  color: '#0F172A',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {formatPrice(order.total_price)}
-              </div>
-            </div>
-
-            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748B' }}>Payment</span>
-                {order.is_paid ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803D', fontWeight: 600 }}>
-                    <CheckCircle2 size={12} /> Paid ({order.payment_method || 'Settled'})
-                  </span>
-                ) : (
-                  <span style={{ color: '#B45309', fontWeight: 600 }}>Unpaid</span>
-                )}
-              </div>
-
-              {!order.is_paid && (
-                <div
-                  style={{
-                    background: '#F8FAFC',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '8px',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    marginTop: '4px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CreditCard size={14} style={{ color: '#475569' }} />
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          color: '#334155',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                        }}
-                      >
-                        Payment Method
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>
-                      Settled on close
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                    {[
-                      { id: 'UPI', label: 'UPI / QR', icon: QrCode },
-                      { id: 'CASH', label: 'Cash', icon: Banknote },
-                      { id: 'CARD', label: 'Card', icon: CreditCard },
-                      { id: 'SPLIT', label: 'Split', icon: Split },
-                    ].map((m) => {
-                      const Icon = m.icon;
-                      const selected = m.id === 'SPLIT'
-                        ? (paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT'))
-                        : (paymentMethod || order.payment_method || 'UPI') === m.id;
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => handleSelectPaymentMethod(m.id)}
-                          style={{
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            border: selected ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
-                            background: selected ? '#F0FDF4' : '#FFFFFF',
-                            color: selected ? '#15803D' : '#475569',
-                            boxShadow: selected ? '0 1px 3px rgba(22, 163, 74, 0.15)' : 'none',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          <Icon size={12} />
-                          <span>{m.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {(paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT')) && (
-                    <SplitPaymentBreakdown
-                      totalAmount={Number(order.total_price || 0)}
-                      split={splitAmounts}
-                      onChange={(newSplit) => {
-                        handleSelectPaymentMethod('SPLIT', newSplit);
-                      }}
-                      theme="emerald"
-                    />
-                  )}
+                  );
+                })
+              ) : (
+                <div style={{ padding: '16px 0', textAlign: 'center', color: '#94A3B8', fontSize: '12px' }}>
+                  No items recorded.
                 </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* SECTION: CUSTOMER DETAILS */}
-        <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '12px' }}>
-            Customer Details
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <User size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
-                {order.customer_name || 'Walk-in'}
-              </span>
-              {order.staff_name && (
-                <span style={{ fontSize: '11px', color: '#64748B', marginLeft: 'auto' }}>
-                  by {order.staff_name.split(' ')[0]}
+          {/* SECTION: FINANCIAL SUMMARY */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
+                <span>Subtotal</span>
+                <span style={{ fontWeight: 600, color: '#334155', fontVariantNumeric: 'tabular-nums' }}>
+                  {formatPrice(
+                    (order.items && order.items.length > 0)
+                      ? order.items.reduce((acc, item) => acc + (Number(item.price_at_purchase || 0) * Number(item.quantity || 0)), 0)
+                      : (order.subtotal || (order.gst_amount ? order.total_price - order.gst_amount : order.total_price))
+                  )}
                 </span>
-              )}
-            </div>
+              </div>
 
-            {order.phone ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
-                <a
-                  href={`tel:${order.phone}`}
-                  style={{ fontSize: '12px', color: '#334155', textDecoration: 'none' }}
+              {order.gst_amount && Number(order.gst_amount) > 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
+                  <span>GST ({order.gst_rate || 5}%)</span>
+                  <span style={{ fontWeight: 600, color: '#334155', fontVariantNumeric: 'tabular-nums' }}>
+                    {formatPrice(order.gst_amount)}
+                  </span>
+                </div>
+              ) : null}
+
+              {order.discount_amount && Number(order.discount_amount) > 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#16a34a', fontWeight: 700 }}>
+                  <span>Loyalty Discount</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    -{formatPrice(order.discount_amount)}
+                  </span>
+                </div>
+              ) : null}
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  paddingTop: '8px',
+                  marginTop: '4px',
+                  borderTop: '1px dashed #CBD5E1',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                  Total
+                </div>
+                <div
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 800,
+                    color: '#0F172A',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
                 >
-                  {order.phone}
-                </a>
+                  {formatPrice(order.total_price)}
+                </div>
               </div>
-            ) : (
+
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B' }}>Payment</span>
+                  {order.is_paid ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803D', fontWeight: 600 }}>
+                      <CheckCircle2 size={12} /> Paid ({order.payment_method || 'Settled'})
+                    </span>
+                  ) : (
+                    <span style={{ color: '#B45309', fontWeight: 600 }}>Unpaid</span>
+                  )}
+                </div>
+
+                {!order.is_paid && (
+                  <div
+                    style={{
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '8px',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      marginTop: '4px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CreditCard size={14} style={{ color: '#475569' }} />
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#334155',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          Payment Method
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>
+                        Settled on close
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                      {[
+                        { id: 'UPI', label: 'UPI / QR', icon: QrCode },
+                        { id: 'CASH', label: 'Cash', icon: Banknote },
+                        { id: 'CARD', label: 'Card', icon: CreditCard },
+                        { id: 'SPLIT', label: 'Split', icon: Split },
+                      ].map((m) => {
+                        const Icon = m.icon;
+                        const selected = m.id === 'SPLIT'
+                          ? (paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT'))
+                          : (paymentMethod || order.payment_method || 'UPI') === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => handleSelectPaymentMethod(m.id)}
+                            style={{
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: selected ? '1.5px solid #16A34A' : '1px solid #CBD5E1',
+                              background: selected ? '#F0FDF4' : '#FFFFFF',
+                              color: selected ? '#15803D' : '#475569',
+                              boxShadow: selected ? '0 1px 3px rgba(22, 163, 74, 0.15)' : 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <Icon size={12} />
+                            <span>{m.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {(paymentMethod === 'SPLIT' || paymentMethod?.toUpperCase().startsWith('SPLIT')) && (
+                      <SplitPaymentBreakdown
+                        totalAmount={Number(order.total_price || 0)}
+                        split={splitAmounts}
+                        onChange={(newSplit) => {
+                          handleSelectPaymentMethod('SPLIT', newSplit);
+                        }}
+                        theme="emerald"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION: CUSTOMER DETAILS */}
+          <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', marginBottom: '12px' }}>
+              Customer Details
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
-                <span style={{ fontSize: '12px', color: '#94A3B8' }}>-</span>
+                <User size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
+                  {order.customer_name || 'Walk-in'}
+                </span>
+                {order.staff_name && (
+                  <span style={{ fontSize: '11px', color: '#64748B', marginLeft: 'auto' }}>
+                    by {order.staff_name.split(' ')[0]}
+                  </span>
+                )}
               </div>
-            )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Users size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
-              <span style={{ fontSize: '12px', color: '#475569' }}>
-                {order.party_size || 1} {Number(order.party_size) === 1 ? 'Guest' : 'Guests'}
-              </span>
+              {order.phone ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                  <a
+                    href={`tel:${order.phone}`}
+                    style={{ fontSize: '12px', color: '#334155', textDecoration: 'none' }}
+                  >
+                    {order.phone}
+                  </a>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Phone size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                  <span style={{ fontSize: '12px', color: '#94A3B8' }}>-</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Users size={15} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                <span style={{ fontSize: '12px', color: '#475569' }}>
+                  {order.party_size || 1} {Number(order.party_size) === 1 ? 'Guest' : 'Guests'}
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* SECTION: SPECIAL NOTES (IF PRESENT) */}
+          {order.notes && (
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #F1F5F9', background: '#FFFDF5' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <StickyNote size={13} style={{ color: '#D97706' }} />
+                <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#B45309' }}>
+                  Special Instructions
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#92400E', fontStyle: 'italic', lineHeight: 1.4 }}>
+                "{order.notes}"
+              </p>
+            </div>
+          )}
+
+          {/* ACTION: CANCEL ORDER (if active) */}
+          {order.status !== 'CANCELLED' && (
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #F1F5F9', background: '#FAFAFA' }}>
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(true)}
+                disabled={isAnyActionBusy}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #FCA5A5',
+                  background: '#FEF2F2',
+                  color: '#DC2626',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
+                  opacity: isAnyActionBusy ? 0.6 : 1,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isAnyActionBusy) (e.currentTarget as HTMLElement).style.background = '#FEE2E2';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isAnyActionBusy) (e.currentTarget as HTMLElement).style.background = '#FEF2F2';
+                }}
+              >
+                <X size={15} />
+                Cancel Order
+              </button>
+            </div>
+          )}
         </div>
+      </aside>
 
-        {/* SECTION: SPECIAL NOTES (IF PRESENT) */}
-        {order.notes && (
-          <div style={{ padding: '14px 20px', borderTop: '1px solid #F1F5F9', background: '#FFFDF5' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-              <StickyNote size={13} style={{ color: '#D97706' }} />
-              <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#B45309' }}>
-                Special Instructions
-              </span>
-            </div>
-            <p style={{ margin: 0, fontSize: '12px', color: '#92400E', fontStyle: 'italic', lineHeight: 1.4 }}>
-              "{order.notes}"
-            </p>
-          </div>
-        )}
-
-        {/* ACTION: CANCEL ORDER (if active) */}
-        {order.status !== 'CANCELLED' && (
-          <div style={{ padding: '14px 20px', borderTop: '1px solid #F1F5F9', background: '#FAFAFA' }}>
-            <button
-              type="button"
-              onClick={() => setShowCancelModal(true)}
-              disabled={isAnyActionBusy}
-              style={{
-                width: '100%',
-                padding: '10px 16px',
-                borderRadius: '8px',
-                border: '1px solid #FCA5A5',
-                background: '#FEF2F2',
-                color: '#DC2626',
-                fontSize: '13px',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: isAnyActionBusy ? 'not-allowed' : 'pointer',
-                opacity: isAnyActionBusy ? 0.6 : 1,
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (!isAnyActionBusy) (e.currentTarget as HTMLElement).style.background = '#FEE2E2';
-              }}
-              onMouseLeave={(e) => {
-                if (!isAnyActionBusy) (e.currentTarget as HTMLElement).style.background = '#FEF2F2';
-              }}
-            >
-              <X size={15} />
-              Cancel Order
-            </button>
-          </div>
-        )}
-      </div>
-    </aside>
-
-    {/* Cancel Order Confirmation Modal */}
-    {showCancelModal && (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(3px)',
-          zIndex: 1000000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-        }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget && !isCancelUpdating) {
-            setShowCancelModal(false);
-          }
-        }}
-      >
+      {/* Cancel Order Confirmation Modal */}
+      {showCancelModal && (
         <div
-          role="dialog"
-          aria-modal="true"
           style={{
-            background: '#FFFFFF',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '380px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-            padding: '24px 20px',
-            textAlign: 'center',
-            border: '1px solid #F1F5F9',
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1000000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isCancelUpdating) {
+              setShowCancelModal(false);
+            }
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
             style={{
-              width: '52px',
-              height: '52px',
-              borderRadius: '50%',
-              background: '#FEF2F2',
-              border: '1px solid #FEE2E2',
-              color: '#DC2626',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 14px',
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '380px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+              padding: '24px 20px',
+              textAlign: 'center',
+              border: '1px solid #F1F5F9',
             }}
           >
-            <AlertTriangle size={26} />
-          </div>
-
-          <div style={{ fontSize: '17px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
-            Cancel Order #{order.ticket_number ? String(order.ticket_number).padStart(3, '0') : order.id?.slice(-4)}?
-          </div>
-
-          <p style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.5', margin: '0 0 20px' }}>
-            Are you sure you want to cancel this order? This action will mark the order as cancelled and release any assigned table.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <button
-              type="button"
-              disabled={isCancelUpdating}
-              onClick={() => setShowCancelModal(false)}
+            <div
               style={{
-                height: '42px',
-                borderRadius: '8px',
-                border: '1px solid #E2E8F0',
-                background: '#F1F5F9',
-                color: '#334155',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: isCancelUpdating ? 'not-allowed' : 'pointer',
-                transition: 'background 0.15s ease',
-              }}
-            >
-              Keep Order
-            </button>
-            <button
-              type="button"
-              disabled={isCancelUpdating}
-              onClick={handleConfirmCancelOrder}
-              style={{
-                height: '42px',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#DC2626',
-                color: '#FFFFFF',
-                fontSize: '13px',
-                fontWeight: 700,
-                display: 'inline-flex',
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                background: '#FEF2F2',
+                border: '1px solid #FEE2E2',
+                color: '#DC2626',
+                display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
-                cursor: isCancelUpdating ? 'not-allowed' : 'pointer',
-                opacity: isCancelUpdating ? 0.7 : 1,
-                boxShadow: '0 1px 2px rgba(220, 38, 38, 0.2)',
-                transition: 'background 0.15s ease',
+                margin: '0 auto 14px',
               }}
             >
-              {isCancelUpdating ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Cancelling...
-                </>
-              ) : (
-                'Yes, Cancel'
-              )}
-            </button>
+              <AlertTriangle size={26} />
+            </div>
+
+            <div style={{ fontSize: '17px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
+              Cancel Order #{order.ticket_number ? String(order.ticket_number).padStart(3, '0') : order.id?.slice(-4)}?
+            </div>
+
+            <p style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.5', margin: '0 0 20px' }}>
+              Are you sure you want to cancel this order? This action will mark the order as cancelled and release any assigned table.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                type="button"
+                disabled={isCancelUpdating}
+                onClick={() => setShowCancelModal(false)}
+                style={{
+                  height: '42px',
+                  borderRadius: '8px',
+                  border: '1px solid #E2E8F0',
+                  background: '#F1F5F9',
+                  color: '#334155',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: isCancelUpdating ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s ease',
+                }}
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                disabled={isCancelUpdating}
+                onClick={handleConfirmCancelOrder}
+                style={{
+                  height: '42px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: isCancelUpdating ? 'not-allowed' : 'pointer',
+                  opacity: isCancelUpdating ? 0.7 : 1,
+                  boxShadow: '0 1px 2px rgba(220, 38, 38, 0.2)',
+                  transition: 'background 0.15s ease',
+                }}
+              >
+                {isCancelUpdating ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  'Yes, Cancel'
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    <EditOrderModal
-      isOpen={isEditModalOpen}
-      onClose={() => setIsEditModalOpen(false)}
-      order={order}
-      slug={slug}
-      tables={tables}
-      onOrderUpdated={(updated) => {
-        setOrder(updated);
-        setTempStatus(updated.status);
-        setTempTableNumber(updated.table_number || '');
-        setPaymentMethod(updated.payment_method || '');
-        if (onOrderUpdated) {
-          onOrderUpdated(updated);
-        }
-      }}
-    />
-  </>,
-  document.body
+      <EditOrderModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        order={order}
+        slug={slug}
+        tables={tables}
+        onOrderUpdated={(updated) => {
+          setOrder(updated);
+          setTempStatus(updated.status);
+          setTempTableNumber(updated.table_number || '');
+          setPaymentMethod(updated.payment_method || '');
+          if (onOrderUpdated) {
+            onOrderUpdated(updated);
+          }
+        }}
+      />
+    </>,
+    document.body
   );
 }
 

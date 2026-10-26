@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
           counterTargetPrinter = counterRecord.printer_name.trim();
           counterPrinterType = counterRecord.printer_type || 'DEFAULT';
         }
-      } catch {}
+      } catch { }
       if (!counterTargetPrinter) {
         counterTargetPrinter = (printerName && printerName.trim() !== 'POS-80C') ? printerName.trim() : targetPrinter;
       }
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
             };
           }
         }
-      } catch {}
+      } catch { }
 
       for (const [cName, cItems] of Object.entries(counterMap)) {
         const conf = counterPrinterMap[cName.trim().toLowerCase()] || { id: undefined, printerName: targetPrinter };

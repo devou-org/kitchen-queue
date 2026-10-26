@@ -76,7 +76,7 @@ export function PrintStationListener() {
               setStationActive(true);
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }
 
       const isStation = isDevicePrintStation();
@@ -344,7 +344,7 @@ export function PrintStationListener() {
               method: 'POST',
               headers: getAuthHeaders(currentSlug),
               body: JSON.stringify({ slug: currentSlug, action: 'complete', jobId: job.id }),
-            }).catch(() => {});
+            }).catch(() => { });
           } else {
             clearPrintMark(ticketNo, undefined, job.counter_name);
           }
