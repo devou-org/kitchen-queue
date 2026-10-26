@@ -170,7 +170,26 @@ export function PrintStationListener() {
         const counterSavedDev = (typeof window !== 'undefined' && data.counter_name)
           ? localStorage.getItem(`qdine_bt_counter_${data.counter_name.trim().toLowerCase()}`)
           : null;
-        const targetKotPrinter = counterSavedDev || (data.printer_name && data.printer_name !== 'POS-80C' ? data.printer_name : null) || localKotPrinter || 'POS-80C';
+        const isMasterKot = !data.counter_name || data.counter_name.trim().toUpperCase() === 'ALL' || data.counter_name.trim().toUpperCase() === 'ALL ITEMS' || data.counter_name.trim().toUpperCase() === 'MASTER';
+
+        let targetKotPrinter = counterSavedDev || (data.printer_name && data.printer_name !== 'POS-80C' ? data.printer_name : null) || localKotPrinter;
+
+        if (!targetKotPrinter && isMasterKot && typeof window !== 'undefined') {
+          targetKotPrinter = localStorage.getItem('qdine_bill_printer_name');
+          if (!targetKotPrinter) {
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith('qdine_bt_counter_')) {
+                const val = localStorage.getItem(k)?.trim();
+                if (val && val.toUpperCase() !== 'POS-80C') {
+                  targetKotPrinter = val;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        if (!targetKotPrinter) targetKotPrinter = 'POS-80C';
         const result = await printUnifiedThermalTicket({
           base64Bytes,
           kotData: data.kotData,

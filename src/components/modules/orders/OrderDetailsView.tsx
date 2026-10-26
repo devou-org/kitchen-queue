@@ -337,8 +337,23 @@ export function OrderDetailsView({
     );
 
     try {
-      const savedPrinter = typeof window !== 'undefined' ? localStorage.getItem('qdine_kot_printer_name') : null;
-      const targetPrinter = (savedPrinter || 'POS-80C').trim();
+      let resolvedPrinter = typeof window !== 'undefined' ? localStorage.getItem('qdine_kot_printer_name') : null;
+      if (!resolvedPrinter && typeof window !== 'undefined') {
+        resolvedPrinter = localStorage.getItem('qdine_bt_printer_name') || localStorage.getItem('qdine_bill_printer_name');
+        if (!resolvedPrinter) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('qdine_bt_counter_')) {
+              const val = localStorage.getItem(k)?.trim();
+              if (val && val.toUpperCase() !== 'POS-80C') {
+                resolvedPrinter = val;
+                break;
+              }
+            }
+          }
+        }
+      }
+      const targetPrinter = (resolvedPrinter || 'POS-80C').trim();
       const savedBridgeUrl = typeof window !== 'undefined' ? localStorage.getItem('qdine_printer_bridge_url') : null;
 
       const isStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
