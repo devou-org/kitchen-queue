@@ -184,9 +184,8 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', background: 'var(--bg-gradient)' }}>
-        <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
-        <p style={{ color: '#6B6667' }}>Fetching ticket...</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-gradient)' }}>
+        <div className="loader" />
       </div>
     );
   }
@@ -216,24 +215,25 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
   const displayPosition = position || 1;
 
   return (
-    <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh', paddingBottom: '120px' }}>
+    <div style={{ background: 'var(--bg-gradient)', minHeight: '100vh', paddingBottom: '40px' }}>
       {/* Header */}
       <header style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 20px',
+        padding: '14px 16px',
         background: 'white',
         position: 'sticky',
         top: 0,
-        zIndex: 10
+        zIndex: 20,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
       }}>
-        <button onClick={() => router.push(`/${slug}/menu`)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => router.push(`/${slug}/menu`)} aria-label="Back to menu" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
           <ChevronLeft size={24} color="var(--primary)" />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Circle size={8} fill={isLive ? "#06A77D" : "#FFA500"} color={isLive ? "#06A77D" : "#FFA500"} />
-          <span style={{ fontSize: '13px', fontWeight: 700, color: isLive ? '#06A77D' : '#FFA500', letterSpacing: '0.02em' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: isLive ? '#06A77D' : '#FFA500', letterSpacing: '0.04em' }}>
             {isLive ? 'LIVE STATUS UPDATE' : 'CONNECTING...'}
           </span>
         </div>
@@ -263,16 +263,16 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
           {showSurveyTip && (
             <div style={{
               position: 'absolute',
-              top: '40px',
+              top: '38px',
               right: '0',
               background: '#33322F',
               color: 'white',
-              padding: '8px 12px',
+              padding: '6px 10px',
               borderRadius: '8px',
               fontSize: '11px',
               fontWeight: 600,
               whiteSpace: 'nowrap',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
               zIndex: 50,
               display: 'flex',
               alignItems: 'center',
@@ -287,7 +287,7 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
                 background: '#33322F',
                 transform: 'rotate(45deg)'
               }} />
-              <span> Help us get better! 🚀</span>
+              <span>Help us get better! 🚀</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -315,23 +315,22 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
         </div>
       </header>
 
-      <main style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
-
+      <main style={{ maxWidth: '480px', margin: '0 auto', padding: '14px 16px 32px' }}>
 
         {/* Ticket Card */}
         <div style={{
           background: 'white',
-          borderRadius: '24px',
-          padding: '32px 24px',
+          borderRadius: '20px',
+          padding: '22px 16px',
           textAlign: 'center',
-          marginBottom: '20px',
+          marginBottom: '14px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
           border: '1px solid rgba(0,0,0,0.02)'
         }}>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: '#9CA3AF', letterSpacing: '0.05em', marginBottom: '8px' }}>
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.06em', marginBottom: '4px' }}>
             YOUR TICKET NUMBER
           </p>
-          <h1 style={{ fontSize: '72px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1, margin: '8px 0' }}>
+          <h1 style={{ fontSize: 'clamp(48px, 13vw, 64px)', fontWeight: 900, color: 'var(--primary)', lineHeight: 1.05, margin: '4px 0' }}>
             #{String(ticketData.token_number).padStart(3, '0')}
           </h1>
 
@@ -341,18 +340,18 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '12px',
+              gap: '10px',
               background: 'rgba(0,0,0,0.03)',
-              padding: '12px 24px',
-              borderRadius: '16px',
-              marginTop: '16px'
+              padding: '10px 18px',
+              borderRadius: '14px',
+              marginTop: '12px'
             }}>
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '10px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <p style={{ fontSize: '9.5px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   QUEUE POSITION
                 </p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
-                  <span style={{ fontSize: '28px', fontWeight: 800, color: '#33322F' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '2px' }}>
+                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#33322F', lineHeight: 1.1 }}>
                     {formatOrdinal(displayPosition)}
                   </span>
                 </div>
@@ -365,20 +364,20 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
         {(ticketData.queue_status === 'WAITING' || ticketData.queue_status === 'PENDING') && (
           <div style={{
             background: '#EEF6FF',
-            borderRadius: '18px',
-            padding: '16px',
+            borderRadius: '16px',
+            padding: '12px 14px',
             display: 'flex',
-            gap: '12px',
+            gap: '10px',
             alignItems: 'flex-start',
-            marginBottom: '20px',
+            marginBottom: '14px',
             border: '1px solid #DBEAFE'
           }}>
-            <div style={{ padding: '4px' }}>
-              <Bell size={20} color="#FBBF24" fill="#FBBF24" />
+            <div style={{ padding: '2px', flexShrink: 0 }}>
+              <Bell size={18} color="#FBBF24" fill="#FBBF24" />
             </div>
             <div>
-              <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#1E40AF', marginBottom: '2px' }}>Please approach the counter</h4>
-              <p style={{ fontSize: '12px', color: '#3B82F6', lineHeight: 1.4, fontWeight: 500 }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#1E40AF', marginBottom: '2px' }}>Please approach the counter</h4>
+              <p style={{ fontSize: '11.5px', color: '#3B82F6', lineHeight: 1.35, fontWeight: 500 }}>
                 Receive your table assignment and enjoy your visit.
               </p>
             </div>
@@ -389,36 +388,45 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
         {ticketData.queue_status !== 'CANCELLED' && (
           <div style={{
             background: 'white',
-            borderRadius: '24px',
-            padding: '24px',
-            marginBottom: '20px',
+            borderRadius: '20px',
+            padding: '18px 14px',
+            marginBottom: '14px',
             boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F' }}>Queue Progress</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <h3 style={{ fontWeight: 800, fontSize: '15px', color: '#33322F' }}>Queue Progress</h3>
             </div>
 
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {/* Connecting Lines */}
-              <div style={{
-                position: 'absolute',
-                top: '20px',
-                left: '10%',
-                right: '10%',
-                height: '2px',
-                background: '#F3F4F6',
-                zIndex: 0
-              }} />
-              <div style={{
-                position: 'absolute',
-                top: '20px',
-                left: '10%',
-                width: stages.length > 1 ? `${(currentStageIndex / (stages.length - 1)) * 80}%` : '0%',
-                height: '2px',
-                background: 'var(--primary)',
-                zIndex: 0,
-                transition: 'width 0.5s ease'
-              }} />
+            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              {/* Connecting Lines dynamically aligned with centers of first and last circles */}
+              {(() => {
+                const stepOffset = stages.length > 0 ? (100 / (stages.length * 2)) : 10;
+                const span = 100 - (stepOffset * 2);
+                const progressWidth = stages.length > 1 ? (currentStageIndex / (stages.length - 1)) * span : 0;
+                return (
+                  <>
+                    <div style={{
+                      position: 'absolute',
+                      top: '18px',
+                      left: `${stepOffset}%`,
+                      right: `${stepOffset}%`,
+                      height: '2px',
+                      background: '#F3F4F6',
+                      zIndex: 0
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      top: '18px',
+                      left: `${stepOffset}%`,
+                      width: `${progressWidth}%`,
+                      height: '2px',
+                      background: 'var(--primary)',
+                      zIndex: 0,
+                      transition: 'width 0.5s ease'
+                    }} />
+                  </>
+                );
+              })()}
 
               {stages.map((stage, i) => {
                 const Icon = stage.icon;
@@ -427,10 +435,10 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
                 const isPending = currentStageIndex < i;
 
                 return (
-                  <div key={stage.key} style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flex: 1 }}>
+                  <div key={stage.key} style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
                     <div style={{
-                      width: '40px',
-                      height: '40px',
+                      width: '36px',
+                      height: '36px',
                       borderRadius: '50%',
                       background: isPending ? 'white' : (isCurrent ? 'white' : 'var(--primary)'),
                       border: isPending ? '1px solid #F3F4F6' : (isCurrent ? '2px solid var(--primary)' : 'none'),
@@ -439,15 +447,20 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
                       justifyContent: 'center',
                       color: isPending ? '#D1D5DB' : (isCurrent ? 'var(--primary)' : 'white'),
                       boxShadow: isCurrent ? '0 0 0 4px rgba(0, 0, 0, 0.04)' : 'none',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s ease',
+                      flexShrink: 0
                     }}>
-                      {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />}
+                      {isCompleted ? <CheckCircle2 size={18} /> : <Icon size={18} strokeWidth={isCurrent ? 2.5 : 2} />}
                     </div>
                     <span style={{
-                      fontSize: '9px',
+                      fontSize: 'clamp(8px, 2.1vw, 9.5px)',
                       fontWeight: 800,
                       color: isPending ? '#9CA3AF' : 'var(--primary)',
-                      letterSpacing: '0.02em'
+                      letterSpacing: '0.01em',
+                      textAlign: 'center',
+                      lineHeight: 1.2,
+                      wordBreak: 'break-word',
+                      maxWidth: '100%'
                     }}>
                       {stage.label}
                     </span>
@@ -461,47 +474,47 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
         {/* Waitlist Details Card */}
         <div style={{
           background: 'white',
-          borderRadius: '24px',
-          padding: '24px',
+          borderRadius: '20px',
+          padding: '18px 16px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
         }}>
-          <h3 style={{ fontWeight: 800, fontSize: '17px', color: '#33322F', marginBottom: '20px' }}>Waitlist Details</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <h3 style={{ fontWeight: 800, fontSize: '15px', color: '#33322F', marginBottom: '16px' }}>Waitlist Details</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Name</span>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13.5px', color: '#6B6667', fontWeight: 500 }}>Name</span>
+              <span style={{ fontWeight: 800, fontSize: '13.5px', color: '#33322F' }}>
                 {ticketData.user_name || '-'}
               </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Party Size</span>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13.5px', color: '#6B6667', fontWeight: 500 }}>Party Size</span>
+              <span style={{ fontWeight: 800, fontSize: '13.5px', color: '#33322F', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Users size={14} /> {ticketData.party_size}
               </span>
             </div>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Joined At</span>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13.5px', color: '#6B6667', fontWeight: 500 }}>Joined At</span>
+              <span style={{ fontWeight: 800, fontSize: '13.5px', color: '#33322F' }}>
                 {new Date(ticketData.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
 
-            <div style={{ borderTop: '1px dashed #E5E7EB', margin: '8px 0' }} />
+            <div style={{ borderTop: '1px dashed #E5E7EB', margin: '4px 0' }} />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Status</span>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: '#EC7951', textTransform: 'uppercase' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13.5px', color: '#6B6667', fontWeight: 500 }}>Status</span>
+              <span style={{ fontWeight: 800, fontSize: '13.5px', color: '#EC7951', textTransform: 'uppercase' }}>
                 {ticketData.queue_status}
               </span>
             </div>
             
             {ticketData.queue_status !== 'SEATED' && ticketData.queue_status !== 'CANCELLED' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '14px', color: '#6B6667', fontWeight: 500 }}>Current Position</span>
-                <span style={{ fontWeight: 800, fontSize: '14px', color: '#33322F' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13.5px', color: '#6B6667', fontWeight: 500 }}>Current Position</span>
+                <span style={{ fontWeight: 800, fontSize: '13.5px', color: '#33322F' }}>
                   {displayPosition}
                 </span>
               </div>
@@ -516,13 +529,13 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
             disabled={cancelling}
             style={{
               width: '100%',
-              padding: '16px',
-              marginTop: '20px',
+              padding: '14px',
+              marginTop: '16px',
               backgroundColor: '#FFF0F2',
               color: '#E11D48',
               border: '1px solid #FFE4E6',
               borderRadius: '16px',
-              fontSize: '15px',
+              fontSize: '14px',
               fontWeight: 700,
               cursor: cancelling ? 'not-allowed' : 'pointer',
               opacity: cancelling ? 0.7 : 1,

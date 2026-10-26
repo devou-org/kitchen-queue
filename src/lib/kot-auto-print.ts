@@ -12,7 +12,7 @@
  */
 
 import sql, { getOrderById, getRestaurantById, getCounters, createPrintJob } from '@/lib/db';
-import { buildKotEscposBuffer, KotPrintData, sendRawPrintToWindowsPrinter } from '@/lib/escpos';
+import { buildKotEscposBuffer, KotPrintData } from '@/lib/escpos';
 import { pusherServer } from '@/lib/pusher';
 
 export interface AutoKotOptions {
@@ -22,8 +22,8 @@ export interface AutoKotOptions {
 }
 
 export async function autoQueueAndBroadcastKot(
-  restaurantId: string, 
-  orderId: string, 
+  restaurantId: string,
+  orderId: string,
   optionsOrForce: boolean | AutoKotOptions = false
 ) {
   try {
@@ -63,11 +63,16 @@ export async function autoQueueAndBroadcastKot(
           console.log(`ℹ️ KOT print jobs already exist for Order #${order.ticket_number}, skipping duplicate generation.`);
           return;
         }
-      } catch {}
+      } catch { }
     }
 
-    const restaurant = await getRestaurantById(restaurantId);
+    // Fetch restaurant and counters in parallel
+    const [restaurant, countersList] = await Promise.all([
+      getRestaurantById(restaurantId),
+      getCounters(restaurantId),
+    ]);
     const restaurantName = restaurant?.name || 'QDINE';
+    const timezone = restaurant?.timezone || 'Asia/Kolkata';
 
     // Group items by counter
     const counterMap: Record<string, any[]> = {};
@@ -78,7 +83,6 @@ export async function autoQueueAndBroadcastKot(
     }
 
     // Look up all counter printer configurations
-    const countersList = await getCounters(restaurantId);
     const counterPrinterMap: Record<string, { id?: string; printerName: string; printerType: string; printerAddress?: string }> = {};
     for (const c of countersList) {
       if (c.name) {
@@ -91,12 +95,10 @@ export async function autoQueueAndBroadcastKot(
       }
     }
 
-    const isWindows = process.platform === 'win32';
-
     // Process each counter slip that has items
-    for (const [cName, cItems] of Object.entries(counterMap)) {
-      if (!cItems || cItems.length === 0) continue;
+    const validCounterEntries = Object.entries(counterMap).filter(([_, items]) => items && items.length > 0);
 
+    const slips = validCounterEntries.map(([cName, cItems]) => {
       const conf = counterPrinterMap[cName.trim().toLowerCase()] || {
         id: undefined,
         printerName: 'POS-80C',
@@ -105,13 +107,14 @@ export async function autoQueueAndBroadcastKot(
 
       const kotData: KotPrintData = {
         restaurantName,
+        timezone,
         ticketNumber: order.ticket_number,
         orderType: order.order_type,
         tableNumber: order.table_number,
-        customerName: order.customer_name,
-        phone: order.phone,
+        customerName: order.customer_name || 'Walk-in',
+        phone: order.phone || undefined,
         staffName: order.staff_name,
-        createdAt: new Date().toISOString(),
+        createdAt: options.isAddOn ? new Date().toISOString() : (order.created_at || new Date().toISOString()),
         counterName: cName,
         items: cItems,
         notes: order.notes,
@@ -121,56 +124,54 @@ export async function autoQueueAndBroadcastKot(
       const buffer = buildKotEscposBuffer(kotData);
       const base64Bytes = buffer.toString('base64');
 
-      // 1. Direct hardware print if running on Windows (Cashier / Counter PC)
-      if (isWindows) {
+      return { cName, cItems, conf, kotData, buffer, base64Bytes };
+    });
+
+    // 2 & 3. Run createPrintJob plus pusherServer.trigger for all counters in parallel with Promise.all
+    await Promise.all(
+      slips.map(async (slip) => {
+        let job: any = null;
         try {
-          const slipTitle = options.isAddOn
-            ? `RUNNING KOT #${order.ticket_number} - ${cName} (ADD-ON)`
-            : `KOT #${order.ticket_number} - ${cName}`;
-          const winRes = await sendRawPrintToWindowsPrinter(
-            conf.printerName,
-            buffer,
-            slipTitle
-          );
-          if (winRes.success) {
-            console.log(`🖨️ [Windows] Printed ${slipTitle} to "${conf.printerName}"`);
-          } else {
-            console.warn(`⚠️ [Windows] Print failed for ${cName} on "${conf.printerName}": ${winRes.error}`);
-          }
-        } catch (winErr) {
-          console.error('Windows direct print error:', winErr);
+          job = await createPrintJob(restaurantId, {
+            order_id: order.id,
+            ticket_number: Number(order.ticket_number) || undefined,
+            counter_name: slip.cName,
+            printer_name: slip.conf.printerName,
+            raw_base64: slip.base64Bytes,
+          });
+        } catch (jobErr) {
+          console.error(`Failed to create print job for counter ${slip.cName}:`, jobErr);
         }
-      }
 
-      // 2. Queue into database print_jobs
-      await createPrintJob(restaurantId, {
-        order_id: order.id,
-        ticket_number: Number(order.ticket_number) || undefined,
-        counter_name: cName,
-        printer_name: conf.printerName,
-        raw_base64: base64Bytes,
-      });
-
-      // 3. Broadcast realtime Pusher event for Android Phones / Tablets / Browser
-      try {
-        await pusherServer.trigger(`queue-channel-${restaurantId}`, 'kot_auto_print', {
+        // Keep Pusher payload safely under 10KB
+        // If base64Bytes is large (>3500 chars), omit raw bytes and send print_job_id for station to fetch
+        const isLarge = slip.base64Bytes.length > 3500;
+        const pusherPayload: Record<string, any> = {
           order_id: order.id,
           ticket_number: order.ticket_number,
-          counter_id: conf.id,
-          counter_name: cName,
-          printer_name: conf.printerName,
-          printer_type: conf.printerType,
-          printer_address: conf.printerAddress,
+          counter_id: slip.conf.id,
+          counter_name: slip.cName,
+          printer_name: slip.conf.printerName,
+          printer_type: slip.conf.printerType,
+          printer_address: slip.conf.printerAddress,
           is_add_on: Boolean(options.isAddOn),
-          kotData,
-          base64Bytes,
-          itemCount: cItems.length,
+          itemCount: slip.cItems.length,
           timestamp: new Date().toISOString(),
-        });
-      } catch (pushErr) {
-        console.error('Pusher kot_auto_print trigger error:', pushErr);
-      }
-    }
+          print_job_id: job?.id,
+        };
+
+        if (!isLarge) {
+          pusherPayload.kotData = slip.kotData;
+          pusherPayload.base64Bytes = slip.base64Bytes;
+        }
+
+        try {
+          await pusherServer.trigger(`queue-channel-${restaurantId}`, 'kot_auto_print', pusherPayload);
+        } catch (pushErr) {
+          console.error('Pusher kot_auto_print trigger error:', pushErr);
+        }
+      })
+    );
 
     const mode = options.isAddOn ? 'Add-on KOT' : 'KOT';
     console.log(`🖨️ Auto-queued ${mode} print slips for Order #${order.ticket_number} across ${Object.keys(counterMap).length} counter(s)`);

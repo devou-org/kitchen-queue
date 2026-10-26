@@ -1,12 +1,13 @@
 import { ApiResponse, Order, OrderFilters } from '@/types';
 
 export interface CreateOrderData {
-  customer_name: string;
-  phone: string;
+  customer_name?: string;
+  phone?: string | null;
   items: {
     product_id: string;
     quantity: number;
     price_at_purchase: number;
+    notes?: string;
   }[];
   notes?: string;
   party_size: number;
@@ -17,6 +18,8 @@ export interface CreateOrderData {
   payment_method?: string;
   payment_split?: Record<string, number> | null;
   discount_amount?: number;
+  loyalty_reward_id?: string;
+  selected_reward_id?: string;
 }
 
 export interface UpdateOrderData {
@@ -28,7 +31,7 @@ export interface UpdateOrderData {
   notes?: string | null;
   party_size?: number;
   order_type?: string;
-  items?: { product_id: string; quantity: number }[];
+  items?: { product_id: string; quantity: number; notes?: string }[];
   payment_method?: string;
   payment_split?: Record<string, number> | null;
 }

@@ -11,7 +11,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { restaurant } = useRestaurant();
+  const { restaurant, loading: resLoading } = useRestaurant();
 
   const getTargetRoute = (user: any) => {
     const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
@@ -27,6 +27,7 @@ export default function AdminLogin() {
     if (perms.includes('tables')) return 'tables';
     if (perms.includes('products')) return 'products';
     if (perms.includes('inventory')) return 'inventory';
+    if (perms.includes('finance')) return 'finance';
     if (perms.includes('analytics') && showOrdering) return 'analytics';
     if (perms.includes('staff')) return 'staff';
     if (perms.includes('billing')) return 'billing';
@@ -71,6 +72,14 @@ export default function AdminLogin() {
       setLoading(false);
     }
   };
+
+  if (resLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="loader" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>

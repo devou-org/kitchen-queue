@@ -4,10 +4,44 @@ import { requireAdmin } from '@/lib/auth';
 import { calculateProductStatus } from '@/lib/validators';
 import { pusherServer } from '@/lib/pusher';
 
+async function resolveRestaurant(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const querySlug = searchParams.get('slug');
+  const headerSlug = request.headers.get('x-restaurant-slug');
+
+  let rawSlug = querySlug || headerSlug || '';
+  if (rawSlug.startsWith('["') || rawSlug.startsWith("['")) {
+    try {
+      const parsed = JSON.parse(rawSlug);
+      if (Array.isArray(parsed) && parsed[0]) rawSlug = parsed[0];
+    } catch {
+      // ignore
+    }
+  }
+  const cleanSlug = rawSlug.replace(/[\[\]'"]/g, '').trim();
+
+  if (cleanSlug) {
+    const restaurant = await getRestaurantBySlug(cleanSlug);
+    if (restaurant) return restaurant;
+  }
+
+  // Fallback to admin auth context if available
+  try {
+    const admin = await requireAdmin(request);
+    if (admin?.restaurantSlug) {
+      const restaurant = await getRestaurantBySlug(admin.restaurantSlug);
+      if (restaurant) return restaurant;
+    }
+  } catch {
+    // ignore
+  }
+
+  return await getRestaurantBySlug('demo');
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const slug = request.headers.get('x-restaurant-slug') || 'demo';
-    const restaurant = await getRestaurantBySlug(slug);
+    const restaurant = await resolveRestaurant(request);
     
     if (!restaurant) {
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
@@ -25,8 +59,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const slug = request.headers.get('x-restaurant-slug') || 'demo';
-    const restaurant = await getRestaurantBySlug(slug);
+    const restaurant = await resolveRestaurant(request);
     
     if (!restaurant) {
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
@@ -92,8 +125,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const slug = request.headers.get('x-restaurant-slug') || 'demo';
-    const restaurant = await getRestaurantBySlug(slug);
+    const restaurant = await resolveRestaurant(request);
     
     if (!restaurant) {
        return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
