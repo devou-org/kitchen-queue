@@ -11,7 +11,8 @@
     "printer:sim": "node printer_simulator.js",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:bill-printer": "node scripts/run_migration_bill_printer.js"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -28,6 +29,8 @@
     "pusher": "^5.3.3",
     "pusher-js": "^8.5.0",
     "qrcode.react": "^4.2.0",
+    "qz-lna": "^0.1.3",
+    "qz-tray": "^2.3.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hot-toast": "^2.6.0",
@@ -40,6 +43,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.19.39",
     "@types/pg": "^8.20.0",
+    "@types/qz-tray": "^2.2.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

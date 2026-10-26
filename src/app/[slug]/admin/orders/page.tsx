@@ -10,6 +10,7 @@ import { orderService } from '@/app/services/orders.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ChefHat, Search, X, Printer, Store, Loader2, ClipboardList, Sparkles, RotateCcw, UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
+import { useKeepAwake } from '@/hooks/useKeepAwake';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { OrderTableRow, OrderTableHeader } from '@/components/modules/orders/OrderTableRow';
 import OrderDetailsView from '@/components/modules/orders/OrderDetailsView';
@@ -21,6 +22,7 @@ import { KitchenSnapshotModal } from '@/components/modules/orders/KitchenSnapsho
 import { useAdminLayout } from '@/context/AdminLayoutContext';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
+import { Loading } from '@/components/ui/Loading';
 
 interface OrderUpdateLog {
   id: string;
@@ -95,6 +97,9 @@ export default function AdminOrders() {
   const { restaurant } = useRestaurant();
   const [autoPrintKot, setAutoPrintKot] = useState(false);
   const [counterDrawerOpen, setCounterDrawerOpen] = useState(false);
+
+  const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
+  useKeepAwake(isPrintStation);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -378,70 +383,25 @@ export default function AdminOrders() {
       }
     };
 
-    const handleKotAutoPrint = async (data: any) => {
-      // Check if auto-print is enabled on this device
-      const autoPrint = typeof window !== 'undefined' ? (localStorage.getItem('qdine_auto_print_kot') === 'true') : false;
-      if (!autoPrint) return;
-
-      // Only filter if this station is an explicitly locked dedicated KDS station
-      const dedicatedStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_dedicated_kds_station') || '') : '';
-      if (dedicatedStation && dedicatedStation !== '' && dedicatedStation.toLowerCase() !== (data.counter_name || '').toLowerCase()) {
-        console.log(`[Auto-Print] Station is dedicated to "${dedicatedStation}"; skipping "${data.counter_name}" slip.`);
-        return;
-      }
-
-      toast(`Auto-printing KOT #${String(data.ticket_number).padStart(3, '0')} (${data.counter_name})...`, {
-        icon: <PrinterIllustration size={22} status="printing" />,
-        duration: 3000,
-      });
-
-      try {
-        const result = await printUnifiedThermalTicket({
-          base64Bytes: data.base64Bytes,
-          kotData: data.kotData,
-          printerName: data.printer_name,
-          counterId: data.counter_id,
-          counterName: data.counter_name,
-          isAutoPrint: true,
-        });
-
-        const label = data.is_add_on ? `Add-on KOT (${data.counter_name || 'Counter'})` : (data.counter_name || 'KOT');
-        if (result.success) {
-          toast.success(`Auto-printed: ${label} #${String(data.ticket_number).padStart(3, '0')} (${result.method})`, {
-            icon: <PrinterIllustration size={22} status="success" />,
-            id: data.is_add_on ? `print-${data.order_id}-${data.counter_name}-${Date.now()}` : `print-${data.order_id}-${data.counter_name}`,
-          });
-        } else {
-          toast.error(result.message || '⚠️ Thermal printer not paired. Tap "Pair Printer" at the top.', {
-            id: `print-unpaired`,
-            duration: 6000,
-          });
-        }
-      } catch (err: any) {
-        console.error('Auto-print execution error:', err);
-      }
-    };
-
     channel.bind('new_order', handleNewOrder);
     channel.bind('order_update', handleOrderUpdate);
-    channel.bind('kot_auto_print', handleKotAutoPrint);
 
     return () => {
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       channel.unbind('new_order', handleNewOrder);
       channel.unbind('order_update', handleOrderUpdate);
-      channel.unbind('kot_auto_print', handleKotAutoPrint);
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
-  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string) => {
+  const handleStatusChange = async (id: string, newStatus: string, tableNumber?: string, pMethod?: string, pSplit?: any) => {
     setModalLoading(true);
     try {
       const data = await orderService.updateOrder(id, {
         status: newStatus,
         is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : undefined,
         table_number: tableNumber,
-        payment_method: pMethod || undefined
+        payment_method: pMethod || undefined,
+        payment_split: pSplit || undefined,
       });
       if (data.success) {
         // Success feedback handled by Pusher event to avoid duplicates
@@ -453,6 +413,7 @@ export default function AdminOrders() {
             status: newStatus as Order['status'],
             table_number: tableNumber ?? o.table_number,
             payment_method: pMethod ?? o.payment_method,
+            payment_split: pSplit !== undefined ? pSplit : o.payment_split,
             is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
           } : o)
             .filter(o => {
@@ -465,6 +426,7 @@ export default function AdminOrders() {
           status: newStatus as Order['status'],
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
+          payment_split: pSplit !== undefined ? pSplit : prev.payment_split,
           is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
         } : null);
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
@@ -1035,7 +997,9 @@ export default function AdminOrders() {
 
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {loading ? (
-            <div style={{ padding: '60px', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}><div className="loader" /></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 'calc(100vh - 220px)', width: '100%' }}>
+              <div className="loader" />
+            </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', height: displayedOrders.length === 0 ? '100%' : 'auto' }}>
               <OrderTableHeader />

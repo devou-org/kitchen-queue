@@ -8,7 +8,8 @@ import sql, {
   getCounters,
 } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { buildKotEscposBuffer, sendRawPrintToWindowsPrinter, KotPrintData } from '@/lib/escpos';
+import { buildKotEscposBuffer, KotPrintData } from '@/lib/escpos';
+import { pusherServer } from '@/lib/pusher';
 
 async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
   const admin = await requireAdmin(request);
@@ -31,7 +32,15 @@ async function resolveRestaurant(request: NextRequest, bodySlug?: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, counterName, printerName, orderData, separateSlips, slug } = body;
+    const { orderId, counterName, printerName, orderData, separateSlips, slug, isStation, isTest } = body;
+    const isTestPrint = Boolean(
+      isTest ||
+      orderData?.ticket_number === 999 ||
+      orderData?.ticket_number === '999' ||
+      String(orderId || '').startsWith('test-') ||
+      String(orderData?.id || '').startsWith('test-') ||
+      String(orderData?.customer_name || '').toLowerCase().includes('test')
+    );
 
     const restaurant = await resolveRestaurant(request, slug);
     if (!restaurant) {
@@ -63,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     const targetPrinter = printerName?.trim() || process.env.KOT_PRINTER_NAME || 'POS-80C';
     const restaurantName = restaurant.name || 'QDINE';
-    const isWindows = process.platform === 'win32';
+    const timezone = restaurant.timezone || 'Asia/Kolkata';
 
     // Check if cloud print agent is active on the cashier PC
     const agentHeartbeat = await getAgentHeartbeat(restaurant.id);
@@ -90,22 +99,29 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if this counter has a dedicated configured printer
-      let counterTargetPrinter = targetPrinter;
+      // Check if counter has dedicated configuration in database
+      let counterRecord: any = null;
+      let counterTargetPrinter = '';
+      let counterPrinterType = 'DEFAULT';
       try {
-        const counterRecord = await getCounterByName(restaurant.id, counterName);
+        counterRecord = await getCounterByName(restaurant.id, counterName);
         if (counterRecord?.printer_name && counterRecord.printer_name.trim()) {
           counterTargetPrinter = counterRecord.printer_name.trim();
+          counterPrinterType = counterRecord.printer_type || 'DEFAULT';
         }
       } catch {}
+      if (!counterTargetPrinter) {
+        counterTargetPrinter = (printerName && printerName.trim() !== 'POS-80C') ? printerName.trim() : targetPrinter;
+      }
 
       const kotData: KotPrintData = {
         restaurantName,
+        timezone,
         ticketNumber: order.ticket_number,
         orderType: order.order_type,
         tableNumber: order.table_number,
-        customerName: order.customer_name,
-        phone: order.phone,
+        customerName: order.customer_name || 'Walk-in',
+        phone: order.phone || undefined,
         staffName: order.staff_name,
         createdAt: order.created_at,
         counterName: counterName,
@@ -116,22 +132,21 @@ export async function POST(request: NextRequest) {
       const buffer = buildKotEscposBuffer(kotData);
       const base64Bytes = buffer.toString('base64');
 
-      // 1. If Windows host (local server dev)
-      if (isWindows) {
-        const printResult = await sendRawPrintToWindowsPrinter(
-          counterTargetPrinter,
-          buffer,
-          `KOT #${order.ticket_number} - ${counterName}`
-        );
-        if (printResult.success) {
-          return NextResponse.json({
-            success: true,
-            mode: 'server',
-            message: `KOT printed for ${counterName}`,
-            printer: counterTargetPrinter,
-            itemCount: filteredItems.length,
-          });
-        }
+      // For station or test prints, return compiled buffer directly to caller without queuing or Pusher broadcast
+      if (isStation || isTestPrint) {
+        return NextResponse.json({
+          success: true,
+          mode: 'client',
+          message: `KOT buffer ready for ${counterName}`,
+          printer: counterTargetPrinter,
+          printerType: counterPrinterType,
+          printerAddress: counterRecord?.printer_address,
+          counterId: counterRecord?.id,
+          counterName,
+          itemCount: filteredItems.length,
+          kotData,
+          base64Bytes,
+        });
       }
 
       // 2. Queue for Cloud Print Agent
@@ -143,22 +158,45 @@ export async function POST(request: NextRequest) {
         raw_base64: base64Bytes,
       });
 
+      // 3. Broadcast to designated Print Station via realtime socket
+      try {
+        await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'kot_auto_print', {
+          order_id: order.id,
+          ticket_number: order.ticket_number,
+          counter_id: counterRecord?.id,
+          counter_name: counterName,
+          printer_name: counterTargetPrinter,
+          printer_type: counterPrinterType,
+          printer_address: counterRecord?.printer_address,
+          kotData,
+          base64Bytes,
+          is_manual: true,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (pushErr) {
+        console.error('Pusher manual kot_auto_print error:', pushErr);
+      }
+
       // If print agent is online on cashier PC, it will print in < 1 second!
       if (isAgentOnline) {
         return NextResponse.json({
           success: true,
           mode: 'agent',
+          broadcasted: true,
           message: `KOT sent to ${counterTargetPrinter} for ${counterName}!`,
           printer: counterTargetPrinter,
           itemCount: filteredItems.length,
+          kotData,
+          base64Bytes,
         });
       }
 
-      // 3. Fallback to client browser print if agent not detected
+      // 4. Return to caller with broadcasted flag
       return NextResponse.json({
         success: true,
-        mode: 'client',
-        message: `KOT ready for ${counterName}`,
+        mode: 'station',
+        broadcasted: true,
+        message: `KOT sent to Print Station for ${counterName}!`,
         printer: counterTargetPrinter,
         kotData,
         base64Bytes,
@@ -197,11 +235,12 @@ export async function POST(request: NextRequest) {
 
         const kotData: KotPrintData = {
           restaurantName,
+          timezone,
           ticketNumber: order.ticket_number,
           orderType: order.order_type,
           tableNumber: order.table_number,
-          customerName: order.customer_name,
-          phone: order.phone,
+          customerName: order.customer_name || 'Walk-in',
+          phone: order.phone || undefined,
           staffName: order.staff_name,
           createdAt: order.created_at,
           counterName: cName,
@@ -213,33 +252,44 @@ export async function POST(request: NextRequest) {
         const base64Bytes = buffer.toString('base64');
         slips.push({ kotData, base64Bytes, printerName: slipPrinter, counterId: conf.id });
 
-        // Queue each slip to its dedicated counter printer
-        await createPrintJob(restaurant.id, {
-          order_id: order.id,
-          ticket_number: Number(order.ticket_number) || undefined,
-          counter_name: cName,
-          printer_name: slipPrinter,
-          raw_base64: base64Bytes,
+        if (!isTestPrint) {
+          // Queue each slip to its dedicated counter printer
+          await createPrintJob(restaurant.id, {
+            order_id: order.id,
+            ticket_number: Number(order.ticket_number) || undefined,
+            counter_name: cName,
+            printer_name: slipPrinter,
+            raw_base64: base64Bytes,
+          });
+        }
+      }
+
+      // For station or test prints, return compiled slips directly to caller without Pusher broadcast
+      if (isStation || isTestPrint) {
+        return NextResponse.json({
+          success: true,
+          mode: 'client',
+          message: `${slips.length} KOT slips ready for print`,
+          slips,
         });
       }
 
-      if (isWindows) {
-        let printedCount = 0;
-        for (const slip of slips) {
-          const res = await sendRawPrintToWindowsPrinter(
-            slip.printerName || targetPrinter,
-            Buffer.from(slip.base64Bytes, 'base64'),
-            `KOT #${order.ticket_number} - ${slip.kotData.counterName}`
-          );
-          if (res.success) printedCount++;
-        }
-        if (printedCount > 0) {
-          return NextResponse.json({
-            success: true,
-            mode: 'server',
-            message: `KOT printed for ${printedCount} counter(s)`,
-            printer: targetPrinter,
+      // Broadcast all counter slips to Print Station
+      for (const slip of slips) {
+        try {
+          await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'kot_auto_print', {
+            order_id: order.id,
+            ticket_number: order.ticket_number,
+            counter_id: slip.counterId,
+            counter_name: slip.kotData.counterName,
+            printer_name: slip.printerName,
+            kotData: slip.kotData,
+            base64Bytes: slip.base64Bytes,
+            is_manual: true,
+            timestamp: new Date().toISOString(),
           });
+        } catch (pushErr) {
+          console.error('Pusher manual separate slips error:', pushErr);
         }
       }
 
@@ -247,6 +297,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           mode: 'agent',
+          broadcasted: true,
           message: `${slips.length} KOT slips sent to Cashier ${targetPrinter}!`,
           printer: targetPrinter,
         });
@@ -254,8 +305,9 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        mode: 'client',
-        message: `KOT ready for all counters`,
+        mode: 'station',
+        broadcasted: true,
+        message: `${slips.length} KOT slips sent to Print Station!`,
         printer: targetPrinter,
         slips,
       });
@@ -264,11 +316,12 @@ export async function POST(request: NextRequest) {
     // Default: Single unified Master KOT with all items
     const kotData: KotPrintData = {
       restaurantName,
+      timezone,
       ticketNumber: order.ticket_number,
       orderType: order.order_type,
       tableNumber: order.table_number,
-      customerName: order.customer_name,
-      phone: order.phone,
+      customerName: order.customer_name || 'Walk-in',
+      phone: order.phone || undefined,
       staffName: order.staff_name,
       createdAt: order.created_at,
       counterName: 'ALL ITEMS',
@@ -279,22 +332,17 @@ export async function POST(request: NextRequest) {
     const buffer = buildKotEscposBuffer(kotData);
     const base64Bytes = buffer.toString('base64');
 
-    if (isWindows) {
-      const printResult = await sendRawPrintToWindowsPrinter(
-        targetPrinter,
-        buffer,
-        `KOT #${order.ticket_number} - ALL`
-      );
-
-      if (printResult.success) {
-        return NextResponse.json({
-          success: true,
-          mode: 'server',
-          message: `Master KOT printed for all items`,
-          printer: targetPrinter,
-          itemCount: allItems.length,
-        });
-      }
+    // For station or test prints, return buffer directly for client printing without Pusher broadcast
+    if (isStation || isTestPrint) {
+      return NextResponse.json({
+        success: true,
+        mode: 'client',
+        message: `Master KOT buffer ready`,
+        printer: targetPrinter,
+        itemCount: allItems.length,
+        kotData,
+        base64Bytes,
+      });
     }
 
     // Queue job
@@ -306,20 +354,40 @@ export async function POST(request: NextRequest) {
       raw_base64: base64Bytes,
     });
 
+    // Broadcast Master KOT to Print Station
+    try {
+      await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'kot_auto_print', {
+        order_id: order.id,
+        ticket_number: order.ticket_number,
+        counter_name: 'ALL',
+        printer_name: targetPrinter,
+        kotData,
+        base64Bytes,
+        is_manual: true,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (pushErr) {
+      console.error('Pusher manual master KOT error:', pushErr);
+    }
+
     if (isAgentOnline) {
       return NextResponse.json({
         success: true,
         mode: 'agent',
+        broadcasted: true,
         message: `Master KOT sent to Cashier ${targetPrinter}!`,
         printer: targetPrinter,
         itemCount: allItems.length,
+        kotData,
+        base64Bytes,
       });
     }
 
     return NextResponse.json({
       success: true,
-      mode: 'client',
-      message: `Master KOT ready for all items`,
+      mode: 'station',
+      broadcasted: true,
+      message: `Master KOT sent to Print Station!`,
       printer: targetPrinter,
       kotData,
       base64Bytes,

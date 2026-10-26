@@ -169,7 +169,7 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ slug:
       return;
     }
 
-    const phoneToUse = phone || `+910000000000`;
+    const phoneToUse = phone && phone.trim() ? phone.trim() : undefined;
 
     setSaving(true);
     try {
@@ -198,8 +198,8 @@ export default function StaffEditOrderPage({ params }: { params: Promise<{ slug:
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
-        <div className="loader" style={{ width: 40, height: 40, borderWidth: 4 }} />
+      <div style={{ minHeight: 'calc(100vh - 180px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="loader" />
       </div>
     );
   }

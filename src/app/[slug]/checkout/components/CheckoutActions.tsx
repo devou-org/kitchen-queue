@@ -28,17 +28,27 @@ export default function CheckoutActions({
 }: CheckoutActionsProps) {
   if (inOtpStep) return null;
   
-  const handleConfirm = async () => {
-    if (loading) return;
+  const handleConfirm = async (): Promise<boolean> => {
+    if (loading) return false;
     if (addToMode) {
       await onAddToOrder();
+      return true;
     } else {
       const form = document.getElementById('new-order-form') as HTMLFormElement;
-      if (form && typeof form.requestSubmit === 'function') {
-        form.requestSubmit();
-      } else {
-        await onSubmitNewOrder(new Event('submit') as unknown as React.FormEvent);
+      if (form) {
+        if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+          if (typeof form.reportValidity === 'function') {
+            form.reportValidity();
+          }
+          return false;
+        }
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+          return true;
+        }
       }
+      await onSubmitNewOrder(new Event('submit') as unknown as React.FormEvent);
+      return true;
     }
   };
 

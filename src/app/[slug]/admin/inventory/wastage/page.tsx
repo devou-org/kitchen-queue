@@ -455,9 +455,8 @@ export default function WastageAndAdjustmentsPage() {
           }}
         >
           {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#94A3B8' }}>
-              <Loader2 size={30} className="animate-spin" style={{ margin: '0 auto 10px' }} />
-              Loading wastage records...
+            <div style={{ padding: '60px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '260px' }}>
+              <div className="loader" />
             </div>
           ) : wastages.length === 0 ? (
             <div style={{ padding: '60px 20px', textAlign: 'center' }}>
@@ -545,9 +544,8 @@ export default function WastageAndAdjustmentsPage() {
           }}
         >
           {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#94A3B8' }}>
-              <Loader2 size={30} className="animate-spin" style={{ margin: '0 auto 10px' }} />
-              Loading stock adjustment records...
+            <div style={{ padding: '60px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '260px' }}>
+              <div className="loader" />
             </div>
           ) : adjustments.length === 0 ? (
             <div style={{ padding: '60px 20px', textAlign: 'center' }}>
