@@ -1932,36 +1932,36 @@ export async function createOrder(data: {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, CURRENT_DATE), $17, $18, $19, $20, $21, $22, $23, $24, $25, $26::jsonb, $27, $28)
         RETURNING id
       `,
-     [
-  data.restaurant_id,
-  queueId,
-  userId,
-  data.customer_name || 'Walk-in',
-  data.phone || null,
-  finalTotalPrice,
-  defaultStatus,
-  isPaid,
-  data.notes || null,
-  data.party_size || 1,
-  nextToken,
-  data.table_number || null,
-  tableId,
-  tableSessionId,
-  validStaffId,
-  data.business_date || null,
-  effectiveSubtotal,
-  data.gst_amount || 0,
-  data.gst_rate || 0,
-  data.gst_type || 'NONE',
-  pendingAt,
-  preparingAt,
-  data.order_type || 'DINE_IN',
-  paidAt,
-  paymentMethod,
-  paymentSplit,
-  discountVal,
-  data.loyalty_reward_id || null
-]
+      [
+        data.restaurant_id,
+        queueId,
+        userId,
+        data.customer_name || 'Walk-in',
+        data.phone || null,
+        finalTotalPrice,
+        defaultStatus,
+        isPaid,
+        data.notes || null,
+        data.party_size || 1,
+        nextToken,
+        data.table_number || null,
+        tableId,
+        tableSessionId,
+        validStaffId,
+        data.business_date || null,
+        effectiveSubtotal,
+        data.gst_amount || 0,
+        data.gst_rate || 0,
+        data.gst_type || 'NONE',
+        pendingAt,
+        preparingAt,
+        data.order_type || 'DINE_IN',
+        paidAt,
+        paymentMethod,
+        paymentSplit,
+        discountVal,
+        data.loyalty_reward_id || null
+      ]
     );
 
     const orderId = orderResult.rows[0]?.id;
@@ -2015,7 +2015,7 @@ export async function createOrder(data: {
     if (isPaid) {
       import('@/modules/finance/finance.service').then(({ FinanceService }) => {
         FinanceService.recordPosIncome(orderId).catch(err => console.error('Finance income record on createOrder error:', err));
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return await getOrderById(data.restaurant_id, orderId);
@@ -2216,11 +2216,11 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   if (status === 'CLOSED' || status === 'COMPLETED' || updatedOrder?.is_paid) {
     import('@/modules/finance/finance.service').then(({ FinanceService }) => {
       FinanceService.recordPosIncome(id).catch(err => console.error('Finance income record error:', err));
-    }).catch(() => {});
+    }).catch(() => { });
   } else if (status === 'CANCELLED' || status === 'REFUNDED') {
     import('@/modules/finance/finance.service').then(({ FinanceService }) => {
       FinanceService.recordPosIncome(id).catch(err => console.error('Finance cancel record error:', err));
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   return updatedOrder;
@@ -2357,11 +2357,11 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     if (nextIsPaid || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
       import('@/modules/finance/finance.service').then(({ FinanceService }) => {
         FinanceService.recordPosIncome(id).catch(err => console.error('Finance income record error in completeOrderAndBill:', err));
-      }).catch(() => {});
+      }).catch(() => { });
     } else if (nextStatus === 'CANCELLED' || nextStatus === 'REFUNDED') {
       import('@/modules/finance/finance.service').then(({ FinanceService }) => {
         FinanceService.recordPosIncome(id).catch(err => console.error('Finance cancel record error in completeOrderAndBill:', err));
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return updatedOrder;
@@ -4433,7 +4433,7 @@ export async function mergeDuplicateCustomerLoyalty(restaurantId: string) {
 }
 
 export async function getLoyaltyCustomersList(
-  restaurantId: string, 
+  restaurantId: string,
   search?: string,
   page: number = 1,
   limit: number = 50

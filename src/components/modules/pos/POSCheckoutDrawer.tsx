@@ -90,10 +90,10 @@ export function POSCheckoutDrawer({
 
   const isTableDirected = Boolean(
     hideOrderType ||
-      (typeof window !== 'undefined' &&
-        (new URLSearchParams(window.location.search).get('table') ||
-          new URLSearchParams(window.location.search).get('table_number')) &&
-        orderForm.table_number)
+    (typeof window !== 'undefined' &&
+      (new URLSearchParams(window.location.search).get('table') ||
+        new URLSearchParams(window.location.search).get('table_number')) &&
+      orderForm.table_number)
   );
 
   // Compute default country code based on restaurant location
@@ -147,7 +147,7 @@ export function POSCheckoutDrawer({
           }
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       isSubscribed = false;
@@ -714,9 +714,9 @@ export function POSCheckoutDrawer({
     const totalCapacity = selectedTable ? Number(selectedTable.effective_capacity || selectedTable.capacity) || 1 : 15;
     const maxFree = selectedTable
       ? getTableFreeSeats(selectedTable, {
-          phone: orderForm.phone,
-          customerName: orderForm.customer_name,
-        })
+        phone: orderForm.phone,
+        customerName: orderForm.customer_name,
+      })
       : 15;
 
     const limit = Math.max(totalCapacity, maxFree, 1);
@@ -1765,8 +1765,8 @@ export function POSCheckoutDrawer({
                           {loyaltySettings?.loyalty_mode === 'PUNCH_CARD'
                             ? `${loyaltyProfile.total_visits || 0} visits`
                             : selectedReward && Number(selectedReward.points_required || 0) > 0
-                            ? `${Math.max(0, loyaltyProfile.points_balance - Number(selectedReward.points_required)).toLocaleString()} pts`
-                            : `${loyaltyProfile.points_balance.toLocaleString()} pts`}
+                              ? `${Math.max(0, loyaltyProfile.points_balance - Number(selectedReward.points_required)).toLocaleString()} pts`
+                              : `${loyaltyProfile.points_balance.toLocaleString()} pts`}
                         </span>
                         {loyaltySettings?.loyalty_mode !== 'PUNCH_CARD' && selectedReward && Number(selectedReward.points_required || 0) > 0 && (
                           <span style={{ fontSize: '10px', color: '#16A34A', fontWeight: 700, marginTop: '2px' }}>
@@ -1925,13 +1925,13 @@ export function POSCheckoutDrawer({
                                   border: isSelected
                                     ? '1.5px solid #16A34A'
                                     : isEligible
-                                    ? '1px solid #CBD5E1'
-                                    : '1px dashed #CBD5E1',
+                                      ? '1px solid #CBD5E1'
+                                      : '1px dashed #CBD5E1',
                                   background: isSelected
                                     ? '#F0FDF4'
                                     : isEligible
-                                    ? '#FFFFFF'
-                                    : '#F8FAFC',
+                                      ? '#FFFFFF'
+                                      : '#F8FAFC',
                                   boxShadow: isSelected ? '0 3px 10px rgba(22, 163, 74, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
                                   gap: '8px',
                                 }}
@@ -1982,18 +1982,18 @@ export function POSCheckoutDrawer({
                                     border: isSelected
                                       ? 'none'
                                       : isEligible
-                                      ? '1px solid var(--primary, #971345)'
-                                      : 'none',
+                                        ? '1px solid var(--primary, #971345)'
+                                        : 'none',
                                     background: isSelected
                                       ? '#16A34A'
                                       : isEligible
-                                      ? '#FFFFFF'
-                                      : '#E2E8F0',
+                                        ? '#FFFFFF'
+                                        : '#E2E8F0',
                                     color: isSelected
                                       ? '#FFFFFF'
                                       : isEligible
-                                      ? 'var(--primary, #971345)'
-                                      : '#94A3B8',
+                                        ? 'var(--primary, #971345)'
+                                        : '#94A3B8',
                                     cursor: isEligible ? 'pointer' : 'not-allowed',
                                     display: 'flex',
                                     alignItems: 'center',

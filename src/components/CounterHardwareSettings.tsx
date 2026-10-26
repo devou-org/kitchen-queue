@@ -255,7 +255,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             });
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [slug, fetchCounters, fetchBillPrinter, checkQzStatus]);
 
@@ -328,7 +328,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             bill_printer_type: 'BLUETOOTH',
             bill_printer_address: null,
           }),
-        }).catch(() => {});
+        }).catch(() => { });
         setTick(t => t + 1);
       } else {
         toast.error(res.error || 'Bluetooth pairing failed', { id: toastId });
@@ -361,7 +361,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
           bill_printer_type: billPrinter.printer_type,
           bill_printer_address: null,
         }),
-      }).catch(() => {});
+      }).catch(() => { });
       setTick(t => t + 1);
       toast.success('Disconnected Bluetooth bill printer');
     } catch (err: any) {
@@ -397,7 +397,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
             bill_printer_type: 'USB',
             bill_printer_address: null,
           }),
-        }).catch(() => {});
+        }).catch(() => { });
         setTick(t => t + 1);
       } else {
         toast.error(res.error || 'USB connection failed', { id: toastId });
@@ -429,7 +429,7 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
           bill_printer_type: billPrinter.printer_type,
           bill_printer_address: null,
         }),
-      }).catch(() => {});
+      }).catch(() => { });
       setTick(t => t + 1);
       toast.success('Disconnected USB bill printer');
     } catch (err: any) {
@@ -1458,227 +1458,159 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {counters.map(counter => {
-          const form = formStates[counter.id] || {
-            printer_name: counter.printer_name || 'POS-80C',
-            printer_type: counter.printer_type || 'DEFAULT',
-            printer_address: counter.printer_address || '',
-          };
+          {counters.map(counter => {
+            const form = formStates[counter.id] || {
+              printer_name: counter.printer_name || 'POS-80C',
+              printer_type: counter.printer_type || 'DEFAULT',
+              printer_address: counter.printer_address || '',
+            };
 
-          const isQz = form.printer_type === 'QZ_TRAY';
-          const isBt = form.printer_type === 'BLUETOOTH';
-          const isUsb = form.printer_type === 'USB';
-          const isNet = form.printer_type === 'NETWORK';
+            const isQz = form.printer_type === 'QZ_TRAY';
+            const isBt = form.printer_type === 'BLUETOOTH';
+            const isUsb = form.printer_type === 'USB';
+            const isNet = form.printer_type === 'NETWORK';
 
-          const btConnected = isBluetoothConnectedForCounter(counter.id, form.printer_name, counter.name).connected;
-          const usbConnected = isSerialConnectedForCounter(counter.id, form.printer_name).connected;
+            const btConnected = isBluetoothConnectedForCounter(counter.id, form.printer_name, counter.name).connected;
+            const usbConnected = isSerialConnectedForCounter(counter.id, form.printer_name).connected;
 
-          const isSaving = savingCounterId === counter.id;
-          const isSaved = savedCounterId === counter.id;
-          const isConnecting = connectingCounterId === counter.id;
-          const isTesting = testingCounterId === counter.id;
+            const isSaving = savingCounterId === counter.id;
+            const isSaved = savedCounterId === counter.id;
+            const isConnecting = connectingCounterId === counter.id;
+            const isTesting = testingCounterId === counter.id;
 
-          return (
-            <div
-              key={counter.id}
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: '8px',
-                border: '1px solid #E2E8F0',
-                padding: '12px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-              }}
-            >
-              {/* Header: Counter Name & Status Badge */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: counter.is_active !== false ? '#10B981' : '#94A3B8',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
-                    {counter.name}
-                  </span>
-                </div>
-
-                {/* Connection Status Indicator */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {isQz ? (
+            return (
+              <div
+                key={counter.id}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '8px',
+                  border: '1px solid #E2E8F0',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                }}
+              >
+                {/* Header: Counter Name & Status Badge */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span
                       style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: qzActive ? '#EFF6FF' : '#F1F5F9',
-                        color: qzActive ? '#1D4ED8' : '#64748B',
-                        border: qzActive ? '1px solid #BFDBFE' : '1px solid #E2E8F0',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: counter.is_active !== false ? '#10B981' : '#94A3B8',
+                        flexShrink: 0,
                       }}
-                    >
-                      <Cpu size={10} />
-                      {qzActive ? 'QZ Tray Active' : 'QZ Standby'}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                      {counter.name}
                     </span>
-                  ) : isBt ? (
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: btConnected ? '#EFF6FF' : '#F1F5F9',
-                        color: btConnected ? '#2563EB' : '#64748B',
-                        border: btConnected ? '1px solid #DBEAFE' : '1px solid #E2E8F0',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <Bluetooth size={10} />
-                      {btConnected ? 'Bluetooth Paired' : 'BT Standby'}
-                    </span>
-                  ) : isUsb ? (
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: usbConnected ? '#F0FDF4' : '#F1F5F9',
-                        color: usbConnected ? '#16A34A' : '#64748B',
-                        border: usbConnected ? '1px solid #DCFCE7' : '1px solid #E2E8F0',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <Usb size={10} />
-                      {usbConnected ? 'USB Active' : 'USB Standby'}
-                    </span>
-                  ) : isNet ? (
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: form.printer_address ? '#FAF5FF' : '#F1F5F9',
-                        color: form.printer_address ? '#9333EA' : '#64748B',
-                        border: form.printer_address ? '1px solid #F3E8FF' : '1px solid #E2E8F0',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <Wifi size={10} />
-                      LAN IP
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: '#F8FAFC',
-                        color: '#64748B',
-                        border: '1px solid #E2E8F0',
-                      }}
-                    >
-                      System Default
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Minimal Configuration Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: isNet ? '1fr 1fr 1fr' : '1fr 1.4fr', gap: '8px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '3px' }}>
-                    Connection
-                  </label>
-                  <CustomSelect
-                    value={form.printer_type}
-                    onChange={(newType: string) => handleFieldChange(counter.id, 'printer_type', newType)}
-                    options={CONNECTION_OPTIONS}
-                    direction="auto"
-                    buttonStyle={{
-                      height: '32px',
-                      padding: '0 8px',
-                      fontSize: '12px',
-                      borderRadius: '6px',
-                      border: '1px solid #CBD5E1',
-                      fontWeight: 500,
-                    }}
-                    dropdownStyle={{
-                      zIndex: 100,
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                      Printer Device
-                    </label>
-                    {systemPrinters.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setManualInputCounters(prev => ({ ...prev, [counter.id]: !prev[counter.id] }))}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: 0,
-                          fontSize: '10px',
-                          color: '#2563EB',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {manualInputCounters[counter.id] ? (
-                          <>
-                            <List size={10} />
-                            <span>Pick Detected</span>
-                          </>
-                        ) : (
-                          <>
-                            <Edit2 size={10} />
-                            <span>Custom</span>
-                          </>
-                        )}
-                      </button>
-                    )}
                   </div>
 
-                  {systemPrinters.length > 0 && !manualInputCounters[counter.id] ? (
+                  {/* Connection Status Indicator */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isQz ? (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: qzActive ? '#EFF6FF' : '#F1F5F9',
+                          color: qzActive ? '#1D4ED8' : '#64748B',
+                          border: qzActive ? '1px solid #BFDBFE' : '1px solid #E2E8F0',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Cpu size={10} />
+                        {qzActive ? 'QZ Tray Active' : 'QZ Standby'}
+                      </span>
+                    ) : isBt ? (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: btConnected ? '#EFF6FF' : '#F1F5F9',
+                          color: btConnected ? '#2563EB' : '#64748B',
+                          border: btConnected ? '1px solid #DBEAFE' : '1px solid #E2E8F0',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Bluetooth size={10} />
+                        {btConnected ? 'Bluetooth Paired' : 'BT Standby'}
+                      </span>
+                    ) : isUsb ? (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: usbConnected ? '#F0FDF4' : '#F1F5F9',
+                          color: usbConnected ? '#16A34A' : '#64748B',
+                          border: usbConnected ? '1px solid #DCFCE7' : '1px solid #E2E8F0',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Usb size={10} />
+                        {usbConnected ? 'USB Active' : 'USB Standby'}
+                      </span>
+                    ) : isNet ? (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: form.printer_address ? '#FAF5FF' : '#F1F5F9',
+                          color: form.printer_address ? '#9333EA' : '#64748B',
+                          border: form.printer_address ? '1px solid #F3E8FF' : '1px solid #E2E8F0',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Wifi size={10} />
+                        LAN IP
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: '#F8FAFC',
+                          color: '#64748B',
+                          border: '1px solid #E2E8F0',
+                        }}
+                      >
+                        System Default
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Minimal Configuration Row */}
+                <div style={{ display: 'grid', gridTemplateColumns: isNet ? '1fr 1fr 1fr' : '1fr 1.4fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '3px' }}>
+                      Connection
+                    </label>
                     <CustomSelect
-                      value={form.printer_name}
-                      onChange={(val: string) => {
-                        handleFieldChange(counter.id, 'printer_name', val);
-                        if (val && form.printer_type === 'BLUETOOTH') {
-                          handleFieldChange(counter.id, 'printer_type', 'QZ_TRAY');
-                        }
-                      }}
-                      options={[
-                        ...(form.printer_name && !systemPrinters.includes(form.printer_name)
-                          ? [{ value: form.printer_name, label: `${form.printer_name} (Current)`, icon: Printer }]
-                          : []),
-                        ...systemPrinters.map(p => ({ value: p, label: p, icon: Printer })),
-                      ]}
-                      placeholder="Select Printer..."
+                      value={form.printer_type}
+                      onChange={(newType: string) => handleFieldChange(counter.id, 'printer_type', newType)}
+                      options={CONNECTION_OPTIONS}
                       direction="auto"
                       buttonStyle={{
                         height: '32px',
@@ -1692,256 +1624,324 @@ export function CounterHardwareSettings({ slug, primaryColor = '#971345' }: Coun
                         zIndex: 100,
                       }}
                     />
-                  ) : (
-                    <input
-                      type="text"
-                      value={form.printer_name}
-                      onChange={e => handleFieldChange(counter.id, 'printer_name', e.target.value)}
-                      placeholder={systemPrinters[0] || 'POS-80C'}
-                      style={{
-                        width: '100%',
-                        height: '32px',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '12px',
-                        color: '#0F172A',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                      <label style={{ fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                        Printer Device
+                      </label>
+                      {systemPrinters.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setManualInputCounters(prev => ({ ...prev, [counter.id]: !prev[counter.id] }))}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            fontSize: '10px',
+                            color: '#2563EB',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {manualInputCounters[counter.id] ? (
+                            <>
+                              <List size={10} />
+                              <span>Pick Detected</span>
+                            </>
+                          ) : (
+                            <>
+                              <Edit2 size={10} />
+                              <span>Custom</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {systemPrinters.length > 0 && !manualInputCounters[counter.id] ? (
+                      <CustomSelect
+                        value={form.printer_name}
+                        onChange={(val: string) => {
+                          handleFieldChange(counter.id, 'printer_name', val);
+                          if (val && form.printer_type === 'BLUETOOTH') {
+                            handleFieldChange(counter.id, 'printer_type', 'QZ_TRAY');
+                          }
+                        }}
+                        options={[
+                          ...(form.printer_name && !systemPrinters.includes(form.printer_name)
+                            ? [{ value: form.printer_name, label: `${form.printer_name} (Current)`, icon: Printer }]
+                            : []),
+                          ...systemPrinters.map(p => ({ value: p, label: p, icon: Printer })),
+                        ]}
+                        placeholder="Select Printer..."
+                        direction="auto"
+                        buttonStyle={{
+                          height: '32px',
+                          padding: '0 8px',
+                          fontSize: '12px',
+                          borderRadius: '6px',
+                          border: '1px solid #CBD5E1',
+                          fontWeight: 500,
+                        }}
+                        dropdownStyle={{
+                          zIndex: 100,
+                        }}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={form.printer_name}
+                        onChange={e => handleFieldChange(counter.id, 'printer_name', e.target.value)}
+                        placeholder={systemPrinters[0] || 'POS-80C'}
+                        style={{
+                          width: '100%',
+                          height: '32px',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #CBD5E1',
+                          fontSize: '12px',
+                          color: '#0F172A',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {isNet && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '3px' }}>
+                        IP Address & Port
+                      </label>
+                      <input
+                        type="text"
+                        value={form.printer_address}
+                        onChange={e => handleFieldChange(counter.id, 'printer_address', e.target.value)}
+                        placeholder="192.168.1.100:9100"
+                        style={{
+                          width: '100%',
+                          height: '32px',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #CBD5E1',
+                          fontSize: '12px',
+                          fontFamily: 'monospace',
+                          color: '#0F172A',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
 
-                {isNet && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '3px' }}>
-                      IP Address & Port
-                    </label>
-                    <input
-                      type="text"
-                      value={form.printer_address}
-                      onChange={e => handleFieldChange(counter.id, 'printer_address', e.target.value)}
-                      placeholder="192.168.1.100:9100"
-                      style={{
-                        width: '100%',
-                        height: '32px',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '12px',
-                        fontFamily: 'monospace',
-                        color: '#0F172A',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons Row */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingTop: '2px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {isQz ? (
-                    !qzActive ? (
-                      <>
+                {/* Action Buttons Row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingTop: '2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isQz ? (
+                      !qzActive ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleConnectQz}
+                            disabled={qzConnecting}
+                            style={{
+                              padding: '4px 9px',
+                              borderRadius: '5px',
+                              border: '1px solid #BFDBFE',
+                              backgroundColor: '#EFF6FF',
+                              color: '#1D4ED8',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: qzConnecting ? 'not-allowed' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            {qzConnecting ? <Loader2 size={11} className="animate-spin" /> : <Cpu size={11} />}
+                            <span>Connect QZ</span>
+                          </button>
+                          <a
+                            href="https://qz.io/download/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '5px',
+                              border: '1px solid #E2E8F0',
+                              backgroundColor: '#FFFFFF',
+                              color: '#2563EB',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                            }}
+                          >
+                            Download QZ ↗
+                          </a>
+                        </>
+                      ) : null
+                    ) : isBt ? (
+                      btConnected ? (
                         <button
                           type="button"
-                          onClick={handleConnectQz}
-                          disabled={qzConnecting}
+                          onClick={() => handleDisconnectBluetooth(counter)}
                           style={{
-                            padding: '4px 9px',
+                            padding: '4px 8px',
                             borderRadius: '5px',
-                            border: '1px solid #BFDBFE',
-                            backgroundColor: '#EFF6FF',
-                            color: '#1D4ED8',
+                            border: '1px solid #FECACA',
+                            backgroundColor: '#FEF2F2',
+                            color: '#DC2626',
                             fontSize: '11px',
                             fontWeight: 600,
-                            cursor: qzConnecting ? 'not-allowed' : 'pointer',
+                            cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
                           }}
                         >
-                          {qzConnecting ? <Loader2 size={11} className="animate-spin" /> : <Cpu size={11} />}
-                          <span>Connect QZ</span>
+                          <BluetoothOff size={11} />
+                          <span>Disconnect</span>
                         </button>
-                        <a
-                          href="https://qz.io/download/"
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handlePairBluetooth(counter)}
+                          disabled={isConnecting}
+                          style={{
+                            padding: '4px 9px',
+                            borderRadius: '5px',
+                            border: '1px solid #DBEAFE',
+                            backgroundColor: '#EFF6FF',
+                            color: '#2563EB',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: isConnecting ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          {isConnecting ? <Loader2 size={11} className="animate-spin" /> : <Bluetooth size={11} />}
+                          <span>Pair Bluetooth</span>
+                        </button>
+                      )
+                    ) : isUsb ? (
+                      usbConnected ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDisconnectUsb(counter)}
                           style={{
                             padding: '4px 8px',
                             borderRadius: '5px',
                             border: '1px solid #E2E8F0',
-                            backgroundColor: '#FFFFFF',
-                            color: '#2563EB',
+                            backgroundColor: '#F8FAFC',
+                            color: '#475569',
                             fontSize: '11px',
                             fontWeight: 600,
-                            textDecoration: 'none',
+                            cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '3px',
+                            gap: '4px',
                           }}
                         >
-                          Download QZ ↗
-                        </a>
-                      </>
-                    ) : null
-                  ) : isBt ? (
-                    btConnected ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDisconnectBluetooth(counter)}
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: '5px',
-                          border: '1px solid #FECACA',
-                          backgroundColor: '#FEF2F2',
-                          color: '#DC2626',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <BluetoothOff size={11} />
-                        <span>Disconnect</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handlePairBluetooth(counter)}
-                        disabled={isConnecting}
-                        style={{
-                          padding: '4px 9px',
-                          borderRadius: '5px',
-                          border: '1px solid #DBEAFE',
-                          backgroundColor: '#EFF6FF',
-                          color: '#2563EB',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: isConnecting ? 'not-allowed' : 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        {isConnecting ? <Loader2 size={11} className="animate-spin" /> : <Bluetooth size={11} />}
-                        <span>Pair Bluetooth</span>
-                      </button>
-                    )
-                  ) : isUsb ? (
-                    usbConnected ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDisconnectUsb(counter)}
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: '5px',
-                          border: '1px solid #E2E8F0',
-                          backgroundColor: '#F8FAFC',
-                          color: '#475569',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <Usb size={11} />
-                        <span>Disconnect</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleConnectUsb(counter)}
-                        disabled={isConnecting}
-                        style={{
-                          padding: '4px 9px',
-                          borderRadius: '5px',
-                          border: '1px solid #DCFCE7',
-                          backgroundColor: '#F0FDF4',
-                          color: '#16A34A',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: isConnecting ? 'not-allowed' : 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        {isConnecting ? <Loader2 size={11} className="animate-spin" /> : <Usb size={11} />}
-                        <span>Connect USB</span>
-                      </button>
-                    )
-                  ) : null}
+                          <Usb size={11} />
+                          <span>Disconnect</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleConnectUsb(counter)}
+                          disabled={isConnecting}
+                          style={{
+                            padding: '4px 9px',
+                            borderRadius: '5px',
+                            border: '1px solid #DCFCE7',
+                            backgroundColor: '#F0FDF4',
+                            color: '#16A34A',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: isConnecting ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          {isConnecting ? <Loader2 size={11} className="animate-spin" /> : <Usb size={11} />}
+                          <span>Connect USB</span>
+                        </button>
+                      )
+                    ) : null}
 
-                  {/* Test Print Button */}
+                    {/* Test Print Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleTestPrint(counter)}
+                      disabled={isTesting}
+                      style={{
+                        padding: '4px 9px',
+                        borderRadius: '5px',
+                        border: '1px solid #E2E8F0',
+                        backgroundColor: '#FFFFFF',
+                        color: '#0F172A',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: isTesting ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      {isTesting ? (
+                        <Loader2 size={11} className="animate-spin" style={{ color: '#2563EB' }} />
+                      ) : (
+                        <Play size={10} style={{ fill: '#2563EB', color: '#2563EB' }} />
+                      )}
+                      <span>Test Print</span>
+                    </button>
+                  </div>
+
+                  {/* Save Button */}
                   <button
                     type="button"
-                    onClick={() => handleTestPrint(counter)}
-                    disabled={isTesting}
+                    onClick={() => handleSaveCounter(counter)}
+                    disabled={isSaving}
                     style={{
-                      padding: '4px 9px',
+                      padding: '4px 11px',
                       borderRadius: '5px',
-                      border: '1px solid #E2E8F0',
-                      backgroundColor: '#FFFFFF',
-                      color: '#0F172A',
+                      border: 'none',
+                      backgroundColor: isSaved ? '#16A34A' : primaryColor,
+                      color: '#FFFFFF',
                       fontSize: '11px',
-                      fontWeight: 600,
-                      cursor: isTesting ? 'not-allowed' : 'pointer',
+                      fontWeight: 700,
+                      cursor: isSaving ? 'not-allowed' : 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    {isTesting ? (
-                      <Loader2 size={11} className="animate-spin" style={{ color: '#2563EB' }} />
+                    {isSaving ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : isSaved ? (
+                      <Check size={11} />
                     ) : (
-                      <Play size={10} style={{ fill: '#2563EB', color: '#2563EB' }} />
+                      <Save size={11} />
                     )}
-                    <span>Test Print</span>
+                    <span>{isSaved ? 'Saved' : 'Save'}</span>
                   </button>
                 </div>
-
-                {/* Save Button */}
-                <button
-                  type="button"
-                  onClick={() => handleSaveCounter(counter)}
-                  disabled={isSaving}
-                  style={{
-                    padding: '4px 11px',
-                    borderRadius: '5px',
-                    border: 'none',
-                    backgroundColor: isSaved ? '#16A34A' : primaryColor,
-                    color: '#FFFFFF',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    cursor: isSaving ? 'not-allowed' : 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {isSaving ? (
-                    <Loader2 size={11} className="animate-spin" />
-                  ) : isSaved ? (
-                    <Check size={11} />
-                  ) : (
-                    <Save size={11} />
-                  )}
-                  <span>{isSaved ? 'Saved' : 'Save'}</span>
-                </button>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
       )}
     </div>

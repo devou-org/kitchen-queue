@@ -630,7 +630,7 @@ export default function AdminPosPage() {
     }
     return sum;
   }, [cart, orderForm.free_reward_product_id]);
-  
+
   let gstAmount = 0;
   let totalPrice = subtotal;
   if (restaurant?.gst_type === 'REGULAR') {
@@ -835,137 +835,137 @@ export default function AdminPosPage() {
 
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: '20px' }}>
 
-      {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 220px)' }}>
-          <div className="loader" />
-        </div>
-      ) : (
-        <>
-          {/* Categories */}
-          <div style={{ paddingBottom: '16px', display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                style={{
-                  padding: '6px 16px',
-                  borderRadius: 'var(--radius-full)',
-                  border: '1.5px solid',
-                  borderColor: cat === category ? 'var(--primary)' : 'var(--border)',
-                  background: cat === category ? 'var(--primary)' : 'white',
-                  color: cat === category ? 'white' : 'var(--text-secondary)',
-                  fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
-                }}
-              >{cat}</button>
-            ))}
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 220px)' }}>
+            <div className="loader" />
           </div>
+        ) : (
+          <>
+            {/* Categories */}
+            <div style={{ paddingBottom: '16px', display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '1.5px solid',
+                    borderColor: cat === category ? 'var(--primary)' : 'var(--border)',
+                    background: cat === category ? 'var(--primary)' : 'white',
+                    color: cat === category ? 'white' : 'var(--text-secondary)',
+                    fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
+                  }}
+                >{cat}</button>
+              ))}
+            </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', paddingBottom: totalItems > 0 ? '90px' : '24px' }}>
-            {filtered.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                quantity={cart.get(product.id)?.quantity || 0}
-                onUpdate={handleUpdate}
-              />
-            ))}
-          </div>
-        </>
-      )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', paddingBottom: totalItems > 0 ? '90px' : '24px' }}>
+              {filtered.map(product => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  quantity={cart.get(product.id)?.quantity || 0}
+                  onUpdate={handleUpdate}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
-      {mounted && totalItems > 0 && typeof document !== 'undefined' && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 'clamp(14px, 3vw, 24px)',
-            left: 0,
-            right: 0,
-            padding: '0 clamp(10px, 3vw, 20px)',
-            zIndex: 99999,
-            pointerEvents: 'none',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            boxSizing: 'border-box',
-          }}
-        >
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setCheckoutOpen(true)}
+        {mounted && totalItems > 0 && typeof document !== 'undefined' && createPortal(
+          <div
             style={{
-              pointerEvents: 'auto',
-              width: '100%',
-              maxWidth: '460px',
-              borderRadius: '12px',
-              height: '52px',
-              fontSize: '15px',
-              fontWeight: 800,
+              position: 'fixed',
+              bottom: 'clamp(14px, 3vw, 24px)',
+              left: 0,
+              right: 0,
+              padding: '0 clamp(10px, 3vw, 20px)',
+              zIndex: 99999,
+              pointerEvents: 'none',
               display: 'flex',
+              justifyContent: 'center',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0 clamp(12px, 2.5vw, 20px)',
-              boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)',
-              cursor: 'pointer',
-              border: 'none',
-              background: 'var(--primary, #059669)',
-              color: '#FFFFFF',
-              letterSpacing: '-0.01em',
-              transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
               boxSizing: 'border-box',
-              minWidth: 0,
-              gap: '8px',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
-              e.currentTarget.style.boxShadow = '0 16px 36px -4px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(5, 150, 105, 0.55)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0) scale(1)';
-              e.currentTarget.style.boxShadow = '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.5vw, 10px)', minWidth: 0, overflow: 'hidden', flexShrink: 1 }}>
-              <span
-                style={{
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  padding: '3px 10px',
-                  borderRadius: '999px',
-                  fontSize: 'clamp(11.5px, 1.5vw, 13px)',
-                  fontWeight: 900,
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                {totalItems} {totalItems === 1 ? 'item' : 'items'}
-              </span>
-              <span style={{ fontSize: 'clamp(13px, 1.8vw, 15px)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                View Cart &amp; Checkout
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1vw, 8px)', fontSize: 'clamp(14px, 1.8vw, 16px)', fontWeight: 900, flexShrink: 0, whiteSpace: 'nowrap' }}>
-              <span>{formatPrice(totalPrice)}</span>
-              <span style={{ fontSize: '19px', lineHeight: 1 }}>→</span>
-            </div>
-          </button>
-        </div>,
-        document.body
-      )}
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setCheckoutOpen(true)}
+              style={{
+                pointerEvents: 'auto',
+                width: '100%',
+                maxWidth: '460px',
+                borderRadius: '12px',
+                height: '52px',
+                fontSize: '15px',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 clamp(12px, 2.5vw, 20px)',
+                boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'var(--primary, #059669)',
+                color: '#FFFFFF',
+                letterSpacing: '-0.01em',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxSizing: 'border-box',
+                minWidth: 0,
+                gap: '8px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
+                e.currentTarget.style.boxShadow = '0 16px 36px -4px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(5, 150, 105, 0.55)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = '0 12px 30px -4px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(5, 150, 105, 0.45)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.5vw, 10px)', minWidth: 0, overflow: 'hidden', flexShrink: 1 }}>
+                <span
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.25)',
+                    padding: '3px 10px',
+                    borderRadius: '999px',
+                    fontSize: 'clamp(11.5px, 1.5vw, 13px)',
+                    fontWeight: 900,
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  {totalItems} {totalItems === 1 ? 'item' : 'items'}
+                </span>
+                <span style={{ fontSize: 'clamp(13px, 1.8vw, 15px)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  View Cart &amp; Checkout
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(4px, 1vw, 8px)', fontSize: 'clamp(14px, 1.8vw, 16px)', fontWeight: 900, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                <span>{formatPrice(totalPrice)}</span>
+                <span style={{ fontSize: '19px', lineHeight: 1 }}>→</span>
+              </div>
+            </button>
+          </div>,
+          document.body
+        )}
 
-      <POSCheckoutDrawer
-        isOpen={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        cart={cart}
-        onUpdateCart={handleUpdate}
-        onUpdateCartNotes={handleUpdateNotes}
-        tables={tables}
-        restaurant={restaurant}
-        orderForm={orderForm}
-        setOrderForm={setOrderForm}
-        onSubmitOrder={submitOrder}
-        submitting={submitting}
-        hideOrderType={Boolean(tableParam)}
-      />
+        <POSCheckoutDrawer
+          isOpen={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          cart={cart}
+          onUpdateCart={handleUpdate}
+          onUpdateCartNotes={handleUpdateNotes}
+          tables={tables}
+          restaurant={restaurant}
+          orderForm={orderForm}
+          setOrderForm={setOrderForm}
+          onSubmitOrder={submitOrder}
+          submitting={submitting}
+          hideOrderType={Boolean(tableParam)}
+        />
       </div>
     </AdminContentWrapper>
   );

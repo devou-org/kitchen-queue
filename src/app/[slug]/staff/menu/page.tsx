@@ -318,7 +318,7 @@ export default function StaffMenuPage() {
 
   const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
   let subtotal = Array.from(cart.values()).reduce((s, i) => s + i.price * i.quantity, 0);
-  
+
   let gstAmount = 0;
   let totalPrice = subtotal;
   if (restaurant?.gst_type === 'REGULAR') {

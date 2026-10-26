@@ -160,10 +160,8 @@ export async function autoQueueAndBroadcastKot(
           print_job_id: job?.id,
         };
 
-        if (!isLarge) {
-          pusherPayload.kotData = slip.kotData;
-          pusherPayload.base64Bytes = slip.base64Bytes;
-        }
+        pusherPayload.kotData = slip.kotData;
+        pusherPayload.base64Bytes = slip.base64Bytes;
 
         try {
           await pusherServer.trigger(`queue-channel-${restaurantId}`, 'kot_auto_print', pusherPayload);
