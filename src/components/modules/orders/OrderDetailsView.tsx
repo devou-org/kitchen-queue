@@ -398,30 +398,63 @@ export function OrderDetailsView({
 
       // Cloud hosted: Print via local bridge (silent) or 80mm browser thermal driver
       if (data.slips && Array.isArray(data.slips)) {
+        let successCount = 0;
+        let lastFailureReason = '';
+
         for (const slip of data.slips) {
-          await printKotFromBrowser({
+          const slipRes = await printKotFromBrowser({
             kotData: slip.kotData,
             base64Bytes: slip.base64Bytes,
             printerName: slip.printerName || data.printer || targetPrinter,
+            printerAddress: slip.printerAddress,
+            printerType: slip.printerType,
             counterId: slip.counterId,
             counterName: slip.kotData?.counterName,
             localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
           });
+
+          if (slipRes.success) {
+            successCount++;
+          } else {
+            lastFailureReason = slipRes.message || 'Slip printing failed';
+          }
+
+          // Small delay between separate slips to allow spooler / printer socket to cycle
+          if (data.slips.length > 1) {
+            await new Promise((r) => setTimeout(r, 300));
+          }
         }
-        toast.success(`KOT printed for ${data.slips.length} counter(s)!`, { id: toastId });
+
+        if (successCount === data.slips.length) {
+          toast.success(`KOT printed for ${data.slips.length} counter(s)!`, { id: toastId });
+        } else if (successCount > 0) {
+          toast.success(`Printed ${successCount}/${data.slips.length} slips (${lastFailureReason})`, { id: toastId });
+        } else {
+          toast.error(`KOT slips failed: ${lastFailureReason || 'Check printer connection'}`, { id: toastId });
+        }
       } else if (data.kotData) {
         const clientRes = await printKotFromBrowser({
           kotData: data.kotData,
           base64Bytes: data.base64Bytes,
           printerName: data.printer || targetPrinter,
+          printerAddress: data.printerAddress,
+          printerType: data.printerType,
           counterId: data.counterId,
           counterName: data.counterName || counterName,
           localBridgeUrl: savedBridgeUrl ? `${savedBridgeUrl.replace(/\/+$/, '')}/print` : undefined,
         });
+
+        if (!clientRes.success) {
+          toast.error(clientRes.message || 'KOT print failed', { id: toastId });
+          return;
+        }
+
         if (clientRes.method === 'bluetooth') {
           toast.success(clientRes.message || 'KOT printed via Bluetooth!', { id: toastId });
         } else if (clientRes.method === 'serial') {
           toast.success(clientRes.message || 'KOT printed via USB!', { id: toastId });
+        } else if (clientRes.method === 'qz-tray') {
+          toast.success(clientRes.message || 'KOT printed via QZ Tray!', { id: toastId });
         } else if (clientRes.method === 'bridge') {
           toast.success(clientRes.message || `KOT sent to ${targetPrinter}!`, { id: toastId });
         } else {
