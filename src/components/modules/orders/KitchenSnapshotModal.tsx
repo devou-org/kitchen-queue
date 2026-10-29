@@ -226,11 +226,11 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
             justifyContent: 'space-between',
             background: '#FFFFFF',
             flexShrink: 0,
-            flexWrap: 'wrap',
-            gap: '10px',
+            flexWrap: 'nowrap',
+            gap: '12px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
             <div
               style={{
                 width: '38px',
@@ -246,7 +246,7 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
             >
               <ChefHat size={20} />
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <h2
                 style={{
                   fontSize: '17px',
@@ -254,6 +254,9 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
                   color: '#0F172A',
                   margin: 0,
                   letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
               >
                 Kitchen Demand Snapshot
@@ -261,59 +264,29 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => loadSnapshot(true)}
-              disabled={loading}
-              title="Refresh snapshot"
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                border: '1px solid #E2E8F0',
-                background: '#FFFFFF',
-                color: '#475569',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#FFFFFF')}
-            >
-              <RefreshCw
-                size={14}
-                style={{
-                  animation: loading ? 'spin 1s linear infinite' : 'none',
-                }}
-              />
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '8px',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#64748B',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#E2E8F0')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#F1F5F9')}
-              title="Close (Esc)"
-            >
-              <X size={16} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: '#F1F5F9',
+              border: 'none',
+              borderRadius: '8px',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#64748B',
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#E2E8F0')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#F1F5F9')}
+            title="Close (Esc)"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         {/* 2. KPI Metrics Summary Banner with 8px radius */}
@@ -760,6 +733,7 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
             alignItems: 'center',
             justifyContent: 'space-between',
             flexShrink: 0,
+            gap: '12px',
           }}
         >
           <div style={{ fontSize: '12px', color: '#64748B' }}>
@@ -769,23 +743,35 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => loadSnapshot(true)}
+            disabled={loading}
+            title="Refresh snapshot"
             style={{
               height: '34px',
-              padding: '0 16px',
+              padding: '0 14px',
               borderRadius: '8px',
               border: '1px solid #CBD5E1',
               background: '#FFFFFF',
               color: '#334155',
               fontSize: '13px',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              flexShrink: 0,
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FAFC')}
             onMouseLeave={(e) => (e.currentTarget.style.background = '#FFFFFF')}
           >
-            Close
+            <RefreshCw
+              size={14}
+              style={{
+                animation: loading ? 'spin 1s linear infinite' : 'none',
+              }}
+            />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
