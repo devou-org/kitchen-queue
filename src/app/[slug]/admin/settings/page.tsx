@@ -5,7 +5,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant, invalidateRestaurantCache } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power, ChefHat, Monitor, CheckCircle2 } from 'lucide-react';
+import { Store, Eye, Sparkles, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power, ChefHat, Monitor, CheckCircle2 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
@@ -13,6 +13,7 @@ import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { ServiceToggle, checkOperatingHours } from '@/components/ServiceToggle';
 import { CounterHardwareSettings } from '@/components/CounterHardwareSettings';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
+import { UpdatesAndPatchesCard } from '@/components/modules/settings/UpdatesAndPatchesCard';
 
 interface CollapsibleCardProps {
   id: string;
@@ -107,7 +108,7 @@ export default function AdminSettings() {
   const [isPrintStation, setIsPrintStation] = useState(false);
   const [isServiceOnline, setIsServiceOnline] = useState(true);
 
-  const SECTION_KEYS = ['service_status', 'profile', 'menu', 'kitchen_workflow', 'hours', 'autoprint', 'gst', 'preview', 'qrcode'];
+  const SECTION_KEYS = ['service_status', 'profile', 'menu', 'kitchen_workflow', 'hours', 'autoprint', 'gst', 'preview', 'qrcode', 'updates_patches'];
 
   // Collapsible Sections State (all collapsed by default)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -1317,6 +1318,32 @@ export default function AdminSettings() {
                 />
               </CollapsibleCard>
             )}
+
+            {/* 7. Updates and Patches Card */}
+            <CollapsibleCard
+              id="updates_patches"
+              title="Updates and Patches"
+              icon={<Sparkles size={18} style={{ color: primaryColor || 'var(--primary, #971345)' }} />}
+              badge={
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    backgroundColor: '#EFF6FF',
+                    color: '#1D4ED8',
+                    border: '1px solid #BFDBFE',
+                  }}
+                >
+                  Platform
+                </span>
+              }
+              isCollapsed={!!collapsedSections['updates_patches']}
+              onToggle={() => toggleSection('updates_patches')}
+            >
+              <UpdatesAndPatchesCard primaryColor={primaryColor} />
+            </CollapsibleCard>
 
           </div>
         </div>
