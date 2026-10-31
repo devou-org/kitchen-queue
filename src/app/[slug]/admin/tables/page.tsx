@@ -30,6 +30,7 @@ export default function AdminTablesPage() {
 
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'AVAILABLE' | 'OCCUPIED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -88,7 +89,7 @@ export default function AdminTablesPage() {
       });
       if (res.success) {
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
-        await fetchTables();
+        await fetchTables(false);
         setSelectedOrder((prev: any) => prev ? {
           ...prev,
           status: newStatus,
@@ -109,11 +110,23 @@ export default function AdminTablesPage() {
 
   const handleOrderUpdated = (updatedOrder: Order) => {
     setSelectedOrder(updatedOrder);
-    fetchTables();
+    setTables((prev) =>
+      prev.map((t) => ({
+        ...t,
+        active_orders: (t.active_orders || []).map((o: any) =>
+          o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
+        ),
+      }))
+    );
+    fetchTables(false);
   };
 
-  const fetchTables = async () => {
-    setLoading(true);
+  const fetchTables = async (showSpinner = false) => {
+    if (showSpinner || tables.length === 0) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     try {
       const headers: Record<string, string> = slugStr ? { 'x-restaurant-slug': slugStr } : {};
       const res = await fetch('/api/tables', { headers });
@@ -127,11 +140,12 @@ export default function AdminTablesPage() {
       toast.error('Network error loading tables');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchTables();
+    fetchTables(true);
   }, [slugStr]);
 
   const handleCreateTable = async (tableNumber: string, capacity: number) => {

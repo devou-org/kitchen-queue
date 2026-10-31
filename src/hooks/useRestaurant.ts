@@ -39,6 +39,10 @@ let lastFetchTime = 0;
 let fetchPromise: Promise<RestaurantContext | null> | null = null;
 const listeners = new Set<(data: RestaurantContext | null) => void>();
 
+export function getCachedRestaurant(): RestaurantContext | null {
+  return cached;
+}
+
 export function invalidateRestaurantCache() {
   cached = null;
   lastFetchTime = 0;

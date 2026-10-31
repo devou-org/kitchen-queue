@@ -238,23 +238,56 @@ export function SalesAnalyticsChart({
             align-items: center;
           }
         }
+        .sales-chart-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-bottom: 18px;
+          width: 100%;
+          min-width: 0;
+        }
         .analytics-metric-switcher {
           display: flex;
           align-items: center;
           gap: 6px;
           background-color: #F1F5F9;
-          padding: 3px;
+          padding: 4px;
           border-radius: 8px;
           overflow-x: auto;
           max-width: 100%;
+          min-width: 0;
           scrollbar-width: none;
           -ms-overflow-style: none;
           -webkit-overflow-scrolling: touch;
+          touch-action: pan-x;
+          overscroll-behavior-x: contain;
         }
         .analytics-metric-switcher::-webkit-scrollbar {
           display: none;
         }
         @media (max-width: 768px) {
+          .sales-chart-header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+          .analytics-metric-switcher {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-x !important;
+            overscroll-behavior-x: contain !important;
+            padding: 4px !important;
+            box-sizing: border-box !important;
+          }
           .sales-quick-stats-ribbon {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 8px !important;
@@ -276,16 +309,7 @@ export function SalesAnalyticsChart({
       `}</style>
 
       {/* Header & Controls */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          marginBottom: '18px',
-        }}
-      >
+      <div className="sales-chart-header">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div
@@ -310,17 +334,6 @@ export function SalesAnalyticsChart({
         </div>
 
         {/* View Switcher Buttons */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            backgroundColor: '#F1F5F9',
-            padding: '3px',
-            borderRadius: '8px',
-            flexWrap: 'wrap',
-          }}
-        >
         <div className="analytics-metric-switcher">
           <button
             type="button"
@@ -420,7 +433,6 @@ export function SalesAnalyticsChart({
           </button>
         </div>
       </div>
-      </div>
 
       {/* Metric Quick Stats Ribbon */}
       <div
@@ -483,7 +495,7 @@ export function SalesAnalyticsChart({
       </div>
 
       {/* Chart Canvas Area */}
-      <div style={{ width: '100%', minHeight: 260, height: activeMetric === 'payment_methods' ? 'auto' : 260, minWidth: 0 }}>
+      <div style={{ width: '100%', minHeight: 260, height: activeMetric === 'payment_methods' ? 'auto' : 260, minWidth: 0, touchAction: 'pan-y' }}>
         {loading ? (
           <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="loader" style={{ width: 28, height: 28 }} />

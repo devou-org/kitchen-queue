@@ -169,7 +169,7 @@ export default function StaffOrders() {
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
       const data = await orderService.getOrders({
         page,
-        per_page: 100,
+        per_page: 200,
         sort: 'ASC',
         date_from: bDate,
         date_to: bDate,
@@ -684,7 +684,7 @@ export default function StaffOrders() {
 
         <Pagination
           currentPage={page}
-          totalPages={orders.length < 100 && page === 1 ? 1 : orders.length < 100 ? page : page + 1}
+          totalPages={orders.length < 200 && page === 1 ? 1 : orders.length < 200 ? page : page + 1}
           onPageChange={(p) => setPage(p)}
           totalRecords={displayedOrders.length}
           style={{ marginTop: 'auto' }}
