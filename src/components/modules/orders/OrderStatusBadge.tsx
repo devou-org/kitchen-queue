@@ -3,6 +3,7 @@ import React from 'react';
 interface OrderStatusBadgeProps {
   status?: string;
   className?: string;
+  hideDot?: boolean;
 }
 
 export function getOrderStatusConfig(status?: string) {
@@ -83,7 +84,7 @@ export function getOrderStatusConfig(status?: string) {
   }
 }
 
-export default function OrderStatusBadge({ status, className = '' }: OrderStatusBadgeProps) {
+export default function OrderStatusBadge({ status, className = '', hideDot = false }: OrderStatusBadgeProps) {
   const config = getOrderStatusConfig(status);
 
   return (
@@ -106,15 +107,17 @@ export default function OrderStatusBadge({ status, className = '' }: OrderStatus
         lineHeight: 1.3,
       }}
     >
-      <span
-        style={{
-          width: '6px',
-          height: '6px',
-          borderRadius: '50%',
-          backgroundColor: config.dot,
-          flexShrink: 0,
-        }}
-      />
+      {!hideDot && (
+        <span
+          style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            backgroundColor: config.dot,
+            flexShrink: 0,
+          }}
+        />
+      )}
       {config.label}
     </span>
   );
