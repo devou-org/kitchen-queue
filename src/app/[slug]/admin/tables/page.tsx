@@ -779,7 +779,7 @@ export default function AdminTablesPage() {
               {/* Refresh Button */}
               <button
                 type="button"
-                onClick={fetchTables}
+                onClick={() => fetchTables(true)}
                 disabled={loading}
                 title="Refresh Table Status"
                 aria-label="Refresh Table Status"
@@ -1332,7 +1332,7 @@ export default function AdminTablesPage() {
         table={selectedEditTable}
         isOpen={!!selectedEditTable}
         onClose={() => setSelectedEditTable(null)}
-        onSuccess={fetchTables}
+        onSuccess={() => fetchTables(false)}
         primaryColor={primaryColor}
       />
 
