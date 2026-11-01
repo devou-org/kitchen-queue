@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Plus, Minus, Trash2, Loader2, Utensils, User, Phone, Users, Check, ShoppingBag, Activity, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Order, Product } from '@/types';
+import { Order, Product, SelectedVariantSnapshot, SelectedCustomizationSnapshot } from '@/types';
 import { formatPrice } from '@/lib/format';
 import { validatePhone } from '@/lib/validators';
 import { orderService } from '@/app/services/orders.api';
@@ -28,6 +28,9 @@ interface EditableOrderItem {
   product_name?: string;
   price?: number;
   notes?: string;
+  selected_variant?: SelectedVariantSnapshot | null;
+  selected_customizations?: SelectedCustomizationSnapshot[];
+  customization_summary?: string | null;
 }
 
 export function EditOrderModal({
@@ -80,6 +83,9 @@ export function EditOrderModal({
         product_name: i.product_name,
         price: i.price_at_purchase,
         notes: i.notes || '',
+        selected_variant: i.selected_variant,
+        selected_customizations: i.selected_customizations,
+        customization_summary: i.customization_summary,
       }));
       setItems(initialItems);
       setSearchQuery('');
@@ -1071,13 +1077,45 @@ export function EditOrderModal({
                                 fontSize: '13.5px',
                                 fontWeight: 600,
                                 color: '#0F172A',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                flexWrap: 'wrap',
                               }}
                             >
-                              {itemName}
+                              <span>{itemName}</span>
+                              {item.selected_variant && (
+                                <span style={{
+                                  fontSize: '9.5px',
+                                  fontWeight: 700,
+                                  padding: '1px 5px',
+                                  borderRadius: '4px',
+                                  background: '#EEF2FF',
+                                  color: '#4338CA',
+                                  textTransform: 'uppercase',
+                                }}>
+                                  {item.selected_variant.name}
+                                </span>
+                              )}
                             </div>
+                            {(() => {
+                              if (!item.customization_summary) return null;
+                              let summaryText = item.customization_summary.trim();
+                              if (item.selected_variant?.name) {
+                                const varName = item.selected_variant.name.trim().toLowerCase();
+                                if (summaryText.toLowerCase() === varName) return null;
+                                const prefix = `${item.selected_variant.name.trim()} • `;
+                                if (summaryText.toLowerCase().startsWith(prefix.toLowerCase())) {
+                                  summaryText = summaryText.slice(prefix.length).trim();
+                                }
+                              }
+                              if (!summaryText) return null;
+                              return (
+                                <div style={{ fontSize: '11px', color: '#64748B', marginTop: '1px', fontWeight: 500 }}>
+                                  +{summaryText}
+                                </div>
+                              );
+                            })()}
                             <div style={{ fontSize: '12px', color: '#64748B', marginTop: '1px' }}>
                               {formatPrice(unitPrice)} each
                             </div>
