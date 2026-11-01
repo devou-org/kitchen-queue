@@ -7,10 +7,11 @@ import { Product, ProductVariant, CustomizationGroup, CustomizationOption } from
 import { InventoryItem } from '@/types/inventory';
 import { inventoryService } from '@/app/services/inventory.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Layers, ArrowLeft, ArrowUpDown, Loader2, Sliders, Trash2, Boxes } from 'lucide-react';
+import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Layers, ArrowLeft, ArrowUpDown, Loader2, Sliders, Trash2, Boxes, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 import { ProductImageUploader } from '@/components/modules/products/ProductImageUploader';
+import { ReuseCustomizationModal } from '@/components/modules/products/ReuseCustomizationModal';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 
 interface Category {
@@ -42,6 +43,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
   const [newCounterName, setNewCounterName] = useState('');
   const [addingCounter, setAddingCounter] = useState(false);
   const [reorderModalOpen, setReorderModalOpen] = useState(false);
+  const [reuseModalOpen, setReuseModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: initialData?.name || '',
@@ -323,6 +325,30 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
     });
   };
 
+  const handleReuseGroup = (templateGroup: CustomizationGroup) => {
+    const newGroup: CustomizationGroup = {
+      id: `grp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      name: templateGroup.name,
+      min_selection: templateGroup.min_selection,
+      max_selection: templateGroup.max_selection,
+      options: (templateGroup.options || []).map(opt => ({
+        id: `opt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        name: opt.name,
+        price: opt.price,
+        stock_quantity: opt.stock_quantity !== undefined ? opt.stock_quantity : null,
+        inventory_item_id: opt.inventory_item_id || null,
+        inventory_deduct_qty: opt.inventory_deduct_qty ? Number(opt.inventory_deduct_qty) : null,
+        inventory_unit: opt.inventory_unit || null,
+        is_default: Boolean(opt.is_default),
+      })),
+    };
+
+    setCustomizationGroups(prev => [...prev, newGroup]);
+    setHasCustomizations(true);
+    setReuseModalOpen(false);
+    toast.success(`Imported group "${templateGroup.name}" with ${templateGroup.options.length} options!`);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.price || !form.category) {
@@ -482,7 +508,47 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
         .form-card-pricing { order: 2; }
         .form-card-inventory { order: 3; }
         .form-card-customizations { order: 4; }
-        .form-card-image { order: 5; }
+
+        /* Desktop grid columns */
+        .variant-table-header {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 85px 80px 80px 72px 28px;
+          gap: 8px;
+          padding: 0 10px;
+          border: 1.5px solid transparent;
+          font-size: 11px;
+          font-weight: 600;
+          color: #64748b;
+          box-sizing: border-box;
+        }
+        .variant-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 85px 80px 80px 72px 28px;
+          align-items: center;
+          gap: 8px;
+          background-color: #ffffff;
+          padding: 8px 10px;
+          border-radius: 6px;
+          box-sizing: border-box;
+        }
+        .variant-cell-name { min-width: 0; }
+        .variant-cell-price { min-width: 0; }
+        .variant-cell-stock { min-width: 0; }
+        .variant-cell-bom { min-width: 0; }
+        .variant-cell-default { min-width: 0; }
+        .variant-cell-delete { min-width: 0; }
+
+        .cust-option-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 85px 80px auto 26px;
+          align-items: center;
+          gap: 8px;
+        }
+        .cust-opt-name { min-width: 0; }
+        .cust-opt-price { min-width: 0; }
+        .cust-opt-stock { min-width: 0; }
+        .cust-opt-default { min-width: 0; }
+        .cust-opt-delete { min-width: 0; }
 
         @media (min-width: 820px) {
           .product-form-container {
@@ -501,26 +567,148 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             flex-direction: column;
             gap: 24px;
           }
-          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-customizations, .form-card-image {
+          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-customizations {
             order: unset;
           }
         }
 
         @media (max-width: 640px) {
-          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-customizations, .form-card-image {
-            padding: 16px !important;
+          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-customizations {
+            padding: 14px 12px !important;
           }
+          .variant-section-container, .cust-section-container {
+            padding: 12px 10px !important;
+          }
+          .cust-group-card {
+            padding: 10px 8px !important;
+          }
+          .cust-options-list {
+            padding: 8px 6px !important;
+          }
+
+          /* Hide desktop table header on phone */
+          .variant-table-header {
+            display: none !important;
+          }
+          .variant-scroll-wrapper {
+            overflow-x: visible !important;
+          }
+          .variant-list-inner {
+            min-width: 0 !important;
+          }
+
+          /* Transform variant row into mobile card */
+          .variant-row {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+            padding: 10px 8px !important;
+          }
+          .variant-cell-name {
+            order: 1 !important;
+            flex: 1 1 120px !important;
+            width: calc(100% - 110px) !important;
+          }
+          .variant-cell-default {
+            order: 2 !important;
+            flex: 0 0 70px !important;
+          }
+          .variant-cell-delete {
+            order: 3 !important;
+            flex: 0 0 28px !important;
+          }
+          .variant-cell-price {
+            order: 4 !important;
+            flex: 1 1 calc(33.333% - 6px) !important;
+            min-width: 75px !important;
+          }
+          .variant-cell-stock {
+            order: 5 !important;
+            flex: 1 1 calc(33.333% - 6px) !important;
+            min-width: 65px !important;
+          }
+          .variant-cell-bom {
+            order: 6 !important;
+            flex: 1 1 calc(33.333% - 6px) !important;
+            min-width: 65px !important;
+          }
+
+          /* Transform customization option row on phone */
+          .cust-option-row {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+          }
+          .cust-opt-name {
+            order: 1 !important;
+            flex: 1 1 140px !important;
+            width: calc(100% - 36px) !important;
+          }
+          .cust-opt-delete {
+            order: 2 !important;
+            flex: 0 0 28px !important;
+          }
+          .cust-opt-price {
+            order: 3 !important;
+            flex: 1 1 calc(35% - 6px) !important;
+            min-width: 75px !important;
+          }
+          .cust-opt-stock {
+            order: 4 !important;
+            flex: 1 1 calc(30% - 6px) !important;
+            min-width: 65px !important;
+          }
+          .cust-opt-default {
+            order: 5 !important;
+            flex: 0 0 auto !important;
+            display: flex !important;
+            align-items: center !important;
+          }
+
+          .form-header-actions {
+            width: 100% !important;
+            margin-left: 0 !important;
+            justify-content: flex-end;
+            gap: 8px !important;
+          }
+
+          .form-header-actions .form-cancel-btn {
+            flex: 1 1 auto !important;
+            min-width: 75px !important;
+            padding: 0 12px !important;
+            white-space: nowrap !important;
+            justify-content: center !important;
+          }
+
+          .form-header-actions .form-submit-btn {
+            flex: 2 1 auto !important;
+            min-width: 120px !important;
+            padding: 0 16px !important;
+            white-space: nowrap !important;
+            justify-content: center !important;
+          }
+
+          .form-header-actions .btn-close-modal {
+            flex: 0 0 38px !important;
+            width: 38px !important;
+            min-width: 38px !important;
+            margin-left: 0 !important;
+          }
+        }
+
+        .form-header-actions button {
+          white-space: nowrap !important;
         }
       `}</style>
       
       {/* Top Action Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 260px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', paddingBottom: '16px', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 240px', minWidth: 0 }}>
           {!isModal ? (
             <Link 
               prefetch={false} 
               href={`/${slug}/admin/products`}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#475569', textDecoration: 'none', transition: 'all 0.2s ease' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#475569', textDecoration: 'none', transition: 'all 0.2s ease', flexShrink: 0 }}
               title="Back to Products"
             >
               <ArrowLeft size={18} />
@@ -530,8 +718,8 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               <UtensilsCrossed size={20} />
             </div>
           )}
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0, wordBreak: 'break-word' }}>
               {isEditing ? `Edit Item: ${initialData.name}` : 'Add New Item'}
             </h1>
             <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
@@ -540,9 +728,10 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto', flexShrink: 0 }}>
+        <div className="form-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto', flexShrink: 0 }}>
           <button
             type="button"
+            className="form-cancel-btn"
             onClick={handleCancelClick}
             disabled={loading}
             style={{
@@ -558,13 +747,16 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               fontWeight: 600,
               fontSize: '13px',
               cursor: loading ? 'not-allowed' : 'pointer',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             Cancel
           </button>
           <button
             type="submit"
+            className="form-submit-btn"
             disabled={loading}
             style={{
               display: 'inline-flex',
@@ -572,7 +764,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               justifyContent: 'center',
               gap: '8px',
               height: '38px',
-              padding: '0 22px',
+              padding: '0 20px',
               borderRadius: '8px',
               border: 'none',
               backgroundColor: 'var(--primary, #0f172a)',
@@ -583,7 +775,9 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               opacity: loading ? 0.85 : 1,
               boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
               transition: 'all 0.2s ease',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
@@ -593,6 +787,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           {isModal && (
             <button
               type="button"
+              className="btn-close-modal"
               onClick={handleCancelClick}
               style={{
                 display: 'inline-flex',
@@ -606,7 +801,8 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                 color: '#475569',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                marginLeft: '4px'
+                marginLeft: '4px',
+                flexShrink: 0,
               }}
               title="Close Modal"
             >
@@ -651,6 +847,16 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   backgroundColor: '#ffffff',
                   outline: 'none'
                 }}
+              />
+            </div>
+
+            {/* Small Product Image Uploader directly inside Basic Details */}
+            <div>
+              <ProductImageUploader
+                value={form.image_url}
+                onChange={(url) => setForm(f => ({ ...f, image_url: url }))}
+                folder={slug ? `/products/${(Array.isArray(slug) ? slug[0] : slug).replace(/[\[\]'"]/g, '').trim()}` : '/products'}
+                disabled={loading}
               />
             </div>
 
@@ -1051,11 +1257,10 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              
-              {/* --- SECTION 1: VARIANTS --- */}
-              <div style={{ backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <div>
+                          {/* --- SECTION 1: VARIANTS --- */}
+              <div className="variant-section-container" style={{ backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0 }}>
                     <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
                       Portions & Variants <span style={{ fontSize: '12px', fontWeight: 400, color: '#64748b' }}>(Optional)</span>
                     </h3>
@@ -1089,165 +1294,185 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                     No variants added. The standard price (₹{form.price || '0'}) will be used.
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 85px 75px 75px auto auto', gap: '8px', padding: '0 10px', fontSize: '11px', fontWeight: 600, color: '#64748b' }}>
-                      <span>Variant Name</span>
-                      <span>Price (₹)</span>
-                      <span>Stock</span>
-                      <span title="Recipe BOM scaling: e.g. 1.5x for Large, 0.7x for Small">BOM Scale</span>
-                      <span style={{ textAlign: 'center' }}>Default</span>
-                      <span></span>
-                    </div>
+                    <div className="variant-scroll-wrapper" style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+                      <div className="variant-list-inner" style={{ minWidth: '480px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Column Headers with exact matching widths and padding */}
+                        <div className="variant-table-header">
+                          <span>Variant Name</span>
+                          <span style={{ textAlign: 'left', paddingLeft: '4px' }}>Price (₹)</span>
+                          <span style={{ textAlign: 'left', paddingLeft: '4px' }}>Stock</span>
+                          <span style={{ textAlign: 'left', paddingLeft: '4px' }} title="Recipe BOM scaling: e.g. 1.5x for Large, 0.7x for Small">BOM Scale</span>
+                          <span style={{ textAlign: 'center' }}>Default</span>
+                          <span></span>
+                        </div>
 
-                    {variants.map((v, idx) => (
-                      <div
-                        key={v.id || idx}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 85px 75px 75px auto auto',
-                          alignItems: 'center',
-                          gap: '8px',
-                          backgroundColor: '#ffffff',
-                          padding: '8px 10px',
-                          borderRadius: '6px',
-                          border: v.is_default ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={v.name}
-                          onChange={(e) => handleUpdateVariant(idx, 'name', e.target.value)}
-                          placeholder="e.g. Regular, Large"
-                          style={{
-                            padding: '6px 10px',
-                            borderRadius: '6px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '13px',
-                            color: '#0f172a',
-                            outline: 'none',
-                          }}
-                        />
-                        <div style={{ position: 'relative' }}>
-                          <span style={{ position: 'absolute', left: '7px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: '#64748b' }}>₹</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={v.price}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              handleUpdateVariant(idx, 'price', val);
-                              if (v.is_default) {
-                                setForm(f => ({ ...f, price: val.toString() }));
-                              }
-                            }}
-                            placeholder="Price"
+                        {variants.map((v, idx) => (
+                          <div
+                            key={v.id || idx}
+                            className="variant-row"
                             style={{
-                              width: '100%',
-                              padding: '6px 6px 6px 18px',
-                              borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: '#0f172a',
-                              outline: 'none',
+                              border: v.is_default ? '1.5px solid #2563eb' : '1.5px solid #e2e8f0',
                             }}
-                          />
-                        </div>
-                        <div style={{ position: 'relative' }}>
-                          <input
-                            type="number"
-                            min="0"
-                            value={v.stock_quantity !== undefined && v.stock_quantity !== null ? v.stock_quantity : ''}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0);
-                              handleUpdateVariant(idx, 'stock_quantity' as any, val);
-                            }}
-                            placeholder="Stock ∞"
-                            title="Sellable portion stock quantity (leave empty for unlimited)"
-                            style={{
-                              width: '100%',
-                              padding: '6px 6px',
-                              borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '12.5px',
-                              color: '#0f172a',
-                              outline: 'none',
-                            }}
-                          />
-                        </div>
-                        <div style={{ position: 'relative' }}>
-                          <span style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', fontSize: '11px', color: '#94a3b8', pointerEvents: 'none' }}>×</span>
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="0.1"
-                            value={v.recipe_multiplier !== undefined && v.recipe_multiplier !== null ? v.recipe_multiplier : ''}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? null : Math.max(0.1, parseFloat(e.target.value) || 1.0);
-                              handleUpdateVariant(idx, 'recipe_multiplier' as any, val);
-                            }}
-                            placeholder="1.0"
-                            title="Recipe BOM Multiplier: scales raw ingredient consumption from base recipe (e.g. 1.5 for Large)"
-                            style={{
-                              width: '100%',
-                              padding: '6px 16px 6px 6px',
-                              borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '12px',
-                              color: '#0f172a',
-                              outline: 'none',
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleUpdateVariant(idx, 'is_default', true);
-                            setForm(f => ({ ...f, price: v.price.toString() }));
-                          }}
-                          style={{
-                            padding: '5px 8px',
-                            borderRadius: '6px',
-                            border: v.is_default ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                            backgroundColor: v.is_default ? '#eff6ff' : '#f8fafc',
-                            color: v.is_default ? '#2563eb' : '#64748b',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {v.is_default ? '✓ Default' : 'Default'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveVariant(idx)}
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            backgroundColor: 'transparent',
-                            color: '#ef4444',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                          title="Remove variant"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                          >
+                            <div className="variant-cell-name">
+                              <input
+                                type="text"
+                                value={v.name}
+                                onChange={(e) => handleUpdateVariant(idx, 'name', e.target.value)}
+                                placeholder="e.g. Regular, Large"
+                                style={{
+                                  width: '100%',
+                                  minWidth: 0,
+                                  boxSizing: 'border-box',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '13px',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                }}
+                              />
+                            </div>
+                            <div className="variant-cell-price" style={{ position: 'relative', width: '100%', minWidth: 0 }}>
+                              <span style={{ position: 'absolute', left: '7px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: '#64748b' }}>₹</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={v.price}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  handleUpdateVariant(idx, 'price', val);
+                                  if (v.is_default) {
+                                    setForm(f => ({ ...f, price: val.toString() }));
+                                  }
+                                }}
+                                placeholder="Price"
+                                style={{
+                                  width: '100%',
+                                  minWidth: 0,
+                                  boxSizing: 'border-box',
+                                  padding: '6px 6px 6px 18px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '13px',
+                                  fontWeight: 600,
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                }}
+                              />
+                            </div>
+                            <div className="variant-cell-stock" style={{ position: 'relative', width: '100%', minWidth: 0 }}>
+                              <input
+                                type="number"
+                                min="0"
+                                value={v.stock_quantity !== undefined && v.stock_quantity !== null ? v.stock_quantity : ''}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0);
+                                  handleUpdateVariant(idx, 'stock_quantity' as any, val);
+                                }}
+                                placeholder="Stock ∞"
+                                title="Sellable portion stock quantity (leave empty for unlimited)"
+                                style={{
+                                  width: '100%',
+                                  minWidth: 0,
+                                  boxSizing: 'border-box',
+                                  padding: '6px 6px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '12.5px',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                }}
+                              />
+                            </div>
+                            <div className="variant-cell-bom" style={{ position: 'relative', width: '100%', minWidth: 0 }}>
+                              <span style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', fontSize: '11px', color: '#94a3b8', pointerEvents: 'none' }}>×</span>
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0.1"
+                                value={v.recipe_multiplier !== undefined && v.recipe_multiplier !== null ? v.recipe_multiplier : ''}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? null : Math.max(0.1, parseFloat(e.target.value) || 1.0);
+                                  handleUpdateVariant(idx, 'recipe_multiplier' as any, val);
+                                }}
+                                placeholder="1.0"
+                                title="Recipe BOM Multiplier: scales raw ingredient consumption from base recipe (e.g. 1.5 for Large)"
+                                style={{
+                                  width: '100%',
+                                  minWidth: 0,
+                                  boxSizing: 'border-box',
+                                  padding: '6px 16px 6px 6px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '12px',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                }}
+                              />
+                            </div>
+                            <div className="variant-cell-default" style={{ width: '100%', minWidth: 0 }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateVariant(idx, 'is_default', true);
+                                  setForm(f => ({ ...f, price: v.price.toString() }));
+                                }}
+                                style={{
+                                  width: '100%',
+                                  minWidth: 0,
+                                  boxSizing: 'border-box',
+                                  height: '31px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '0 4px',
+                                  borderRadius: '6px',
+                                  border: v.is_default ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                                  backgroundColor: v.is_default ? '#eff6ff' : '#f8fafc',
+                                  color: v.is_default ? '#2563eb' : '#64748b',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {v.is_default ? '✓ Default' : 'Default'}
+                              </button>
+                            </div>
+                            <div className="variant-cell-delete">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveVariant(idx)}
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '6px',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  color: '#ef4444',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  boxSizing: 'border-box',
+                                }}
+                                title="Remove variant"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
                 )}
               </div>
 
               {/* --- SECTION 2: CUSTOMIZATION GROUPS --- */}
-              <div style={{ backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div className="cust-section-container" style={{ backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '8px', flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
                       Customization Groups <span style={{ fontSize: '12px', fontWeight: 400, color: '#64748b' }}>(Add-ons, Options)</span>
@@ -1256,36 +1481,101 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                       e.g., &quot;Choose Crust&quot;, &quot;Add Extra Toppings&quot;, &quot;Spice Level&quot;
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddCustomizationGroup}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '5px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
-                      backgroundColor: '#ffffff',
-                      color: '#0f172a',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Plus size={13} /> Add Group
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setReuseModalOpen(true)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        color: '#2563eb',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                      title="Reuse groups configured on other products"
+                    >
+                      <Copy size={13} /> Reuse Group
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddCustomizationGroup}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        color: '#0f172a',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Plus size={13} /> Add Group
+                    </button>
+                  </div>
                 </div>
 
                 {customizationGroups.length === 0 ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '12.5px' }}>
-                    No customization groups created yet. Click &quot;Add Group&quot; to configure toppings, crusts, or add-ons.
+                  <div style={{ padding: '20px 16px', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                    <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 12px 0' }}>
+                      No customization groups created yet. Create a new one or reuse one from other products!
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => setReuseModalOpen(true)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#eff6ff',
+                          color: '#2563eb',
+                          fontWeight: 600,
+                          fontSize: '12.5px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Copy size={13} /> Reuse Existing Group
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddCustomizationGroup}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          fontWeight: 600,
+                          fontSize: '12.5px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Plus size={13} /> Add New Group
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {customizationGroups.map((group, gIdx) => (
                       <div
                         key={group.id || gIdx}
+                        className="cust-group-card"
                         style={{
                           backgroundColor: '#ffffff',
                           borderRadius: '8px',
@@ -1383,7 +1673,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                         </div>
 
                         {/* Options List */}
-                        <div style={{ backgroundColor: '#f8fafc', borderRadius: '6px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className="cust-options-list" style={{ backgroundColor: '#f8fafc', borderRadius: '6px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             Options in this group:
                           </div>
@@ -1391,6 +1681,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                           {group.options.map((opt, oIdx) => (
                             <div
                               key={opt.id || oIdx}
+                              className="cust-option-item"
                               style={{
                                 backgroundColor: opt.inventory_item_id ? '#f0fdf4' : '#ffffff',
                                 border: opt.inventory_item_id ? '1px solid #86efac' : '1px solid #e2e8f0',
@@ -1401,28 +1692,25 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                 gap: '6px',
                               }}
                             >
-                              <div
-                                style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: '1fr 80px 75px auto auto',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                }}
-                              >
-                                <input
-                                  type="text"
-                                  value={opt.name}
-                                  onChange={(e) => handleUpdateOption(gIdx, oIdx, 'name', e.target.value)}
-                                  placeholder="Option name (e.g. Cheese Burst, Jalapeno)"
-                                  style={{
-                                    padding: '5px 8px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #cbd5e1',
-                                    fontSize: '12.5px',
-                                    outline: 'none',
-                                  }}
-                                />
-                                <div style={{ position: 'relative' }}>
+                              <div className="cust-option-row">
+                                <div className="cust-opt-name">
+                                  <input
+                                    type="text"
+                                    value={opt.name}
+                                    onChange={(e) => handleUpdateOption(gIdx, oIdx, 'name', e.target.value)}
+                                    placeholder="Option name (e.g. Cheese Burst, Jalapeno)"
+                                    style={{
+                                      width: '100%',
+                                      boxSizing: 'border-box',
+                                      padding: '5px 8px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #cbd5e1',
+                                      fontSize: '12.5px',
+                                      outline: 'none',
+                                    }}
+                                  />
+                                </div>
+                                <div className="cust-opt-price" style={{ position: 'relative', width: '100%' }}>
                                   <span style={{ position: 'absolute', left: '7px', top: '50%', transform: 'translateY(-50%)', fontSize: '11px', color: '#64748b' }}>+₹</span>
                                   <input
                                     type="number"
@@ -1433,6 +1721,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                     placeholder="0"
                                     style={{
                                       width: '100%',
+                                      boxSizing: 'border-box',
                                       padding: '5px 6px 5px 22px',
                                       borderRadius: '6px',
                                       border: '1px solid #cbd5e1',
@@ -1442,7 +1731,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                     }}
                                   />
                                 </div>
-                                <div style={{ position: 'relative' }}>
+                                <div className="cust-opt-stock" style={{ position: 'relative', width: '100%' }}>
                                   <input
                                     type="number"
                                     min="0"
@@ -1455,6 +1744,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                     title="Stock quantity (leave empty for unlimited)"
                                     style={{
                                       width: '100%',
+                                      boxSizing: 'border-box',
                                       padding: '5px 6px',
                                       borderRadius: '6px',
                                       border: '1px solid #cbd5e1',
@@ -1464,42 +1754,47 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                     }}
                                   />
                                 </div>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#475569', cursor: 'pointer' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={Boolean(opt.is_default)}
-                                    onChange={(e) => handleUpdateOption(gIdx, oIdx, 'is_default', e.target.checked)}
-                                  />
-                                  Preselected
-                                </label>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveOption(gIdx, oIdx)}
-                                  disabled={group.options.length <= 1}
-                                  style={{
-                                    width: '26px',
-                                    height: '26px',
-                                    borderRadius: '4px',
-                                    border: 'none',
-                                    backgroundColor: 'transparent',
-                                    color: group.options.length <= 1 ? '#cbd5e1' : '#ef4444',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: group.options.length <= 1 ? 'not-allowed' : 'pointer',
-                                  }}
-                                  title="Remove option"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
+                                <div className="cust-opt-default">
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(opt.is_default)}
+                                      onChange={(e) => handleUpdateOption(gIdx, oIdx, 'is_default', e.target.checked)}
+                                    />
+                                    Preselected
+                                  </label>
+                                </div>
+                                <div className="cust-opt-delete">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveOption(gIdx, oIdx)}
+                                    disabled={group.options.length <= 1}
+                                    style={{
+                                      width: '26px',
+                                      height: '26px',
+                                      borderRadius: '4px',
+                                      border: 'none',
+                                      backgroundColor: 'transparent',
+                                      color: group.options.length <= 1 ? '#cbd5e1' : '#ef4444',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: group.options.length <= 1 ? 'not-allowed' : 'pointer',
+                                      boxSizing: 'border-box',
+                                    }}
+                                    title="Remove option"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Raw Material Inventory Link */}
                               {inventoryItems.length > 0 && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', paddingTop: '2px', borderTop: opt.inventory_item_id ? '1px dashed #86efac' : 'none' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', paddingTop: '2px', borderTop: opt.inventory_item_id ? '1px dashed #86efac' : 'none', flexWrap: 'wrap' }}>
                                   {opt.inventory_item_id ? (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', flexWrap: 'wrap' }}>
-                                      <span style={{ color: '#15803d', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                      <span style={{ color: '#15803d', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
                                         <Boxes size={13} /> Raw Item:
                                       </span>
                                       <select
@@ -1519,7 +1814,8 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                           fontSize: '11.5px',
                                           color: '#0f172a',
                                           outline: 'none',
-                                          maxWidth: '190px',
+                                          maxWidth: '100%',
+                                          flex: '1 1 120px',
                                         }}
                                       >
                                         {inventoryItems.map(item => (
@@ -1528,7 +1824,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                           </option>
                                         ))}
                                       </select>
-                                      <span style={{ color: '#64748b' }}>Deduct:</span>
+                                      <span style={{ color: '#64748b', flexShrink: 0 }}>Deduct:</span>
                                       <input
                                         type="number"
                                         step="0.001"
@@ -1540,7 +1836,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                         }}
                                         placeholder="0.05"
                                         style={{
-                                          width: '60px',
+                                          width: '55px',
                                           padding: '3px 6px',
                                           borderRadius: '5px',
                                           border: '1px solid #86efac',
@@ -1548,7 +1844,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                           outline: 'none',
                                         }}
                                       />
-                                      <span style={{ color: '#166534', fontWeight: 600 }}>{opt.inventory_unit || 'units'}</span>
+                                      <span style={{ color: '#166534', fontWeight: 600, flexShrink: 0 }}>{opt.inventory_unit || 'units'}</span>
                                       <button
                                         type="button"
                                         onClick={() => {
@@ -1565,6 +1861,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                                           marginLeft: 'auto',
                                           fontWeight: 600,
                                           textDecoration: 'underline',
+                                          flexShrink: 0,
                                         }}
                                       >
                                         Unlink
@@ -1631,23 +1928,6 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             </div>
           )}
         </div>
-
-        {/* Card 4: Product Image Card */}
-        <div className="form-card-image" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ImageIcon size={18} />
-            </div>
-            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Product Image</h2>
-          </div>
-
-          <ProductImageUploader
-            value={form.image_url}
-            onChange={(url) => setForm(f => ({ ...f, image_url: url }))}
-            folder={slug ? `/products/${(Array.isArray(slug) ? slug[0] : slug).replace(/[\[\]'"]/g, '').trim()}` : '/products'}
-            disabled={loading}
-          />
-        </div>
       </div>
     </div>
   </form>
@@ -1660,6 +1940,14 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
     }}
     slug={(Array.isArray(slug) ? slug[0] : (slug || '')).replace(/[\[\]'"]/g, '').trim()}
     onReordered={fetchCategories}
+  />
+
+  <ReuseCustomizationModal
+    isOpen={reuseModalOpen}
+    onClose={() => setReuseModalOpen(false)}
+    onSelectGroup={handleReuseGroup}
+    existingGroupNames={customizationGroups.map(g => g.name)}
+    slug={(Array.isArray(slug) ? slug[0] : (slug || '')).replace(/[\[\]'"]/g, '').trim()}
   />
   </>
   );

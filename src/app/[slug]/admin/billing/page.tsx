@@ -231,12 +231,12 @@ export default function BillingPage() {
         }
 
         .billing-page-header .admin-page-header-container {
-          height: 68px !important;
-          min-height: 68px !important;
+          height: auto !important;
+          min-height: 44px !important;
           display: flex !important;
           align-items: center !important;
           margin: 0 !important;
-          padding: 0 !important;
+          padding: 4px 0 !important;
           gap: 12px !important;
           width: 100% !important;
         }
@@ -245,15 +245,18 @@ export default function BillingPage() {
           display: flex !important;
           flex-wrap: nowrap !important;
           align-items: center !important;
+          justify-content: flex-end !important;
           gap: 10px !important;
           width: 100% !important;
           min-width: 0 !important;
+          margin-left: auto !important;
         }
 
         .billing-actions {
           display: flex !important;
           flex-wrap: nowrap !important;
           align-items: center !important;
+          justify-content: flex-end !important;
           gap: 8px !important;
           margin-left: auto !important;
           flex-shrink: 0 !important;
@@ -262,37 +265,47 @@ export default function BillingPage() {
         @media (max-width: 768px) {
           .billing-page-header {
             height: auto !important;
-            min-height: auto !important;
-            padding: 12px 16px !important;
+            min-height: 40px !important;
+            padding: 6px 14px !important;
           }
 
           .billing-toolbar {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 10px !important;
+            flex-direction: row !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            margin-left: auto !important;
+            gap: 6px !important;
           }
 
           .billing-actions {
-            width: 100% !important;
-            margin-left: 0 !important;
-            justify-content: space-between !important;
-            flex-wrap: wrap !important;
+            width: auto !important;
+            margin-left: auto !important;
+            justify-content: flex-end !important;
+            flex-wrap: nowrap !important;
+          }
+
+          .billing-maximize-toggle {
+            display: none !important;
+          }
+
+          .billing-overview-container {
+            padding: 12px 14px !important;
           }
         }
       `}</style>
       <AdminPageHeader
         className="billing-page-header"
-        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        style={{ paddingTop: 0, minHeight: '44px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="billing-toolbar">
-            {/* Left: Status Control */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            {/* Right: Status Badge & Maximize Toggle */}
+            <div className="billing-actions">
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                height: '38px',
+                height: '34px',
                 padding: '0 12px',
                 borderRadius: '8px',
                 backgroundColor: statusStyle.bg,
@@ -302,16 +315,14 @@ export default function BillingPage() {
                 fontSize: '11px',
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}>
                 {restaurant.billing_status === 'ACTIVE' ? <ShieldCheck size={14} /> : <AlertCircle size={14} />}
                 <span>{restaurant.billing_status || 'ACTIVE'} STATUS</span>
               </div>
-            </div>
 
-            {/* Right: Maximize Toggle */}
-            <div className="billing-actions">
-              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+              <div className="billing-maximize-toggle" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '30px' }}>
                 <LayoutMaximizeToggle />
               </div>
             </div>
@@ -321,7 +332,7 @@ export default function BillingPage() {
 
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
         {/* Pricing and Tier Overview Cards */}
-        <div style={{ padding: '20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+        <div className="billing-overview-container" style={{ padding: '16px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
             {/* Active Plan Card */}
             <div style={{ 

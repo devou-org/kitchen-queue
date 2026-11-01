@@ -473,15 +473,18 @@ export default function AdminSettings() {
           display: flex !important;
           flex-wrap: nowrap !important;
           align-items: center !important;
+          justify-content: flex-end !important;
           gap: 10px !important;
           width: 100% !important;
           min-width: 0 !important;
+          margin-left: auto !important;
         }
 
         .settings-actions {
           display: flex !important;
           flex-wrap: nowrap !important;
           align-items: center !important;
+          justify-content: flex-end !important;
           gap: 8px !important;
           margin-left: auto !important;
           flex-shrink: 0 !important;
@@ -491,26 +494,38 @@ export default function AdminSettings() {
           .settings-page-header {
             height: auto !important;
             min-height: auto !important;
-            padding: 12px 16px !important;
+            padding: 10px 14px !important;
           }
 
           .settings-toolbar {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 10px !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            margin-left: auto !important;
           }
 
           .settings-actions {
             width: 100% !important;
-            margin-left: 0 !important;
-            justify-content: space-between !important;
-            flex-wrap: wrap !important;
+            margin-left: auto !important;
+            justify-content: flex-end !important;
+            flex-wrap: nowrap !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .settings-actions {
+            gap: 6px !important;
+            justify-content: flex-end !important;
+            margin-left: auto !important;
+          }
+
+          .settings-maximize-toggle {
+            display: none !important;
           }
         }
       `}</style>
       <AdminPageHeader
         className="settings-page-header"
-        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        style={{ paddingTop: 0, minHeight: '60px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="settings-toolbar">
@@ -520,8 +535,8 @@ export default function AdminSettings() {
                 type="button"
                 onClick={toggleAllSections}
                 style={{
-                  height: '38px',
-                  padding: '0 12px',
+                  height: '36px',
+                  padding: '0 10px',
                   borderRadius: '8px',
                   background: '#F8FAFC',
                   color: '#475569',
@@ -531,9 +546,10 @@ export default function AdminSettings() {
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '5px',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
               >
                 <ChevronsUpDown size={14} />
@@ -545,8 +561,8 @@ export default function AdminSettings() {
                 onClick={() => handleSaveProfile()}
                 disabled={saving}
                 style={{
-                  height: '38px',
-                  padding: '0 16px',
+                  height: '36px',
+                  padding: '0 14px',
                   borderRadius: '8px',
                   background: 'var(--primary, #971345)',
                   color: '#FFFFFF',
@@ -561,6 +577,7 @@ export default function AdminSettings() {
                   whiteSpace: 'nowrap',
                   opacity: saving ? 0.7 : 1,
                   transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
@@ -568,7 +585,7 @@ export default function AdminSettings() {
               </button>
 
               {/* Left Border Separator */}
-              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+              <div className="settings-maximize-toggle" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                 <LayoutMaximizeToggle />
               </div>
             </div>

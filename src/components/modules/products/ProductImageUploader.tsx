@@ -139,26 +139,14 @@ export function ProductImageUploader({
         }
       `}</style>
 
-      {/* Top Header with Badge */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155', margin: 0 }}>
-            Product Image
-          </label>
-          <span
-            style={{
-              padding: '2px 8px',
-              borderRadius: '9999px',
-              fontSize: '11px',
-              fontWeight: 700,
-              backgroundColor: '#ecfdf5',
-              color: '#059669',
-              border: '1px solid #a7f3d0',
-            }}
-          >
-            Max {MAX_IMAGE_SIZE_LABEL}
-          </span>
-        </div>
+      {/* Label and size notice */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+        <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155', margin: 0 }}>
+          Product Image <span style={{ fontWeight: 400, color: '#64748b', fontSize: '12px' }}>(Optional)</span>
+        </label>
+        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+          Max {MAX_IMAGE_SIZE_LABEL}
+        </span>
       </div>
 
       {/* Hidden File Input */}
@@ -171,15 +159,15 @@ export function ProductImageUploader({
         disabled={disabled || uploading}
       />
 
-      {/* Current Image View without link URL */}
+      {/* Current Image View */}
       {value ? (
-        <div className="product-image-uploaded-card">
-          <div className="product-image-uploaded-info">
+        <div className="product-image-uploaded-card" style={{ padding: '8px 12px' }}>
+          <div className="product-image-uploaded-info" style={{ gap: '10px' }}>
             <div
               style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '8px',
+                width: '42px',
+                height: '42px',
+                borderRadius: '6px',
                 overflow: 'hidden',
                 backgroundColor: '#f1f5f9',
                 border: '1px solid #cbd5e1',
@@ -199,15 +187,20 @@ export function ProductImageUploader({
               />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
-                Image Uploaded
-              </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <CheckCircle2 size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                  Photo attached
+                </span>
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '1px' }}>
+                Visible on customer menu
+              </div>
             </div>
           </div>
 
-          <div className="product-image-uploaded-actions">
+          <div className="product-image-uploaded-actions" style={{ gap: '6px' }}>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -215,7 +208,7 @@ export function ProductImageUploader({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
                 padding: '6px 12px',
                 borderRadius: '6px',
                 border: '1px solid #cbd5e1',
@@ -230,12 +223,12 @@ export function ProductImageUploader({
             >
               {uploading ? (
                 <>
-                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                  <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
                   <span>Uploading...</span>
                 </>
               ) : (
                 <>
-                  <RefreshCw size={13} />
+                  <RefreshCw size={12} />
                   <span>Replace</span>
                 </>
               )}
@@ -265,49 +258,74 @@ export function ProductImageUploader({
           </div>
         </div>
       ) : (
-        /* Empty Upload Dropzone */
+        /* Compact Horizontal Upload Dropzone */
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => !uploading && !disabled && fileInputRef.current?.click()}
           style={{
-            border: `2px dashed ${dragOver ? '#0f172a' : errorMsg ? '#ef4444' : '#cbd5e1'}`,
+            border: `1.5px dashed ${dragOver ? '#0f172a' : errorMsg ? '#ef4444' : '#cbd5e1'}`,
             borderRadius: '8px',
-            padding: '24px 16px',
-            textAlign: 'center',
-            backgroundColor: dragOver ? '#f1f5f9' : uploading ? '#f8fafc' : '#fafafa',
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            backgroundColor: dragOver ? '#f1f5f9' : uploading ? '#f8fafc' : '#ffffff',
             cursor: disabled || uploading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s ease',
+            transition: 'all 0.15s ease',
+            boxSizing: 'border-box',
           }}
         >
           <div
             style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '8px',
+              width: '42px',
+              height: '42px',
+              borderRadius: '6px',
               backgroundColor: uploading ? '#e2e8f0' : '#f1f5f9',
-              color: '#0f172a',
-              display: 'inline-flex',
+              color: '#475569',
+              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: '10px',
+              flexShrink: 0,
             }}
           >
             {uploading ? (
-              <Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} />
+              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
             ) : (
-              <UploadCloud size={22} />
+              <UploadCloud size={20} />
             )}
           </div>
 
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-            {uploading ? 'Uploading...' : 'Click to upload or drag and drop'}
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', lineHeight: 1.3 }}>
+              {uploading ? 'Uploading image...' : 'Upload product photo'}
+            </div>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+              JPG, PNG, WebP • Under {MAX_IMAGE_SIZE_LABEL}
+            </div>
           </div>
 
-          <div style={{ fontSize: '11px', color: '#64748b' }}>
-            JPG, PNG, WebP, SVG • <strong>Strict 250 KB Limit</strong>
-          </div>
+          <button
+            type="button"
+            disabled={disabled || uploading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#f8fafc',
+              color: '#334155',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: disabled || uploading ? 'not-allowed' : 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Browse
+          </button>
         </div>
       )}
 

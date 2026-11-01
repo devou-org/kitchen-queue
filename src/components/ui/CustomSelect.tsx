@@ -21,6 +21,8 @@ export interface CustomSelectProps<T = string> {
   iconColor?: string;
   defaultIcon?: React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>;
   direction?: 'down' | 'up' | 'auto';
+  renderTrigger?: (isOpen: boolean) => React.ReactNode;
+  hideCheck?: boolean;
 }
 
 export function CustomSelect<T extends string = string>({
@@ -36,6 +38,8 @@ export function CustomSelect<T extends string = string>({
   iconColor = 'var(--primary)',
   defaultIcon: DefaultIcon,
   direction = 'down',
+  renderTrigger,
+  hideCheck = false,
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,49 +88,68 @@ export function CustomSelect<T extends string = string>({
       }}
       className={className}
     >
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          width: '100%',
-          height: '42px',
-          padding: '0 12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'white',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-sm, 8px)',
-          fontWeight: 600,
-          fontSize: '14px',
-          color: selectedOption ? 'var(--text-primary)' : '#94A3B8',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.6 : 1,
-          transition: 'all 0.2s ease',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-          ...buttonStyle,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
-          {OptionIcon && <OptionIcon size={16} style={{ color: iconColor, flexShrink: 0 }} />}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-            {selectedOption ? selectedOption.label : placeholder}
-          </span>
-        </div>
-        <ChevronDown
-          size={16}
-          style={{
-            color: 'var(--text-secondary)',
-            transition: 'transform 0.2s ease',
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            flexShrink: 0,
-            marginLeft: '8px',
+      {renderTrigger ? (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              if (!disabled) setIsOpen(!isOpen);
+            }
           }}
-        />
-      </button>
+          style={{ cursor: disabled ? 'not-allowed' : 'pointer', display: 'inline-flex' }}
+        >
+          {renderTrigger(isOpen)}
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setIsOpen(!isOpen)}
+          style={{
+            width: '100%',
+            height: '42px',
+            padding: '0 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'white',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm, 8px)',
+            fontWeight: 600,
+            fontSize: '14px',
+            color: selectedOption ? 'var(--text-primary)' : '#94A3B8',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.6 : 1,
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            ...buttonStyle,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
+            {OptionIcon && <OptionIcon size={16} style={{ color: iconColor, flexShrink: 0 }} />}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+              {selectedOption ? selectedOption.label : placeholder}
+            </span>
+          </div>
+          <ChevronDown
+            size={16}
+            style={{
+              color: 'var(--text-secondary)',
+              transition: 'transform 0.2s ease',
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              flexShrink: 0,
+              marginLeft: '8px',
+            }}
+          />
+        </button>
+      )}
 
       {isOpen && (
         <div
@@ -204,7 +227,7 @@ export function CustomSelect<T extends string = string>({
                   )}
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{option.label}</span>
                 </div>
-                {isSelected && <Check size={14} style={{ color: 'var(--primary, #971345)', flexShrink: 0, marginLeft: '8px' }} />}
+                {isSelected && !hideCheck && <Check size={14} style={{ color: 'var(--primary, #971345)', flexShrink: 0, marginLeft: '8px' }} />}
               </button>
             );
           })}
