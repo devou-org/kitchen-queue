@@ -497,6 +497,29 @@ export default function RecipesPage() {
                         )}
                       </div>
                     )}
+
+                    {/* Variant Scaling Badges */}
+                    {Array.isArray(p.variants) && p.variants.length > 0 && (
+                      <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>BOM Scale:</span>
+                        {p.variants.map((v, vIdx) => (
+                          <span
+                            key={vIdx}
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              backgroundColor: '#EFF6FF',
+                              color: '#2563EB',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              border: '1px solid #DBEAFE',
+                            }}
+                          >
+                            {v.name}: {v.recipe_multiplier ? `${v.recipe_multiplier}x` : '1.0x'}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Food Cost Margin */}
@@ -585,6 +608,25 @@ export default function RecipesPage() {
                   />
                 </div>
               </div>
+
+              {/* Variant Scaling Notice */}
+              {Array.isArray(selectedProduct?.variants) && selectedProduct.variants.length > 0 && (
+                <div style={{ marginBottom: '14px', padding: '10px 14px', backgroundColor: '#EFF6FF', borderRadius: '8px', border: '1px solid #BFDBFE', fontSize: '12px', color: '#1E40AF' }}>
+                  <div style={{ fontWeight: 700, marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Layers size={14} /> Variant Auto-Scaling Active
+                  </div>
+                  <div>
+                    Portions configured below represent <strong>1 serving (1.0x)</strong>. Ordered variants will automatically scale ingredient deductions:
+                    <div style={{ marginTop: '5px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {selectedProduct.variants.map((v, vIdx) => (
+                        <span key={vIdx} style={{ backgroundColor: '#DBEAFE', color: '#1E40AF', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, fontSize: '11px' }}>
+                          {v.name}: {v.recipe_multiplier ? `${v.recipe_multiplier}x` : '1.0x'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Recipe Lines */}
               <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '12px' }}>

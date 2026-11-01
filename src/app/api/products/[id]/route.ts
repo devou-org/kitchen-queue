@@ -110,6 +110,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       body.status = calculateProductStatus(stock, buffer);
     }
 
+    if (body.has_customizations !== undefined) {
+      body.has_customizations = Boolean(body.has_customizations);
+    }
+    if (body.variants !== undefined) {
+      body.variants = Array.isArray(body.variants) ? body.variants : [];
+    }
+    if (body.customization_groups !== undefined) {
+      body.customization_groups = Array.isArray(body.customization_groups) ? body.customization_groups : [];
+    }
+
     const product = await updateProduct(restaurant.id, id, body);
     if (!product) return NextResponse.json({ success: false, error: 'Failed to update product record' }, { status: 500 });
 

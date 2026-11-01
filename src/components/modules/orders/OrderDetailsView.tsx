@@ -1348,11 +1348,54 @@ export function OrderDetailsView({
                                       wordBreak: 'break-word',
                                       overflowWrap: 'break-word',
                                       lineHeight: 1.35,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      flexWrap: 'wrap',
                                     }}
                                   >
-                                    {item.product_name}
+                                    <span>{item.product_name}</span>
+                                    {item.selected_variant && (
+                                      <span style={{
+                                        fontSize: '10px',
+                                        fontWeight: 700,
+                                        padding: '1px 6px',
+                                        borderRadius: '4px',
+                                        background: '#EEF2FF',
+                                        color: '#4338CA',
+                                        textTransform: 'uppercase',
+                                      }}>
+                                        {item.selected_variant.name}
+                                      </span>
+                                    )}
                                   </div>
-                                  {item.notes && (
+                                  {(() => {
+                                    if (!item.customization_summary) return null;
+                                    let summaryText = item.customization_summary.trim();
+                                    if (item.selected_variant?.name) {
+                                      const varName = item.selected_variant.name.trim().toLowerCase();
+                                      if (summaryText.toLowerCase() === varName) return null;
+                                      const prefix = `${item.selected_variant.name.trim()} • `;
+                                      if (summaryText.toLowerCase().startsWith(prefix.toLowerCase())) {
+                                        summaryText = summaryText.slice(prefix.length).trim();
+                                      }
+                                    }
+                                    if (!summaryText) return null;
+                                    return (
+                                      <div
+                                        style={{
+                                          fontSize: '12px',
+                                          color: '#475569',
+                                          fontWeight: 600,
+                                          marginTop: '2px',
+                                          lineHeight: 1.3,
+                                        }}
+                                      >
+                                        +{summaryText}
+                                      </div>
+                                    );
+                                  })()}
+                                  {(item.notes || item.item_note) && (
                                     <div
                                       style={{
                                         fontSize: '11.5px',
@@ -1365,7 +1408,7 @@ export function OrderDetailsView({
                                       }}
                                     >
                                       <Utensils size={11} color="#D97706" style={{ flexShrink: 0 }} />
-                                      <span>Note: {item.notes}</span>
+                                      <span>Note: {item.notes || item.item_note}</span>
                                     </div>
                                   )}
                                   <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>

@@ -246,7 +246,8 @@ export default function StaffMenuPage() {
     let changed = false;
 
     for (const [id, item] of cart.entries()) {
-      const product = byId.get(id);
+      const productId = item.product_id || id;
+      const product = byId.get(productId);
 
       if (!product || product.status === 'OUT_OF_STOCK') {
         newCart.delete(id);
@@ -255,16 +256,19 @@ export default function StaffMenuPage() {
         continue;
       }
 
+      const hasCust = Boolean(item.selected_variant || (item.selected_customizations && item.selected_customizations.length > 0));
+      const expectedPrice = hasCust ? item.price : product.price;
+
       if (
         item.status !== product.status ||
-        item.price !== product.price ||
+        item.price !== expectedPrice ||
         item.name !== product.name ||
         item.image_url !== product.image_url
       ) {
         newCart.set(id, {
           ...item,
           status: product.status,
-          price: product.price,
+          price: expectedPrice,
           name: product.name,
           image_url: product.image_url,
         });

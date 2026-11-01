@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/format';
-import { Product, CartItem, ProductStatus } from '@/types';
+import { Product, CartItem, ProductStatus, SelectedCustomizationSnapshot } from '@/types';
 
 import { pusherClient } from '@/lib/pusher-client';
 import { productService } from '@/app/services/products.api';
@@ -12,6 +12,7 @@ import { useRestaurant } from '@/hooks/useRestaurant';
 import { Search, MapPin, Ticket, ClipboardList } from 'lucide-react';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
 import { sortCategoriesByConfig } from '@/lib/category-order';
+import { ProductCustomizationModal, ProductCustomizationResult } from '@/components/modules/products/ProductCustomizationModal';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -51,10 +52,11 @@ const DietaryIcon = ({ preference }: { preference?: string }) => {
   return null;
 };
 
-function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout = 'LIST' }: {
+function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = true, layout = 'LIST' }: {
   product: Product;
   quantity: number;
   onUpdate: (id: string, delta: number) => void;
+  onCustomize?: (product: Product) => void;
   showOrdering?: boolean;
   layout?: 'LIST' | 'GRID';
 }) {
@@ -62,6 +64,11 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
     ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
     : product.status;
   const isOut = computedStatus === 'OUT_OF_STOCK';
+  const isCustomizable = Boolean(
+    product.has_customizations ||
+    (Array.isArray(product.variants) && product.variants.length > 0) ||
+    (Array.isArray(product.customization_groups) && product.customization_groups.length > 0)
+  );
 
   if (layout === 'GRID') {
     return (
@@ -153,34 +160,76 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
 
           <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <p style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '14px', margin: 0 }}>
-              {formatPrice(product.price)}
+              {isCustomizable ? `From ${formatPrice(product.price)}` : formatPrice(product.price)}
             </p>
 
             {/* Quantity Controls */}
             {showOrdering && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
-                <button
-                  className="qty-btn"
-                  onClick={() => onUpdate(product.id, -1)}
-                  disabled={quantity === 0}
-                  style={{
-                    width: '24px', height: '24px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: '1px solid #e2e8f0', background: 'white', color: quantity > 0 ? 'var(--primary)' : '#cbd5e1', fontWeight: 'bold'
-                  }}
-                >−</button>
-                <span style={{
-                  flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '13px',
-                  color: quantity > 0 ? 'var(--primary)' : '#64748b',
-                }}>{quantity}</span>
-                <button
-                  className="qty-btn"
-                  onClick={() => onUpdate(product.id, 1)}
-                  disabled={isOut || quantity >= 10}
-                  style={{
-                    width: '24px', height: '24px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: '1px solid #e2e8f0', background: 'white', color: isOut ? '#cbd5e1' : 'var(--primary)', fontWeight: 'bold'
-                  }}
-                >+</button>
+                {quantity === 0 ? (
+                  <div style={{ width: '100%', textAlign: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isCustomizable && onCustomize) {
+                          onCustomize(product);
+                        } else {
+                          onUpdate(product.id, 1);
+                        }
+                      }}
+                      disabled={isOut}
+                      style={{
+                        width: '100%',
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        backgroundColor: '#ffffff',
+                        border: '1.5px solid var(--primary)',
+                        color: 'var(--primary)',
+                        fontWeight: 800,
+                        fontSize: '11.5px',
+                        cursor: isOut ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                      }}
+                    >
+                      ADD
+                    </button>
+                    {isCustomizable && (
+                      <span style={{ fontSize: '9px', color: '#64748b', display: 'block', marginTop: '2px', fontWeight: 600 }}>
+                        customisable
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      className="qty-btn"
+                      onClick={() => onUpdate(product.id, -1)}
+                      style={{
+                        width: '24px', height: '24px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1px solid #e2e8f0', background: 'white', color: 'var(--primary)', fontWeight: 'bold'
+                      }}
+                    >−</button>
+                    <span style={{
+                      flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '13px',
+                      color: 'var(--primary)',
+                    }}>{quantity}</span>
+                    <button
+                      className="qty-btn"
+                      onClick={() => {
+                        if (isCustomizable && onCustomize) {
+                          onCustomize(product);
+                        } else {
+                          onUpdate(product.id, 1);
+                        }
+                      }}
+                      disabled={isOut || quantity >= 10}
+                      style={{
+                        width: '24px', height: '24px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1px solid #e2e8f0', background: 'white', color: isOut ? '#cbd5e1' : 'var(--primary)', fontWeight: 'bold'
+                      }}
+                    >+</button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -263,7 +312,7 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
           fontSize: '15px',
           margin: 0,
         }}>
-          {formatPrice(product.price)}
+          {isCustomizable ? `From ${formatPrice(product.price)}` : formatPrice(product.price)}
         </p>
       </div>
 
@@ -299,32 +348,46 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
         {showOrdering && (
           <div style={{
             position: 'absolute',
-            bottom: '-12px',
+            bottom: isCustomizable && quantity === 0 ? '-18px' : '-12px',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10,
           }}>
             {quantity === 0 ? (
-              <button
-                onClick={() => onUpdate(product.id, 1)}
-                disabled={isOut}
-                style={{
-                  padding: '5px 16px',
-                  borderRadius: '6px',
-                  backgroundColor: '#ffffff',
-                  border: '1.5px solid var(--primary)',
-                  color: 'var(--primary)',
-                  fontWeight: 800,
-                  fontSize: '11px',
-                  boxShadow: '0 3px 8px rgba(0,0,0,0.06)',
-                  cursor: isOut ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s',
-                  boxSizing: 'border-box'
-                }}
-              >
-                ADD
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isCustomizable && onCustomize) {
+                      onCustomize(product);
+                    } else {
+                      onUpdate(product.id, 1);
+                    }
+                  }}
+                  disabled={isOut}
+                  style={{
+                    padding: '5px 16px',
+                    borderRadius: '6px',
+                    backgroundColor: '#ffffff',
+                    border: '1.5px solid var(--primary)',
+                    color: 'var(--primary)',
+                    fontWeight: 800,
+                    fontSize: '11px',
+                    boxShadow: '0 3px 8px rgba(0,0,0,0.06)',
+                    cursor: isOut ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  ADD
+                </button>
+                {isCustomizable && (
+                  <span style={{ fontSize: '9px', color: '#64748b', marginTop: '2px', fontWeight: 600, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                    customisable
+                  </span>
+                )}
+              </div>
             ) : (
               <div style={{
                 display: 'flex',
@@ -339,6 +402,7 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
                 justifyContent: 'space-between'
               }}>
                 <button
+                  type="button"
                   onClick={() => onUpdate(product.id, -1)}
                   style={{
                     border: 'none',
@@ -367,7 +431,14 @@ function ProductCard({ product, quantity, onUpdate, showOrdering = true, layout 
                   {quantity}
                 </span>
                 <button
-                  onClick={() => onUpdate(product.id, 1)}
+                  type="button"
+                  onClick={() => {
+                    if (isCustomizable && onCustomize) {
+                      onCustomize(product);
+                    } else {
+                      onUpdate(product.id, 1);
+                    }
+                  }}
                   disabled={isOut || quantity >= 10}
                   style={{
                     border: 'none',
@@ -407,6 +478,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const showDigitalMenu = restaurant?.modules?.DIGITAL_MENU !== false;
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
+  const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
@@ -540,11 +612,12 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     const removedNames: string[] = [];
     let changed = false;
 
-    for (const [id, item] of cart.entries()) {
-      const product = byId.get(id);
+    for (const [key, item] of cart.entries()) {
+      const productId = item.product_id || key;
+      const product = byId.get(productId);
 
       if (!product) {
-        newCart.delete(id);
+        newCart.delete(key);
         removedNames.push(item.name);
         changed = true;
         continue;
@@ -555,22 +628,25 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         : product.status;
 
       if (pStatus === 'OUT_OF_STOCK') {
-        newCart.delete(id);
+        newCart.delete(key);
         removedNames.push(item.name);
         changed = true;
         continue;
       }
 
+      const hasCust = item.selected_variant || (item.selected_customizations && item.selected_customizations.length > 0);
+      const updatedPrice = hasCust ? item.price : product.price;
+
       if (
-        item.status !== product.status ||
-        item.price !== product.price ||
+        item.status !== pStatus ||
+        item.price !== updatedPrice ||
         item.name !== product.name ||
         item.image_url !== product.image_url
       ) {
-        newCart.set(id, {
+        newCart.set(key, {
           ...item,
           status: pStatus,
-          price: product.price,
+          price: updatedPrice,
           name: product.name,
           image_url: product.image_url,
         });
@@ -585,11 +661,22 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     if (removedNames.length > 0) {
       toast.error(`${removedNames.join(', ')} removed from cart (out of stock)`);
     }
-  }, [products, cart, saveCart]);
+  }, [products, cart, saveCart, showOrdering]);
 
   const handleUpdate = (id: string, delta: number) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
+
+    const isCustomizable = Boolean(
+      product.has_customizations ||
+      (Array.isArray(product.variants) && product.variants.length > 0) ||
+      (Array.isArray(product.customization_groups) && product.customization_groups.length > 0)
+    );
+
+    if (isCustomizable && delta > 0) {
+      setCustomizingProduct(product);
+      return;
+    }
 
     const pStatus = showOrdering
       ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
@@ -603,6 +690,22 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     }
 
     const newCart = new Map(cart);
+
+    if (delta < 0) {
+      // Find matching items for this product
+      const matching = Array.from(newCart.entries()).filter(([_, item]) => (item.product_id || _) === id);
+      if (matching.length === 0) return;
+      const [targetKey, targetItem] = matching[matching.length - 1];
+      const newQty = targetItem.quantity + delta;
+      if (newQty <= 0) {
+        newCart.delete(targetKey);
+      } else {
+        newCart.set(targetKey, { ...targetItem, quantity: newQty });
+      }
+      saveCart(newCart);
+      return;
+    }
+
     const existing = newCart.get(id);
     const newQty = (existing?.quantity || 0) + delta;
 
@@ -616,6 +719,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     } else {
       newCart.set(id, {
         product_id: id,
+        cart_item_key: id,
         name: product.name,
         price: product.price,
         quantity: Math.min(newQty, 10),
@@ -624,6 +728,47 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       });
     }
     saveCart(newCart);
+  };
+
+  const handleCustomizationConfirm = (result: ProductCustomizationResult) => {
+    const { product, selected_variant, selected_customizations, customization_summary, quantity, notes, total_unit_price } = result;
+
+    const variantId = selected_variant ? selected_variant.id : 'base';
+    const custKeys = (selected_customizations || []).map((c: SelectedCustomizationSnapshot) => c.option_id).sort().join('_');
+    const cartItemKey = `${product.id}:::${variantId}:::${custKeys}`;
+
+    const newCart = new Map(cart);
+    const existing = newCart.get(cartItemKey);
+    const newQty = (existing?.quantity || 0) + quantity;
+
+    newCart.set(cartItemKey, {
+      product_id: product.id,
+      cart_item_key: cartItemKey,
+      name: product.name,
+      price: total_unit_price,
+      quantity: Math.min(newQty, 10),
+      image_url: product.image_url,
+      status: product.status,
+      selected_variant: selected_variant || undefined,
+      selected_customizations: selected_customizations,
+      customization_summary: customization_summary,
+      notes: notes || undefined,
+      item_note: notes || undefined,
+    });
+
+    saveCart(newCart);
+    setCustomizingProduct(null);
+    toast.success(`Added ${product.name} to cart`);
+  };
+
+  const getProductQuantity = (productId: string) => {
+    let count = 0;
+    cart.forEach((item, key) => {
+      if ((item.product_id || key) === productId) {
+        count += item.quantity;
+      }
+    });
+    return count;
   };
 
   const totalItems = Array.from(cart.values()).reduce((s, i) => s + i.quantity, 0);
@@ -838,8 +983,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
                 <ProductCard
                   key={product.id}
                   product={product}
-                  quantity={cart.get(product.id)?.quantity || 0}
+                  quantity={getProductQuantity(product.id)}
                   onUpdate={isServiceActive ? handleUpdate : () => toast.error('Service is not started')}
+                  onCustomize={isServiceActive ? setCustomizingProduct : () => toast.error('Service is not started')}
                   showOrdering={showOrdering}
                   layout={menuLayout}
                 />
@@ -961,6 +1107,13 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         </div>
       )}
 
+      {/* Product Customization Modal */}
+      <ProductCustomizationModal
+        isOpen={Boolean(customizingProduct)}
+        product={customizingProduct}
+        onClose={() => setCustomizingProduct(null)}
+        onConfirm={handleCustomizationConfirm}
+      />
 
     </div>
   );

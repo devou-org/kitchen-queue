@@ -8,6 +8,9 @@ export interface CreateOrderData {
     quantity: number;
     price_at_purchase: number;
     notes?: string;
+    selected_variant?: any;
+    selected_customizations?: any[];
+    customization_summary?: string | null;
   }[];
   notes?: string;
   party_size: number;

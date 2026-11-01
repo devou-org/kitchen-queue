@@ -69,6 +69,20 @@ async function runAutoMigration(sqlConnection: any) {
       CREATE UNIQUE INDEX IF NOT EXISTS ux_loyalty_order_tx_type 
       ON loyalty_transactions (order_id, transaction_type) 
       WHERE order_id IS NOT NULL AND transaction_type IN ('EARN_POINTS', 'REVERSAL_REFUND', 'REFUND_REDEEM_POINTS', 'REFUND_REDEEM_VISIT');
+
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS has_customizations BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS variants JSONB DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS customization_groups JSONB DEFAULT '[]'::jsonb;
+
+      ALTER TABLE order_items
+      ADD COLUMN IF NOT EXISTS selected_variant JSONB DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS selected_customizations JSONB DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS customization_summary TEXT DEFAULT NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_products_has_customizations 
+      ON products(restaurant_id, has_customizations) 
+      WHERE has_customizations = TRUE;
     `;
     await sqlConnection`
       INSERT INTO gemini_request_config (request_type, max_output_tokens)
@@ -914,11 +928,22 @@ export async function createProduct(data: {
   category: string;
   dietary_preference?: string;
   counter?: string;
+  has_customizations?: boolean;
+  variants?: any[];
+  customization_groups?: any[];
 }) {
   const rows = await sql`
-    INSERT INTO products (restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference, counter)
-    VALUES (${data.restaurant_id}, ${data.name}, ${data.description}, ${data.price}, ${data.image_url}, 
-            ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'}, ${data.counter || null})
+    INSERT INTO products (
+      restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference, counter,
+      has_customizations, variants, customization_groups
+    )
+    VALUES (
+      ${data.restaurant_id}, ${data.name}, ${data.description}, ${data.price}, ${data.image_url}, 
+      ${data.stock_quantity}, ${data.buffer_quantity}, ${data.status}, ${data.category}, ${data.dietary_preference || 'NON_VEG'}, ${data.counter || null},
+      ${Boolean(data.has_customizations)},
+      ${JSON.stringify(data.variants || [])}::jsonb,
+      ${JSON.stringify(data.customization_groups || [])}::jsonb
+    )
     RETURNING *
   `;
 
@@ -947,6 +972,9 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
   is_active: boolean;
   dietary_preference: string;
   counter: string;
+  has_customizations: boolean;
+  variants: any[];
+  customization_groups: any[];
 }>) {
   const client = await pool.connect();
   try {
@@ -973,6 +1001,9 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
         is_active = COALESCE($9, is_active),
         dietary_preference = COALESCE($10, dietary_preference),
         counter = COALESCE($13, counter),
+        has_customizations = COALESCE($14, has_customizations),
+        variants = CASE WHEN $15::text IS NOT NULL THEN $15::jsonb ELSE variants END,
+        customization_groups = CASE WHEN $16::text IS NOT NULL THEN $16::jsonb ELSE customization_groups END,
         updated_at = NOW()
       WHERE restaurant_id = $11 AND id = $12
       RETURNING *
@@ -981,7 +1012,10 @@ export async function updateProduct(restaurantId: string, id: string, data: Part
         data.name ?? null, data.description ?? null, data.price ?? null, data.image_url ?? null,
         data.stock_quantity ?? null, data.buffer_quantity ?? null, data.status ?? null,
         data.category ?? null, data.is_active ?? null, data.dietary_preference ?? null,
-        restaurantId, id, data.counter ?? null
+        restaurantId, id, data.counter ?? null,
+        data.has_customizations !== undefined ? data.has_customizations : null,
+        data.variants !== undefined ? JSON.stringify(data.variants) : null,
+        data.customization_groups !== undefined ? JSON.stringify(data.customization_groups) : null
       ]
     );
 
@@ -1046,7 +1080,7 @@ export async function getOrders(restaurantId: string, filters: {
     if (filters.status) {
       if (sort === 'DESC') {
         return normalizeOrderRows(await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND (o.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND o.status = 'PAID')) 
             AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
@@ -1057,7 +1091,7 @@ export async function getOrders(restaurantId: string, filters: {
         `);
       }
       return normalizeOrderRows(await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND (o.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND o.status = 'PAID')) 
           AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
@@ -1070,7 +1104,7 @@ export async function getOrders(restaurantId: string, filters: {
       const statuses = filters.status_in.split(',');
       if (sort === 'DESC') {
         return normalizeOrderRows(await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
             AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
@@ -1081,7 +1115,7 @@ export async function getOrders(restaurantId: string, filters: {
         `);
       }
       return normalizeOrderRows(await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
           AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
@@ -1093,7 +1127,7 @@ export async function getOrders(restaurantId: string, filters: {
     } else {
       if (sort === 'DESC') {
         return normalizeOrderRows(await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
             AND o.business_date <= ${filters.date_to}::date
           ORDER BY o.business_date DESC,
@@ -1103,7 +1137,7 @@ export async function getOrders(restaurantId: string, filters: {
         `);
       }
       return normalizeOrderRows(await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.business_date >= ${filters.date_from}::date
           AND o.business_date <= ${filters.date_to}::date
         ORDER BY o.business_date ASC,
@@ -1117,13 +1151,13 @@ export async function getOrders(restaurantId: string, filters: {
   if (filters.status) {
     if (sort === 'DESC') {
       return normalizeOrderRows(await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND (o.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND o.status = 'PAID'))
         ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
       `);
     }
     return normalizeOrderRows(await sql`
-      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
       FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND (o.status = ${filters.status} OR (${filters.status} = 'CLOSED' AND o.status = 'PAID'))
       ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
     `);
@@ -1133,13 +1167,13 @@ export async function getOrders(restaurantId: string, filters: {
     const statuses = filters.status_in.split(',');
     if (sort === 'DESC') {
       return normalizeOrderRows(await sql`
-          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+          SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
           FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
           ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
         `);
     }
     return normalizeOrderRows(await sql`
-        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+        SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
         FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar) AND o.status = ANY(${statuses})
         ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
       `);
@@ -1147,13 +1181,13 @@ export async function getOrders(restaurantId: string, filters: {
 
   if (sort === 'DESC') {
     return normalizeOrderRows(await sql`
-      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+      SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
       FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
       ORDER BY o.created_at DESC LIMIT ${per_page} OFFSET ${offset}
     `);
   }
   return normalizeOrderRows(await sql`
-    SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
+    SELECT o.*, s.name as staff_name, (SELECT json_agg(json_build_object('id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity, 'price_at_purchase', oi.price_at_purchase, 'product_name', p.name, 'counter', COALESCE(NULLIF(oi.counter, ''), p.counter, 'Kitchen'), 'status', COALESCE(oi.status, 'PENDING'), 'prepared_at', oi.prepared_at, 'ready_at', oi.ready_at, 'notes', oi.notes, 'selected_variant', oi.selected_variant, 'selected_customizations', oi.selected_customizations, 'customization_summary', oi.customization_summary) ORDER BY oi.id) FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id JOIN restaurants r ON r.id = o.restaurant_id WHERE o.restaurant_id = ${restaurantId} AND (${filters.payment_method || null}::varchar IS NULL OR o.payment_method = ${filters.payment_method || null}::varchar OR o.payment_method ILIKE '%' || ${filters.payment_method || null}::varchar || '%' OR (o.payment_split IS NOT NULL AND jsonb_typeof(o.payment_split) = 'object' AND (o.payment_split->>${filters.payment_method || ''})::numeric > 0)) AND (${filters.order_type || null}::varchar IS NULL OR o.order_type = ${filters.order_type || null}::varchar)
     ORDER BY o.created_at ASC LIMIT ${per_page} OFFSET ${offset}
   `);
@@ -1537,7 +1571,10 @@ export async function getOrderById(restaurantId: string, id: string) {
         'prepared_at', oi.prepared_at,
         'ready_at', oi.ready_at,
         'product_image', p.image_url,
-        'notes', oi.notes
+        'notes', oi.notes,
+        'selected_variant', oi.selected_variant,
+        'selected_customizations', oi.selected_customizations,
+        'customization_summary', oi.customization_summary
       ) ORDER BY oi.id) as items
     FROM orders o 
     LEFT JOIN staffs s ON s.id = o.staff_id
@@ -1577,7 +1614,10 @@ export async function getOrderByTicket(restaurantId: string, ticket_number: numb
         'prepared_at', oi.prepared_at,
         'ready_at', oi.ready_at,
         'product_image', p.image_url,
-        'notes', oi.notes
+        'notes', oi.notes,
+        'selected_variant', oi.selected_variant,
+        'selected_customizations', oi.selected_customizations,
+        'customization_summary', oi.customization_summary
       ) ORDER BY oi.id) as items
     FROM orders o LEFT JOIN staffs s ON s.id = o.staff_id
     LEFT JOIN active_ranks ar ON ar.order_id = o.id
@@ -1621,7 +1661,10 @@ export async function getOrdersByPhone(restaurantId: string, phone: string) {
           'status', COALESCE(oi.status, 'PENDING'),
           'prepared_at', oi.prepared_at,
           'ready_at', oi.ready_at,
-          'notes', oi.notes
+          'notes', oi.notes,
+          'selected_variant', oi.selected_variant,
+          'selected_customizations', oi.selected_customizations,
+          'customization_summary', oi.customization_summary
         ) ORDER BY oi.id) 
         FROM order_items oi 
         LEFT JOIN products p ON p.id = oi.product_id 
@@ -1682,7 +1725,10 @@ export async function getOrdersByPhonePaginated(restaurantId: string, phone: str
             'price_at_purchase', oi.price_at_purchase,
             'status', oi.status,
             'product_name', p.name,
-            'notes', oi.notes
+            'notes', oi.notes,
+            'selected_variant', oi.selected_variant,
+            'selected_customizations', oi.selected_customizations,
+            'customization_summary', oi.customization_summary
           )
         )
         FROM order_items oi
@@ -1726,12 +1772,28 @@ export async function createOrder(data: {
   staff_id?: string;
   business_date?: string;
   loyalty_reward_id?: string;
-  items: { product_id: string; quantity: number; price_at_purchase: number; notes?: string }[];
+  items: {
+    product_id: string;
+    quantity: number;
+    price_at_purchase: number;
+    notes?: string;
+    selected_variant?: any;
+    selected_customizations?: any[];
+    customization_summary?: string;
+  }[];
 }) {
   // 1. Group by product_id for stock deduction & inventory checks
   const stockMap = new Map<string, number>();
-  // 2. Group by product_id, price_at_purchase, and notes for separate line items (e.g. Free loyalty reward at ₹0, or specific item kitchen notes)
-  const lineItemMap = new Map<string, { product_id: string; quantity: number; price_at_purchase: number; notes?: string }>();
+  // 2. Group by product_id, price, notes, and customizations for separate line items
+  const lineItemMap = new Map<string, {
+    product_id: string;
+    quantity: number;
+    price_at_purchase: number;
+    notes?: string;
+    selected_variant?: any;
+    selected_customizations?: any[];
+    customization_summary?: string | null;
+  }>();
 
   for (const item of data.items) {
     const qty = Number(item.quantity);
@@ -1747,12 +1809,24 @@ export async function createOrder(data: {
 
     stockMap.set(item.product_id, (stockMap.get(item.product_id) || 0) + qty);
 
-    const lineKey = `${item.product_id}:::${price}:::${itemNote}`;
+    const variantId = item.selected_variant?.id || '';
+    const custKey = Array.isArray(item.selected_customizations)
+      ? item.selected_customizations.map((c: any) => c.option_id).sort().join(',')
+      : '';
+    const lineKey = `${item.product_id}:::${price}:::${itemNote}:::${variantId}:::${custKey}`;
     const existing = lineItemMap.get(lineKey);
     if (existing) {
       existing.quantity += qty;
     } else {
-      lineItemMap.set(lineKey, { product_id: item.product_id, quantity: qty, price_at_purchase: price, notes: itemNote || undefined });
+      lineItemMap.set(lineKey, {
+        product_id: item.product_id,
+        quantity: qty,
+        price_at_purchase: price,
+        notes: itemNote || undefined,
+        selected_variant: item.selected_variant || null,
+        selected_customizations: item.selected_customizations || [],
+        customization_summary: item.customization_summary || null,
+      });
     }
   }
 
@@ -1768,6 +1842,9 @@ export async function createOrder(data: {
   const quantities = normalizedItems.map((i) => i.quantity);
   const prices = normalizedItems.map((i) => i.price_at_purchase);
   const itemNotes = normalizedItems.map((i) => i.notes || null);
+  const selectedVariants = normalizedItems.map((i) => i.selected_variant ? JSON.stringify(i.selected_variant) : null);
+  const selectedCustomizations = normalizedItems.map((i) => i.selected_customizations && i.selected_customizations.length > 0 ? JSON.stringify(i.selected_customizations) : null);
+  const customizationSummaries = normalizedItems.map((i) => i.customization_summary || null);
 
   const computedTotal = Math.round(
     normalizedItems.reduce((sum, item) => sum + item.quantity * item.price_at_purchase, 0) * 100
@@ -1848,6 +1925,86 @@ export async function createOrder(data: {
         throw new Error(issues.join(' • '));
       }
       throw new Error('One or more items are out of stock or no longer available.');
+    }
+
+    // 0.2 Check & deduct Variant-level and Option-level stock if configured
+    const custProductRows = await client.query(
+      `SELECT id, restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference, counter, has_customizations, variants, customization_groups 
+       FROM products 
+       WHERE id = ANY($1::uuid[]) AND has_customizations = TRUE 
+       FOR UPDATE`,
+      [stockProductIds]
+    );
+
+    const updatedCustomProducts: any[] = [];
+    if (custProductRows.rows.length > 0) {
+      const prodMap = new Map(custProductRows.rows.map((r: any) => [String(r.id), r]));
+      const customIssues: string[] = [];
+
+      for (const item of normalizedItems) {
+        const prod = prodMap.get(String(item.product_id));
+        if (!prod) continue;
+
+        let variantsChanged = false;
+        let groupsChanged = false;
+
+        // Check & deduct Variant stock
+        if (item.selected_variant && Array.isArray(prod.variants)) {
+          const varIndex = prod.variants.findIndex((v: any) => v.id === item.selected_variant?.id);
+          if (varIndex !== -1) {
+            const variant = prod.variants[varIndex];
+            if (typeof variant.stock_quantity === 'number') {
+              if (variant.stock_quantity < item.quantity) {
+                customIssues.push(`"${variant.name}" for "${prod.name}" only has ${variant.stock_quantity} available (${item.quantity} requested)`);
+              } else {
+                variant.stock_quantity -= item.quantity;
+                variantsChanged = true;
+              }
+            }
+          }
+        }
+
+        // Check & deduct Customization Option stock
+        if (Array.isArray(item.selected_customizations) && Array.isArray(prod.customization_groups)) {
+          for (const selectedOpt of item.selected_customizations) {
+            for (const grp of prod.customization_groups) {
+              if (grp.id === selectedOpt.group_id && Array.isArray(grp.options)) {
+                const optIndex = grp.options.findIndex((o: any) => o.id === selectedOpt.option_id);
+                if (optIndex !== -1) {
+                  const option = grp.options[optIndex];
+                  if (typeof option.stock_quantity === 'number') {
+                    if (option.stock_quantity < item.quantity) {
+                      customIssues.push(`Option "${option.name}" only has ${option.stock_quantity} available (${item.quantity} requested)`);
+                    } else {
+                      option.stock_quantity -= item.quantity;
+                      groupsChanged = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (variantsChanged || groupsChanged) {
+          if (!updatedCustomProducts.some(p => p.id === prod.id)) {
+            updatedCustomProducts.push(prod);
+          }
+        }
+      }
+
+      if (customIssues.length > 0) {
+        throw new Error(customIssues.join(' • '));
+      }
+
+      for (const prod of updatedCustomProducts) {
+        await client.query(
+          `UPDATE products 
+           SET variants = $1::jsonb, customization_groups = $2::jsonb, updated_at = NOW() 
+           WHERE id = $3::uuid`,
+          [JSON.stringify(prod.variants), JSON.stringify(prod.customization_groups), prod.id]
+        );
+      }
     }
 
     // 1. Ensure user exists
@@ -1984,7 +2141,7 @@ export async function createOrder(data: {
 
     await client.query(
       `
-        INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase, status, counter, prepared_at, notes)
+        INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase, status, counter, prepared_at, notes, selected_variant, selected_customizations, customization_summary)
         SELECT 
           $1::uuid, 
           t.pid, 
@@ -1993,11 +2150,14 @@ export async function createOrder(data: {
           $5::varchar, 
           COALESCE(NULLIF(p.counter, ''), 'Kitchen'),
           CASE WHEN $5::varchar = 'PREPARING' THEN NOW() ELSE NULL END,
-          NULLIF(TRIM(t.note), '')
-        FROM unnest($2::uuid[], $3::int[], $4::numeric[], $6::text[]) AS t(pid, qty, price, note)
+          NULLIF(TRIM(t.note), ''),
+          t.variant::jsonb,
+          t.customizations::jsonb,
+          NULLIF(TRIM(t.summary), '')
+        FROM unnest($2::uuid[], $3::int[], $4::numeric[], $6::text[], $7::text[], $8::text[], $9::text[]) AS t(pid, qty, price, note, variant, customizations, summary)
         LEFT JOIN products p ON p.id = t.pid
       `,
-      [orderId, productIds, quantities, prices, defaultStatus, itemNotes]
+      [orderId, productIds, quantities, prices, defaultStatus, itemNotes, selectedVariants, selectedCustomizations, customizationSummaries]
     );
 
     // Auto-deduct inventory ingredients for products with configured BOM recipes
@@ -2019,6 +2179,15 @@ export async function createOrder(data: {
     }
 
     await client.query('COMMIT');
+
+    // Notify connected clients of updated variant / option stock
+    if (updatedCustomProducts.length > 0) {
+      import('@/lib/pusher').then(({ pusherServer }) => {
+        for (const prod of updatedCustomProducts) {
+          pusherServer.trigger(`queue-channel-${data.restaurant_id}`, 'product_updated', prod).catch(() => {});
+        }
+      }).catch(() => {});
+    }
 
     // Trigger loyalty reward earning if order was placed as already paid
     if (isPaid) {
@@ -2821,7 +2990,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
 export async function restoreOrderStock(orderId: string) {
   // 1. Get items of the order
   const items = await sql`
-    SELECT product_id, quantity FROM order_items WHERE order_id = ${orderId}
+    SELECT product_id, quantity, selected_variant, selected_customizations FROM order_items WHERE order_id = ${orderId}
   `;
 
   if (items.length === 0) return;
@@ -2857,6 +3026,85 @@ export async function restoreOrderStock(orderId: string) {
     ) AS v
     WHERE p.id = v.pid
   `;
+
+  // 3. Restore variant and customization option stock
+  try {
+    const custProductRows = await sql`
+      SELECT id, restaurant_id, name, description, price, image_url, stock_quantity, buffer_quantity, status, category, dietary_preference, counter, has_customizations, variants, customization_groups 
+      FROM products 
+      WHERE id = ANY(${productIds}::uuid[]) AND has_customizations = TRUE
+    `;
+
+    if (custProductRows.length > 0) {
+      const prodMap = new Map(custProductRows.map((r: any) => [String(r.id), r]));
+      const restoredProducts: any[] = [];
+
+      for (const item of items) {
+        const prod = prodMap.get(String(item.product_id));
+        if (!prod) continue;
+        const qty = Number(item.quantity) || 1;
+
+        let variantsChanged = false;
+        let groupsChanged = false;
+
+        const selVariant = typeof item.selected_variant === 'string' ? JSON.parse(item.selected_variant) : item.selected_variant;
+        if (selVariant?.id && Array.isArray(prod.variants)) {
+          const varIndex = prod.variants.findIndex((v: any) => v.id === selVariant.id);
+          if (varIndex !== -1 && typeof prod.variants[varIndex].stock_quantity === 'number') {
+            prod.variants[varIndex].stock_quantity += qty;
+            variantsChanged = true;
+          }
+        }
+
+        const selCustomizations = typeof item.selected_customizations === 'string' ? JSON.parse(item.selected_customizations) : item.selected_customizations;
+        if (Array.isArray(selCustomizations) && Array.isArray(prod.customization_groups)) {
+          for (const c of selCustomizations) {
+            for (const grp of prod.customization_groups) {
+              if (grp.id === c.group_id && Array.isArray(grp.options)) {
+                const optIndex = grp.options.findIndex((o: any) => o.id === c.option_id);
+                if (optIndex !== -1 && typeof grp.options[optIndex].stock_quantity === 'number') {
+                  grp.options[optIndex].stock_quantity += qty;
+                  groupsChanged = true;
+                }
+              }
+            }
+          }
+        }
+
+        if (variantsChanged || groupsChanged) {
+          if (!restoredProducts.some(p => p.id === prod.id)) {
+            restoredProducts.push(prod);
+          }
+        }
+      }
+
+      for (const prod of restoredProducts) {
+        await sql`
+          UPDATE products 
+          SET variants = ${JSON.stringify(prod.variants)}::jsonb, customization_groups = ${JSON.stringify(prod.customization_groups)}::jsonb, updated_at = NOW()
+          WHERE id = ${prod.id}::uuid
+        `;
+        if (prod.restaurant_id) {
+          import('@/lib/pusher').then(({ pusherServer }) => {
+            pusherServer.trigger(`queue-channel-${prod.restaurant_id}`, 'product_updated', prod).catch(() => {});
+          }).catch(() => {});
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error restoring variant/option stock on cancel:', err);
+  }
+
+  // 4. Restore raw ingredient BOM stock from stock_movements
+  try {
+    const ordRow = await sql`SELECT restaurant_id FROM orders WHERE id = ${orderId} LIMIT 1`;
+    if (ordRow.length > 0 && ordRow[0].restaurant_id) {
+      const { restoreInventoryForOrder } = await import('@/lib/inventory');
+      await restoreInventoryForOrder(pool, ordRow[0].restaurant_id, orderId);
+    }
+  } catch (invRestoreErr) {
+    console.error('Error auto-restoring inventory BOM stock:', invRestoreErr);
+  }
 }
 
 export async function setOrderPaymentStatus(restaurantId: string, id: string, isPaid: boolean) {

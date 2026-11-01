@@ -254,6 +254,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         product_id: i.product_id,
         quantity: i.quantity,
         price_at_purchase: i.price,
+        item_note: i.item_note || undefined,
+        selected_variant: i.selected_variant || undefined,
+        selected_customizations: i.selected_customizations || undefined,
+        customization_summary: i.customization_summary || undefined,
       }));
 
       // Handle FREE_ITEM loyalty reward line item
@@ -270,6 +274,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             product_id: freeProductId,
             quantity: 1,
             price_at_purchase: 0,
+            item_note: undefined,
+            selected_variant: undefined,
+            selected_customizations: undefined,
+            customization_summary: undefined,
           });
         }
       }

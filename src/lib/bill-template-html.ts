@@ -111,10 +111,15 @@ export function generateBillTemplateContentHTML(order: Order, restaurant?: BillR
   // ---- items ----
   const cols = 'minmax(0,1fr) 28px 54px 62px';
   const itemsHtml = items.map((item: any) => {
-    const name = escapeHtml(String(item.product_name || item.name || 'Item').trim().toUpperCase());
+    let rawName = String(item.product_name || item.name || 'Item').trim().toUpperCase();
+    if (item.selected_variant?.name) {
+      rawName += ` (${String(item.selected_variant.name).trim().toUpperCase()})`;
+    }
+    const name = escapeHtml(rawName);
     const qty = Number(item.quantity) || 1;
     const price = Number(item.price_at_purchase ?? item.price ?? 0);
     const isFree = price === 0;
+    const note = item.notes || item.item_note;
     return `
       <div style="display:grid;grid-template-columns:${cols};gap:4px;font-weight:700;padding:2px 0;">
         <span style="overflow-wrap:anywhere;">${name}${isFree ? ' <span style="font-size:10px;font-weight:800;">[FREE]</span>' : ''}</span>
@@ -122,7 +127,8 @@ export function generateBillTemplateContentHTML(order: Order, restaurant?: BillR
         <span style="text-align:right;">${num(price)}</span>
         <span style="text-align:right;">${num(price * qty)}</span>
       </div>
-      ${item.notes ? `<div style="padding-left:8px;font-size:11px;">* Note: ${escapeHtml(String(item.notes).trim())}</div>` : ''}`;
+      ${item.customization_summary ? `<div style="padding-left:8px;font-size:11px;font-weight:700;">+ ${escapeHtml(String(item.customization_summary).trim())}</div>` : ''}
+      ${note ? `<div style="padding-left:8px;font-size:11px;">* Note: ${escapeHtml(String(note).trim())}</div>` : ''}`;
   }).join('');
 
   // ---- totals ----
