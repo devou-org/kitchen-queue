@@ -6,7 +6,7 @@ import Link from 'next/link';
 import toast, { Toaster } from 'react-hot-toast';
 import { 
   ArrowLeft, 
-  Sparkles, 
+  Tag, 
   Plus, 
   Edit3, 
   Trash2, 
@@ -215,7 +215,7 @@ export default function SuperAdminUpdatesPage() {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <Sparkles size={18} />
+                <Tag size={18} />
               </div>
               <h1 style={styles.headerTitle}>Updates & Patches</h1>
             </div>
@@ -286,7 +286,7 @@ export default function SuperAdminUpdatesPage() {
         ) : updates.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748B' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#F1F5F9', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-              <Sparkles size={28} />
+              <Tag size={28} />
             </div>
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: '0 0 6px' }}>No updates published yet</h3>
             <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '380px', margin: '0 auto 20px' }}>
@@ -407,7 +407,7 @@ export default function SuperAdminUpdatesPage() {
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <Sparkles size={18} />
+                  <Tag size={18} />
                 </div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
                   {editingItem ? 'Edit Patch Update' : 'New System Update'}

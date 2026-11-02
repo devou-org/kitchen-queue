@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, ExternalLink, Calendar, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Tag, ExternalLink, Calendar, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 interface SystemUpdate {
   id: string;
@@ -15,9 +15,13 @@ interface SystemUpdate {
 
 interface UpdatesAndPatchesCardProps {
   primaryColor?: string;
+  onLatestVersion?: (version: string) => void;
 }
 
-export function UpdatesAndPatchesCard({ primaryColor = 'var(--primary, #971345)' }: UpdatesAndPatchesCardProps) {
+export function UpdatesAndPatchesCard({
+  primaryColor = 'var(--primary, #971345)',
+  onLatestVersion,
+}: UpdatesAndPatchesCardProps) {
   const [updates, setUpdates] = useState<SystemUpdate[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,6 +32,12 @@ export function UpdatesAndPatchesCard({ primaryColor = 'var(--primary, #971345)'
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         setUpdates(data.data);
+        if (onLatestVersion) {
+          const firstVer = data.data.find((u: SystemUpdate) => u.version_tag)?.version_tag;
+          if (firstVer) {
+            onLatestVersion(firstVer);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load system updates:', err);
@@ -182,4 +192,3 @@ export function UpdatesAndPatchesCard({ primaryColor = 'var(--primary, #971345)'
   );
 }
 export default UpdatesAndPatchesCard;
-

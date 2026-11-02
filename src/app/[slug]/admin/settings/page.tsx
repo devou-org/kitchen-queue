@@ -5,7 +5,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant, invalidateRestaurantCache } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Store, Eye, Sparkles, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power, ChefHat, Monitor, CheckCircle2 } from 'lucide-react';
+import { Store, Eye, Tag, Sparkles, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power, ChefHat, Monitor, CheckCircle2 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
@@ -107,6 +107,7 @@ export default function AdminSettings() {
   const [autoPrintKot, setAutoPrintKot] = useState(false);
   const [isPrintStation, setIsPrintStation] = useState(false);
   const [isServiceOnline, setIsServiceOnline] = useState(true);
+  const [latestVersion, setLatestVersion] = useState<string>('');
 
   const SECTION_KEYS = ['service_status', 'profile', 'menu', 'kitchen_workflow', 'hours', 'autoprint', 'gst', 'preview', 'qrcode', 'updates_patches'];
 
@@ -1340,26 +1341,28 @@ export default function AdminSettings() {
             <CollapsibleCard
               id="updates_patches"
               title="Updates and Patches"
-              icon={<Sparkles size={18} style={{ color: primaryColor || 'var(--primary, #971345)' }} />}
+              icon={<Tag size={18} style={{ color: primaryColor || 'var(--primary, #971345)' }} />}
               badge={
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    backgroundColor: '#EFF6FF',
-                    color: '#1D4ED8',
-                    border: '1px solid #BFDBFE',
-                  }}
-                >
-                  Platform
-                </span>
+                latestVersion ? (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      backgroundColor: '#EFF6FF',
+                      color: '#1D4ED8',
+                      border: '1px solid #BFDBFE',
+                    }}
+                  >
+                    {latestVersion}
+                  </span>
+                ) : null
               }
               isCollapsed={!!collapsedSections['updates_patches']}
               onToggle={() => toggleSection('updates_patches')}
             >
-              <UpdatesAndPatchesCard primaryColor={primaryColor} />
+              <UpdatesAndPatchesCard primaryColor={primaryColor} onLatestVersion={setLatestVersion} />
             </CollapsibleCard>
 
           </div>
