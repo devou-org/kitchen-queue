@@ -116,14 +116,31 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
   };
 
   const orderRef = useRef<Order | null>(null);
+  const fetchOrderSeqRef = useRef(0);
   useEffect(() => { orderRef.current = order; }, [order]);
 
   useEffect(() => {
     const fetchOrder = async (silent = false) => {
+      const seq = ++fetchOrderSeqRef.current;
       try {
         const data = await orderService.getOrderById(id);
+        if (seq !== fetchOrderSeqRef.current) return;
         if (data.success && data.data) {
-          setOrder(data.data);
+          const orderData: Order = data.data;
+          setOrder((prev): Order => {
+            if (!prev) return orderData;
+            const existingTime = prev.updated_at ? new Date(prev.updated_at).getTime() : 0;
+            const incomingTime = orderData.updated_at ? new Date(orderData.updated_at).getTime() : 0;
+            if (existingTime > incomingTime) {
+              return {
+                ...orderData,
+                status: prev.status,
+                is_paid: prev.is_paid !== undefined ? prev.is_paid : orderData.is_paid,
+                updated_at: prev.updated_at,
+              };
+            }
+            return orderData;
+          });
         } else if (!silent) {
           setError(data.error || 'Order not found');
           setOrder(null);
@@ -132,7 +149,7 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
         console.error('❌ Failed to fetch order:', err);
         if (!silent) setError('Failed to load order');
       } finally {
-        if (!silent) setLoading(false);
+        if (!silent && seq === fetchOrderSeqRef.current) setLoading(false);
       }
     };
 
@@ -142,10 +159,10 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
     const channelName = restaurant.pusher_channel;
     const channel = pusherClient.subscribe(channelName);
 
-    channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
-    channel.bind('pusher:subscription_error', () => setIsLive(false));
+    const handleSubSucceeded = () => setIsLive(true);
+    const handleSubError = () => setIsLive(false);
 
-    channel.bind('order_update', (data: any) => {
+    const handleOrderUpdate = (data: any) => {
       const currentOrder = orderRef.current;
       const isOurOrder = data.order_id === id || (currentOrder?.id && data.order_id === currentOrder.id);
 
@@ -155,30 +172,40 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
             new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { });
           } catch { }
         }
-        setOrder(prev => prev ? { ...prev, status: data.new_status || prev.status, is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : prev.is_paid } : null);
+        setOrder(prev => prev ? { 
+          ...prev, 
+          status: data.new_status || prev.status, 
+          is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : prev.is_paid,
+          updated_at: new Date().toISOString(),
+        } : null);
         fetchOrder(true);
       }
-    });
+    };
 
-    channel.bind('queue_updated', (data: any) => {
+    const handleQueueUpdated = (data: any) => {
+      // CRITICAL FIX: Only match if this order explicitly links to this waitlist queue record by queue_id.
+      // NEVER match data.queue.token_number with currentOrder.ticket_number! Waitlist tokens and order ticket numbers
+      // are completely separate systems (both start at 1, 2, 3...) and collided during rush hours!
       if (data.type === 'UPDATE' && data.queue) {
         const currentOrder = orderRef.current;
-        const isOurOrder = (currentOrder?.ticket_number && data.queue.token_number === currentOrder.ticket_number) || (currentOrder?.id && data.queue.id === currentOrder.queue_id);
+        const isOurQueue = Boolean(currentOrder?.queue_id && data.queue.id === currentOrder.queue_id);
 
-        if (isOurOrder) {
-          if (data.queue.queue_status === 'READY' && currentOrder?.status !== 'READY') {
-            try {
-              new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { });
-            } catch { }
-          }
-          setOrder(prev => prev ? { ...prev, status: data.queue.queue_status || prev.status } : null);
+        if (isOurQueue) {
           fetchOrder(true);
         }
       }
-    });
+    };
+
+    channel.bind('pusher:subscription_succeeded', handleSubSucceeded);
+    channel.bind('pusher:subscription_error', handleSubError);
+    channel.bind('order_update', handleOrderUpdate);
+    channel.bind('queue_updated', handleQueueUpdated);
 
     return () => {
-      channel.unbind_all();
+      channel.unbind('pusher:subscription_succeeded', handleSubSucceeded);
+      channel.unbind('pusher:subscription_error', handleSubError);
+      channel.unbind('order_update', handleOrderUpdate);
+      channel.unbind('queue_updated', handleQueueUpdated);
       pusherClient?.unsubscribe(channelName);
     };
   }, [id, restaurant]);

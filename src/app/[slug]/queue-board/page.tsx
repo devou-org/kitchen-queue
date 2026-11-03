@@ -38,13 +38,20 @@ export default function QueueBoardPage() {
     if (!pusherClient || !restaurant) return;
     const channelName = restaurant.pusher_channel;
     const channel = pusherClient.subscribe(channelName);
-    setIsLive(true);
+    const handleQueueUpdated = () => fetchQueues(true);
+    const handleSubSucceeded = () => setIsLive(true);
+    const handleSubError = () => setIsLive(false);
 
-    channel.bind('queue_updated', () => fetchQueues(true));
-    channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
-    channel.bind('pusher:subscription_error', () => setIsLive(false));
+    channel.bind('queue_updated', handleQueueUpdated);
+    channel.bind('pusher:subscription_succeeded', handleSubSucceeded);
+    channel.bind('pusher:subscription_error', handleSubError);
 
-    return () => { channel.unbind_all(); channel.unsubscribe(); };
+    return () => {
+      channel.unbind('queue_updated', handleQueueUpdated);
+      channel.unbind('pusher:subscription_succeeded', handleSubSucceeded);
+      channel.unbind('pusher:subscription_error', handleSubError);
+      pusherClient?.unsubscribe(channelName);
+    };
   }, [restaurant]);
 
   if (resLoading || loading) {

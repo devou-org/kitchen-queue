@@ -36,6 +36,7 @@ import { printKotFromBrowser, printBillFromBrowser } from '@/lib/client-print';
 import { printBillTemplateDirectly } from '@/components/BillTemplate';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { orderService } from '@/app/services/orders.api';
+import { tableService } from '@/app/services/tables.api';
 import { EditOrderModal } from './EditOrderModal';
 
 interface OrderDetailsViewProps {
@@ -170,6 +171,36 @@ export function OrderDetailsView({
       }
 
       await onStatusChange(order.id, statusToApply, tempTableNumber, pMethod, pSplit);
+
+      // If order closed on a merged table, unmerge the table
+      if (statusToApply === 'CLOSED') {
+        const effectiveTableNum = (tempTableNumber || order.table_number || '').trim();
+        const parts = effectiveTableNum.split('+').map(p => p.trim()).filter(Boolean);
+        const targetTable = (tables || []).find((t: any) => {
+          if (t.id && (order as any).table_id && t.id === (order as any).table_id) return true;
+          if (t.table_number === effectiveTableNum) return true;
+          if (parts.length > 0 && parts.includes(t.table_number)) return true;
+          if (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => parts.includes(m) || m === effectiveTableNum)) return true;
+          return false;
+        });
+
+        const isMerged = targetTable && (
+          Boolean(targetTable.merged_into_table_id) ||
+          (Array.isArray(targetTable.merged_table_ids) && targetTable.merged_table_ids.length > 0) ||
+          (Array.isArray(targetTable.merged_table_numbers) && targetTable.merged_table_numbers.length > 0) ||
+          (targetTable.table_number && targetTable.table_number.includes('+')) ||
+          effectiveTableNum.includes('+')
+        );
+
+        if (isMerged && targetTable) {
+          try {
+            const tableIdToUnmerge = targetTable.merged_into_table_id || targetTable.id;
+            await tableService.unmergeTable(tableIdToUnmerge);
+          } catch (unmergeErr) {
+            console.error('Failed to unmerge table after closing order:', unmergeErr);
+          }
+        }
+      }
       setTempStatus(statusToApply as any);
       setOrder((prev) => ({
         ...prev,

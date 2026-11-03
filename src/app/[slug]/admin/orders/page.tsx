@@ -7,6 +7,7 @@ import { Order } from '@/types';
 import { getCurrentBusinessDate } from '@/lib/format';
 import { pusherClient } from '@/lib/pusher-client';
 import { orderService } from '@/app/services/orders.api';
+import { tableService } from '@/app/services/tables.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { ChefHat, Search, X, Printer, Store, Loader2, ClipboardList, Sparkles, RotateCcw, UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { printUnifiedThermalTicket, tryAutoConnectBluetooth } from '@/lib/hardware-printer';
@@ -228,9 +229,12 @@ export default function AdminOrders() {
     }
   };
 
+  const fetchSeqRef = useRef(0);
+
   const fetchOrders = useCallback(async (silent = false) => {
     if (!restaurant) return;
     if (!silent && ordersRef.current.length === 0) setLoading(true);
+    const seq = ++fetchSeqRef.current;
     try {
       const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
 
@@ -244,9 +248,36 @@ export default function AdminOrders() {
         order_type: orderTypeFilter || undefined,
       });
 
+      if (seq !== fetchSeqRef.current) {
+        return;
+      }
+
       if (data.success && data.data) {
-        setOrders(data.data);
-        ordersRef.current = data.data;
+        const incomingOrders: Order[] = data.data;
+        setOrders(prev => {
+          const prevMap = new Map(prev.map(o => [o.id, o]));
+          const merged = incomingOrders.map((incomingOrder: Order) => {
+            const existing = prevMap.get(incomingOrder.id);
+            if (!existing) return incomingOrder;
+
+            // If local state has a newer updated_at than the fetched DB record, don't revert it
+            const existingTime = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
+            const incomingTime = incomingOrder.updated_at ? new Date(incomingOrder.updated_at).getTime() : 0;
+            if (existingTime > incomingTime) {
+              return {
+                ...incomingOrder,
+                status: existing.status,
+                items: existing.items || incomingOrder.items,
+                table_number: existing.table_number || incomingOrder.table_number,
+                is_paid: existing.is_paid !== undefined ? existing.is_paid : incomingOrder.is_paid,
+                updated_at: existing.updated_at,
+              };
+            }
+            return incomingOrder;
+          });
+          ordersRef.current = merged;
+          return merged;
+        });
       } else {
         setOrders([]);
         ordersRef.current = [];
@@ -257,7 +288,9 @@ export default function AdminOrders() {
       setOrders([]);
       ordersRef.current = [];
     } finally {
-      setLoading(false);
+      if (seq === fetchSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, [page, statusFilter, orderTypeFilter, restaurant?.timezone, restaurant?.rollover_time]);
 
@@ -290,18 +323,35 @@ export default function AdminOrders() {
     const channel = pusherClient.subscribe(channelName);
 
     const handleNewOrder = (data: any) => {
+      if (data.restaurant_id && restaurant && data.restaurant_id !== restaurant.id) return;
       toast.success(`New order created: #${String(data.ticket_number).padStart(3, '0')}`);
       fetchOrdersDebounced(true);
       fetchTables();
     };
 
     const handleOrderUpdate = (data: any) => {
+      if (data.restaurant_id && restaurant && data.restaurant_id !== restaurant.id) return;
       fetchTables();
+
+      const currentFilter = statusFilter && statusFilter !== 'ALL' ? statusFilter : undefined;
+      const targetMatchesFilter = !currentFilter || data.new_status === currentFilter;
+
       // 1. PATCH LOCAL STATE (The "incremental" way)
       // This makes the UI update INSTANTLY without a network request
       setOrders(prev => {
         const orderIndex = prev.findIndex(o => o.id === data.order_id);
-        if (orderIndex === -1) return prev; // Not in current filter, ignore
+        if (orderIndex === -1) {
+          // If this order is not in current list but its new status matches the filter, pull it in
+          if (targetMatchesFilter) {
+            fetchOrdersDebounced(true);
+          }
+          return prev;
+        }
+
+        // If existing order no longer matches filter, filter it out immediately
+        if (currentFilter && data.new_status && data.new_status !== currentFilter) {
+          return prev.filter(o => o.id !== data.order_id);
+        }
 
         return prev.map(o => {
           if (o.id === data.order_id) {
@@ -311,15 +361,10 @@ export default function AdminOrders() {
               table_number: data.table_number || o.table_number,
               is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : o.is_paid,
               items: data.items || o.items,
+              updated_at: new Date().toISOString(),
             };
           }
           return o;
-        }).filter(o => {
-          const currentFilter = statusFilter && statusFilter !== 'ALL' ? statusFilter : undefined;
-          if (currentFilter) {
-            return o.status === currentFilter;
-          }
-          return true;
         });
       });
 
@@ -331,6 +376,7 @@ export default function AdminOrders() {
             table_number: data.table_number || prev.table_number,
             is_paid: typeof data.is_paid === 'boolean' ? data.is_paid : prev.is_paid,
             items: data.items || prev.items,
+            updated_at: new Date().toISOString(),
           };
         }
         return prev;
@@ -390,6 +436,7 @@ export default function AdminOrders() {
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       channel.unbind('new_order', handleNewOrder);
       channel.unbind('order_update', handleOrderUpdate);
+      pusherClient?.unsubscribe(channelName);
     };
   }, [fetchOrdersDebounced, statusFilter, restaurant]);
 
@@ -404,6 +451,32 @@ export default function AdminOrders() {
         payment_split: pSplit || undefined,
       });
       if (data.success) {
+        // If order closed on a merged table, unmerge the table
+        if (newStatus === 'CLOSED') {
+          const tNum = (tableNumber || selectedOrder?.table_number || '').trim();
+          const parts = tNum.split('+').map(p => p.trim()).filter(Boolean);
+          const targetTable = tables.find(t =>
+            t.table_number === tNum ||
+            (parts.length > 0 && parts.includes(t.table_number)) ||
+            (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => parts.includes(m) || m === tNum))
+          );
+          const isMerged = targetTable && (
+            Boolean(targetTable.merged_into_table_id) ||
+            (Array.isArray(targetTable.merged_table_ids) && targetTable.merged_table_ids.length > 0) ||
+            (Array.isArray(targetTable.merged_table_numbers) && targetTable.merged_table_numbers.length > 0) ||
+            (targetTable.table_number && targetTable.table_number.includes('+')) ||
+            tNum.includes('+')
+          );
+          if (isMerged && targetTable) {
+            try {
+              const tableIdToUnmerge = targetTable.merged_into_table_id || targetTable.id;
+              tableService.unmergeTable(tableIdToUnmerge).then(() => fetchTables()).catch(() => {});
+            } catch (err) {
+              console.error('Failed to unmerge table after closing order:', err);
+            }
+          }
+        }
+
         // Success feedback handled by Pusher event to avoid duplicates
         // Update local state instantly for UI responsiveness
         setOrders(prev => {
@@ -414,7 +487,8 @@ export default function AdminOrders() {
             table_number: tableNumber ?? o.table_number,
             payment_method: pMethod ?? o.payment_method,
             payment_split: pSplit !== undefined ? pSplit : o.payment_split,
-            is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : o.is_paid
+            is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : o.is_paid,
+            updated_at: new Date().toISOString(),
           } : o)
             .filter(o => {
               if (currentFilter) return o.status === currentFilter;
@@ -427,7 +501,8 @@ export default function AdminOrders() {
           table_number: tableNumber ?? prev.table_number,
           payment_method: pMethod ?? prev.payment_method,
           payment_split: pSplit !== undefined ? pSplit : prev.payment_split,
-          is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid
+          is_paid: newStatus === 'CLOSED' ? true : newStatus === 'CANCELLED' ? false : prev.is_paid,
+          updated_at: new Date().toISOString(),
         } : null);
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
       } else {
