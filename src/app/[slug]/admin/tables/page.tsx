@@ -89,6 +89,40 @@ export default function AdminTablesPage() {
       });
       if (res.success) {
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
+
+        // If order closed on a merged table, unmerge the table
+        if (newStatus === 'CLOSED') {
+          const tNum = (tableNumber || selectedOrder?.table_number || '').trim();
+          const parts = tNum.split('+').map(p => p.trim()).filter(Boolean);
+          const targetTable = tables.find(t =>
+            t.table_number === tNum ||
+            (parts.length > 0 && parts.includes(t.table_number)) ||
+            (selectedTable && (t.id === selectedTable.id || t.table_number === selectedTable.table_number))
+          );
+          const isMerged = targetTable && (
+            Boolean(targetTable.merged_into_table_id) ||
+            (Array.isArray(targetTable.merged_table_ids) && targetTable.merged_table_ids.length > 0) ||
+            (Array.isArray(targetTable.merged_table_numbers) && targetTable.merged_table_numbers.length > 0) ||
+            (targetTable.table_number && targetTable.table_number.includes('+')) ||
+            tNum.includes('+')
+          );
+          if (isMerged && targetTable) {
+            try {
+              const tableIdToUnmerge = targetTable.merged_into_table_id || targetTable.id;
+              await fetch('/api/tables/unmerge', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(slugStr ? { 'x-restaurant-slug': slugStr } : {})
+                },
+                body: JSON.stringify({ table_id: tableIdToUnmerge })
+              });
+            } catch (err) {
+              console.error('Failed to unmerge table after closing order:', err);
+            }
+          }
+        }
+
         await fetchTables(false);
         setSelectedOrder((prev: any) => prev ? {
           ...prev,

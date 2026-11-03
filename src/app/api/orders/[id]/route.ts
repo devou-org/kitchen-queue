@@ -159,6 +159,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       || table_number !== undefined
       || Array.isArray(items);
 
+    let addedItemsList: { product_name: string; quantity: number }[] = [];
+    let itemsUpdated = false;
+
     if (shouldUpdateDetails) {
       const payload: {
         customer_name?: string;
@@ -217,11 +220,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       order = await updateOrderDetails(restaurant.id, id, payload);
+      itemsUpdated = Array.isArray(payload.items);
 
       // 🔔 BROADCAST DETAILS UPDATE (With added items specific info)
       try {
-        let addedItemsList: { product_name: string; quantity: number }[] = [];
-        
         if (Array.isArray(items)) {
           const oldItemsMap = new Map((existing.items as OrderItem[] || []).map((i: OrderItem) => [i.product_id, i.quantity]));
           const productIdsToFetch = new Set<string>();
@@ -269,19 +271,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           }
         }
 
-        await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'order_update', {
-          type: 'order_update',
-          items_updated: Array.isArray(payload.items),
-          added_items: addedItemsList.length > 0 ? addedItemsList : undefined,
-          restaurant_id: restaurant.id,
-          order_id: id,
-          ticket_number: existing.ticket_number,
-          new_status: order.status,
-          order_type: order.order_type,
-          table_number: order.table_number,
-          is_paid: order.is_paid,
-          timestamp: new Date().toISOString(),
-        });
+        // Only broadcast here if there is NO subsequent status/payment update in this same request
+        const willUpdateStatusOrPayment = Boolean(status || typeof is_paid === 'boolean' || payment_method || payment_split !== undefined || (!shouldUpdateDetails && table_number !== undefined));
+        if (!willUpdateStatusOrPayment) {
+          await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'order_update', {
+            type: 'order_update',
+            items_updated: itemsUpdated,
+            added_items: addedItemsList.length > 0 ? addedItemsList : undefined,
+            restaurant_id: restaurant.id,
+            order_id: id,
+            ticket_number: existing.ticket_number,
+            new_status: order.status,
+            order_type: order.order_type,
+            table_number: order.table_number,
+            is_paid: order.is_paid,
+            items: order.items,
+            timestamp: new Date().toISOString(),
+          });
+        }
       } catch (pushErr) {
         console.error('❌ Pusher trigger failed (order details update):', pushErr);
       }
@@ -345,6 +352,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       try {
         await pusherServer.trigger(`queue-channel-${restaurant.id}`, 'order_update', {
           type: 'order_update',
+          items_updated: itemsUpdated,
+          added_items: addedItemsList.length > 0 ? addedItemsList : undefined,
           restaurant_id: restaurant.id,
           order_id: id,
           ticket_number: existing.ticket_number,
@@ -352,6 +361,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           order_type: order.order_type,
           table_number: order.table_number,
           is_paid: order.is_paid,
+          items: order.items,
           timestamp: new Date().toISOString(),
         });
         console.log(`📤 Pusher event sent: order_update for ticket #${existing.ticket_number}`);

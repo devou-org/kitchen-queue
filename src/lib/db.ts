@@ -2286,45 +2286,104 @@ export async function findOrCreateTableSession(
 export async function checkAndCloseTableSession(
   clientOrPool: any,
   restaurantId: string,
-  tableNumber: string
+  tableNumber?: string | null,
+  tableId?: string | null
 ) {
-  if (!tableNumber || tableNumber.trim() === '') return;
-  const cleanTableNum = tableNumber.trim();
-  const leadTableNum = cleanTableNum.includes('+') ? cleanTableNum.split('+')[0].trim() : cleanTableNum;
+  if ((!tableNumber || tableNumber.trim() === '') && !tableId) return;
 
-  const tblRes = await clientOrPool.query(
-    `SELECT id FROM restaurant_tables WHERE restaurant_id = $1 AND (table_number = $2 OR table_number = $3) LIMIT 1`,
-    [restaurantId, cleanTableNum, leadTableNum]
+  const cleanTableNum = (tableNumber || '').trim();
+  const individualNums = cleanTableNum.includes('+')
+    ? cleanTableNum.split('+').map(s => s.trim()).filter(Boolean)
+    : (cleanTableNum ? [cleanTableNum] : []);
+
+  // 1. Find all directly referenced tables by ID or table number
+  const queryParts: string[] = [];
+  const queryParams: any[] = [restaurantId];
+
+  if (tableId) {
+    queryParams.push(tableId);
+    queryParts.push(`id = $${queryParams.length}`);
+  }
+  if (cleanTableNum) {
+    queryParams.push(cleanTableNum);
+    queryParts.push(`LOWER(TRIM(table_number)) = LOWER(TRIM($${queryParams.length}))`);
+  }
+  if (individualNums.length > 0) {
+    queryParams.push(individualNums);
+    queryParts.push(`table_number = ANY($${queryParams.length}::text[])`);
+  }
+
+  const matchedRes = await clientOrPool.query(
+    `SELECT id, table_number, merged_into_table_id 
+     FROM restaurant_tables 
+     WHERE restaurant_id = $1 AND (${queryParts.join(' OR ')})`,
+    queryParams
   );
 
-  if (tblRes.rows.length === 0) return;
-  const tableId = tblRes.rows[0].id;
+  if (matchedRes.rows.length === 0) return;
 
+  // 2. Resolve primary table IDs for any merged groups
+  const primaryTableIds = new Set<string>();
+  for (const row of matchedRes.rows) {
+    if (row.merged_into_table_id) {
+      primaryTableIds.add(String(row.merged_into_table_id));
+    } else {
+      primaryTableIds.add(String(row.id));
+    }
+  }
+
+  // 3. Find ALL tables belonging to these merge groups (primary tables + secondary tables merged into them)
+  const groupRes = await clientOrPool.query(
+    `SELECT id, table_number, merged_into_table_id
+     FROM restaurant_tables
+     WHERE restaurant_id = $1
+       AND (id = ANY($2::uuid[]) OR merged_into_table_id = ANY($2::uuid[]))`,
+    [restaurantId, Array.from(primaryTableIds)]
+  );
+
+  if (groupRes.rows.length === 0) return;
+
+  const allGroupTableIds: string[] = groupRes.rows.map((r: any) => r.id);
+  const allGroupTableNumbers: string[] = groupRes.rows.map((r: any) => r.table_number.trim());
+  const isMergedGroup = groupRes.rows.length > 1 || groupRes.rows.some((r: any) => r.merged_into_table_id !== null);
+
+  // 4. Check for ANY remaining active orders across the entire table group
   const activeCheck = await clientOrPool.query(
     `SELECT COUNT(*)::int as active_count
      FROM orders
      WHERE restaurant_id = $1
-       AND (table_id = $2 OR table_number = $3 OR table_number = $4 OR ('+' || table_number || '+') LIKE ('%+' || $4 || '+%'))
        AND status NOT IN ('CLOSED', 'CANCELLED', 'EXPIRED')
-       AND (order_type IS NULL OR order_type NOT IN ('TAKEAWAY', 'DELIVERY'))`,
-    [restaurantId, tableId, cleanTableNum, leadTableNum]
+       AND (order_type IS NULL OR order_type NOT IN ('TAKEAWAY', 'DELIVERY'))
+       AND (
+         table_id = ANY($2::uuid[])
+         OR table_number = ANY($3::text[])
+         OR EXISTS (
+           SELECT 1 FROM unnest($3::text[]) tnum
+           WHERE ('+' || orders.table_number || '+') LIKE ('%+' || tnum || '+%')
+         )
+       )`,
+    [restaurantId, allGroupTableIds, allGroupTableNumbers]
   );
 
   const activeCount = Number(activeCheck.rows[0]?.active_count || 0);
 
+  // 5. If no more active orders remain on this table / merged group
   if (activeCount === 0) {
+    // Close open table sessions for all tables in this group
     await clientOrPool.query(
       `UPDATE table_sessions
        SET status = 'CLOSED', ended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE restaurant_id = $1 AND table_id = $2 AND status = 'OPEN'`,
-      [restaurantId, tableId]
+       WHERE restaurant_id = $1 AND table_id = ANY($2::uuid[]) AND status = 'OPEN'`,
+      [restaurantId, allGroupTableIds]
     );
 
+    // Set table status to AVAILABLE
     await clientOrPool.query(
       `UPDATE restaurant_tables
-       SET status = 'AVAILABLE', updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
-      [tableId]
+       SET status = 'AVAILABLE',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE restaurant_id = $1 AND id = ANY($2::uuid[])`,
+      [restaurantId, allGroupTableIds]
     );
   }
 }
@@ -2373,7 +2432,7 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   const activeTableNum = tableNumber || updatedOrder?.table_number;
   if (activeTableNum && (status === 'CLOSED' || status === 'CANCELLED' || status === 'EXPIRED')) {
     try {
-      await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
+      await checkAndCloseTableSession(pool, restaurantId, activeTableNum, updatedOrder?.table_id);
     } catch (tblErr) {
       console.error('Error re-evaluating table occupancy & session:', tblErr);
     }
@@ -2382,10 +2441,14 @@ export async function updateOrderStatus(restaurantId: string, id: string, status
   // Sync item status if master order status changed
   if (status === 'CANCELLED') {
     try { await pool.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]); } catch (_) { }
+  } else if (status === 'PREPARING') {
+    try { await pool.query(`UPDATE order_items SET status = 'PREPARING', prepared_at = COALESCE(prepared_at, NOW()) WHERE order_id = $1 AND status = 'PENDING'`, [id]); } catch (_) { }
   } else if (status === 'READY') {
     try { await pool.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]); } catch (_) { }
   } else if (status === 'SERVED' || status === 'CLOSED' || status === 'COMPLETED') {
     try { await pool.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]); } catch (_) { }
+  } else if (status === 'PENDING') {
+    try { await pool.query(`UPDATE order_items SET status = 'PENDING' WHERE order_id = $1 AND status IN ('PREPARING', 'READY')`, [id]); } catch (_) { }
   }
   // Trigger Loyalty Points processing: Cancellations take precedence over is_paid
   if (status === 'CANCELLED' || status === 'REFUNDED') {
@@ -2494,10 +2557,14 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     // Sync item status if master order status changed
     if (nextStatus === 'CANCELLED') {
       await client.query(`UPDATE order_items SET status = 'CANCELLED' WHERE order_id = $1`, [id]);
+    } else if (nextStatus === 'PREPARING') {
+      await client.query(`UPDATE order_items SET status = 'PREPARING', prepared_at = COALESCE(prepared_at, NOW()) WHERE order_id = $1 AND status = 'PENDING'`, [id]);
     } else if (nextStatus === 'READY') {
       await client.query(`UPDATE order_items SET status = 'READY', ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING')`, [id]);
     } else if (nextStatus === 'SERVED' || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED') {
       await client.query(`UPDATE order_items SET status = 'SERVED', served_at = COALESCE(served_at, NOW()), ready_at = COALESCE(ready_at, NOW()) WHERE order_id = $1 AND status IN ('PENDING', 'PREPARING', 'READY')`, [id]);
+    } else if (nextStatus === 'PENDING') {
+      await client.query(`UPDATE order_items SET status = 'PENDING' WHERE order_id = $1 AND status IN ('PREPARING', 'READY')`, [id]);
     }
 
     const effectiveTotal = (nextIsPaid && splitTotal && splitTotal > 0) ? splitTotal : Number(existing.total_price);
@@ -2513,7 +2580,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     // Re-evaluate table occupancy and close session if table changed or order is CLOSED, CANCELLED, or EXPIRED
     if (previousTable && (nextTableNumber !== previousTable)) {
       try {
-        await checkAndCloseTableSession(pool, restaurantId, previousTable);
+        await checkAndCloseTableSession(pool, restaurantId, previousTable, existing.table_id);
       } catch (tblErr) {
         console.error('Error re-evaluating previous table occupancy:', tblErr);
       }
@@ -2522,7 +2589,7 @@ export async function completeOrderAndBill(restaurantId: string, id: string, sta
     const activeTableNum = nextTableNumber || previousTable;
     if (activeTableNum && (nextStatus === 'CLOSED' || nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED')) {
       try {
-        await checkAndCloseTableSession(pool, restaurantId, activeTableNum);
+        await checkAndCloseTableSession(pool, restaurantId, activeTableNum, nextTableId || existing.table_id);
       } catch (tblErr) {
         console.error('Error re-evaluating table occupancy & session:', tblErr);
       }
@@ -2680,6 +2747,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
   }
 
   let nextTotalPrice = Number(existingOrder.total_price || 0);
+  let itemsWereAddedOrIncreased = false;
 
   if (Array.isArray(data.items)) {
     if (data.items.length === 0) {
@@ -2923,6 +2991,11 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
       nextTotalPrice = newSubtotal;
     }
 
+    itemsWereAddedOrIncreased = nextItems.some((ni) => {
+      const ex = existingItemMap.get(ni.product_id);
+      return !ex || ni.quantity > ex.quantity;
+    });
+
     await sql`
       UPDATE orders
       SET subtotal = ${newSubtotal},
@@ -2955,6 +3028,9 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
     }
   }
 
+  const shouldMoveToPreparing = itemsWereAddedOrIncreased && ['READY', 'SERVED'].includes(existingOrder.status);
+  const targetOrderStatus = shouldMoveToPreparing ? 'PREPARING' : existingOrder.status;
+
   const rows = await sql`
     UPDATE orders
     SET customer_name = COALESCE(${data.customer_name ?? null}, customer_name),
@@ -2965,6 +3041,8 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
         table_number = ${nextTableNumber},
         table_id = ${nextTableId},
         table_session_id = ${nextTableSessionId},
+        status = ${targetOrderStatus},
+        preparing_at = CASE WHEN ${shouldMoveToPreparing} THEN COALESCE(preparing_at, NOW()) ELSE preparing_at END,
         total_price = ${nextTotalPrice},
         updated_at = NOW()
     WHERE restaurant_id = ${restaurantId} AND id = ${id}
@@ -2978,7 +3056,7 @@ export async function updateOrderDetails(restaurantId: string, id: string, data:
   // If table was changed or cleared, re-evaluate session of previous table
   if (previousTable && (nextTableNumber !== previousTable)) {
     try {
-      await checkAndCloseTableSession(pool, restaurantId, previousTable);
+      await checkAndCloseTableSession(pool, restaurantId, previousTable, existingOrder.table_id);
     } catch (tblErr) {
       console.error('Error re-evaluating previous table occupancy:', tblErr);
     }
