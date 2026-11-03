@@ -19,6 +19,7 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { POSCheckoutDrawer, POSOrderFormData } from '@/components/modules/pos/POSCheckoutDrawer';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { ProductCustomizationModal, ProductCustomizationResult } from '@/components/modules/products/ProductCustomizationModal';
+import { sortCategoriesByConfig, ConfiguredCategory } from '@/lib/category-order';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -138,6 +139,7 @@ export default function AdminPosPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
+  const configuredCategoriesRef = useRef<ConfiguredCategory[]>([]);
 
   const [mounted, setMounted] = useState(false);
   const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
@@ -239,7 +241,12 @@ export default function AdminPosPage() {
   useEffect(() => {
     const initPage = async () => {
       try {
-        const res = await productService.getProducts();
+        const currentSlug = Array.isArray(slug) ? slug[0] : (slug || '');
+        const [res, catRes] = await Promise.all([
+          productService.getProducts(),
+          productService.getCategories(currentSlug).catch(() => ({ success: false, data: [] }))
+        ]);
+
         if (res.success && res.data) {
           const parsedData = res.data.map(p => ({
             ...p,
@@ -248,12 +255,12 @@ export default function AdminPosPage() {
             buffer_quantity: Number(p.buffer_quantity)
           }));
           setProducts(parsedData);
-          const uniqueCats = Array.from(new Set(
-            parsedData
-              .map((p: Product) => p.category?.trim())
-              .filter((cat: string) => cat && cat !== 'All')
-          ));
-          setCategories(['All', ...uniqueCats]);
+
+          const configured = (catRes.success && Array.isArray(catRes.data)) ? (catRes.data as ConfiguredCategory[]) : [];
+          configuredCategoriesRef.current = configured;
+          const productCats = parsedData.map((p: Product) => p.category?.trim()).filter((cat): cat is string => Boolean(cat));
+          const sortedCats = sortCategoriesByConfig(productCats, configured);
+          setCategories(['All', ...sortedCats]);
         }
 
         await fetchTables();
@@ -264,7 +271,7 @@ export default function AdminPosPage() {
       }
     };
     initPage();
-  }, [fetchTables]);
+  }, [fetchTables, slug]);
 
   // Pusher for real-time updates
   useEffect(() => {
@@ -281,15 +288,26 @@ export default function AdminPosPage() {
       };
       setProducts(prev => {
         const exists = prev.find(p => p.id === parsedProduct.id);
-        if (exists) {
-          return prev.map(p => p.id === parsedProduct.id ? { ...p, ...parsedProduct } : p);
-        }
-        return [...prev, parsedProduct];
+        const nextProducts = exists
+          ? prev.map(p => p.id === parsedProduct.id ? { ...p, ...parsedProduct } : p)
+          : [...prev, parsedProduct];
+
+        const productCats = nextProducts.map((p: Product) => p.category?.trim()).filter((cat): cat is string => Boolean(cat));
+        const sortedCats = sortCategoriesByConfig(productCats, configuredCategoriesRef.current);
+        setCategories(['All', ...sortedCats]);
+
+        return nextProducts;
       });
     });
 
     channel.bind('product_deleted', (data: { id: string }) => {
-      setProducts(prev => prev.filter(p => p.id !== data.id));
+      setProducts(prev => {
+        const nextProducts = prev.filter(p => p.id !== data.id);
+        const productCats = nextProducts.map((p: Product) => p.category?.trim()).filter((cat): cat is string => Boolean(cat));
+        const sortedCats = sortCategoriesByConfig(productCats, configuredCategoriesRef.current);
+        setCategories(['All', ...sortedCats]);
+        return nextProducts;
+      });
     });
 
     channel.bind('new_order', () => {
@@ -790,6 +808,15 @@ export default function AdminPosPage() {
     .sort((a, b) => {
       const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
       if (statusDiff !== 0) return statusDiff;
+      if (category === 'All') {
+        const catIndexA = categories.indexOf(a.category || '');
+        const catIndexB = categories.indexOf(b.category || '');
+        if (catIndexA !== -1 && catIndexB !== -1 && catIndexA !== catIndexB) {
+          return catIndexA - catIndexB;
+        }
+        if (catIndexA !== -1) return -1;
+        if (catIndexB !== -1) return 1;
+      }
       return a.name.localeCompare(b.name);
     });
 
