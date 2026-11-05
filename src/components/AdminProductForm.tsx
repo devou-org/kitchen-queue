@@ -103,6 +103,15 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         setCategories(data.data);
+        // If the currently selected category was deleted, clear the selection
+        // so the stale value cannot be written back to the DB on next save
+        // and accidentally re-trigger the auto-sync that would resurrect it.
+        setForm(prev => {
+          const stillExists = (data.data as Array<{ id: string; name: string }>).some(
+            (c) => c.name.toLowerCase() === prev.category.toLowerCase()
+          );
+          return stillExists ? prev : { ...prev, category: '' };
+        });
       }
     } catch (err) {
       console.error('Failed to load categories', err);
