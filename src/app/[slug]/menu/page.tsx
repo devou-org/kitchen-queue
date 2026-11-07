@@ -927,8 +927,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         </div>
 
         {/* Dietary Preference Filter (Veg / Non-Veg / All) */}
-        <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
+        <div style={{ padding: '0 16px 10px', display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+          <DietaryFilter variant="pills" value={dietaryFilter} onChange={setDietaryFilter} />
         </div>
 
         {/* Category Filter */}

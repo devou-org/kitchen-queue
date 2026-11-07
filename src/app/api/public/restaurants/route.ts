@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRestaurant, seedDefaultRoles, pool } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
+import { SubscriptionService, SaaSProductId, SaaSPlanTier, BillingCycle } from '@/modules/billing/subscription.service';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,6 +54,9 @@ export async function POST(request: NextRequest) {
       gst_type,
       gst_number,
       gst_rate,
+      product: requestedProduct,
+      plan: requestedPlan,
+      billing_cycle: requestedBillingCycle,
       modules
     } = body;
 
@@ -65,7 +69,63 @@ export async function POST(request: NextRequest) {
     }
     const restaurantName = name.trim();
 
-    // 2. Validation: Admin Credentials
+    // 2. Validation: Product Selection
+    const normalizedProduct: SaaSProductId = (
+      requestedProduct
+        ? String(requestedProduct).toUpperCase().trim()
+        : 'POS'
+    ) as SaaSProductId;
+
+    const validProducts: SaaSProductId[] = ['POS', 'DIGITAL_MENU', 'QUEUE_MANAGEMENT'];
+    if (!validProducts.includes(normalizedProduct)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid product '${requestedProduct}'. Must be one of: POS, DIGITAL_MENU, QUEUE_MANAGEMENT.`,
+        },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // 3. Validation: Billing Cycle
+    const normalizedBillingCycle: BillingCycle = (
+      requestedBillingCycle
+        ? String(requestedBillingCycle).toUpperCase().trim()
+        : 'ANNUALLY'
+    ) as BillingCycle;
+
+    if (!['ANNUALLY', 'MONTHLY'].includes(normalizedBillingCycle)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid billing_cycle '${requestedBillingCycle}'. Must be either 'ANNUALLY' or 'MONTHLY'.`,
+        },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // 4. Validation: Plan Tier (for POS)
+    let planTier: SaaSPlanTier = 'PREMIUM';
+    if (normalizedProduct === 'POS') {
+      if (requestedPlan) {
+        const upperPlan = String(requestedPlan).toUpperCase().trim();
+        if (upperPlan === 'ESSENTIAL' || upperPlan === 'PREMIUM') {
+          planTier = upperPlan as SaaSPlanTier;
+        } else {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Invalid plan '${requestedPlan}' for POS. Must be 'ESSENTIAL' or 'PREMIUM'.`,
+            },
+            { status: 400, headers: corsHeaders }
+          );
+        }
+      }
+    } else {
+      planTier = 'STANDALONE';
+    }
+
+    // 5. Validation: Admin Credentials
     if (!admin_email || typeof admin_email !== 'string' || !admin_email.trim()) {
       return NextResponse.json(
         { success: false, error: 'Admin email (admin_email) is required for store ownership' },
@@ -88,7 +148,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Validation: Unique Admin Email
+    // 6. Validation: Unique Admin Email
     const existingAdmin = await pool.query(
       `SELECT id FROM admins WHERE LOWER(email) = $1 LIMIT 1`,
       [emailTrimmed]
@@ -100,7 +160,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Determine & Validate Slug
+    // 7. Determine & Validate Slug
     let targetSlug = customSlug ? customSlug.trim().toLowerCase() : slugify(restaurantName);
     if (!targetSlug) {
       targetSlug = 'restaurant-' + Math.random().toString(36).substring(2, 7);
@@ -119,18 +179,16 @@ export async function POST(request: NextRequest) {
       [targetSlug]
     );
     if (existingSlug.rows.length > 0) {
-      // If user supplied a custom slug, return conflict
       if (customSlug) {
         return NextResponse.json(
           { success: false, error: `The store slug '${targetSlug}' is already taken. Please choose another.` },
           { status: 409, headers: corsHeaders }
         );
       }
-      // If auto-generated, append a random unique suffix
       targetSlug = `${targetSlug}-${Math.random().toString(36).substring(2, 6)}`;
     }
 
-    // 5. Create Restaurant
+    // 8. Create Restaurant Record
     const restaurant = await createRestaurant({
       name: restaurantName,
       slug: targetSlug,
@@ -148,12 +206,17 @@ export async function POST(request: NextRequest) {
       gst_type: gst_type || 'NONE',
       gst_number: gst_number ? String(gst_number).trim() : undefined,
       gst_rate: gst_rate !== undefined ? parseFloat(gst_rate) : 5.0,
-      modules: Array.isArray(modules) && modules.length > 0
-        ? modules
-        : ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT']
+      modules: Array.isArray(modules) && modules.length > 0 ? modules : undefined
     });
 
-    // 6. Create Admin User (Store Owner)
+    // 9. Data-Driven Provisioning: Subscription, Trial & Modules
+    const subscriptionInfo = await SubscriptionService.provisionOnboardingSubscription(restaurant.id, {
+      product: normalizedProduct,
+      planTier,
+      billingCycle: normalizedBillingCycle,
+    });
+
+    // 10. Create Admin User (Store Owner)
     const passwordHash = await hashPassword(admin_password);
     const ownerName = admin_name ? String(admin_name).trim() : `${restaurantName} Owner`;
 
@@ -164,7 +227,6 @@ export async function POST(request: NextRequest) {
         [emailTrimmed, passwordHash, ownerName, restaurant.id]
       );
     } catch (adminErr: any) {
-      // Fallback if name column is missing in legacy schema
       if (adminErr.message?.includes('name')) {
         await pool.query(
           `INSERT INTO admins (email, password, restaurant_id, is_super_admin)
@@ -176,14 +238,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 7. Seed Default Roles (Waiter, Kitchen Staff, Cashier, Manager)
+    // 11. Seed Default Staff Roles (Waiter, Kitchen Staff, Cashier, Manager)
     await seedDefaultRoles(restaurant.id);
 
-    // 8. Return Success Response with Portal & Menu URLs
+    // 12. Return Comprehensive Success Response
     return NextResponse.json(
       {
         success: true,
-        message: 'Restaurant and admin owner account created successfully',
+        message: normalizedProduct === 'POS'
+          ? 'Restaurant onboarded successfully with a 14-day full-featured Premium free trial'
+          : `Restaurant onboarded successfully with standalone ${normalizedProduct === 'DIGITAL_MENU' ? 'Digital Menu' : 'Q Management'}`,
         data: {
           restaurant: {
             id: restaurant.id,
@@ -199,10 +263,12 @@ export async function POST(request: NextRequest) {
             email: emailTrimmed,
             name: ownerName
           },
+          subscription: subscriptionInfo,
           urls: {
             admin_portal: `/${restaurant.slug}/admin/login`,
             digital_menu: `/${restaurant.slug}/menu`,
-            pos_terminal: `/${restaurant.slug}/admin/pos`
+            pos_terminal: `/${restaurant.slug}/admin/pos`,
+            queue_screen: `/${restaurant.slug}/queue`
           }
         }
       },

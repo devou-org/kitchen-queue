@@ -1,104 +1,193 @@
-# Public Restaurant Onboarding API Documentation
+# Qdine – Public Onboarding & Subscription API Documentation
 
-This documentation details the **Public Restaurant Onboarding API** designed for your external landing page, marketing site, or onboarding funnel.
+This documentation provides the complete technical specification for the **Qdine Public Onboarding & Subscription API** (`/api/public/restaurants` / `/api/onboarding`).
 
-Unlike the internal Super Admin endpoints, this API is **completely public (requires zero tokens or authentication)**, supports **Cross-Origin Resource Sharing (CORS)** from any domain, and atomically creates the restaurant, initial store owner (admin account), queue state, and default staff roles in a single request.
-
----
-
-## 1. Quick Reference
-
-| Property           | Value                                                  |
-| :----------------- | :----------------------------------------------------- |
-| **Endpoint URL**   | `/api/public/restaurants` _(Alias: `/api/onboarding`)_ |
-| **HTTP Method**    | `POST`                                                 |
-| **Authentication** | **None (Public)**                                      |
-| **Content-Type**   | `application/json`                                     |
-| **CORS Support**   | Enabled (`*` all origins, `POST, OPTIONS`)             |
+It supports onboarding for all three independent products (**POS**, **Digital Menu**, and **Q Management System**), automated **14-day full Premium Free Trial** provisioning for POS, configurable **Monthly / Annual** billing cycles, and a **100% data-driven** plan & pricing architecture.
 
 ---
 
-## 2. Request Parameters
+## 1. Executive Summary & Product Architecture
 
-Send a JSON payload with the following fields:
+Qdine operates three independent software products. During onboarding, a customer chooses **exactly one** product:
 
-### 2.1 Required Fields
-
-| Field            | Type     | Validation / Rules        | Description                                 | Example                     |
-| :--------------- | :------- | :------------------------ | :------------------------------------------ | :-------------------------- |
-| `name`           | `string` | **Required**, non-empty   | Official name of the restaurant / café      | `"The Coastal Bistro"`      |
-| `admin_email`    | `string` | **Required**, valid email | Email address for the store owner to log in | `"owner@coastalbistro.com"` |
-| `admin_password` | `string` | **Required**, min 6 chars | Password for the owner's Admin Portal login | `"Secret@12345"`            |
+| Product Option | ID | Default Onboarding Mode | Features / Scope |
+| :--- | :--- | :--- | :--- |
+| **POS** | `POS` | **14-Day Free Trial** (All Premium features unlocked, 30 AI Analyst credits, no credit card required) | Full restaurant POS, Table Management, QR Ordering, Inventory, Loyalty, AI Analyst, Finance Management. |
+| **Digital Menu** | `DIGITAL_MENU` | **Standalone Product** | QR-based digital menu, catalogue management, branding & online ordering. |
+| **Q Management** | `QUEUE_MANAGEMENT` | **Standalone Product** | Waitlist queue management, token generation, live display screen & customer SMS/OTP paging. |
 
 ---
 
-### 2.2 Optional Fields
+## 2. POS Subscription Plans & Features (Post-Trial)
 
-| Field              | Type       | Default                                                   | Description                                                            | Example                                                                |
-| :----------------- | :--------- | :-------------------------------------------------------- | :--------------------------------------------------------------------- | :--------------------------------------------------------------------- |
-| `slug`             | `string`   | Auto-generated from `name`                                | Unique URL handle (`[a-z0-9-]` only). Used for portal and QR menu URLs | `"coastal-bistro"`                                                     |
-| `admin_name`       | `string`   | `"{name} Owner"`                                          | Full name of the store owner                                           | `"Rahul Sharma"`                                                       |
-| `phone`            | `string`   | `null`                                                    | Primary restaurant or owner contact number                             | `"+91 9876543210"`                                                     |
-| `address`          | `string`   | `null`                                                    | Physical street address of the outlet                                  | `"12 Marine Drive, Kochi"`                                             |
-| `logo_url`         | `string`   | `null`                                                    | Public image URL for the restaurant logo                               | `"https://example.com/logo.png"`                                       |
-| `primary_color`    | `string`   | `"#971345"`                                               | Brand HEX color used for buttons, badges, and QR menu                  | `"#2563EB"`                                                            |
-| `secondary_color`  | `string`   | `"#ffffff"`                                               | Secondary accent HEX color                                             | `"#ffffff"`                                                            |
-| `menu_layout`      | `string`   | `"LIST"`                                                  | Display format for the customer QR menu (`"LIST"` or `"GRID"`)         | `"GRID"`                                                               |
-| `menu_title`       | `string`   | `"Today's Specials"`                                      | Headline displayed atop the digital menu                               | `"Chef's Daily Selection"`                                             |
-| `menu_description` | `string`   | Preset text                                               | Subtitle description for the customer menu                             | `"Fresh ingredients prepared daily"`                                   |
-| `timezone`         | `string`   | `"Asia/Kolkata"`                                          | Standard IANA timezone string                                          | `"Asia/Kolkata"`                                                       |
-| `opening_time`     | `string`   | `"09:00:00"`                                              | Daily opening time (`HH:mm:ss`)                                        | `"10:00:00"`                                                           |
-| `closing_time`     | `string`   | `"22:00:00"`                                              | Daily closing time (`HH:mm:ss`)                                        | `"23:00:00"`                                                           |
-| `gst_type`         | `string`   | `"NONE"`                                                  | Tax model: `"NONE"`, `"REGULAR"`, or `"COMPOSITION"`                   | `"REGULAR"`                                                            |
-| `gst_number`       | `string`   | `null`                                                    | Official 15-character GSTIN identifier                                 | `"32AAAAA0000A1Z5"`                                                    |
-| `gst_rate`         | `number`   | `5.0`                                                     | Applicable GST percentage                                              | `5.0`                                                                  |
-| `modules`          | `string[]` | `['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT']` | Array of modules enabled for this restaurant                           | `['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY']` |
+When the 14-day free trial concludes, POS customers select one of two plans:
+
+### A. Essential Plan (₹6,999/year or ₹699/month, customizable)
+- **POS & Table Management**: Complete control over floor plans, active orders, split payments, and checkout.
+- **Digital Menu & QR Ordering**: Diners scan QR codes at tables or counters to place instant orders.
+- **Menu Management**: Manage catalogue, categories, item variants, add-ons, and prices.
+- **Sales & Statements**: Granular daily closing statements, tax summaries, and revenue analytics.
+- **Customised Profile & Branding**: Personalize themes, colors, logos, and digital menu headers.
+- **AI Analyst Credits**: **10 AI Analyst credits** / month for asking natural language questions about sales trends, peak hours, and top items.
+
+### B. Premium Plan (₹9,999/year or ₹999/month, customizable)
+Includes **all features from Essential Plan**, plus:
+- **Comprehensive Inventory**: Recipe management, batch stock tracking, supplier management, and low-stock alerts.
+- **Customisable Loyalty Points**: Tiered customer reward programs, points earning and redemption at checkout.
+- **AI Analyst Credits**: **30 AI Analyst credits** / month for advanced forecasting, inventory insights, and business analysis.
+- **Inbuilt Finance Management**: Expense logging, vendor payouts, cash flow balances, and profit/loss statements.
+- **Free Access to New Features**: Automatic zero-cost rollout of upcoming platform capabilities.
 
 ---
 
-## 3. What Happens Under the Hood?
+## 3. Data-Driven Architecture (Zero Hardcoding)
 
-When you call this API, the system atomically completes 5 operations:
+All products, plan tiers, billing cycles, pricing, AI credits, and features are stored in relational database tables rather than hardcoded logic.
 
-1. **Creates Restaurant Record**: Stores the restaurant in PostgreSQL with billing tier, colors, timing, and address.
-2. **Generates Unique Slug**: If `slug` was omitted, creates a clean URL slug from the restaurant name (e.g. `"The Coastal Bistro"` -> `"the-coastal-bistro"`).
-3. **Creates Owner Account**: Hashes `admin_password` with bcrypt and registers the admin record linked directly to this restaurant.
-4. **Seeds Default Staff Roles**: Automatically provisions the 4 core staff roles in the database:
-   - `Waiter` (`pos`, `orders`, `tables`)
-   - `Kitchen Staff` (`orders`)
-   - `Cashier` (`pos`, `orders`, `tables`, `analytics`)
-   - `Manager` (`pos`, `orders`, `tables`, `products`, `inventory`, `analytics`, `staff`)
-5. **Initializes Live Queue & Modules**: Pre-populates `queue_state` and enables digital menu & online ordering.
+### 3.1 Relational Schema Diagram
+
+```
++------------------+       +-------------------+       +-----------------------+
+|  saas_products   | 1---* |    saas_plans     | 1---* |   saas_plan_pricing   |
+|------------------|       |-------------------|       |-----------------------|
+| id (PK)          |       | id (PK)           |       | id (PK)               |
+| name             |       | product_id (FK)   |       | plan_id (FK)          |
+| has_trial        |       | tier              |       | billing_cycle         |
+| trial_days       |       | monthly_ai_credits|       | price                 |
++------------------+       | is_default_trial  |       | currency              |
+                           +-------------------+       +-----------------------+
+                                     | 1
+                                     |
+                                     *
+                           +-------------------+
+                           |saas_plan_features |
+                           |-------------------|
+                           | id (PK)           |
+                           | plan_id (FK)      |
+                           | feature_code      |
+                           | is_included       |
+                           +-------------------+
+```
+
+### 3.2 Tenant Provisioning in `restaurants` Table
+When a restaurant is created:
+- `selected_product`: `'POS' | 'DIGITAL_MENU' | 'QUEUE_MANAGEMENT'`
+- `billing_tier`: `'PREMIUM'` (during trial) or `'ESSENTIAL'` / `'STANDALONE'`
+- `billing_status`: `'TRIAL'` (for POS) or `'ACTIVE'` (for standalone)
+- `billing_period`: `'ANNUALLY'` or `'MONTHLY'`
+- `is_trial`: `true` (for POS) or `false`
+- `trial_ends_at`: `NOW() + INTERVAL '14 days'` (for POS)
+- `monthly_ai_credits`: `30` (trial/premium) or `10` (essential) or `0`
+- `restaurant_modules`: Tenant-specific feature flags dynamically synced to active plan features.
 
 ---
 
-## 4. Responses
+## 4. API Specification
 
-### 4.1 Success Response (`201 Created`)
+### 4.1 Endpoint Details
 
+| Attribute | Specification |
+| :--- | :--- |
+| **URL** | `/api/public/restaurants` _(Alias: `/api/onboarding`)_ |
+| **HTTP Method** | `POST` |
+| **Authentication** | **None (Public Onboarding)** |
+| **Content-Type** | `application/json` |
+| **CORS** | `*` (Any origin permitted for landing pages, web apps, mobile apps) |
+
+---
+
+### 4.2 Request Body Parameters
+
+#### Required Parameters
+| Parameter | Type | Valid Values | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | `string` | Non-empty string | Name of the restaurant or food brand. |
+| `admin_email` | `string` | Valid email format | Primary email for store owner portal login. Must be unique. |
+| `admin_password` | `string` | Min 6 characters | Initial password for the owner account. |
+
+#### Product & Plan Selection (Data-Driven)
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `product` | `string` | `"POS"` | Target product: `"POS"`, `"DIGITAL_MENU"`, or `"QUEUE_MANAGEMENT"`. |
+| `plan` | `string` | `"PREMIUM"` | Desired post-trial plan for POS: `"ESSENTIAL"` or `"PREMIUM"`. Ignored for standalone. |
+| `billing_cycle`| `string` | `"ANNUALLY"` | Billing interval: `"ANNUALLY"` or `"MONTHLY"`. |
+
+#### Store Profile & Branding (Optional)
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `slug` | `string` | Auto-slug from `name` | Unique URL handle (`[a-z0-9-]` only) for menus and admin portal. |
+| `admin_name` | `string` | `"{name} Owner"` | Full name of the business owner. |
+| `phone` | `string` | `null` | Store contact phone number. |
+| `address` | `string` | `null` | Physical street address. |
+| `logo_url` | `string` | `null` | Hosted image URL for the brand logo. |
+| `primary_color` | `string` | `"#971345"` | Primary brand hex code for buttons, QR menus, and badges. |
+| `secondary_color`| `string` | `"#ffffff"` | Secondary accent color. |
+| `menu_layout` | `string` | `"LIST"` | Display format for QR menu: `"LIST"` or `"GRID"`. |
+| `timezone` | `string` | `"Asia/Kolkata"` | IANA timezone string. |
+| `opening_time` | `string` | `"09:00:00"` | Daily outlet opening time (`HH:mm:ss`). |
+| `closing_time` | `string` | `"22:00:00"` | Daily outlet closing time (`HH:mm:ss`). |
+| `gst_type` | `string` | `"NONE"` | Tax model: `"NONE"`, `"REGULAR"`, or `"COMPOSITION"`. |
+| `gst_number` | `string` | `null` | 15-character GSTIN. |
+| `gst_rate` | `number` | `5.0` | Default GST percentage (e.g. 5.0, 18.0). |
+
+---
+
+## 5. Request & Response Examples
+
+### Example 1: POS Onboarding (Default 14-Day Free Trial)
+
+#### Request:
+```bash
+POST /api/public/restaurants
+Content-Type: application/json
+
+{
+  "name": "Spice Garden Bistro",
+  "admin_email": "admin@spicegarden.com",
+  "admin_password": "SecurePassword123",
+  "product": "POS",
+  "plan": "PREMIUM",
+  "billing_cycle": "ANNUALLY",
+  "phone": "+91 9876543210",
+  "primary_color": "#059669"
+}
+```
+
+#### Response (`201 Created`):
 ```json
 {
   "success": true,
-  "message": "Restaurant and admin owner account created successfully",
+  "message": "Restaurant onboarded successfully with a 14-day full-featured Premium free trial",
   "data": {
     "restaurant": {
-      "id": "7b8f9e20-3329-44cb-8a4e-d0f98317a102",
-      "name": "The Coastal Bistro",
-      "slug": "the-coastal-bistro",
+      "id": "c1f7a188-3481-42ab-8e01-140b991d6f1a",
+      "name": "Spice Garden Bistro",
+      "slug": "spice-garden-bistro",
       "phone": "+91 9876543210",
-      "address": "12 Marine Drive, Kochi",
-      "primary_color": "#971345",
+      "address": null,
+      "primary_color": "#059669",
       "menu_layout": "LIST",
-      "created_at": "2026-09-22T08:30:00.000Z"
+      "created_at": "2026-11-05T14:30:00.000Z"
     },
     "admin": {
-      "email": "owner@coastalbistro.com",
-      "name": "Rahul Sharma"
+      "email": "admin@spicegarden.com",
+      "name": "Spice Garden Bistro Owner"
+    },
+    "subscription": {
+      "product": "POS",
+      "is_trial": true,
+      "trial_days": 14,
+      "trial_ends_at": "2026-11-19T14:30:00.000Z",
+      "tier": "PREMIUM",
+      "billing_cycle": "ANNUALLY",
+      "monthly_ai_credits": 30,
+      "unlocked_tier": "PREMIUM"
     },
     "urls": {
-      "admin_portal": "/the-coastal-bistro/admin/login",
-      "digital_menu": "/the-coastal-bistro/menu",
-      "pos_terminal": "/the-coastal-bistro/admin/pos"
+      "admin_portal": "/spice-garden-bistro/admin/login",
+      "digital_menu": "/spice-garden-bistro/menu",
+      "pos_terminal": "/spice-garden-bistro/admin/pos",
+      "queue_screen": "/spice-garden-bistro/queue"
     }
   }
 }
@@ -106,199 +195,240 @@ When you call this API, the system atomically completes 5 operations:
 
 ---
 
-### 4.2 Error Responses
+### Example 2: Standalone Digital Menu Onboarding
 
-#### `400 Bad Request` (Missing required parameters or invalid formatting)
+#### Request:
+```bash
+POST /api/public/restaurants
+Content-Type: application/json
 
-```json
 {
-  "success": false,
-  "error": "Admin password (admin_password) must be at least 6 characters long"
+  "name": "Artisan Bakery Café",
+  "admin_email": "hello@artisanbakery.com",
+  "admin_password": "SecurePassword123",
+  "product": "DIGITAL_MENU",
+  "billing_cycle": "ANNUALLY",
+  "primary_color": "#D97706"
 }
 ```
 
-#### `409 Conflict` (Email or Slug already in use)
-
+#### Response (`201 Created`):
 ```json
 {
-  "success": false,
-  "error": "An account with this admin email already exists. Please use a different email or log in."
-}
-```
-
-or
-
-```json
-{
-  "success": false,
-  "error": "The store slug 'coastal-bistro' is already taken. Please choose another."
-}
-```
-
-#### `500 Internal Server Error`
-
-```json
-{
-  "success": false,
-  "error": "Failed to onboard restaurant"
-}
-```
-
----
-
-## 5. Code Integration Examples
-
-### 5.1 JavaScript (`fetch`)
-
-```javascript
-async function onboardNewRestaurant() {
-  const payload = {
-    name: "The Coastal Bistro",
-    admin_email: "owner@coastalbistro.com",
-    admin_password: "SecurePassword123",
-    admin_name: "Rahul Sharma",
-    phone: "+91 9876543210",
-    address: "12 Marine Drive, Kochi",
-    primary_color: "#971345",
-  };
-
-  try {
-    const response = await fetch(
-      "https://your-domain.com/api/public/restaurants",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      },
-    );
-
-    const result = await response.json();
-
-    if (response.ok && result.success) {
-      console.log("Restaurant created!", result.data);
-      // Redirect user directly to their new admin login portal
-      window.location.href = `https://your-domain.com${result.data.urls.admin_portal}`;
-    } else {
-      alert("Registration failed: " + (result.error || "Unknown error"));
+  "success": true,
+  "message": "Restaurant onboarded successfully with standalone Digital Menu",
+  "data": {
+    "restaurant": {
+      "id": "e4a29c12-7811-4712-bf91-9c88219ad334",
+      "name": "Artisan Bakery Café",
+      "slug": "artisan-bakery-cafe",
+      "primary_color": "#D97706",
+      "created_at": "2026-11-05T14:30:00.000Z"
+    },
+    "admin": {
+      "email": "hello@artisanbakery.com",
+      "name": "Artisan Bakery Café Owner"
+    },
+    "subscription": {
+      "product": "DIGITAL_MENU",
+      "is_trial": false,
+      "trial_days": 0,
+      "trial_ends_at": null,
+      "tier": "STANDALONE",
+      "billing_cycle": "ANNUALLY",
+      "monthly_ai_credits": 0,
+      "unlocked_tier": "STANDALONE"
+    },
+    "urls": {
+      "admin_portal": "/artisan-bakery-cafe/admin/login",
+      "digital_menu": "/artisan-bakery-cafe/menu",
+      "pos_terminal": "/artisan-bakery-cafe/admin/pos",
+      "queue_screen": "/artisan-bakery-cafe/queue"
     }
-  } catch (error) {
-    console.error("Network error:", error);
   }
 }
 ```
 
 ---
 
-### 5.2 React Form Example
+### Example 3: Standalone Q Management System Onboarding
+
+#### Request:
+```bash
+POST /api/public/restaurants
+Content-Type: application/json
+
+{
+  "name": "Downtown Express Food Court",
+  "admin_email": "ops@expresscourt.com",
+  "admin_password": "SecurePassword123",
+  "product": "QUEUE_MANAGEMENT",
+  "billing_cycle": "MONTHLY"
+}
+```
+
+#### Response (`201 Created`):
+```json
+{
+  "success": true,
+  "message": "Restaurant onboarded successfully with standalone Q Management",
+  "data": {
+    "restaurant": {
+      "id": "18f99e4b-9c44-46aa-b2b9-e48f729fcf91",
+      "name": "Downtown Express Food Court",
+      "slug": "downtown-express-food-court",
+      "created_at": "2026-11-05T14:30:00.000Z"
+    },
+    "admin": {
+      "email": "ops@expresscourt.com",
+      "name": "Downtown Express Food Court Owner"
+    },
+    "subscription": {
+      "product": "QUEUE_MANAGEMENT",
+      "is_trial": false,
+      "trial_days": 0,
+      "trial_ends_at": null,
+      "tier": "STANDALONE",
+      "billing_cycle": "MONTHLY",
+      "monthly_ai_credits": 0,
+      "unlocked_tier": "STANDALONE"
+    },
+    "urls": {
+      "admin_portal": "/downtown-express-food-court/admin/login",
+      "digital_menu": "/downtown-express-food-court/menu",
+      "pos_terminal": "/downtown-express-food-court/admin/pos",
+      "queue_screen": "/downtown-express-food-court/queue"
+    }
+  }
+}
+```
+
+---
+
+## 6. Error Responses
+
+| HTTP Status | Error Case | Response Body |
+| :--- | :--- | :--- |
+| **`400 Bad Request`** | Missing restaurant name | `{"success": false, "error": "Restaurant name is required"}` |
+| **`400 Bad Request`** | Invalid email format | `{"success": false, "error": "Invalid email address format"}` |
+| **`400 Bad Request`** | Short password | `{"success": false, "error": "Admin password (admin_password) must be at least 6 characters long"}` |
+| **`400 Bad Request`** | Invalid product option | `{"success": false, "error": "Invalid product 'KIOSK'. Must be one of: POS, DIGITAL_MENU, QUEUE_MANAGEMENT."}` |
+| **`400 Bad Request`** | Invalid billing cycle | `{"success": false, "error": "Invalid billing_cycle 'WEEKLY'. Must be either 'ANNUALLY' or 'MONTHLY'."}` |
+| **`409 Conflict`** | Email already registered | `{"success": false, "error": "An account with this admin email already exists. Please use a different email or log in."}` |
+| **`409 Conflict`** | Custom slug already taken | `{"success": false, "error": "The store slug 'spice-garden' is already taken. Please choose another."}` |
+| **`500 Internal Error`**| Unexpected server failure | `{"success": false, "error": "Failed to onboard restaurant"}` |
+
+---
+
+## 7. Frontend Integration Example (React / TypeScript)
 
 ```tsx
-import React, { useState } from "react";
+import React, { useState } from 'react';
+
+type ProductChoice = 'POS' | 'DIGITAL_MENU' | 'QUEUE_MANAGEMENT';
 
 export function OnboardingForm() {
+  const [product, setProduct] = useState<ProductChoice>('POS');
+  const [plan, setPlan] = useState<'ESSENTIAL' | 'PREMIUM'>('PREMIUM');
+  const [cycle, setCycle] = useState<'MONTHLY' | 'ANNUALLY'>('ANNUALLY');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    admin_email: "",
-    admin_password: "",
-    phone: "",
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const res = await fetch(
-        "https://your-domain.com/api/public/restaurants",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        },
-      );
-      const data = await res.json();
+      const response = await fetch('/api/public/restaurants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          admin_email: email,
+          admin_password: password,
+          product,
+          plan: product === 'POS' ? plan : undefined,
+          billing_cycle: cycle,
+        }),
+      });
 
-      if (res.ok && data.success) {
-        // Automatically redirect to the created admin portal
-        window.location.href = `https://your-domain.com${data.data.urls.admin_portal}`;
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        // Redirect directly to store owner's admin portal
+        window.location.href = resData.data.urls.admin_portal;
       } else {
-        alert(data.error || "Failed to create restaurant");
+        alert(resData.error || 'Onboarding failed');
       }
     } catch (err) {
-      alert("Network error connecting to onboarding service");
+      alert('Network error while connecting to Qdine onboarding');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto p-6 bg-white rounded-xl shadow">
+      <h2 className="text-xl font-bold">Get Started with Qdine</h2>
+
+      {/* Product Selection */}
+      <div className="grid grid-cols-3 gap-2">
+        {(['POS', 'DIGITAL_MENU', 'QUEUE_MANAGEMENT'] as const).map((prod) => (
+          <button
+            key={prod}
+            type="button"
+            onClick={() => setProduct(prod)}
+            className={`p-3 rounded-lg border text-xs font-semibold ${
+              product === prod ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200'
+            }`}
+          >
+            {prod === 'POS' ? 'POS System' : prod === 'DIGITAL_MENU' ? 'Digital Menu' : 'Q Management'}
+          </button>
+        ))}
+      </div>
+
+      {product === 'POS' && (
+        <div className="p-3 bg-emerald-50 text-emerald-800 rounded-lg text-xs">
+          🎉 <strong>14-Day Free Trial:</strong> All Premium features & 30 AI Analyst credits unlocked! No credit card required.
+        </div>
+      )}
+
+      {/* Basic Inputs */}
       <input
         type="text"
         placeholder="Restaurant Name"
         required
-        value={formData.name}
-        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full p-2 border rounded"
       />
       <input
         type="email"
-        placeholder="Your Email Address"
+        placeholder="Email Address"
         required
-        value={formData.admin_email}
-        onChange={(e) =>
-          setFormData({ ...formData, admin_email: e.target.value })
-        }
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="w-full p-2 border rounded"
       />
       <input
         type="password"
         placeholder="Password (min 6 characters)"
         required
         minLength={6}
-        value={formData.admin_password}
-        onChange={(e) =>
-          setFormData({ ...formData, admin_password: e.target.value })
-        }
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className="w-full p-2 border rounded"
       />
-      <input
-        type="tel"
-        placeholder="Phone Number (optional)"
-        value={formData.phone}
-        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-      />
-      <button type="submit" disabled={loading}>
-        {loading ? "Creating Your Restaurant..." : "Get Started Free"}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"
+      >
+        {loading ? 'Setting up...' : product === 'POS' ? 'Start 14-Day Free Trial' : 'Create Account'}
       </button>
     </form>
   );
 }
 ```
-
----
-
-### 5.3 cURL Command
-
-```bash
-curl -X POST https://your-domain.com/api/public/restaurants \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "The Coastal Bistro",
-    "admin_email": "owner@coastalbistro.com",
-    "admin_password": "Password@123",
-    "phone": "+91 9876543210",
-    "address": "12 Marine Drive, Kochi",
-    "primary_color": "#971345"
-  }'
-```
-
----
-
-## 6. Post-Registration Workflow
-
-Once the API returns `201 Created`:
-
-1. **Admin Portal Login**: The owner can log in at `https://your-domain.com/{slug}/admin/login` using their `admin_email` and `admin_password`.
-2. **Customer QR Menu**: Live immediately at `https://your-domain.com/{slug}/menu`.
-3. **POS Terminal**: Live immediately at `https://your-domain.com/{slug}/admin/pos`.
-4. **Staff Roles**: 4 default roles (`Waiter`, `Kitchen Staff`, `Cashier`, `Manager`) are already initialized and ready for staff assignment under `/admin/staff`.
