@@ -29,6 +29,9 @@ interface BillingData {
     billing_status: string;
     billing_start_date: string | null;
     billing_end_date: string | null;
+    is_trial?: boolean;
+    trial_ends_at?: string | null;
+    selected_product?: string;
   };
   transactions: Array<{
     id: string;
@@ -53,6 +56,7 @@ interface BillingData {
   pricingConfig: {
     name: string;
     subscriptionPrice: number;
+    billingPeriod?: string;
     features: string[];
     perOrderCommission?: {
       threshold: number;
@@ -60,6 +64,9 @@ interface BillingData {
       aboveFlat: number;
     };
     otpCharge?: number;
+    effectiveEndDate?: string | null;
+    isTrial?: boolean;
+    trialEndsAt?: string | null;
   } | null;
   todayOtpUsage?: {
     count: number;
@@ -333,8 +340,28 @@ export default function BillingPage() {
             }}>
               <h2 style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Current Plan</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '12px' }}>
-                <span style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>{restaurant.billing_tier || 'BASIC'}</span>
-                <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{restaurant.billing_model || 'SUBSCRIPTION'} MODEL</span>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>
+                  {pricingConfig?.name || restaurant.billing_tier || 'STANDALONE'}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {restaurant.billing_period ? `${restaurant.billing_period} ` : ''}
+                    {restaurant.billing_model || 'SUBSCRIPTION'} MODEL
+                  </span>
+                  {restaurant.billing_status === 'TRIAL' && (
+                    <span style={{ 
+                      fontSize: '10px', 
+                      backgroundColor: '#fef3c7', 
+                      color: '#92400e', 
+                      fontWeight: 700, 
+                      padding: '2px 6px', 
+                      borderRadius: '4px',
+                      textTransform: 'uppercase'
+                    }}>
+                      Free Trial
+                    </span>
+                  )}
+                </div>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px', fontSize: '13px', color: '#4b5563' }}>
@@ -342,15 +369,20 @@ export default function BillingPage() {
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
                       <span>Base Subscription:</span>
-                      <strong style={{ color: '#111827' }}>₹{pricingConfig?.subscriptionPrice || 0}/month</strong>
+                      <strong style={{ color: '#111827' }}>
+                        ₹{Number(pricingConfig?.subscriptionPrice || 0).toLocaleString('en-IN')}
+                        {restaurant.billing_period === 'ANNUALLY' ? '/year' : '/month'}
+                      </strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
                       <span>Cycle Start Date:</span>
                       <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_start_date)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Renewal/End Date:</span>
-                      <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_end_date)}</strong>
+                      <span>{restaurant.billing_status === 'TRIAL' ? 'Trial Ends:' : 'Renewal/End Date:'}</span>
+                      <strong style={{ color: '#111827' }}>
+                        {formatDate(restaurant.billing_end_date || pricingConfig?.effectiveEndDate || null)}
+                      </strong>
                     </div>
                   </>
                 ) : restaurant.billing_model === 'PER_ORDER' ? (

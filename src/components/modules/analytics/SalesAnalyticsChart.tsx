@@ -66,25 +66,6 @@ export function SalesAnalyticsChart({
     setMounted(true);
   }, []);
 
-  if (!mounted) {
-    return (
-      <div
-        style={{
-          height: '320px',
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#FFFFFF',
-          borderRadius: 0,
-          border: 'none',
-        }}
-      >
-        <div className="loader" style={{ width: 32, height: 32 }} />
-      </div>
-    );
-  }
-
   // Format daily trend data
   const chartData = dailyData.map((d) => {
     const rawDate = String(d.date || '').split('T')[0];
@@ -496,7 +477,7 @@ export function SalesAnalyticsChart({
 
       {/* Chart Canvas Area */}
       <div style={{ width: '100%', minHeight: 260, height: activeMetric === 'payment_methods' ? 'auto' : 260, minWidth: 0, touchAction: 'pan-y' }}>
-        {loading ? (
+        {!mounted || loading ? (
           <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="loader" style={{ width: 28, height: 28 }} />
           </div>

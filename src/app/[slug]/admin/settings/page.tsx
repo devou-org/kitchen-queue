@@ -103,12 +103,29 @@ export default function AdminSettings() {
   const { restaurant, loading, refresh } = useRestaurant();
   const [saving, setSaving] = useState(false);
 
+  // Standalone plans (Digital Menu & Queue Management) do not need kitchen workflows or hardware auto-printing
+  const isStandalone = restaurant?.selected_product === 'DIGITAL_MENU' ||
+                       restaurant?.selected_product === 'QUEUE_MANAGEMENT' ||
+                       restaurant?.billing_tier === 'STANDALONE';
+  const showKitchenAndHardware = !isStandalone && restaurant?.modules?.ONLINE_ORDERING !== false;
+
   // Auto-Print State (synced with orders and pos)
   const [autoPrintKot, setAutoPrintKot] = useState(false);
   const [isPrintStation, setIsPrintStation] = useState(false);
   const [isServiceOnline, setIsServiceOnline] = useState(true);
 
-  const SECTION_KEYS = ['service_status', 'profile', 'menu', 'kitchen_workflow', 'hours', 'autoprint', 'gst', 'preview', 'qrcode', 'updates_patches'];
+  const SECTION_KEYS = [
+    'service_status',
+    'profile',
+    'menu',
+    ...(showKitchenAndHardware ? ['kitchen_workflow'] : []),
+    'hours',
+    ...(showKitchenAndHardware ? ['autoprint'] : []),
+    'gst',
+    'preview',
+    'qrcode',
+    'updates_patches',
+  ];
 
   // Collapsible Sections State (all collapsed by default)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -836,7 +853,8 @@ export default function AdminSettings() {
               </div>
             </CollapsibleCard>
 
-            {/* Kitchen Operations & Workflow Card */}
+            {/* Kitchen Operations & Workflow Card (Only for POS / Online Ordering) */}
+            {showKitchenAndHardware && (
             <CollapsibleCard
               id="kitchen_workflow"
               title="Kitchen Workflow"
@@ -962,6 +980,7 @@ export default function AdminSettings() {
                 </button>
               </div>
             </CollapsibleCard>
+            )}
 
             {/* 4. Location & Operating Hours Card */}
             <CollapsibleCard
@@ -1109,7 +1128,8 @@ export default function AdminSettings() {
           {/* Right Column: Auto-Print, GST, Live Preview, QR Code */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-            {/* 4. Auto-Print & Hardware Card */}
+            {/* 4. Auto-Print & Hardware Card (Only for POS / Online Ordering) */}
+            {showKitchenAndHardware && (
             <CollapsibleCard
               id="autoprint"
               title="Auto-Print & Hardware"
@@ -1260,6 +1280,7 @@ export default function AdminSettings() {
                 )}
               </div>
             </CollapsibleCard>
+            )}
 
             {/* 5. GST Information Card (Read-Only) */}
             <CollapsibleCard

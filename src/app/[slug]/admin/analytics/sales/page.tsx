@@ -114,13 +114,17 @@ export default function AdminSalesAnalyticsPage() {
   const [paymentData, setPaymentData] = useState<any[]>([]);
   const hasInitializedDateRef = useRef(false);
   const fetchIdRef = useRef(0);
+  const dateFromRef = useRef(dateFrom);
+  dateFromRef.current = dateFrom;
+  const dateToRef = useRef(dateTo);
+  dateToRef.current = dateTo;
 
   const fetchData = useCallback(async (manualFrom?: string, manualTo?: string) => {
     const fetchId = ++fetchIdRef.current;
     setLoading(true);
     try {
-      const from = manualFrom || dateFrom;
-      const to = manualTo || dateTo;
+      const from = manualFrom || dateFromRef.current;
+      const to = manualTo || dateToRef.current;
 
       const [topProdRes, catRes, dailyRes, paymentRes] = await Promise.all([
         adminService.getTopProducts({
@@ -174,19 +178,19 @@ export default function AdminSalesAnalyticsPage() {
         setLoading(false);
       }
     }
-  }, [dateFrom, dateTo]);
+  }, []);
 
   // Initial fetch using true restaurant business date
   useEffect(() => {
+    if (hasInitializedDateRef.current) return;
+
     if (restaurant) {
-      if (!hasInitializedDateRef.current) {
-        hasInitializedDateRef.current = true;
-        const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
-        setDateFrom(bDate);
-        setDateTo(bDate);
-        fetchData(bDate, bDate);
-      }
-    } else if (!restaurantLoading && !hasInitializedDateRef.current) {
+      hasInitializedDateRef.current = true;
+      const bDate = getCurrentBusinessDate(restaurant.timezone, restaurant.rollover_time);
+      setDateFrom(bDate);
+      setDateTo(bDate);
+      fetchData(bDate, bDate);
+    } else if (!restaurantLoading) {
       // Fallback when restaurant loading is complete without restaurant context
       hasInitializedDateRef.current = true;
       const bDate = getCurrentBusinessDate();
@@ -634,23 +638,48 @@ export default function AdminSalesAnalyticsPage() {
           <span>Swipe horizontally to view full sales details</span>
         </div>
         <div className="table-wrapper sales-table-wrapper" style={{ border: 'none', borderRadius: 0, overflowX: 'auto', width: '100%', margin: 0 }}>
-          {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', width: '100%' }}>
-              <div className="loader" />
-            </div>
-          ) : (
-            <table className="sales-table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
-              <thead>
-                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ paddingLeft: '24px' }}>Item Name</th>
-                  <th>Category</th>
-                  <th style={{ textAlign: 'center' }}>Qty Sold</th>
-                  <th style={{ textAlign: 'right' }}>Unit Price</th>
-                  <th style={{ textAlign: 'right', paddingRight: '24px' }}>Total Rev</th>
+          <table className="sales-table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
+            <thead>
+              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+                <th style={{ paddingLeft: '24px' }}>Item Name</th>
+                <th>Category</th>
+                <th style={{ textAlign: 'center' }}>Qty Sold</th>
+                <th style={{ textAlign: 'right' }}>Unit Price</th>
+                <th style={{ textAlign: 'right', paddingRight: '24px' }}>Total Rev</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 8, background: '#F1F5F9' }} className="animate-pulse" />
+                        <div style={{ width: 140, height: 16, borderRadius: 4, background: '#F1F5F9' }} className="animate-pulse" />
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px 12px' }}>
+                      <div style={{ width: 70, height: 20, borderRadius: 12, background: '#F1F5F9' }} className="animate-pulse" />
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '16px 12px' }}>
+                      <div style={{ width: 32, height: 16, borderRadius: 4, background: '#F1F5F9', margin: '0 auto' }} className="animate-pulse" />
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '16px 12px' }}>
+                      <div style={{ width: 50, height: 16, borderRadius: 4, background: '#F1F5F9', marginLeft: 'auto' }} className="animate-pulse" />
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '16px 24px' }}>
+                      <div style={{ width: 60, height: 16, borderRadius: 4, background: '#F1F5F9', marginLeft: 'auto' }} className="animate-pulse" />
+                    </td>
+                  </tr>
+                ))
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                    No sales data found for the selected filters.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {paginated.map((item, idx) => {
+              ) : (
+                paginated.map((item, idx) => {
                   const catStyle = getCategoryStyle(item.category);
                   return (
                     <tr key={`${item.product_id || item.id}-${idx}`} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -689,17 +718,10 @@ export default function AdminSalesAnalyticsPage() {
                       </td>
                     </tr>
                   );
-                })}
-                {paginated.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                      No sales data found for the selected filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
+                })
+              )}
+            </tbody>
+          </table>
         </div>
         {!loading && totalPages > 1 && (
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)' }}>

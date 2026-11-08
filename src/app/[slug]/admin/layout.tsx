@@ -100,7 +100,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
     ...(showFinance ? [{ key: 'finance', name: 'Finance', href: `/${slug}/admin/finance`, icon: <Landmark size={20} strokeWidth={2.5} /> }] : []),
     ...(showLoyalty ? [{ key: 'loyalty', name: 'Loyalty', href: `/${slug}/admin/loyalty`, icon: <Gift size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics/sales`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'staff', name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
     { key: 'billing', name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
     { key: 'settings', name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
@@ -131,7 +131,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     }
 
     const currentModule = allNavLinks.find(link => pathname.startsWith(link.href) || 
-      (link.key === 'analytics' && (pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)))
+      (link.key === 'analytics' && (pathname.startsWith(`/${slug}/admin/analytics`) || pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)))
     );
 
     if (currentModule) {
@@ -451,7 +451,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         <nav className="sidebar-nav">
           {navLinks.map((link) => {
             const isActive = pathname.startsWith(link.href) ||
-              (link.name === 'Analytics' && (pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)));
+              (link.name === 'Analytics' && (pathname.startsWith(`/${slug}/admin/analytics`) || pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)));
             return (
               <Link key={link.name} 
                 href={link.href} 
