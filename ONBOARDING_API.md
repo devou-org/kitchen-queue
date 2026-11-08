@@ -13,7 +13,7 @@ Qdine operates three independent software products. During onboarding, a custome
 | Product Option | ID | Default Onboarding Mode | Features / Scope |
 | :--- | :--- | :--- | :--- |
 | **POS** | `POS` | **14-Day Free Trial** (All Premium features unlocked, 30 AI Analyst credits, no credit card required) | Full restaurant POS, Table Management, QR Ordering, Inventory, Loyalty, AI Analyst, Finance Management. |
-| **Digital Menu** | `DIGITAL_MENU` | **Standalone Product** | QR-based digital menu, catalogue management, branding & online ordering. |
+| **Digital Menu** | `DIGITAL_MENU` | **Standalone Product** | QR-based digital menu, catalogue management, and brand presentation (view-only digital menu; online ordering, POS & Table Management are disabled). |
 | **Q Management** | `QUEUE_MANAGEMENT` | **Standalone Product** | Waitlist queue management, token generation, live display screen & customer SMS/OTP paging. |
 
 ---
@@ -79,6 +79,10 @@ When a restaurant is created:
 - `trial_ends_at`: `NOW() + INTERVAL '14 days'` (for POS)
 - `monthly_ai_credits`: `30` (trial/premium) or `10` (essential) or `0`
 - `restaurant_modules`: Tenant-specific feature flags dynamically synced to active plan features.
+  - **POS Premium**: All modules enabled (`DIGITAL_MENU`, `ONLINE_ORDERING`, `TABLE_MANAGEMENT`, `QUEUE_MANAGEMENT`, `INVENTORY`, `LOYALTY_PROGRAM`, `FINANCE_MANAGEMENT`, `ANALYTICS`, `REPORTS`), 30 AI credits.
+  - **POS Essential**: Only core modules enabled (`DIGITAL_MENU`, `ONLINE_ORDERING`, `TABLE_MANAGEMENT`, `ANALYTICS`, `REPORTS`), 10 AI credits. Advanced modules (`FINANCE_MANAGEMENT`, `INVENTORY`, `LOYALTY_PROGRAM`, `QUEUE_MANAGEMENT`) are explicitly neglected / disabled (`false`).
+  - **Standalone Digital Menu**: Only `DIGITAL_MENU` enabled. All other modules including `ONLINE_ORDERING` and `TABLE_MANAGEMENT` are disabled (`false`).
+  - **Standalone Q Management**: Only `QUEUE_MANAGEMENT` enabled with default states (`PENDING`, `SEATED`, `CANCELLED`). All other modules including `ONLINE_ORDERING` and `TABLE_MANAGEMENT` are disabled (`false`).
 
 ---
 
@@ -104,6 +108,7 @@ When a restaurant is created:
 | `name` | `string` | Non-empty string | Name of the restaurant or food brand. |
 | `admin_email` | `string` | Valid email format | Primary email for store owner portal login. Must be unique. |
 | `admin_password` | `string` | Min 6 characters | Initial password for the owner account. |
+| `email_verification_otp` | `string` | 6-digit numeric OTP | Verification code sent to `admin_email` via `/api/auth/send-verification-otp`. Email verification is mandatory for onboarding. |
 
 #### Product & Plan Selection (Data-Driven)
 | Parameter | Type | Default | Description |
@@ -132,6 +137,70 @@ When a restaurant is created:
 
 ---
 
+### 4.3 Email Verification & Password Recovery Endpoints
+
+To ensure valid store ownership and secure credential recovery, Qdine provides dedicated endpoints powered by a **Dependency Injection Email Service** (defaulting to the **Resend API** via `RESEND_API_KEY`):
+
+#### 1. Request Email Verification OTP (Pre-Onboarding)
+- **URL**: `/api/auth/send-verification-otp`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "email": "owner@restaurant.com",
+    "restaurant_name": "Spice Garden Bistro"
+  }
+  ```
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "message": "Verification code sent to owner@restaurant.com"
+  }
+  ```
+
+#### 2. Request Password Reset OTP
+- **URL**: `/api/auth/forgot-password`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "email": "owner@restaurant.com"
+  }
+  ```
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "message": "If an account exists with this email address, a password reset code has been sent."
+  }
+  ```
+
+#### 3. Complete Password Reset
+- **URL**: `/api/auth/reset-password`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "email": "owner@restaurant.com",
+    "otp": "491823",
+    "new_password": "NewSecurePassword123"
+  }
+  ```
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "message": "Password has been successfully updated. You may now log in with your new password.",
+    "data": {
+      "email": "owner@restaurant.com",
+      "login_url": "/spice-garden-bistro/admin/login"
+    }
+  }
+  ```
+
+---
+
 ## 5. Request & Response Examples
 
 ### Example 1: POS Onboarding (Default 14-Day Free Trial)
@@ -145,6 +214,7 @@ Content-Type: application/json
   "name": "Spice Garden Bistro",
   "admin_email": "admin@spicegarden.com",
   "admin_password": "SecurePassword123",
+  "email_verification_otp": "481920",
   "product": "POS",
   "plan": "PREMIUM",
   "billing_cycle": "ANNUALLY",
@@ -206,6 +276,7 @@ Content-Type: application/json
   "name": "Artisan Bakery Café",
   "admin_email": "hello@artisanbakery.com",
   "admin_password": "SecurePassword123",
+  "email_verification_otp": "928371",
   "product": "DIGITAL_MENU",
   "billing_cycle": "ANNUALLY",
   "primary_color": "#D97706"
@@ -241,9 +312,7 @@ Content-Type: application/json
     },
     "urls": {
       "admin_portal": "/artisan-bakery-cafe/admin/login",
-      "digital_menu": "/artisan-bakery-cafe/menu",
-      "pos_terminal": "/artisan-bakery-cafe/admin/pos",
-      "queue_screen": "/artisan-bakery-cafe/queue"
+      "digital_menu": "/artisan-bakery-cafe/menu"
     }
   }
 }
@@ -262,6 +331,7 @@ Content-Type: application/json
   "name": "Downtown Express Food Court",
   "admin_email": "ops@expresscourt.com",
   "admin_password": "SecurePassword123",
+  "email_verification_otp": "610294",
   "product": "QUEUE_MANAGEMENT",
   "billing_cycle": "MONTHLY"
 }

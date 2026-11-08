@@ -207,7 +207,7 @@ export default function AdminPosPage() {
   }, [tableParam, mergedParam, tables]);
 
   useEffect(() => {
-    if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
+    if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM === true) {
       const slugStr = Array.isArray(slug) ? slug[0] : slug;
       fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(orderForm.phone.trim())}`)
         .then(res => res.json())

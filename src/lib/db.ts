@@ -490,6 +490,40 @@ async function runAutoMigration(sqlConnection: any) {
           updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_system_updates_published ON system_updates(is_published, published_at DESC);
+
+      CREATE TABLE IF NOT EXISTS email_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          recipient_email VARCHAR(255) NOT NULL,
+          subject VARCHAR(255) NOT NULL,
+          template_type VARCHAR(100) NOT NULL,
+          status VARCHAR(50) NOT NULL,
+          provider VARCHAR(50) NOT NULL,
+          provider_message_id VARCHAR(255),
+          error_message TEXT,
+          metadata JSONB DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS auth_verification_tokens (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          email VARCHAR(255) NOT NULL,
+          token VARCHAR(255) NOT NULL,
+          token_type VARCHAR(50) NOT NULL,
+          expires_at TIMESTAMPTZ NOT NULL,
+          is_used BOOLEAN DEFAULT false,
+          used_at TIMESTAMPTZ DEFAULT NULL,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      ALTER TABLE admins
+      ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ DEFAULT NULL;
+
+      ALTER TABLE restaurants
+      ADD COLUMN IF NOT EXISTS selected_product VARCHAR(50) DEFAULT 'POS',
+      ADD COLUMN IF NOT EXISTS is_trial BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS custom_plan_price DECIMAL(10, 2) DEFAULT NULL;
     `;
     console.log("Auto-migrated menu, GST, tables, counters, inventory, roles, admins, and loyalty schema successfully!");
   } catch (err) {
@@ -690,8 +724,18 @@ export async function createRestaurant(data: {
   }
 
   // Seed default modules for the new restaurant
-  const ALL_MODULES = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'INVENTORY', 'ANALYTICS', 'REPORTS', 'LOYALTY_PROGRAM'];
-  const defaultEnabledModules = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'QUEUE_MANAGEMENT', 'LOYALTY_PROGRAM'];
+  const ALL_MODULES = [
+    'DIGITAL_MENU',
+    'ONLINE_ORDERING',
+    'TABLE_MANAGEMENT',
+    'QUEUE_MANAGEMENT',
+    'INVENTORY',
+    'ANALYTICS',
+    'REPORTS',
+    'LOYALTY_PROGRAM',
+    'FINANCE_MANAGEMENT',
+  ];
+  const defaultEnabledModules = ['DIGITAL_MENU', 'ONLINE_ORDERING', 'TABLE_MANAGEMENT', 'QUEUE_MANAGEMENT', 'LOYALTY_PROGRAM'];
   const enabledModules = data.modules || defaultEnabledModules;
 
   for (const mod of ALL_MODULES) {
@@ -708,6 +752,20 @@ export async function createRestaurant(data: {
     VALUES (${restaurant.id}, 1, 0)
     ON CONFLICT (restaurant_id) DO NOTHING
   `;
+
+  // Seed default queue statuses: Pending, Seated, Cancelled
+  const defaultQueueStatuses = [
+    { status: 'PENDING', color: '#f59e0b', priority: 1 },
+    { status: 'SEATED', color: '#10b981', priority: 2 },
+    { status: 'CANCELLED', color: '#ef4444', priority: 3 },
+  ];
+  for (const qs of defaultQueueStatuses) {
+    await sql`
+      INSERT INTO queue_status (restaurant_id, possible_queue_status, color, priority)
+      VALUES (${restaurant.id}, ${qs.status}, ${qs.color}, ${qs.priority})
+      ON CONFLICT (restaurant_id, possible_queue_status) DO NOTHING
+    `;
+  }
 
   return restaurant;
 }

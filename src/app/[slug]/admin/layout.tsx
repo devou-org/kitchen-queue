@@ -50,7 +50,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   // Controlled via Super Admin Subscription Modules
   const showInventory = restaurant?.modules?.INVENTORY === true;
   const showFinance = restaurant?.modules?.FINANCE_MANAGEMENT === true;
-  const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM !== false;
+  const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM === true;
+  const showTables = showOrdering && restaurant?.modules?.TABLE_MANAGEMENT !== false;
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
@@ -94,7 +95,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     ...(showOrdering ? [{ key: 'pos', name: 'POS', href: `/${slug}/admin/pos`, icon: <Store size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'orders', name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(!showOrdering && showQueue ? [{ key: 'queue', name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
-    { key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
+    ...(showTables ? [{ key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> }] : []),
     { key: 'products', name: 'Menu', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
     ...(showFinance ? [{ key: 'finance', name: 'Finance', href: `/${slug}/admin/finance`, icon: <Landmark size={20} strokeWidth={2.5} /> }] : []),
@@ -150,6 +151,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       const isUnauthorizedPath = 
         pathname.startsWith(`/${slug}/admin/pos`) || 
         pathname.startsWith(`/${slug}/admin/orders`) || 
+        pathname.startsWith(`/${slug}/admin/tables`) || 
         pathname.startsWith(`/${slug}/admin/statements`) || 
         pathname.startsWith(`/${slug}/admin/sales`) ||
         pathname.startsWith(`/${slug}/admin/analytics`);
@@ -157,6 +159,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         const target = showQueue ? 'queue' : 'products';
         router.replace(`/${slug}/admin/${target}`);
       }
+    } else if (!resLoading && restaurant && !showTables && pathname.startsWith(`/${slug}/admin/tables`)) {
+      router.replace(`/${slug}/admin/products`);
     }
 
     if (!resLoading && restaurant && restaurant.modules?.INVENTORY !== true) {
