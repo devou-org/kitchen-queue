@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRestaurant, seedDefaultRoles, pool } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { SubscriptionService, SaaSProductId, SaaSPlanTier, BillingCycle } from '@/modules/billing/subscription.service';
+import { AuthTokenService } from '@/modules/auth/auth-token.service';
+import { emailService } from '@/modules/email/email.service';
+import { QueueService } from '@/modules/queue/queue.service';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +60,7 @@ export async function POST(request: NextRequest) {
       product: requestedProduct,
       plan: requestedPlan,
       billing_cycle: requestedBillingCycle,
+      email_verification_otp,
       modules
     } = body;
 
@@ -160,7 +164,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 7. Determine & Validate Slug
+    // 7. Email Verification Validation (Mandatory for store onboarding)
+    if (!email_verification_otp || !String(email_verification_otp).trim()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Email verification code (email_verification_otp) is required. Please request a verification code via /api/auth/send-verification-otp and verify your email to complete onboarding.',
+          code: 'EMAIL_VERIFICATION_REQUIRED',
+        },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    const isValidOtp = await AuthTokenService.verifyAndConsumeOtp(
+      emailTrimmed,
+      String(email_verification_otp).trim(),
+      'EMAIL_VERIFICATION'
+    );
+    if (!isValidOtp) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid or expired email verification code. Please request a new code.',
+          code: 'INVALID_VERIFICATION_CODE',
+        },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    const isEmailVerified = true;
+
+    // 8. Determine & Validate Slug
     let targetSlug = customSlug ? customSlug.trim().toLowerCase() : slugify(restaurantName);
     if (!targetSlug) {
       targetSlug = 'restaurant-' + Math.random().toString(36).substring(2, 7);
@@ -188,7 +221,40 @@ export async function POST(request: NextRequest) {
       targetSlug = `${targetSlug}-${Math.random().toString(36).substring(2, 6)}`;
     }
 
-    // 8. Create Restaurant Record
+    // 9. Determine Initial Modules Based on Chosen Product & Plan
+    let initialModules: string[] | undefined = undefined;
+    if (Array.isArray(modules) && modules.length > 0) {
+      initialModules = modules;
+    } else if (normalizedProduct === 'DIGITAL_MENU') {
+      initialModules = ['DIGITAL_MENU'];
+    } else if (normalizedProduct === 'QUEUE_MANAGEMENT') {
+      initialModules = ['QUEUE_MANAGEMENT'];
+    } else if (planTier === 'ESSENTIAL') {
+      // Essential Plan only gets core POS & Table Management, Digital Menu, Sales & Statements
+      // Neglects Inventory, Loyalty, Finance, and Queue
+      initialModules = [
+        'DIGITAL_MENU',
+        'ONLINE_ORDERING',
+        'TABLE_MANAGEMENT',
+        'ANALYTICS',
+        'REPORTS',
+      ];
+    } else {
+      // Default for POS Premium trial: all premium modules
+      initialModules = [
+        'DIGITAL_MENU',
+        'ONLINE_ORDERING',
+        'TABLE_MANAGEMENT',
+        'QUEUE_MANAGEMENT',
+        'INVENTORY',
+        'LOYALTY_PROGRAM',
+        'FINANCE_MANAGEMENT',
+        'ANALYTICS',
+        'REPORTS',
+      ];
+    }
+
+    // 10. Create Restaurant Record
     const restaurant = await createRestaurant({
       name: restaurantName,
       slug: targetSlug,
@@ -206,42 +272,59 @@ export async function POST(request: NextRequest) {
       gst_type: gst_type || 'NONE',
       gst_number: gst_number ? String(gst_number).trim() : undefined,
       gst_rate: gst_rate !== undefined ? parseFloat(gst_rate) : 5.0,
-      modules: Array.isArray(modules) && modules.length > 0 ? modules : undefined
+      modules: initialModules
     });
 
-    // 9. Data-Driven Provisioning: Subscription, Trial & Modules
+    // 11. Data-Driven Provisioning: Subscription, Trial & Modules
     const subscriptionInfo = await SubscriptionService.provisionOnboardingSubscription(restaurant.id, {
       product: normalizedProduct,
       planTier,
       billingCycle: normalizedBillingCycle,
     });
 
-    // 10. Create Admin User (Store Owner)
+    // 11. Create Admin User (Store Owner)
     const passwordHash = await hashPassword(admin_password);
     const ownerName = admin_name ? String(admin_name).trim() : `${restaurantName} Owner`;
 
     try {
       await pool.query(
-        `INSERT INTO admins (email, password, name, restaurant_id, is_super_admin)
-         VALUES ($1, $2, $3, $4, false)`,
-        [emailTrimmed, passwordHash, ownerName, restaurant.id]
+        `INSERT INTO admins (email, password, name, restaurant_id, is_super_admin, is_email_verified, email_verified_at)
+         VALUES ($1, $2, $3, $4, false, $5, $6)`,
+        [emailTrimmed, passwordHash, ownerName, restaurant.id, isEmailVerified, isEmailVerified ? new Date().toISOString() : null]
       );
     } catch (adminErr: any) {
-      if (adminErr.message?.includes('name')) {
+      try {
+        await pool.query(
+          `INSERT INTO admins (email, password, name, restaurant_id, is_super_admin)
+           VALUES ($1, $2, $3, $4, false)`,
+          [emailTrimmed, passwordHash, ownerName, restaurant.id]
+        );
+      } catch {
         await pool.query(
           `INSERT INTO admins (email, password, restaurant_id, is_super_admin)
            VALUES ($1, $2, $3, false)`,
           [emailTrimmed, passwordHash, restaurant.id]
         );
-      } else {
-        throw adminErr;
+      }
+      if (isEmailVerified) {
+        await AuthTokenService.markAdminEmailVerified(emailTrimmed).catch(() => {});
       }
     }
 
-    // 11. Seed Default Staff Roles (Waiter, Kitchen Staff, Cashier, Manager)
+    // 12. If email is not pre-verified, dispatch verification email automatically
+    if (!isEmailVerified) {
+      AuthTokenService.createVerificationOtp(emailTrimmed, 'EMAIL_VERIFICATION', 10)
+        .then((otp) => emailService.sendEmailVerificationOtp(emailTrimmed, otp, restaurantName))
+        .catch((err) => console.error('[Onboarding] Verification email dispatch error:', err));
+    }
+
+    // 13. Seed Default Staff Roles (Waiter, Kitchen Staff, Cashier, Manager)
     await seedDefaultRoles(restaurant.id);
 
-    // 12. Return Comprehensive Success Response
+    // 14. Seed Default Queue Statuses (Pending, Seated, Cancelled)
+    await QueueService.seedDefaultQueueStatuses(restaurant.id);
+
+    // 15. Return Comprehensive Success Response
     return NextResponse.json(
       {
         success: true,
@@ -261,14 +344,15 @@ export async function POST(request: NextRequest) {
           },
           admin: {
             email: emailTrimmed,
-            name: ownerName
+            name: ownerName,
+            is_email_verified: isEmailVerified
           },
           subscription: subscriptionInfo,
           urls: {
             admin_portal: `/${restaurant.slug}/admin/login`,
             digital_menu: `/${restaurant.slug}/menu`,
-            pos_terminal: `/${restaurant.slug}/admin/pos`,
-            queue_screen: `/${restaurant.slug}/queue`
+            ...(normalizedProduct === 'POS' ? { pos_terminal: `/${restaurant.slug}/admin/pos` } : {}),
+            ...(normalizedProduct === 'POS' || normalizedProduct === 'QUEUE_MANAGEMENT' ? { queue_screen: `/${restaurant.slug}/queue` } : {})
           }
         }
       },

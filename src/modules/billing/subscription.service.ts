@@ -121,7 +121,7 @@ export class SubscriptionService {
         product_id: 'DIGITAL_MENU' as SaaSProductId,
         tier: 'STANDALONE' as SaaSPlanTier,
         name: 'Digital Menu Standalone',
-        description: 'Standalone QR digital menu and contactless menu viewing/ordering.',
+        description: 'Standalone QR digital menu and contactless catalogue viewing.',
         monthly_ai_credits: 0,
         is_default_trial_tier: false,
         pricing: {
@@ -129,7 +129,7 @@ export class SubscriptionService {
           MONTHLY: 299,
         },
         features: [
-          { feature_code: 'DIGITAL_MENU_QR', feature_name: 'Digital Menu & QR Ordering', feature_description: 'Contactless QR menu viewing and direct ordering', is_included: true },
+          { feature_code: 'DIGITAL_MENU_QR', feature_name: 'Digital Menu & QR Catalogue', feature_description: 'Contactless QR menu viewing for customers', is_included: true },
           { feature_code: 'MENU_MANAGEMENT', feature_name: 'Menu Management', feature_description: 'Complete catalogue, item availability and pricing', is_included: true },
           { feature_code: 'PROFILE_BRANDING', feature_name: 'Customised Profile & Branding', feature_description: 'Custom brand colours and header presentation', is_included: true },
         ],
@@ -227,6 +227,20 @@ export class SubscriptionService {
     return Object.values(this.FALLBACK_CATALOG.plans).filter((p) => p.product_id === productId);
   }
 
+  private static async ensureRestaurantColumns(): Promise<void> {
+    try {
+      await pool.query(`
+        ALTER TABLE restaurants
+        ADD COLUMN IF NOT EXISTS selected_product VARCHAR(50) DEFAULT 'POS',
+        ADD COLUMN IF NOT EXISTS is_trial BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS custom_plan_price DECIMAL(10, 2) DEFAULT NULL;
+      `);
+    } catch (err) {
+      console.error('[SubscriptionService] Failed to ensure restaurant columns:', err);
+    }
+  }
+
   /**
    * Provision subscription and modules during customer onboarding
    */
@@ -244,53 +258,83 @@ export class SubscriptionService {
     const now = new Date();
 
     if (selectedProduct === 'POS') {
-      // 14-day Free Trial with full Premium features unlocked and 30 AI Analyst credits
+      const chosenTier: SaaSPlanTier = options.planTier || 'PREMIUM';
+      const isEssential = chosenTier === 'ESSENTIAL';
       const trialDays = 14;
       const trialEndDate = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
-      const chosenTier = options.planTier || 'PREMIUM';
+      const allocatedAiCredits = isEssential ? 10 : 30;
 
-      // Update restaurant subscription status
-      await pool.query(
-        `UPDATE restaurants 
-         SET 
-           billing_tier = $1,
-           billing_model = 'SUBSCRIPTION',
-           billing_status = 'TRIAL',
-           billing_period = $2,
-           billing_start_date = $3,
-           billing_end_date = $4,
-           monthly_ai_credits = 30,
-           selected_product = 'POS',
-           is_trial = true,
-           trial_ends_at = $4,
-           custom_plan_price = $5
-         WHERE id = $6`,
-        [chosenTier, billingCycle, now.toISOString(), trialEndDate.toISOString(), options.customPrice || null, restaurantId]
-      );
+      // Update restaurant subscription status with auto-migration resilience
+      try {
+        await pool.query(
+          `UPDATE restaurants 
+           SET 
+             billing_tier = $1,
+             billing_model = 'SUBSCRIPTION',
+             billing_status = 'TRIAL',
+             billing_period = $2,
+             billing_start_date = $3,
+             billing_end_date = $4,
+             monthly_ai_credits = $5,
+             selected_product = 'POS',
+             is_trial = true,
+             trial_ends_at = $4,
+             custom_plan_price = $6
+           WHERE id = $7`,
+          [chosenTier, billingCycle, now.toISOString(), trialEndDate.toISOString(), allocatedAiCredits, options.customPrice || null, restaurantId]
+        );
+      } catch (updateErr: any) {
+        if (updateErr.message?.includes('column') || updateErr.message?.includes('does not exist')) {
+          await this.ensureRestaurantColumns();
+          await pool.query(
+            `UPDATE restaurants 
+             SET 
+               billing_tier = $1,
+               billing_model = 'SUBSCRIPTION',
+               billing_status = 'TRIAL',
+               billing_period = $2,
+               billing_start_date = $3,
+               billing_end_date = $4,
+               monthly_ai_credits = $5,
+               selected_product = 'POS',
+               is_trial = true,
+               trial_ends_at = $4,
+               custom_plan_price = $6
+             WHERE id = $7`,
+            [chosenTier, billingCycle, now.toISOString(), trialEndDate.toISOString(), allocatedAiCredits, options.customPrice || null, restaurantId]
+          );
+        } else {
+          throw updateErr;
+        }
+      }
 
-      // Seed 30 AI credits for current billing period
+      // Seed AI credits for current billing period (10 for Essential, 30 for Premium)
       const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       await pool.query(
         `INSERT INTO ai_credits (restaurant_id, billing_period, allocated_credits, used_credits)
-         VALUES ($1, $2, 30, 0.00)
+         VALUES ($1, $2, $3, 0.00)
          ON CONFLICT (restaurant_id, billing_period)
-         DO UPDATE SET allocated_credits = 30`,
-        [restaurantId, currentPeriod]
+         DO UPDATE SET allocated_credits = $3`,
+        [restaurantId, currentPeriod, allocatedAiCredits]
       );
 
-      // Activate all Premium modules for trial
-      const trialModules = [
+      // Provision modules based on tier:
+      // Essential: POS & Table Management, Digital Menu & QR, Sales & Statements, Profile Branding (10 AI Credits)
+      // Neglect / disable Finance, Inventory, Loyalty, Queue
+      // Premium: All modules unlocked (30 AI Credits)
+      const posModules = [
         { name: 'DIGITAL_MENU', enabled: true },
         { name: 'ONLINE_ORDERING', enabled: true },
-        { name: 'QUEUE_MANAGEMENT', enabled: true },
-        { name: 'INVENTORY', enabled: true },
-        { name: 'LOYALTY_PROGRAM', enabled: true },
-        { name: 'FINANCE_MANAGEMENT', enabled: true },
+        { name: 'TABLE_MANAGEMENT', enabled: true },
         { name: 'ANALYTICS', enabled: true },
         { name: 'REPORTS', enabled: true },
+        { name: 'INVENTORY', enabled: !isEssential },
+        { name: 'LOYALTY_PROGRAM', enabled: !isEssential },
+        { name: 'FINANCE_MANAGEMENT', enabled: !isEssential },
+        { name: 'QUEUE_MANAGEMENT', enabled: !isEssential },
       ];
 
-      for (const mod of trialModules) {
+      for (const mod of posModules) {
         await pool.query(
           `INSERT INTO restaurant_modules (restaurant_id, module_name, is_enabled)
            VALUES ($1, $2, $3)
@@ -307,32 +351,57 @@ export class SubscriptionService {
         trial_ends_at: trialEndDate.toISOString(),
         tier: chosenTier,
         billing_cycle: billingCycle,
-        monthly_ai_credits: 30,
-        unlocked_tier: 'PREMIUM',
+        monthly_ai_credits: allocatedAiCredits,
+        unlocked_tier: chosenTier,
       };
     } else if (selectedProduct === 'DIGITAL_MENU') {
       // Standalone Digital Menu
-      await pool.query(
-        `UPDATE restaurants 
-         SET 
-           billing_tier = 'STANDALONE',
-           billing_model = 'SUBSCRIPTION',
-           billing_status = 'ACTIVE',
-           billing_period = $1,
-           billing_start_date = $2,
-           monthly_ai_credits = 0,
-           selected_product = 'DIGITAL_MENU',
-           is_trial = false,
-           trial_ends_at = NULL,
-           custom_plan_price = $3
-         WHERE id = $4`,
-        [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
-      );
+      try {
+        await pool.query(
+          `UPDATE restaurants 
+           SET 
+             billing_tier = 'STANDALONE',
+             billing_model = 'SUBSCRIPTION',
+             billing_status = 'ACTIVE',
+             billing_period = $1,
+             billing_start_date = $2,
+             monthly_ai_credits = 0,
+             selected_product = 'DIGITAL_MENU',
+             is_trial = false,
+             trial_ends_at = NULL,
+             custom_plan_price = $3
+           WHERE id = $4`,
+          [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
+        );
+      } catch (updateErr: any) {
+        if (updateErr.message?.includes('column') || updateErr.message?.includes('does not exist')) {
+          await this.ensureRestaurantColumns();
+          await pool.query(
+            `UPDATE restaurants 
+             SET 
+               billing_tier = 'STANDALONE',
+               billing_model = 'SUBSCRIPTION',
+               billing_status = 'ACTIVE',
+               billing_period = $1,
+               billing_start_date = $2,
+               monthly_ai_credits = 0,
+               selected_product = 'DIGITAL_MENU',
+               is_trial = false,
+               trial_ends_at = NULL,
+               custom_plan_price = $3
+             WHERE id = $4`,
+            [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
+          );
+        } else {
+          throw updateErr;
+        }
+      }
 
-      // Enable only Digital Menu modules
+      // Enable only Digital Menu modules (online ordering & table management disabled)
       const digitalMenuModules = [
         { name: 'DIGITAL_MENU', enabled: true },
-        { name: 'ONLINE_ORDERING', enabled: true },
+        { name: 'ONLINE_ORDERING', enabled: false },
+        { name: 'TABLE_MANAGEMENT', enabled: false },
         { name: 'QUEUE_MANAGEMENT', enabled: false },
         { name: 'INVENTORY', enabled: false },
         { name: 'LOYALTY_PROGRAM', enabled: false },
@@ -363,27 +432,52 @@ export class SubscriptionService {
       };
     } else if (selectedProduct === 'QUEUE_MANAGEMENT') {
       // Standalone Queue Management
-      await pool.query(
-        `UPDATE restaurants 
-         SET 
-           billing_tier = 'STANDALONE',
-           billing_model = 'SUBSCRIPTION',
-           billing_status = 'ACTIVE',
-           billing_period = $1,
-           billing_start_date = $2,
-           monthly_ai_credits = 0,
-           selected_product = 'QUEUE_MANAGEMENT',
-           is_trial = false,
-           trial_ends_at = NULL,
-           custom_plan_price = $3
-         WHERE id = $4`,
-        [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
-      );
+      try {
+        await pool.query(
+          `UPDATE restaurants 
+           SET 
+             billing_tier = 'STANDALONE',
+             billing_model = 'SUBSCRIPTION',
+             billing_status = 'ACTIVE',
+             billing_period = $1,
+             billing_start_date = $2,
+             monthly_ai_credits = 0,
+             selected_product = 'QUEUE_MANAGEMENT',
+             is_trial = false,
+             trial_ends_at = NULL,
+             custom_plan_price = $3
+           WHERE id = $4`,
+          [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
+        );
+      } catch (updateErr: any) {
+        if (updateErr.message?.includes('column') || updateErr.message?.includes('does not exist')) {
+          await this.ensureRestaurantColumns();
+          await pool.query(
+            `UPDATE restaurants 
+             SET 
+               billing_tier = 'STANDALONE',
+               billing_model = 'SUBSCRIPTION',
+               billing_status = 'ACTIVE',
+               billing_period = $1,
+               billing_start_date = $2,
+               monthly_ai_credits = 0,
+               selected_product = 'QUEUE_MANAGEMENT',
+               is_trial = false,
+               trial_ends_at = NULL,
+               custom_plan_price = $3
+             WHERE id = $4`,
+            [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
+          );
+        } else {
+          throw updateErr;
+        }
+      }
 
       // Enable only Queue Management module
       const qModules = [
         { name: 'DIGITAL_MENU', enabled: false },
         { name: 'ONLINE_ORDERING', enabled: false },
+        { name: 'TABLE_MANAGEMENT', enabled: false },
         { name: 'QUEUE_MANAGEMENT', enabled: true },
         { name: 'INVENTORY', enabled: false },
         { name: 'LOYALTY_PROGRAM', enabled: false },

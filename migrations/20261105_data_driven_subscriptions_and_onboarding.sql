@@ -63,7 +63,7 @@ ADD COLUMN IF NOT EXISTS custom_plan_price DECIMAL(10, 2) DEFAULT NULL;
 INSERT INTO saas_products (id, name, description, has_trial, trial_days, is_active)
 VALUES
 ('POS', 'Point of Sale (POS)', 'Complete restaurant POS with Essential and Premium plans', true, 14, true),
-('DIGITAL_MENU', 'Digital Menu', 'Standalone digital menu and QR-based ordering solution', false, 0, true),
+('DIGITAL_MENU', 'Digital Menu', 'Standalone digital menu and QR catalogue solution', false, 0, true),
 ('QUEUE_MANAGEMENT', 'Q Management System', 'Standalone queue management and waitlist solution', false, 0, true)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
@@ -77,7 +77,7 @@ INSERT INTO saas_plans (id, product_id, tier, name, description, monthly_ai_cred
 VALUES
 ('POS_ESSENTIAL', 'POS', 'ESSENTIAL', 'Essential Plan', 'Core POS, QR ordering, menu, sales & statements, profile branding, and 10 AI credits.', 10, false, true),
 ('POS_PREMIUM', 'POS', 'PREMIUM', 'Premium Plan', 'Everything in Essential plus inventory, loyalty, 30 AI credits, finance management, and free access to new features.', 30, true, true),
-('DIGITAL_MENU_STANDALONE', 'DIGITAL_MENU', 'STANDALONE', 'Digital Menu Standalone', 'Standalone QR menu and contactless viewing/ordering.', 0, false, true),
+('DIGITAL_MENU_STANDALONE', 'DIGITAL_MENU', 'STANDALONE', 'Digital Menu Standalone', 'Standalone QR menu and contactless catalogue viewing.', 0, false, true),
 ('QUEUE_MGMT_STANDALONE', 'QUEUE_MANAGEMENT', 'STANDALONE', 'Q Management Standalone', 'Standalone digital queue management and guest paging.', 0, false, true)
 ON CONFLICT (id) DO UPDATE SET
   tier = EXCLUDED.tier,
@@ -135,7 +135,7 @@ ON CONFLICT (plan_id, feature_code) DO NOTHING;
 -- Standalone Digital Menu Features
 INSERT INTO saas_plan_features (plan_id, feature_code, feature_name, feature_description, is_included)
 VALUES
-('DIGITAL_MENU_STANDALONE', 'DIGITAL_MENU_QR', 'Digital Menu & QR Ordering', 'Customers can scan QR codes and browse/order.', true),
+('DIGITAL_MENU_STANDALONE', 'DIGITAL_MENU_QR', 'Digital Menu & QR Catalogue', 'Customers can scan QR codes and browse menu items.', true),
 ('DIGITAL_MENU_STANDALONE', 'MENU_MANAGEMENT', 'Menu Management', 'Manage product catalogue, variations, and pricing.', true),
 ('DIGITAL_MENU_STANDALONE', 'PROFILE_BRANDING', 'Customised Profile & Branding', 'Customise the digital menu to match brand identity.', true)
 ON CONFLICT (plan_id, feature_code) DO NOTHING;
