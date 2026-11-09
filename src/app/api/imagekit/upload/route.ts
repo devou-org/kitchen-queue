@@ -15,11 +15,23 @@ const ALLOWED_IMAGE_TYPES = [
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authentication Check
-    const admin = await requireAdmin(request);
+    // 1. Authentication Check (Restaurant Admin, Staff, or Super Admin)
+    let admin = await requireAdmin(request);
+    if (!admin) {
+      const { verifyToken } = await import('@/lib/auth');
+      const superToken = request.cookies.get('super_admin_token')?.value
+        || request.headers.get('Authorization')?.replace('Bearer ', '');
+      if (superToken) {
+        const payload = await verifyToken(superToken);
+        if (payload?.isSuperAdmin) {
+          admin = payload as any;
+        }
+      }
+    }
+
     if (!admin) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized: Admin or Staff authentication required' },
+        { success: false, error: 'Unauthorized: Admin, Staff or Super Admin authentication required' },
         { status: 401 }
       );
     }

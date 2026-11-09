@@ -30,7 +30,11 @@ interface RestaurantBilling {
   billing_start_date: string | null;
   billing_end_date: string | null;
   custom_subscription_charge?: string | number | null;
+  custom_plan_price?: string | number | null;
   custom_otp_charge?: string | number | null;
+  selected_product?: string;
+  is_trial?: boolean;
+  trial_ends_at?: string | null;
 }
 
 interface Transaction {
@@ -72,7 +76,7 @@ export default function SuperAdminRestaurantBilling() {
   const [txLoading, setTxLoading] = useState(false);
 
   // Form states for updating billing details
-  const [billingTier, setBillingTier] = useState('BASIC');
+  const [billingTier, setBillingTier] = useState('ESSENTIAL');
   const [billingModel, setBillingModel] = useState('SUBSCRIPTION');
   const [billingPeriod, setBillingPeriod] = useState('MONTHLY');
   const [billingStatus, setBillingStatus] = useState('ACTIVE');
@@ -105,12 +109,13 @@ export default function SuperAdminRestaurantBilling() {
       }
       const r = resData.data;
       setRestaurant(r);
-      setBillingTier(r.billing_tier || 'BASIC');
+      setBillingTier(r.billing_tier || (r.selected_product === 'POS' ? 'ESSENTIAL' : 'STANDALONE'));
       setBillingModel(r.billing_model || 'SUBSCRIPTION');
-      setBillingPeriod(r.billing_period || 'MONTHLY');
+      setBillingPeriod(r.billing_period === 'YEARLY' ? 'ANNUALLY' : (r.billing_period || 'MONTHLY'));
       setBillingStatus(r.billing_status || 'ACTIVE');
       setBillingEndDate(r.billing_end_date ? r.billing_end_date.split('T')[0] : '');
-      setCustomSubscriptionCharge(r.custom_subscription_charge !== null && r.custom_subscription_charge !== undefined ? String(r.custom_subscription_charge) : '');
+      const effSubCharge = r.custom_subscription_charge ?? r.custom_plan_price;
+      setCustomSubscriptionCharge(effSubCharge !== null && effSubCharge !== undefined ? String(effSubCharge) : '');
       setCustomOtpCharge(r.custom_otp_charge !== null && r.custom_otp_charge !== undefined ? String(r.custom_otp_charge) : '');
 
       // 2. Fetch all transactions and summaries from super-admin billing endpoint
@@ -175,7 +180,7 @@ export default function SuperAdminRestaurantBilling() {
     if (restaurant && restaurant.billing_end_date) {
       const baseDate = new Date(restaurant.billing_start_date || new Date());
       const newEndDate = new Date(baseDate);
-      if (newPeriod === 'YEARLY') {
+      if (newPeriod === 'ANNUALLY' || newPeriod === 'YEARLY') {
         newEndDate.setFullYear(newEndDate.getFullYear() + 1);
       } else {
         newEndDate.setMonth(newEndDate.getMonth() + 1);
@@ -188,6 +193,10 @@ export default function SuperAdminRestaurantBilling() {
     e.preventDefault();
     setUpdatingDetails(true);
     try {
+      const normalizedPeriod = billingPeriod === 'YEARLY' ? 'ANNUALLY' : billingPeriod;
+      const subChargeVal = customSubscriptionCharge.trim() === '' ? null : parseFloat(customSubscriptionCharge);
+      const otpChargeVal = customOtpCharge.trim() === '' ? null : parseFloat(customOtpCharge);
+
       const res = await fetch(`/api/super-admin/restaurants/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -195,17 +204,29 @@ export default function SuperAdminRestaurantBilling() {
         body: JSON.stringify({
           billing_tier: billingTier,
           billing_model: billingModel,
-          billing_period: billingPeriod,
+          billing_period: normalizedPeriod,
           billing_status: billingStatus,
           billing_end_date: billingEndDate || null,
-          custom_subscription_charge: customSubscriptionCharge.trim() === '' ? null : parseFloat(customSubscriptionCharge),
-          custom_otp_charge: customOtpCharge.trim() === '' ? null : parseFloat(customOtpCharge),
+          custom_subscription_charge: subChargeVal,
+          custom_plan_price: subChargeVal,
+          custom_otp_charge: otpChargeVal,
         }),
       });
       const data = await res.json();
       if (data.success) {
         toast.success('Billing details updated successfully!');
-        setRestaurant(data.data);
+        if (data.data) {
+          const updated = data.data;
+          setRestaurant(updated);
+          setBillingTier(updated.billing_tier || billingTier);
+          setBillingModel(updated.billing_model || billingModel);
+          setBillingPeriod(updated.billing_period === 'YEARLY' ? 'ANNUALLY' : (updated.billing_period || normalizedPeriod));
+          setBillingStatus(updated.billing_status || billingStatus);
+          setBillingEndDate(updated.billing_end_date ? updated.billing_end_date.split('T')[0] : (billingEndDate || ''));
+          const savedCharge = updated.custom_subscription_charge ?? updated.custom_plan_price;
+          setCustomSubscriptionCharge(savedCharge !== null && savedCharge !== undefined ? String(savedCharge) : (customSubscriptionCharge || ''));
+          setCustomOtpCharge(updated.custom_otp_charge !== null && updated.custom_otp_charge !== undefined ? String(updated.custom_otp_charge) : (customOtpCharge || ''));
+        }
       } else {
         toast.error(data.error || 'Failed to update billing details');
       }
@@ -364,19 +385,34 @@ export default function SuperAdminRestaurantBilling() {
               <form onSubmit={handleUpdateBilling} style={styles.form}>
                 <div style={styles.formRow}>
                   <div style={styles.formField}>
-                    <label style={styles.label}>Pricing Tier <span style={{ color: '#059669', fontSize: '9px', marginLeft: '4px' }}>(AUTO)</span></label>
+                    <label style={styles.label}>Pricing Tier</label>
                     <select
                       value={billingTier}
-                      onChange={e => setBillingTier(e.target.value)}
-                      style={{ ...styles.select, backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }}
-                      disabled
+                      onChange={e => {
+                        const nextTier = e.target.value;
+                        setBillingTier(nextTier);
+                        if (nextTier !== 'COMPLETE' && billingModel === 'PER_ORDER') {
+                          setBillingModel('SUBSCRIPTION');
+                        }
+                        if (nextTier !== 'COMPLETE' && nextTier !== 'PRO' && billingModel === 'ONE_TIME') {
+                          setBillingModel('SUBSCRIPTION');
+                        }
+                      }}
+                      style={styles.select}
                     >
-                      <option value="BASIC">BASIC (₹{billingTier === 'BASIC' && customSubscriptionCharge ? customSubscriptionCharge : '399'}/mo, digital menu)</option>
-                      <option value="PRO">PRO (₹{billingTier === 'PRO' && customSubscriptionCharge ? customSubscriptionCharge : '999'}/mo, queue)</option>
-                      <option value="COMPLETE">COMPLETE (₹{billingTier === 'COMPLETE' && customSubscriptionCharge ? customSubscriptionCharge : '1499'}/mo, queue/ordering)</option>
+                      <optgroup label="Modern SaaS Plans">
+                        <option value="ESSENTIAL">ESSENTIAL (₹699/mo, POS & Tables)</option>
+                        <option value="PREMIUM">PREMIUM (₹999/mo, Complete POS)</option>
+                        <option value="STANDALONE">STANDALONE (₹299/mo, Digital Menu / Queue)</option>
+                      </optgroup>
+                      <optgroup label="Legacy Plans">
+                        <option value="BASIC">BASIC (₹399/mo, Legacy Menu)</option>
+                        <option value="PRO">PRO (₹999/mo, Legacy Queue)</option>
+                        <option value="COMPLETE">COMPLETE (₹1,499/mo, Legacy Complete)</option>
+                      </optgroup>
                     </select>
                     <span style={{ fontSize: '10px', color: '#64748b', marginTop: '-4px' }}>
-                      Pricing tier is automatically locked to active modules.
+                      Pricing and feature tier for this restaurant.
                     </span>
                   </div>
 
@@ -402,12 +438,12 @@ export default function SuperAdminRestaurantBilling() {
                   <div style={styles.formField}>
                     <label style={styles.label}>Billing Period</label>
                     <select
-                      value={billingPeriod}
+                      value={billingPeriod === 'YEARLY' ? 'ANNUALLY' : billingPeriod}
                       onChange={handleBillingPeriodChange}
                       style={styles.select}
                     >
                       <option value="MONTHLY">MONTHLY</option>
-                      <option value="YEARLY">YEARLY</option>
+                      <option value="ANNUALLY">ANNUALLY</option>
                     </select>
                   </div>
 

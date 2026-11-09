@@ -14,6 +14,7 @@ import { ServiceToggle, checkOperatingHours } from '@/components/ServiceToggle';
 import { CounterHardwareSettings } from '@/components/CounterHardwareSettings';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
 import { UpdatesAndPatchesCard } from '@/components/modules/settings/UpdatesAndPatchesCard';
+import { RestaurantLogoUploader } from '@/components/modules/settings/RestaurantLogoUploader';
 
 interface CollapsibleCardProps {
   id: string;
@@ -680,40 +681,41 @@ export default function AdminSettings() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                  <div>
-                    <label style={S.label}>Phone Number</label>
-                    <PhoneInput
-                      international
-                      countryCallingCodeEditable={false}
-                      placeholder="Enter phone number"
-                      value={phone as any}
-                      onChange={val => setPhone(val ? String(val) : '')}
-                      defaultCountry="IN"
-                      style={{ ...S.input, display: 'flex', alignItems: 'center' }}
-                    />
-                    <style>{`
-                      .PhoneInputInput {
-                        border: none;
-                        outline: none;
-                        flex: 1;
-                        font-size: 14px;
-                        background: transparent;
-                        color: #0f172a;
-                        padding-left: 8px;
-                      }
-                      .PhoneInputCountry {
-                        margin-right: 8px;
-                      }
-                    `}</style>
-                  </div>
-                  <div>
-                    <label style={S.label}>Logo URL</label>
-                    <input
-                      type="url" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}
-                      style={S.input} placeholder="https://..."
-                    />
-                  </div>
+                <div>
+                  <label style={S.label}>Phone Number</label>
+                  <PhoneInput
+                    international
+                    countryCallingCodeEditable={false}
+                    placeholder="Enter phone number"
+                    value={phone as any}
+                    onChange={val => setPhone(val ? String(val) : '')}
+                    defaultCountry="IN"
+                    style={{ ...S.input, display: 'flex', alignItems: 'center' }}
+                  />
+                  <style>{`
+                    .PhoneInputInput {
+                      border: none;
+                      outline: none;
+                      flex: 1;
+                      font-size: 14px;
+                      background: transparent;
+                      color: #0f172a;
+                      padding-left: 8px;
+                    }
+                    .PhoneInputCountry {
+                      margin-right: 8px;
+                    }
+                  `}</style>
+                </div>
+
+                <div>
+                  <RestaurantLogoUploader
+                    value={logoUrl}
+                    onChange={setLogoUrl}
+                    restaurantName={name}
+                    primaryColor={primaryColor}
+                    disabled={saving}
+                  />
                 </div>
 
                 <div>

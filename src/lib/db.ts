@@ -632,7 +632,7 @@ export async function getAllRestaurants() {
 export async function getRestaurantById(id: string) {
   try {
     const rows = await sql`
-      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude, timezone, opening_time, closing_time, rollover_time, kitchen_mode
+      SELECT id, name, slug, phone, address, logo_url, primary_color, secondary_color, menu_layout, menu_title, menu_description, created_at, updated_at, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, gst_type, gst_number, gst_rate, custom_subscription_charge, custom_otp_charge, monthly_ai_credits, custom_ai_credits, country, country_code, state, state_code, district, city, latitude, longitude, timezone, opening_time, closing_time, rollover_time, kitchen_mode, selected_product, is_trial, trial_ends_at, custom_plan_price
       FROM restaurants WHERE id = ${id} LIMIT 1
     `;
     return rows[0] || null;
@@ -806,8 +806,13 @@ export async function updateRestaurant(id: string, data: {
   latitude?: number | null;
   longitude?: number | null;
   kitchen_mode?: 'KOT' | 'KDS' | string | null;
+  selected_product?: string | null;
+  is_trial?: boolean | null;
+  trial_ends_at?: string | null;
+  custom_plan_price?: number | null;
 }) {
   try {
+    const effectivePlanPrice = data.custom_plan_price !== undefined ? data.custom_plan_price : data.custom_subscription_charge;
     const rows = await sql`
       UPDATE restaurants SET
         name = COALESCE(${data.name ?? null}, name),
@@ -833,6 +838,7 @@ export async function updateRestaurant(id: string, data: {
         gst_number = COALESCE(${data.gst_number ?? null}, gst_number),
         gst_rate = COALESCE(${data.gst_rate ?? null}, gst_rate),
         custom_subscription_charge = CASE WHEN ${data.custom_subscription_charge !== undefined} THEN ${data.custom_subscription_charge ?? null} ELSE custom_subscription_charge END,
+        custom_plan_price = CASE WHEN ${effectivePlanPrice !== undefined} THEN ${effectivePlanPrice ?? null} ELSE custom_plan_price END,
         custom_otp_charge = CASE WHEN ${data.custom_otp_charge !== undefined} THEN ${data.custom_otp_charge ?? null} ELSE custom_otp_charge END,
         monthly_ai_credits = CASE WHEN ${data.monthly_ai_credits !== undefined} THEN ${data.monthly_ai_credits ?? 10} ELSE monthly_ai_credits END,
         custom_ai_credits = CASE WHEN ${data.custom_ai_credits !== undefined} THEN ${data.custom_ai_credits ?? null} ELSE custom_ai_credits END,
@@ -845,6 +851,9 @@ export async function updateRestaurant(id: string, data: {
         latitude = CASE WHEN ${data.latitude !== undefined} THEN ${data.latitude ?? null} ELSE latitude END,
         longitude = CASE WHEN ${data.longitude !== undefined} THEN ${data.longitude ?? null} ELSE longitude END,
         kitchen_mode = COALESCE(${data.kitchen_mode ?? null}, kitchen_mode),
+        selected_product = COALESCE(${data.selected_product ?? null}, selected_product),
+        is_trial = CASE WHEN ${data.is_trial !== undefined} THEN ${data.is_trial ?? false} ELSE is_trial END,
+        trial_ends_at = CASE WHEN ${data.trial_ends_at !== undefined} THEN ${data.trial_ends_at ?? null} ELSE trial_ends_at END,
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
