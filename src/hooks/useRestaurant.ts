@@ -32,6 +32,8 @@ export type RestaurantContext = {
   latitude?: number | null;
   longitude?: number | null;
   kitchen_mode?: 'KOT' | 'KDS';
+  selected_product?: 'POS' | 'DIGITAL_MENU' | 'QUEUE_MANAGEMENT';
+  billing_tier?: string;
 };
 
 let cached: RestaurantContext | null = null;

@@ -155,11 +155,38 @@ To ensure valid store ownership and secure credential recovery, Qdine provides d
   ```json
   {
     "success": true,
-    "message": "Verification code sent to owner@restaurant.com"
+    "message": "Email verification code sent successfully",
+    "data": {
+      "email": "owner@restaurant.com",
+      "expires_in_minutes": 10,
+      "provider": "resend"
+    }
   }
   ```
 
-#### 2. Request Password Reset OTP
+#### 2. Verify Email OTP (Optional Standalone Pre-check)
+- **URL**: `/api/auth/verify-email`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "email": "owner@restaurant.com",
+    "otp": "492108"
+  }
+  ```
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "message": "Email verified successfully",
+    "data": {
+      "email": "owner@restaurant.com",
+      "verified": true
+    }
+  }
+  ```
+
+#### 3. Request Password Reset OTP
 - **URL**: `/api/auth/forgot-password`
 - **Method**: `POST`
 - **Body**:
@@ -176,7 +203,7 @@ To ensure valid store ownership and secure credential recovery, Qdine provides d
   }
   ```
 
-#### 3. Complete Password Reset
+#### 4. Complete Password Reset
 - **URL**: `/api/auth/reset-password`
 - **Method**: `POST`
 - **Body**:
@@ -404,10 +431,37 @@ export function OnboardingForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleSendOtp = async () => {
+    if (!email) return alert('Please enter your email first');
+    setOtpSending(true);
+    try {
+      const res = await fetch('/api/auth/send-verification-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, restaurant_name: name || 'My Restaurant' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOtpSent(true);
+        alert('Verification code sent to your email!');
+      } else {
+        alert(data.error || 'Failed to send verification code');
+      }
+    } catch {
+      alert('Network error sending code');
+    } finally {
+      setOtpSending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!otp) return alert('Please enter the verification code sent to your email');
     setLoading(true);
 
     try {
@@ -418,6 +472,7 @@ export function OnboardingForm() {
           name,
           admin_email: email,
           admin_password: password,
+          email_verification_otp: otp,
           product,
           plan: product === 'POS' ? plan : undefined,
           billing_cycle: cycle,
@@ -473,14 +528,37 @@ export function OnboardingForm() {
         onChange={(e) => setName(e.target.value)}
         className="w-full p-2 border rounded"
       />
-      <input
-        type="email"
-        placeholder="Email Address"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="w-full p-2 border rounded"
-      />
+      <div className="flex gap-2">
+        <input
+          type="email"
+          placeholder="Admin Email Address"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="flex-1 p-2 border rounded"
+        />
+        <button
+          type="button"
+          onClick={handleSendOtp}
+          disabled={otpSending || !email}
+          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-xs font-semibold rounded border"
+        >
+          {otpSent ? 'Resend Code' : 'Send Code'}
+        </button>
+      </div>
+
+      {otpSent && (
+        <input
+          type="text"
+          placeholder="Enter 6-digit Email OTP"
+          required
+          maxLength={6}
+          value={otp}
+          onChange={(e) => setOtp(e.target.value)}
+          className="w-full p-2 border rounded border-amber-400 bg-amber-50 font-mono tracking-widest text-center text-lg"
+        />
+      )}
+
       <input
         type="password"
         placeholder="Password (min 6 characters)"

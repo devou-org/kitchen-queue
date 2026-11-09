@@ -1,5 +1,5 @@
 // Billing Tiers
-export type BillingTier = 'BASIC' | 'PRO' | 'COMPLETE';
+export type BillingTier = 'BASIC' | 'PRO' | 'COMPLETE' | 'STANDALONE' | 'ESSENTIAL' | 'PREMIUM';
 
 // Billing Models
 export type BillingModel = 'SUBSCRIPTION' | 'PER_ORDER' | 'ONE_TIME';
@@ -8,6 +8,7 @@ export interface TierPricing {
   name: string;
   features: string[];
   subscriptionMonthly: number;
+  subscriptionAnnual?: number;
   oneTime: number | null; // null if not available
   otpCharge: number | null; // null if not available
   perOrder: {
@@ -22,6 +23,7 @@ export const BILLING_PRICING: Record<BillingTier, TierPricing> = {
     name: 'Basic',
     features: ['DIGITAL_MENU'],
     subscriptionMonthly: 399,
+    subscriptionAnnual: 3999,
     oneTime: null,
     otpCharge: null,
     perOrder: null,
@@ -30,6 +32,7 @@ export const BILLING_PRICING: Record<BillingTier, TierPricing> = {
     name: 'Pro',
     features: ['DIGITAL_MENU', 'QUEUE_MANAGEMENT'],
     subscriptionMonthly: 999,
+    subscriptionAnnual: 9999,
     oneTime: 15000,
     otpCharge: 0.50,
     perOrder: {
@@ -42,6 +45,7 @@ export const BILLING_PRICING: Record<BillingTier, TierPricing> = {
     name: 'Complete',
     features: ['DIGITAL_MENU', 'QUEUE_MANAGEMENT', 'ALL_FEATURES'],
     subscriptionMonthly: 1499,
+    subscriptionAnnual: 14999,
     oneTime: 30000,
     otpCharge: 0.50,
     perOrder: {
@@ -49,6 +53,33 @@ export const BILLING_PRICING: Record<BillingTier, TierPricing> = {
       flatLimit: 100,
       flatCharge: 3,
     },
+  },
+  STANDALONE: {
+    name: 'Standalone Plan',
+    features: ['DIGITAL_MENU'],
+    subscriptionMonthly: 299,
+    subscriptionAnnual: 2999,
+    oneTime: null,
+    otpCharge: 0.50,
+    perOrder: null,
+  },
+  ESSENTIAL: {
+    name: 'Essential Plan',
+    features: ['POS', 'TABLE_MANAGEMENT', 'DIGITAL_MENU', 'ANALYTICS', 'REPORTS'],
+    subscriptionMonthly: 699,
+    subscriptionAnnual: 6999,
+    oneTime: null,
+    otpCharge: 0.50,
+    perOrder: null,
+  },
+  PREMIUM: {
+    name: 'Premium Plan',
+    features: ['POS', 'TABLE_MANAGEMENT', 'DIGITAL_MENU', 'ANALYTICS', 'REPORTS', 'INVENTORY', 'LOYALTY_PROGRAM', 'FINANCE_MANAGEMENT', 'QUEUE_MANAGEMENT'],
+    subscriptionMonthly: 999,
+    subscriptionAnnual: 9999,
+    oneTime: null,
+    otpCharge: 0.50,
+    perOrder: null,
   },
 };
 

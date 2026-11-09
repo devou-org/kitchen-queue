@@ -124,11 +124,6 @@ export function AnalyticsNav({ inHeader = false }: AnalyticsNavProps = {}) {
               key={tab.name}
               href={tab.href}
               className={`analytics-nav-item ${isActive ? 'analytics-nav-item--active' : ''}`}
-              onClick={(e) => {
-                if (!e.defaultPrevented && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-                  router.push(tab.href);
-                }
-              }}
             >
               <span>{tab.name}</span>
             </Link>

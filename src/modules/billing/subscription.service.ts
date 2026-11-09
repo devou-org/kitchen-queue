@@ -356,6 +356,13 @@ export class SubscriptionService {
       };
     } else if (selectedProduct === 'DIGITAL_MENU') {
       // Standalone Digital Menu
+      const endDate = new Date(now);
+      if (billingCycle === 'ANNUALLY') {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+
       try {
         await pool.query(
           `UPDATE restaurants 
@@ -365,13 +372,14 @@ export class SubscriptionService {
              billing_status = 'ACTIVE',
              billing_period = $1,
              billing_start_date = $2,
+             billing_end_date = $3,
              monthly_ai_credits = 0,
              selected_product = 'DIGITAL_MENU',
              is_trial = false,
              trial_ends_at = NULL,
-             custom_plan_price = $3
-           WHERE id = $4`,
-          [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
+             custom_plan_price = $4
+           WHERE id = $5`,
+          [billingCycle, now.toISOString(), endDate.toISOString(), options.customPrice || null, restaurantId]
         );
       } catch (updateErr: any) {
         if (updateErr.message?.includes('column') || updateErr.message?.includes('does not exist')) {
@@ -384,13 +392,14 @@ export class SubscriptionService {
                billing_status = 'ACTIVE',
                billing_period = $1,
                billing_start_date = $2,
+               billing_end_date = $3,
                monthly_ai_credits = 0,
                selected_product = 'DIGITAL_MENU',
                is_trial = false,
                trial_ends_at = NULL,
-               custom_plan_price = $3
-             WHERE id = $4`,
-            [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
+               custom_plan_price = $4
+             WHERE id = $5`,
+            [billingCycle, now.toISOString(), endDate.toISOString(), options.customPrice || null, restaurantId]
           );
         } else {
           throw updateErr;
@@ -432,6 +441,13 @@ export class SubscriptionService {
       };
     } else if (selectedProduct === 'QUEUE_MANAGEMENT') {
       // Standalone Queue Management
+      const endDate = new Date(now);
+      if (billingCycle === 'ANNUALLY') {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+
       try {
         await pool.query(
           `UPDATE restaurants 
@@ -441,13 +457,14 @@ export class SubscriptionService {
              billing_status = 'ACTIVE',
              billing_period = $1,
              billing_start_date = $2,
+             billing_end_date = $3,
              monthly_ai_credits = 0,
              selected_product = 'QUEUE_MANAGEMENT',
              is_trial = false,
              trial_ends_at = NULL,
-             custom_plan_price = $3
-           WHERE id = $4`,
-          [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
+             custom_plan_price = $4
+           WHERE id = $5`,
+          [billingCycle, now.toISOString(), endDate.toISOString(), options.customPrice || null, restaurantId]
         );
       } catch (updateErr: any) {
         if (updateErr.message?.includes('column') || updateErr.message?.includes('does not exist')) {
@@ -460,13 +477,14 @@ export class SubscriptionService {
                billing_status = 'ACTIVE',
                billing_period = $1,
                billing_start_date = $2,
+               billing_end_date = $3,
                monthly_ai_credits = 0,
                selected_product = 'QUEUE_MANAGEMENT',
                is_trial = false,
                trial_ends_at = NULL,
-               custom_plan_price = $3
-             WHERE id = $4`,
-            [billingCycle, now.toISOString(), options.customPrice || null, restaurantId]
+               custom_plan_price = $4
+             WHERE id = $5`,
+            [billingCycle, now.toISOString(), endDate.toISOString(), options.customPrice || null, restaurantId]
           );
         } else {
           throw updateErr;
