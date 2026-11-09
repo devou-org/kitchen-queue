@@ -28,7 +28,7 @@ export default function AdminLogin() {
   const slugStr = (Array.isArray(slug) ? slug[0] : slug) || '';
   const { restaurant, loading: resLoading } = useRestaurant();
 
-  // Primary color fallback
+  // Primary brand color
   const primaryColor = restaurant?.primary_color || '#065f46';
 
   // Login form state
@@ -51,7 +51,9 @@ export default function AdminLogin() {
   const [countdown, setCountdown] = useState<number>(0);
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Timer countdown hook
+  // Focus input state for active borders
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
   useEffect(() => {
     if (countdown <= 0) return;
     const timer = setInterval(() => {
@@ -60,7 +62,6 @@ export default function AdminLogin() {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  // Route target decider based on user permissions & restaurant modules
   const getTargetRoute = (user: any) => {
     const showOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
     const showQueue = restaurant?.modules?.QUEUE_MANAGEMENT !== false;
@@ -76,7 +77,7 @@ export default function AdminLogin() {
     if (perms.includes('products')) return 'products';
     if (perms.includes('inventory')) return 'inventory';
     if (perms.includes('finance')) return 'finance';
-    if (perms.includes('analytics') && showOrdering) return 'analytics';
+    if (perms.includes('analytics') && showOrdering) return 'analytics/sales';
     if (perms.includes('staff')) return 'staff';
     if (perms.includes('billing')) return 'billing';
     if (perms.includes('settings')) return 'settings';
@@ -84,7 +85,6 @@ export default function AdminLogin() {
     return showOrdering ? 'orders' : 'products';
   };
 
-  // Check already logged in session
   useEffect(() => {
     const checkAuth = async () => {
       const hasCookie = document.cookie.split('; ').find((row) => row.startsWith('admin_logged_in='));
@@ -99,7 +99,6 @@ export default function AdminLogin() {
     checkAuth();
   }, [slugStr, restaurant]);
 
-  // Handle standard admin login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return toast.error('Email and password are required');
@@ -121,7 +120,6 @@ export default function AdminLogin() {
     }
   };
 
-  // Step 1: Request 6-digit OTP code to email
   const handleRequestResetOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!resetEmail || !resetEmail.trim()) {
@@ -139,7 +137,7 @@ export default function AdminLogin() {
       if (data.success) {
         toast.success('Verification code sent to your email!');
         setViewMode('RESET_PASSWORD');
-        setCountdown(60); // 60s cooldown for resend
+        setCountdown(60);
         setOtpDigits(['', '', '', '', '', '']);
         setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
       } else {
@@ -152,9 +150,7 @@ export default function AdminLogin() {
     }
   };
 
-  // Step 2: Handle OTP box typing & pasting
   const handleOtpChange = (index: number, value: string) => {
-    // Only accept numeric inputs
     const cleanVal = value.replace(/\D/g, '');
     if (!cleanVal) {
       const newDigits = [...otpDigits];
@@ -163,7 +159,6 @@ export default function AdminLogin() {
       return;
     }
 
-    // If user pasted multiple characters
     if (cleanVal.length > 1) {
       const pastedChars = cleanVal.slice(0, 6).split('');
       const newDigits = [...otpDigits];
@@ -180,7 +175,6 @@ export default function AdminLogin() {
     newDigits[index] = cleanVal;
     setOtpDigits(newDigits);
 
-    // Auto-advance to next box
     if (index < 5 && cleanVal) {
       otpInputRefs.current[index + 1]?.focus();
     }
@@ -196,7 +190,6 @@ export default function AdminLogin() {
     }
   };
 
-  // Step 3: Confirm OTP & Save New Password
   const handleConfirmReset = async (e: React.FormEvent) => {
     e.preventDefault();
     const fullOtp = otpDigits.join('').trim();
@@ -224,7 +217,6 @@ export default function AdminLogin() {
       const data = await res.json();
       if (data.success) {
         toast.success('Password updated successfully! Signing you in...');
-        // Auto-login with the updated credentials
         const loginRes = await authService.adminLogin(resetEmail.trim().toLowerCase(), newPassword);
         if (loginRes.success) {
           const target = getTargetRoute(loginRes.user);
@@ -247,410 +239,790 @@ export default function AdminLogin() {
 
   if (resLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: '#94A3B8' }} />
       </div>
     );
   }
 
   const isPasswordsMatching = confirmPassword.length > 0 && newPassword === confirmPassword;
 
+  // Reusable input style generator for rock-solid cross-browser rendering
+  const getInputStyle = (inputName: string, hasLeftIcon = true, hasRightIcon = false) => {
+    const isFocused = focusedInput === inputName;
+    return {
+      width: '100%',
+      height: '46px',
+      boxSizing: 'border-box' as const,
+      paddingLeft: hasLeftIcon ? '42px' : '14px',
+      paddingRight: hasRightIcon ? '42px' : '14px',
+      backgroundColor: '#F8FAFC',
+      border: `1.5px solid ${isFocused ? primaryColor : '#E2E8F0'}`,
+      boxShadow: isFocused ? `0 0 0 3px ${primaryColor}20` : 'none',
+      borderRadius: '12px',
+      fontSize: '14.5px',
+      color: '#0F172A',
+      outline: 'none',
+      transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+    };
+  };
+
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-50 antialiased overflow-hidden selection:bg-slate-900 selection:text-white">
-      {/* Dynamic Brand Color Injection */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          :root {
-            --brand-primary: ${primaryColor};
-            --brand-ring: ${primaryColor}25;
-          }
-        `
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px 16px',
+      backgroundColor: '#F8FAFC',
+      position: 'relative',
+      overflow: 'hidden',
+      boxSizing: 'border-box',
+    }}>
+
+      {/* Ambient background glow */}
+      <div style={{
+        position: 'absolute',
+        top: '-150px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '650px',
+        height: '400px',
+        borderRadius: '50%',
+        background: `radial-gradient(circle, ${primaryColor}18 0%, transparent 70%)`,
+        pointerEvents: 'none',
+        zIndex: 0,
       }} />
 
-      {/* Elegant background ambient pattern & gradient */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full blur-3xl opacity-20"
-          style={{ backgroundColor: primaryColor }}
-        />
-        <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
-      </div>
+      {/* Main Elevated Card */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: '430px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 20px 40px -15px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.05)',
+        padding: '36px 32px',
+        zIndex: 10,
+        boxSizing: 'border-box',
+      }}>
 
-      {/* Main Elevated Card Container */}
-      <div className="relative w-full max-w-[430px] z-10">
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 p-7 sm:p-9 transition-all">
+        {/* Brand Logo & Header */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '24px' }}>
           
-          {/* Header & Logo */}
-          <div className="flex flex-col items-center text-center mb-7">
-            {/* Logo Wrapper */}
-            <div className="w-16 h-16 rounded-2xl p-2 bg-white shadow-md shadow-slate-100 border border-slate-100 flex items-center justify-center mb-4 transition-transform hover:scale-105">
-              {restaurant?.logo_url ? (
-                <img
-                  src={restaurant.logo_url}
-                  alt={restaurant.name || 'Brand Logo'}
-                  className="w-full h-full object-contain rounded-xl"
-                />
-              ) : (
-                <div
-                  className="w-full h-full rounded-xl flex items-center justify-center text-white font-black text-2xl shadow-inner"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : 'Q'}
-                </div>
-              )}
-            </div>
-
-            {/* Context Badge */}
-            {viewMode === 'LOGIN' && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 mb-2">
-                <Store className="w-3.5 h-3.5 text-slate-500" />
-                Kitchen & Store Portal
-              </span>
-            )}
-            {viewMode === 'FORGOT_PASSWORD' && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 mb-2">
-                <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                Password Recovery
-              </span>
-            )}
-            {viewMode === 'RESET_PASSWORD' && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 mb-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                Step 2 of 2: Verification
-              </span>
-            )}
-
-            {/* Title */}
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {viewMode === 'LOGIN' && (restaurant?.name ? `${restaurant.name}` : 'Admin Sign In')}
-              {viewMode === 'FORGOT_PASSWORD' && 'Reset Your Password'}
-              {viewMode === 'RESET_PASSWORD' && 'Create New Password'}
-            </h1>
-
-            {/* Subtitle with styled badge for email */}
-            {viewMode === 'LOGIN' && (
-              <p className="text-sm text-slate-500 mt-1.5">
-                Sign in to manage floor, orders, and kitchen operations
-              </p>
-            )}
-
-            {viewMode === 'FORGOT_PASSWORD' && (
-              <p className="text-sm text-slate-500 mt-1.5 max-w-xs">
-                Enter your registered admin email to receive a secure 6-digit verification code.
-              </p>
-            )}
-
-            {viewMode === 'RESET_PASSWORD' && (
-              <div className="mt-2 flex flex-col items-center gap-1">
-                <span className="text-xs text-slate-500">Enter the 6-digit code sent to</span>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-800 rounded-full text-xs font-medium border border-slate-200/60">
-                  <Mail className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="font-mono">{resetEmail}</span>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('FORGOT_PASSWORD')}
-                    className="ml-1 font-semibold hover:underline text-slate-900"
-                    title="Change email"
-                  >
-                    Edit
-                  </button>
-                </div>
+          <div style={{
+            width: '68px',
+            height: '68px',
+            borderRadius: '18px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '14px',
+            overflow: 'hidden',
+            padding: '6px',
+            boxSizing: 'border-box',
+          }}>
+            {restaurant?.logo_url ? (
+              <img
+                src={restaurant.logo_url}
+                alt={restaurant.name || 'Brand Logo'}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }}
+              />
+            ) : (
+              <div style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '12px',
+                backgroundColor: primaryColor,
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                fontSize: '26px',
+              }}>
+                {restaurant?.name ? restaurant.name.charAt(0).toUpperCase() : 'Q'}
               </div>
             )}
           </div>
 
-          {/* ==================================================== */}
-          {/* VIEW 1: ADMIN LOGIN FORM                            */}
-          {/* ==================================================== */}
+          {/* Context Badge */}
           {viewMode === 'LOGIN' && (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Admin Email
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@restaurant.com"
-                    autoComplete="email"
-                    required
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Password
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setResetEmail(email || '');
-                      setViewMode('FORGOT_PASSWORD');
-                    }}
-                    className="text-xs font-semibold hover:underline transition-colors"
-                    style={{ color: primaryColor }}
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    required
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-12 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10 hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-60 cursor-pointer mt-2"
-                style={{ backgroundColor: primaryColor }}
-              >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <span>Secure Sign In</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              backgroundColor: '#F1F5F9',
+              color: '#475569',
+              marginBottom: '10px',
+            }}>
+              <Store size={14} style={{ color: '#64748B' }} />
+              Kitchen & Store Portal
+            </span>
+          )}
+          {viewMode === 'FORGOT_PASSWORD' && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              backgroundColor: '#FEF3C7',
+              color: '#B45309',
+              border: '1px solid #FDE68A',
+              marginBottom: '10px',
+            }}>
+              <KeyRound size={14} style={{ color: '#D97706' }} />
+              Password Recovery
+            </span>
+          )}
+          {viewMode === 'RESET_PASSWORD' && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              backgroundColor: '#ECFDF5',
+              color: '#047857',
+              border: '1px solid #A7F3D0',
+              marginBottom: '10px',
+            }}>
+              <ShieldCheck size={14} style={{ color: '#059669' }} />
+              Step 2 of 2: Verification
+            </span>
           )}
 
-          {/* ==================================================== */}
-          {/* VIEW 2: FORGOT PASSWORD (EMAIL INPUT)                */}
-          {/* ==================================================== */}
+          {/* Heading */}
+          <h1 style={{
+            fontSize: '23px',
+            fontWeight: 800,
+            color: '#0F172A',
+            letterSpacing: '-0.02em',
+            margin: '0 0 6px 0',
+            lineHeight: 1.2,
+          }}>
+            {viewMode === 'LOGIN' && (restaurant?.name ? restaurant.name : 'Qdine Admin')}
+            {viewMode === 'FORGOT_PASSWORD' && 'Reset Your Password'}
+            {viewMode === 'RESET_PASSWORD' && 'Create New Password'}
+          </h1>
+
+          {/* Description */}
+          {viewMode === 'LOGIN' && (
+            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+              Sign in to manage floor, orders, and kitchen operations
+            </p>
+          )}
+
           {viewMode === 'FORGOT_PASSWORD' && (
-            <form onSubmit={handleRequestResetOtp} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Registered Admin Email
+            <p style={{ fontSize: '13px', color: '#64748B', margin: 0, maxWidth: '320px', lineHeight: 1.45 }}>
+              Enter your registered admin email to receive a secure 6-digit verification code.
+            </p>
+          )}
+
+          {viewMode === 'RESET_PASSWORD' && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+              <span style={{ fontSize: '12.5px', color: '#64748B' }}>Enter the 6-digit code sent to</span>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                backgroundColor: '#F1F5F9',
+                borderRadius: '9999px',
+                border: '1px solid #E2E8F0',
+                fontSize: '12px',
+                color: '#1E293B',
+              }}>
+                <Mail size={13} style={{ color: '#64748B' }} />
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{resetEmail}</span>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('FORGOT_PASSWORD')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: primaryColor,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: '11.5px',
+                    marginLeft: '4px',
+                    padding: 0,
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ==================================================== */}
+        {/* VIEW 1: LOGIN FORM                                   */}
+        {/* ==================================================== */}
+        {viewMode === 'LOGIN' && (
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            
+            {/* Email Field */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: '7px',
+              }}>
+                Admin Email
+              </label>
+              <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+                <span style={{
+                  position: 'absolute',
+                  left: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: focusedInput === 'email' ? primaryColor : '#94A3B8',
+                  pointerEvents: 'none',
+                  zIndex: 2,
+                  transition: 'color 0.15s ease',
+                }}>
+                  <Mail size={18} />
+                </span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onFocus={() => setFocusedInput('email')}
+                  onBlur={() => setFocusedInput(null)}
+                  placeholder="admin@restaurant.com"
+                  autoComplete="email"
+                  required
+                  style={getInputStyle('email', true, false)}
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
+                <label style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#475569',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  margin: 0,
+                }}>
+                  Password
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="email"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    placeholder="admin@restaurant.com"
-                    autoFocus
-                    required
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition-all"
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(email || '');
+                    setViewMode('FORGOT_PASSWORD');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: primaryColor,
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  Forgot Password?
+                </button>
               </div>
 
-              <button
-                type="submit"
-                disabled={resetLoading}
-                className="w-full h-12 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10 hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-60 cursor-pointer mt-2"
-                style={{ backgroundColor: primaryColor }}
-              >
-                {resetLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <span>Send Verification Code</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+              <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+                <span style={{
+                  position: 'absolute',
+                  left: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: focusedInput === 'password' ? primaryColor : '#94A3B8',
+                  pointerEvents: 'none',
+                  zIndex: 2,
+                  transition: 'color 0.15s ease',
+                }}>
+                  <Lock size={18} />
+                </span>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setFocusedInput('password')}
+                  onBlur={() => setFocusedInput(null)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
+                  style={getInputStyle('password', true, true)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    padding: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2,
+                  }}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                height: '48px',
+                borderRadius: '12px',
+                backgroundColor: primaryColor,
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: '14.5px',
+                border: 'none',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+                marginTop: '6px',
+                opacity: loading ? 0.7 : 1,
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {loading ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <>
+                  <span>Secure Sign In</span>
+                  <ArrowRight size={17} />
+                </>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* ==================================================== */}
+        {/* VIEW 2: FORGOT PASSWORD (EMAIL INPUT)                */}
+        {/* ==================================================== */}
+        {viewMode === 'FORGOT_PASSWORD' && (
+          <form onSubmit={handleRequestResetOtp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: '7px',
+              }}>
+                Registered Admin Email
+              </label>
+              <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+                <span style={{
+                  position: 'absolute',
+                  left: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: focusedInput === 'resetEmail' ? primaryColor : '#94A3B8',
+                  pointerEvents: 'none',
+                  zIndex: 2,
+                }}>
+                  <Mail size={18} />
+                </span>
+                <input
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  onFocus={() => setFocusedInput('resetEmail')}
+                  onBlur={() => setFocusedInput(null)}
+                  placeholder="admin@restaurant.com"
+                  autoFocus
+                  required
+                  style={getInputStyle('resetEmail', true, false)}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={resetLoading}
+              style={{
+                width: '100%',
+                height: '48px',
+                borderRadius: '12px',
+                backgroundColor: primaryColor,
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: '14.5px',
+                border: 'none',
+                cursor: resetLoading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+                marginTop: '6px',
+                opacity: resetLoading ? 0.7 : 1,
+              }}
+            >
+              {resetLoading ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <>
+                  <span>Send Verification Code</span>
+                  <ArrowRight size={17} />
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('LOGIN')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#64748B',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '6px',
+              }}
+            >
+              <ArrowLeft size={15} />
+              Back to Sign In
+            </button>
+          </form>
+        )}
+
+        {/* ==================================================== */}
+        {/* VIEW 3: RESET PASSWORD (6-DIGIT OTP & NEW PASSWORD)  */}
+        {/* ==================================================== */}
+        {viewMode === 'RESET_PASSWORD' && (
+          <form onSubmit={handleConfirmReset} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            
+            {/* Segmented 6-Box OTP Input */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: '10px',
+                textAlign: 'center',
+              }}>
+                6-Digit Verification Code
+              </label>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                {otpDigits.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => {
+                      otpInputRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={idx === 0 ? 6 : 1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                    style={{
+                      width: '46px',
+                      height: '54px',
+                      textAlign: 'center',
+                      fontFamily: 'monospace',
+                      fontSize: '22px',
+                      fontWeight: 800,
+                      color: '#0F172A',
+                      backgroundColor: '#F8FAFC',
+                      border: `2px solid ${digit ? primaryColor : '#CBD5E1'}`,
+                      borderRadius: '12px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 0.15s ease',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* New Password */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: '7px',
+              }}>
+                New Password
+              </label>
+              <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+                <span style={{
+                  position: 'absolute',
+                  left: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: focusedInput === 'newPassword' ? primaryColor : '#94A3B8',
+                  pointerEvents: 'none',
+                  zIndex: 2,
+                }}>
+                  <Lock size={18} />
+                </span>
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  onFocus={() => setFocusedInput('newPassword')}
+                  onBlur={() => setFocusedInput(null)}
+                  placeholder="Min 6 characters"
+                  minLength={6}
+                  required
+                  style={getInputStyle('newPassword', true, true)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    padding: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2,
+                  }}
+                  tabIndex={-1}
+                >
+                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirm New Password */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
+                <label style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#475569',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  margin: 0,
+                }}>
+                  Confirm Password
+                </label>
+                {isPasswordsMatching && (
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle2 size={13} /> Passwords match
+                  </span>
                 )}
+              </div>
+
+              <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+                <span style={{
+                  position: 'absolute',
+                  left: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: focusedInput === 'confirmPassword' ? primaryColor : '#94A3B8',
+                  pointerEvents: 'none',
+                  zIndex: 2,
+                }}>
+                  <Lock size={18} />
+                </span>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onFocus={() => setFocusedInput('confirmPassword')}
+                  onBlur={() => setFocusedInput(null)}
+                  placeholder="Re-type password"
+                  minLength={6}
+                  required
+                  style={{
+                    ...getInputStyle('confirmPassword', true, true),
+                    borderColor:
+                      confirmPassword && !isPasswordsMatching
+                        ? '#F59E0B'
+                        : isPasswordsMatching
+                        ? '#10B981'
+                        : focusedInput === 'confirmPassword'
+                        ? primaryColor
+                        : '#E2E8F0',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    padding: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2,
+                  }}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={resetLoading}
+              style={{
+                width: '100%',
+                height: '48px',
+                borderRadius: '12px',
+                backgroundColor: primaryColor,
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: '14.5px',
+                border: 'none',
+                cursor: resetLoading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+                marginTop: '4px',
+                opacity: resetLoading ? 0.7 : 1,
+              }}
+            >
+              {resetLoading ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <>
+                  <span>Update Password & Log In</span>
+                  <ArrowRight size={17} />
+                </>
+              )}
+            </button>
+
+            {/* Secondary Actions: Resend Code & Back */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingTop: '12px',
+              borderTop: '1px solid #F1F5F9',
+              fontSize: '12px',
+            }}>
+              <button
+                type="button"
+                onClick={() => handleRequestResetOtp()}
+                disabled={countdown > 0 || resetLoading}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: countdown > 0 ? '#94A3B8' : primaryColor,
+                  fontWeight: 700,
+                  cursor: countdown > 0 || resetLoading ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: 0,
+                }}
+              >
+                <RefreshCw size={13} className={resetLoading ? 'animate-spin' : ''} />
+                {countdown > 0 ? `Resend code in ${countdown}s` : 'Resend Code'}
               </button>
 
               <button
                 type="button"
                 onClick={() => setViewMode('LOGIN')}
-                className="w-full py-2.5 text-xs text-slate-500 hover:text-slate-800 font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748B',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: 0,
+                }}
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
+                <ArrowLeft size={13} />
                 Back to Sign In
               </button>
-            </form>
-          )}
+            </div>
+          </form>
+        )}
 
-          {/* ==================================================== */}
-          {/* VIEW 3: RESET PASSWORD (6-DIGIT OTP & NEW CREDENTIALS) */}
-          {/* ==================================================== */}
-          {viewMode === 'RESET_PASSWORD' && (
-            <form onSubmit={handleConfirmReset} className="space-y-4">
-              {/* Segmented 6-Box OTP Input */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2 text-center">
-                  6-Digit Verification Code
-                </label>
-                <div className="flex items-center justify-center gap-2 sm:gap-2.5">
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => {
-                        otpInputRefs.current[idx] = el;
-                      }}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={idx === 0 ? 6 : 1} // Allows paste on first box
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                      className="w-11 h-13 sm:w-12 sm:h-14 text-center font-mono text-xl sm:text-2xl font-bold text-slate-900 bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100 transition-all select-all shadow-sm"
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* New Password */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  New Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min 6 characters"
-                    minLength={6}
-                    required
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
-                    tabIndex={-1}
-                  >
-                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Confirm New Password */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Confirm Password
-                  </label>
-                  {isPasswordsMatching && (
-                    <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Passwords match
-                    </span>
-                  )}
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-type password"
-                    minLength={6}
-                    required
-                    className={`w-full pl-10 pr-10 py-2.5 bg-slate-50/70 border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-4 transition-all ${
-                      confirmPassword && !isPasswordsMatching
-                        ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-50'
-                        : isPasswordsMatching
-                        ? 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-50'
-                        : 'border-slate-200 focus:border-slate-400 focus:ring-slate-100'
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
-                    tabIndex={-1}
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={resetLoading}
-                className="w-full h-12 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10 hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-60 cursor-pointer mt-2"
-                style={{ backgroundColor: primaryColor }}
-              >
-                {resetLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <span>Update Password & Log In</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-              {/* Secondary Actions (Resend + Back) */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                <button
-                  type="button"
-                  onClick={() => handleRequestResetOtp()}
-                  disabled={countdown > 0 || resetLoading}
-                  className="font-semibold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
-                  style={{ color: countdown > 0 ? '#64748b' : primaryColor }}
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${resetLoading ? 'animate-spin' : ''}`} />
-                  {countdown > 0 ? `Resend code in ${countdown}s` : 'Resend Code'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setViewMode('LOGIN')}
-                  className="text-slate-500 hover:text-slate-800 font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  Back to Sign In
-                </button>
-              </div>
-            </form>
-          )}
-
-        </div>
-
-        {/* Global Footer Link: Back to Customer Menu */}
-        <div className="text-center mt-5">
-          <a
-            href={`/${slugStr}/menu`}
-            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 font-medium transition-colors"
-          >
-            <Store className="w-3.5 h-3.5" />
-            <span>Back to Store Digital Menu</span>
-          </a>
-        </div>
       </div>
+
+      {/* Footer Link */}
+      <div style={{ marginTop: '20px', textAlign: 'center', zIndex: 10 }}>
+        <a
+          href={`/${slugStr}/menu`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12.5px',
+            color: '#64748B',
+            textDecoration: 'none',
+            fontWeight: 500,
+          }}
+        >
+          <Store size={14} style={{ color: '#94A3B8' }} />
+          <span>Back to Store Digital Menu</span>
+        </a>
+      </div>
+
     </div>
   );
 }
