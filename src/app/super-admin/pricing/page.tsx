@@ -191,14 +191,14 @@ export default function SuperAdminPricingPage() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
               <span style={styles.badge}>SaaS Subscription Plans</span>
-              <span style={styles.pillBadge}>All 5 Active Plans</span>
+              <span style={styles.pillBadge}>{plans.length} Active Plans</span>
             </div>
             <h1 style={styles.title}>
               <CreditCard size={28} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '10px', color: '#059669' }} />
               Plans & Pricing Management
             </h1>
             <p style={styles.subtitle}>
-              Adjust monthly and annual rates for all 5 platform plans. Changes apply immediately to new onboarding checkouts and renewals.
+              Adjust monthly and annual rates across platform plans. Changes apply immediately to new onboarding checkouts and renewals.
             </p>
           </div>
 
@@ -217,7 +217,7 @@ export default function SuperAdminPricingPage() {
               style={{ ...styles.saveAllBtn, opacity: savingAll ? 0.7 : 1 }}
             >
               <Save size={16} style={{ marginRight: '8px' }} />
-              {savingAll ? 'Saving All...' : 'Save All 5 Plans'}
+              {savingAll ? 'Saving All...' : 'Save All Plans'}
             </button>
           </div>
         </div>
@@ -250,7 +250,7 @@ export default function SuperAdminPricingPage() {
             </div>
             <div>
               <div style={styles.statVal}>Standalone Products</div>
-              <div style={styles.statLabel}>Digital Menu, Q Management & Combo</div>
+              <div style={styles.statLabel}>Digital Menu & Q Management (Combo)</div>
             </div>
           </div>
 

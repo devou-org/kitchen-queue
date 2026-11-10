@@ -32,6 +32,10 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
   const isEditing = !!initialData;
   const { restaurant } = useRestaurant();
   const showOnlineOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
+  const isStandalone = restaurant?.selected_product === 'DIGITAL_MENU' ||
+                       restaurant?.selected_product === 'QUEUE_MANAGEMENT' ||
+                       restaurant?.billing_tier === 'STANDALONE';
+  const showCounters = !isStandalone;
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [counters, setCounters] = useState<any[]>([]);
@@ -75,9 +79,11 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
 
   useEffect(() => {
     fetchCategories();
-    fetchCounters();
+    if (showCounters) {
+      fetchCounters();
+    }
     fetchInventoryItems();
-  }, []);
+  }, [showCounters]);
 
   const fetchInventoryItems = async () => {
     try {
@@ -915,62 +921,64 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
               )}
             </div>
 
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-                  Counter Assignment
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCounter(!showAddCounter)}
-                  style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <Plus size={14} /> Add Counter
-                </button>
-              </div>
-
-              <CustomSelect
-                value={form.counter}
-                onChange={val => setForm(f => ({ ...f, counter: val }))}
-                options={[
-                  { value: '', label: 'Unassigned' },
-                  ...(form.counter && !counters.find(c => c.name === form.counter)
-                    ? [{ value: form.counter, label: form.counter }]
-                    : []),
-                  ...counters.map(c => ({ value: c.name, label: c.name }))
-                ]}
-                placeholder="Unassigned"
-                buttonStyle={{
-                  height: '42px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '14px',
-                  color: '#0f172a',
-                  backgroundColor: '#ffffff',
-                }}
-              />
-
-              {showAddCounter && (
-                <div style={{ marginTop: '10px', display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-                  <input
-                    type="text"
-                    value={newCounterName}
-                    onChange={e => setNewCounterName(e.target.value)}
-                    placeholder="New counter name (e.g. Counter 1, Bakery)"
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddCounter())}
-                  />
+            {showCounters && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                    Counter Assignment
+                  </label>
                   <button
                     type="button"
-                    onClick={handleAddCounter}
-                    disabled={addingCounter}
-                    style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', backgroundColor: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                    onClick={() => setShowAddCounter(!showAddCounter)}
+                    style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   >
-                    {addingCounter ? 'Adding...' : 'Save'}
+                    <Plus size={14} /> Add Counter
                   </button>
                 </div>
-              )}
-            </div>
+
+                <CustomSelect
+                  value={form.counter}
+                  onChange={val => setForm(f => ({ ...f, counter: val }))}
+                  options={[
+                    { value: '', label: 'Unassigned' },
+                    ...(form.counter && !counters.find(c => c.name === form.counter)
+                      ? [{ value: form.counter, label: form.counter }]
+                      : []),
+                    ...counters.map(c => ({ value: c.name, label: c.name }))
+                  ]}
+                  placeholder="Unassigned"
+                  buttonStyle={{
+                    height: '42px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '14px',
+                    color: '#0f172a',
+                    backgroundColor: '#ffffff',
+                  }}
+                />
+
+                {showAddCounter && (
+                  <div style={{ marginTop: '10px', display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                    <input
+                      type="text"
+                      value={newCounterName}
+                      onChange={e => setNewCounterName(e.target.value)}
+                      placeholder="New counter name (e.g. Counter 1, Bakery)"
+                      style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddCounter())}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCounter}
+                      disabled={addingCounter}
+                      style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', backgroundColor: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                    >
+                      {addingCounter ? 'Adding...' : 'Save'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>

@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
     } else if (normalizedProduct === 'DIGITAL_MENU') {
       initialModules = ['DIGITAL_MENU'];
     } else if (normalizedProduct === 'QUEUE_MANAGEMENT') {
-      initialModules = ['QUEUE_MANAGEMENT'];
+      initialModules = ['QUEUE_MANAGEMENT', 'DIGITAL_MENU'];
     } else if (planTier === 'ESSENTIAL') {
       // Essential Plan only gets core POS & Table Management, Digital Menu, Sales & Statements
       // Neglects Inventory, Loyalty, Finance, and Queue

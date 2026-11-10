@@ -14,7 +14,7 @@ Qdine operates three independent software products. During onboarding, a custome
 | :--- | :--- | :--- | :--- |
 | **POS** | `POS` | **14-Day Free Trial** (All Premium features unlocked, 30 AI Analyst credits, no credit card required) | Full restaurant POS, Table Management, QR Ordering, Inventory, Loyalty, AI Analyst, Finance Management. |
 | **Digital Menu** | `DIGITAL_MENU` | **Standalone Product** | QR-based digital menu, catalogue management, and brand presentation (view-only digital menu; online ordering, POS & Table Management are disabled). |
-| **Q Management** | `QUEUE_MANAGEMENT` | **Standalone Product** | Waitlist queue management, token generation, live display screen & customer SMS/OTP paging. |
+| **Q Management** | `QUEUE_MANAGEMENT` | **Standalone Product (Combo)** | Waitlist queue management, token generation, live display screen, customer SMS/OTP paging & contactless QR digital menu. |
 
 ---
 
@@ -82,7 +82,7 @@ When a restaurant is created:
   - **POS Premium**: All modules enabled (`DIGITAL_MENU`, `ONLINE_ORDERING`, `TABLE_MANAGEMENT`, `QUEUE_MANAGEMENT`, `INVENTORY`, `LOYALTY_PROGRAM`, `FINANCE_MANAGEMENT`, `ANALYTICS`, `REPORTS`), 30 AI credits.
   - **POS Essential**: Only core modules enabled (`DIGITAL_MENU`, `ONLINE_ORDERING`, `TABLE_MANAGEMENT`, `ANALYTICS`, `REPORTS`), 10 AI credits. Advanced modules (`FINANCE_MANAGEMENT`, `INVENTORY`, `LOYALTY_PROGRAM`, `QUEUE_MANAGEMENT`) are explicitly neglected / disabled (`false`).
   - **Standalone Digital Menu**: Only `DIGITAL_MENU` enabled. All other modules including `ONLINE_ORDERING` and `TABLE_MANAGEMENT` are disabled (`false`).
-  - **Standalone Q Management**: Only `QUEUE_MANAGEMENT` enabled with default states (`PENDING`, `SEATED`, `CANCELLED`). All other modules including `ONLINE_ORDERING` and `TABLE_MANAGEMENT` are disabled (`false`).
+  - **Standalone Q Management & Digital Menu Combo**: `QUEUE_MANAGEMENT` and `DIGITAL_MENU` enabled with default states (`PENDING`, `SEATED`, `CANCELLED`). Online ordering, POS and table management are disabled (`false`).
 
 ---
 
