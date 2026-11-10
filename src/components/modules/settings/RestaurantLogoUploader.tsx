@@ -48,7 +48,7 @@ export function RestaurantLogoUploader({
     }
 
     setUploading(true);
-    const toastId = toast.loading(`Uploading "${file.name}" to ImageKit...`);
+    const toastId = toast.loading(`Uploading "${file.name}"...`);
 
     try {
       const res = await imageKitService.uploadImage(file, '/logos');
@@ -62,7 +62,7 @@ export function RestaurantLogoUploader({
         toast.error(errorText, { id: toastId });
       }
     } catch (err: any) {
-      const msg = err?.message || 'Error uploading logo to ImageKit';
+      const msg = err?.message || 'Error uploading logo';
       setErrorMsg(msg);
       toast.error(msg, { id: toastId });
     } finally {
@@ -173,11 +173,11 @@ export function RestaurantLogoUploader({
             }}
           />
           <span style={{ fontSize: '11px', color: '#64748b' }}>
-            Paste any direct image URL or ImageKit CDN link.
+            Paste any direct image URL.
           </span>
         </div>
       ) : (
-        /* ImageKit Upload UI */
+        /* Image Upload UI */
         <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Logo Preview Avatar */}
           <div
@@ -249,7 +249,7 @@ export function RestaurantLogoUploader({
                   <UploadCloud size={16} style={{ color: '#059669' }} />
                 )}
                 <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                  {value ? 'Logo Uploaded' : 'Upload Logo via ImageKit'}
+                  {value ? 'Logo Uploaded' : 'Upload Logo'}
                 </span>
                 <span style={{
                   fontSize: '10px',
@@ -263,7 +263,7 @@ export function RestaurantLogoUploader({
                 </span>
               </div>
               <p style={{ fontSize: '11px', color: '#64748b', margin: '3px 0 0 0' }}>
-                PNG, JPG, WEBP, SVG • Auto-optimized with ImageKit CDN
+                PNG, JPG, WEBP, SVG • Recommended 1:1 square ratio
               </p>
             </div>
 

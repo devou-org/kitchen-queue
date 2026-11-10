@@ -138,8 +138,8 @@ export class SubscriptionService {
         id: 'QUEUE_MGMT_STANDALONE',
         product_id: 'QUEUE_MANAGEMENT' as SaaSProductId,
         tier: 'STANDALONE' as SaaSPlanTier,
-        name: 'Q Management Standalone',
-        description: 'Standalone queue management, virtual waitlists, and live counter notifications.',
+        name: 'Q Management & Digital Menu',
+        description: 'Standalone digital queue management with live waitlists, guest paging, and contactless QR digital menu.',
         monthly_ai_credits: 0,
         is_default_trial_tier: false,
         pricing: {
@@ -148,6 +148,9 @@ export class SubscriptionService {
         },
         features: [
           { feature_code: 'QUEUE_MANAGEMENT', feature_name: 'Queue Management System', feature_description: 'Waitlist management, SMS/WhatsApp paging, and TV display board', is_included: true },
+          { feature_code: 'DIGITAL_MENU_QR', feature_name: 'Digital Menu & QR Catalogue', feature_description: 'Contactless QR menu viewing for customers while waiting in line', is_included: true },
+          { feature_code: 'MENU_MANAGEMENT', feature_name: 'Menu Management', feature_description: 'Complete catalogue, item availability and pricing', is_included: true },
+          { feature_code: 'PROFILE_BRANDING', feature_name: 'Customised Profile & Branding', feature_description: 'Custom brand colours and header presentation', is_included: true },
         ],
       },
     },
@@ -491,9 +494,9 @@ export class SubscriptionService {
         }
       }
 
-      // Enable only Queue Management module
+      // Enable Queue Management + Digital Menu combo (online ordering & table management disabled)
       const qModules = [
-        { name: 'DIGITAL_MENU', enabled: false },
+        { name: 'DIGITAL_MENU', enabled: true },
         { name: 'ONLINE_ORDERING', enabled: false },
         { name: 'TABLE_MANAGEMENT', enabled: false },
         { name: 'QUEUE_MANAGEMENT', enabled: true },

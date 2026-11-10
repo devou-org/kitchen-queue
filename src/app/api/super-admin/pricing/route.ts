@@ -43,8 +43,7 @@ export async function GET(request: NextRequest) {
           WHEN p.id = 'POS_PREMIUM' THEN 2
           WHEN p.id = 'DIGITAL_MENU_STANDALONE' THEN 3
           WHEN p.id = 'QUEUE_MGMT_STANDALONE' THEN 4
-          WHEN p.id = 'COMBO_STANDALONE' THEN 5
-          ELSE 6
+          ELSE 5
         END ASC;
     `;
 
