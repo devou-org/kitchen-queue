@@ -556,7 +556,12 @@ export class AIAnalystService {
                 const duration = Date.now() - toolStartTime;
                 console.log(`✅ Tool ${name} completed successfully in ${duration}ms`);
 
-                const formattedResult = typeof rawResult === 'object' && rawResult !== null ? rawResult : { result: rawResult };
+                // Gemini API protobuf specification requires 'functionResponse.response' to be a JSON Object (Struct).
+                // Raw Arrays (e.g. table rows, top product lists) MUST be wrapped in an object like { result: [...] }
+                const formattedResult = (typeof rawResult === 'object' && rawResult !== null && !Array.isArray(rawResult))
+                  ? rawResult
+                  : { result: rawResult };
+
                 return { name, args, success: true, result: formattedResult, durationMs: duration };
               } catch (toolErr: any) {
                 const duration = Date.now() - toolStartTime;
@@ -585,13 +590,19 @@ export class AIAnalystService {
           // Append Gemini's function call turn to conversation
           currentContents.push(candidate.content);
 
-          // Build single turn containing ALL function response parts for Gemini
-          const functionResponseParts = toolResults.map(tr => ({
-            functionResponse: {
-              name: tr.name,
-              response: tr.result
-            }
-          }));
+          // Build single turn containing ALL function response parts for Gemini (must be JSON Object Struct)
+          const functionResponseParts = toolResults.map(tr => {
+            const safeResponse = (typeof tr.result === 'object' && tr.result !== null && !Array.isArray(tr.result))
+              ? tr.result
+              : { result: tr.result };
+
+            return {
+              functionResponse: {
+                name: tr.name,
+                response: safeResponse
+              }
+            };
+          });
 
           // Append tool response turn to conversation
           currentContents.push({
