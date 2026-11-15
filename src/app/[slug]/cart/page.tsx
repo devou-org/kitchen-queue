@@ -39,13 +39,13 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
     setCart(new Map(newCart));
   };
 
-  const updateQty = (id: string, delta: number) => {
+  const updateQty = (key: string, delta: number) => {
     const newCart = new Map(cart);
-    const item = newCart.get(id);
+    const item = newCart.get(key);
     if (!item) return;
     const newQty = item.quantity + delta;
-    if (newQty <= 0) newCart.delete(id);
-    else newCart.set(id, { ...item, quantity: Math.min(newQty, 10) });
+    if (newQty <= 0) newCart.delete(key);
+    else newCart.set(key, { ...item, quantity: Math.min(newQty, 10) });
     saveCart(newCart);
   };
 
@@ -84,31 +84,72 @@ export default function CartPage({ params }: { params: Promise<{ slug: string }>
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '16px', paddingBottom: '160px' }}>
         {/* Items */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-          {items.map(item => (
-            <div key={item.product_id} className="card" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <img
-                  src={item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
-                  alt={item.name}
-                  style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }}
-                  onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'; }}
-                />
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ fontWeight: 700, fontSize: '15px' }}>{item.name}</h3>
-                  <p style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '14px' }}>{formatPrice(item.price)}</p>
+          {items.map(item => {
+            const itemKey = item.cart_item_key || item.product_id;
+            return (
+              <div key={itemKey} className="card" style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <img
+                    src={item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
+                    alt={item.name}
+                    style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'; }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <h3 style={{ fontWeight: 700, fontSize: '15px', margin: 0 }}>{item.name}</h3>
+                      {item.selected_variant && (
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          textTransform: 'uppercase'
+                        }}>
+                          {item.selected_variant.name}
+                        </span>
+                      )}
+                    </div>
+                    {(() => {
+                      if (!item.customization_summary) return null;
+                      let summaryText = item.customization_summary.trim();
+                      if (item.selected_variant?.name) {
+                        const varName = item.selected_variant.name.trim().toLowerCase();
+                        if (summaryText.toLowerCase() === varName) return null;
+                        const prefix = `${item.selected_variant.name.trim()} • `;
+                        if (summaryText.toLowerCase().startsWith(prefix.toLowerCase())) {
+                          summaryText = summaryText.slice(prefix.length).trim();
+                        }
+                      }
+                      if (!summaryText) return null;
+                      return (
+                        <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0', lineHeight: 1.3 }}>
+                          +{summaryText}
+                        </p>
+                      );
+                    })()}
+                    {item.item_note && (
+                      <p style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic', margin: '2px 0 0' }}>
+                        Note: {item.item_note}
+                      </p>
+                    )}
+                    <p style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '14px', margin: '3px 0 0' }}>{formatPrice(item.price)}</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', alignSelf: 'center' }}>
+                    <button className="qty-btn" onClick={() => updateQty(itemKey, -1)}>−</button>
+                    <span style={{ fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>{item.quantity}</span>
+                    <button className="qty-btn" onClick={() => updateQty(itemKey, 1)}>+</button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button className="qty-btn" onClick={() => updateQty(item.product_id, -1)}>−</button>
-                  <span style={{ fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>{item.quantity}</span>
-                  <button className="qty-btn" onClick={() => updateQty(item.product_id, 1)}>+</button>
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{item.quantity} × {formatPrice(item.price)}</span>
+                  <span style={{ fontWeight: 700 }}>{formatPrice(item.price * item.quantity)}</span>
                 </div>
               </div>
-              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>{item.quantity} × {formatPrice(item.price)}</span>
-                <span style={{ fontWeight: 700 }}>{formatPrice(item.price * item.quantity)}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Summary */}

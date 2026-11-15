@@ -30,6 +30,7 @@ export default function AdminTablesPage() {
 
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'AVAILABLE' | 'OCCUPIED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -88,7 +89,41 @@ export default function AdminTablesPage() {
       });
       if (res.success) {
         toast.success(newStatus === 'CANCELLED' ? 'Order cancelled' : `Order updated to ${newStatus}`, { id: `order-status-${id}` });
-        await fetchTables();
+
+        // If order closed on a merged table, unmerge the table
+        if (newStatus === 'CLOSED') {
+          const tNum = (tableNumber || selectedOrder?.table_number || '').trim();
+          const parts = tNum.split('+').map(p => p.trim()).filter(Boolean);
+          const targetTable = tables.find(t =>
+            t.table_number === tNum ||
+            (parts.length > 0 && parts.includes(t.table_number)) ||
+            (selectedTable && (t.id === selectedTable.id || t.table_number === selectedTable.table_number))
+          );
+          const isMerged = targetTable && (
+            Boolean(targetTable.merged_into_table_id) ||
+            (Array.isArray(targetTable.merged_table_ids) && targetTable.merged_table_ids.length > 0) ||
+            (Array.isArray(targetTable.merged_table_numbers) && targetTable.merged_table_numbers.length > 0) ||
+            (targetTable.table_number && targetTable.table_number.includes('+')) ||
+            tNum.includes('+')
+          );
+          if (isMerged && targetTable) {
+            try {
+              const tableIdToUnmerge = targetTable.merged_into_table_id || targetTable.id;
+              await fetch('/api/tables/unmerge', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(slugStr ? { 'x-restaurant-slug': slugStr } : {})
+                },
+                body: JSON.stringify({ table_id: tableIdToUnmerge })
+              });
+            } catch (err) {
+              console.error('Failed to unmerge table after closing order:', err);
+            }
+          }
+        }
+
+        await fetchTables(false);
         setSelectedOrder((prev: any) => prev ? {
           ...prev,
           status: newStatus,
@@ -109,11 +144,23 @@ export default function AdminTablesPage() {
 
   const handleOrderUpdated = (updatedOrder: Order) => {
     setSelectedOrder(updatedOrder);
-    fetchTables();
+    setTables((prev) =>
+      prev.map((t) => ({
+        ...t,
+        active_orders: (t.active_orders || []).map((o: any) =>
+          o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o
+        ),
+      }))
+    );
+    fetchTables(false);
   };
 
-  const fetchTables = async () => {
-    setLoading(true);
+  const fetchTables = async (showSpinner = false) => {
+    if (showSpinner || tables.length === 0) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     try {
       const headers: Record<string, string> = slugStr ? { 'x-restaurant-slug': slugStr } : {};
       const res = await fetch('/api/tables', { headers });
@@ -127,11 +174,12 @@ export default function AdminTablesPage() {
       toast.error('Network error loading tables');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchTables();
+    fetchTables(true);
   }, [slugStr]);
 
   const handleCreateTable = async (tableNumber: string, capacity: number) => {
@@ -765,7 +813,7 @@ export default function AdminTablesPage() {
               {/* Refresh Button */}
               <button
                 type="button"
-                onClick={fetchTables}
+                onClick={() => fetchTables(true)}
                 disabled={loading}
                 title="Refresh Table Status"
                 aria-label="Refresh Table Status"
@@ -1318,7 +1366,7 @@ export default function AdminTablesPage() {
         table={selectedEditTable}
         isOpen={!!selectedEditTable}
         onClose={() => setSelectedEditTable(null)}
-        onSuccess={fetchTables}
+        onSuccess={() => fetchTables(false)}
         primaryColor={primaryColor}
       />
 

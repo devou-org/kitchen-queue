@@ -1363,22 +1363,33 @@ export async function deductInventoryForOrder(
   clientOrPool: any,
   restaurantId: string,
   orderId: string,
-  orderItems: { product_id: string; quantity: number }[]
+  orderItems: {
+    product_id: string;
+    quantity: number;
+    selected_variant?: any;
+    selected_customizations?: any[];
+  }[]
 ) {
   try {
-    // 1. Group quantities by product_id
-    const prodMap = new Map<string, number>();
-    for (const oi of orderItems) {
-      const q = Number(oi.quantity);
-      if (oi.product_id && q > 0) {
-        prodMap.set(oi.product_id, (prodMap.get(oi.product_id) || 0) + q);
-      }
-    }
+    if (!orderItems || orderItems.length === 0) return;
 
-    const productIds = Array.from(prodMap.keys());
+    // 1. Collect all product_ids
+    const productIds = Array.from(new Set(orderItems.map((oi) => oi.product_id).filter(Boolean)));
     if (productIds.length === 0) return;
 
-    // 2. Fetch recipes for these products
+    // 2. Fetch products to get variants and customization_groups configurations
+    const productsRes = await clientOrPool.query(
+      `SELECT id, name, variants, customization_groups
+       FROM products
+       WHERE restaurant_id = $1 AND id = ANY($2::uuid[])`,
+      [restaurantId, productIds]
+    );
+    const prodConfigMap = new Map<string, any>();
+    for (const p of productsRes.rows) {
+      prodConfigMap.set(String(p.id), p);
+    }
+
+    // 3. Fetch base recipes for these products
     const recipesRes = await clientOrPool.query(
       `SELECT r.id AS recipe_id, r.product_id, r.yield_servings,
               ri.item_id, ri.quantity::float AS portion_qty, ri.unit
@@ -1388,26 +1399,99 @@ export async function deductInventoryForOrder(
       [restaurantId, productIds]
     );
 
-    if (recipesRes.rows.length === 0) {
-      // No recipes configured for these menu items; skip BOM deduction
-      return;
+    // Group recipe rows by product_id
+    const recipeRowsByProduct = new Map<string, any[]>();
+    for (const row of recipesRes.rows) {
+      const pid = String(row.product_id);
+      if (!recipeRowsByProduct.has(pid)) recipeRowsByProduct.set(pid, []);
+      recipeRowsByProduct.get(pid)!.push(row);
     }
 
-    // 3. Aggregate total ingredient requirement across all ordered menu products
+    // 4. Calculate total ingredient requirements across all ordered menu products
     // ingredientId -> requiredQty
     const ingredientReqMap = new Map<string, number>();
-    for (const row of recipesRes.rows) {
-      const orderedCount = prodMap.get(row.product_id) || 0;
-      const servings = Math.max(1, Number(row.yield_servings || 1));
-      const needed = (orderedCount * row.portion_qty) / servings;
 
-      ingredientReqMap.set(
-        row.item_id,
-        (ingredientReqMap.get(row.item_id) || 0) + needed
-      );
+    for (const oi of orderItems) {
+      const orderQty = Number(oi.quantity);
+      if (!oi.product_id || orderQty <= 0) continue;
+
+      const pid = String(oi.product_id);
+      const prodConfig = prodConfigMap.get(pid);
+      const recipeRows = recipeRowsByProduct.get(pid);
+
+      // 4.1 Determine variant multiplier and/or direct variant item deduction
+      let multiplier = 1.0;
+      let variantDirectItemId: string | null = null;
+      let variantDirectItemQty = 0;
+
+      if (oi.selected_variant && prodConfig?.variants && Array.isArray(prodConfig.variants)) {
+        const selVarId = oi.selected_variant.id;
+        const selVarName = oi.selected_variant.name;
+        const matchedVariant = prodConfig.variants.find(
+          (v: any) => (selVarId && v.id === selVarId) || (selVarName && v.name === selVarName)
+        );
+        if (matchedVariant) {
+          if (typeof matchedVariant.recipe_multiplier === 'number' && matchedVariant.recipe_multiplier > 0) {
+            multiplier = matchedVariant.recipe_multiplier;
+          }
+          if (matchedVariant.inventory_item_id && Number(matchedVariant.inventory_deduct_qty) > 0) {
+            variantDirectItemId = matchedVariant.inventory_item_id;
+            variantDirectItemQty = Number(matchedVariant.inventory_deduct_qty);
+          }
+        }
+      }
+
+      // 4.2 Base recipe BOM consumption scaled by variant multiplier
+      if (recipeRows && recipeRows.length > 0) {
+        for (const rRow of recipeRows) {
+          const servings = Math.max(1, Number(rRow.yield_servings || 1));
+          const needed = (orderQty * rRow.portion_qty * multiplier) / servings;
+          ingredientReqMap.set(
+            rRow.item_id,
+            (ingredientReqMap.get(rRow.item_id) || 0) + needed
+          );
+        }
+      }
+
+      // 4.3 Direct variant raw inventory deduction
+      if (variantDirectItemId && variantDirectItemQty > 0) {
+        const needed = orderQty * variantDirectItemQty;
+        ingredientReqMap.set(
+          variantDirectItemId,
+          (ingredientReqMap.get(variantDirectItemId) || 0) + needed
+        );
+      }
+
+      // 4.4 Customization Options / Add-ons raw inventory deduction
+      if (
+        Array.isArray(oi.selected_customizations) &&
+        prodConfig?.customization_groups &&
+        Array.isArray(prodConfig.customization_groups)
+      ) {
+        for (const selCust of oi.selected_customizations) {
+          const optId = selCust.option_id;
+          const optName = selCust.option_name;
+          for (const grp of prodConfig.customization_groups) {
+            if (Array.isArray(grp.options)) {
+              const matchedOpt = grp.options.find(
+                (o: any) => (optId && o.id === optId) || (optName && o.name === optName)
+              );
+              if (matchedOpt?.inventory_item_id && Number(matchedOpt.inventory_deduct_qty) > 0) {
+                const needed = orderQty * Number(matchedOpt.inventory_deduct_qty);
+                ingredientReqMap.set(
+                  matchedOpt.inventory_item_id,
+                  (ingredientReqMap.get(matchedOpt.inventory_item_id) || 0) + needed
+                );
+              }
+            }
+          }
+        }
+      }
     }
 
-    // 4. Lock each required ingredient row, deduct stock, and write stock_movement
+    if (ingredientReqMap.size === 0) return;
+
+    // 5. Lock each required ingredient row, deduct stock, and write stock_movement
     for (const [itemId, deductQty] of ingredientReqMap.entries()) {
       if (deductQty <= 0) continue;
 
@@ -1448,13 +1532,85 @@ export async function deductInventoryForOrder(
           unitCost,
           totalCost,
           orderId,
-          `Order #${orderId.slice(-6)} consumption`,
+          `Order #${orderId.slice(-6)} consumption (incl. variant & add-ons)`,
         ]
       );
     }
   } catch (err) {
     console.error('Error during order inventory auto-deduction:', err);
-    // Let caller handle or log without crashing user order if appropriate
+  }
+}
+
+export async function restoreInventoryForOrder(
+  clientOrPool: any,
+  restaurantId: string,
+  orderId: string
+) {
+  try {
+    // 1. Find all CONSUMPTION movements for this order
+    const movementsRes = await clientOrPool.query(
+      `SELECT sm.id, sm.item_id, sm.quantity, sm.unit_cost, sm.total_cost
+       FROM stock_movements sm
+       WHERE sm.restaurant_id = $1 AND sm.reference_type = 'ORDER' AND sm.reference_id = $2 AND sm.movement_type = 'CONSUMPTION'`,
+      [restaurantId, orderId]
+    );
+
+    if (movementsRes.rows.length === 0) return;
+
+    // Check if we already returned them
+    const returnCheckRes = await clientOrPool.query(
+      `SELECT COUNT(*)::int AS cnt
+       FROM stock_movements
+       WHERE restaurant_id = $1 AND reference_type = 'ORDER' AND reference_id = $2 AND movement_type = 'RETURN'`,
+      [restaurantId, orderId]
+    );
+    if (returnCheckRes.rows[0]?.cnt > 0) return; // Already restored
+
+    for (const mov of movementsRes.rows) {
+      const returnQty = Math.abs(Number(mov.quantity));
+      if (returnQty <= 0) continue;
+
+      const itemRes = await clientOrPool.query(
+        `SELECT id, current_stock, cost_per_unit
+         FROM inventory_items
+         WHERE restaurant_id = $1 AND id = $2
+         FOR UPDATE`,
+        [restaurantId, mov.item_id]
+      );
+      if (itemRes.rows.length === 0) continue;
+
+      const ing = itemRes.rows[0];
+      const prevStock = Number(ing.current_stock);
+      const newStock = prevStock + returnQty;
+      const unitCost = Number(mov.unit_cost);
+      const totalCost = Math.round(returnQty * unitCost * 100) / 100;
+
+      await clientOrPool.query(
+        `UPDATE inventory_items
+         SET current_stock = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [newStock, mov.item_id]
+      );
+
+      await clientOrPool.query(
+        `INSERT INTO stock_movements (
+          restaurant_id, item_id, movement_type, quantity, balance_after,
+          unit_cost, total_cost, reference_type, reference_id, reason
+        ) VALUES ($1, $2, 'RETURN', $3, $4, $5, $6, 'ORDER', $7, $8)`,
+        [
+          restaurantId,
+          mov.item_id,
+          returnQty,
+          newStock,
+          unitCost,
+          totalCost,
+          orderId,
+          `Order #${orderId.slice(-6)} cancelled - stock restored`,
+        ]
+      );
+    }
+  } catch (err) {
+    console.error('Error restoring inventory for order:', err);
   }
 }
 

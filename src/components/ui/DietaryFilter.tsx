@@ -8,14 +8,111 @@ interface DietaryFilterProps {
   onChange: (val: DietaryPreferenceFilter) => void;
   className?: string;
   style?: React.CSSProperties;
+  variant?: 'default' | 'pills';
 }
 
-export function DietaryFilter({ value, onChange, className = '', style = {} }: DietaryFilterProps) {
+export function DietaryFilter({ value, onChange, className = '', style = {}, variant = 'default' }: DietaryFilterProps) {
   const options: { id: DietaryPreferenceFilter; label: string; iconColor?: string; borderColor?: string }[] = [
     { id: 'ALL', label: 'All' },
     { id: 'VEG', label: 'Veg', iconColor: '#16a34a', borderColor: '#16a34a' },
     { id: 'NON_VEG', label: 'Non-Veg', iconColor: '#dc2626', borderColor: '#dc2626' },
   ];
+
+  if (variant === 'pills') {
+    return (
+      <div
+        className={`dietary-filter-pills ${className}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          userSelect: 'none',
+          ...style,
+        }}
+      >
+        {options.map((option) => {
+          const isActive = value === option.id;
+          const isAll = option.id === 'ALL';
+          const isVeg = option.id === 'VEG';
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => {
+                if (isActive && !isAll) {
+                  onChange('ALL');
+                } else {
+                  onChange(option.id);
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 16px',
+                borderRadius: 'var(--radius-full, 9999px)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease',
+                backgroundColor: isActive
+                  ? isAll
+                    ? 'var(--primary)'
+                    : isVeg
+                    ? '#F0FDF4'
+                    : '#FEF2F2'
+                  : '#FFFFFF',
+                color: isActive
+                  ? isAll
+                    ? '#FFFFFF'
+                    : isVeg
+                    ? '#15803d'
+                    : '#b91c1c'
+                  : 'var(--text-secondary, #6B6667)',
+                border: '1.5px solid',
+                borderColor: isActive
+                  ? isAll
+                    ? 'var(--primary)'
+                    : isVeg
+                    ? '#16a34a'
+                    : '#dc2626'
+                  : 'var(--border, #EFE9EB)',
+                boxShadow: isActive ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none',
+              }}
+            >
+              {option.iconColor && (
+                <div
+                  style={{
+                    width: '13px',
+                    height: '13px',
+                    border: `1.5px solid ${option.borderColor}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '3px',
+                    background: '#FFFFFF',
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      backgroundColor: option.iconColor,
+                    }}
+                  />
+                </div>
+              )}
+              <span>{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div

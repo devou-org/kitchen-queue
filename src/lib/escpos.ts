@@ -41,6 +41,10 @@ export interface KotPrintItem {
   quantity: number;
   counter?: string;
   notes?: string;
+  item_note?: string;
+  selected_variant?: { id: string; name: string; price?: number };
+  selected_customizations?: Array<{ id: string; name: string; price?: number }>;
+  customization_summary?: string;
 }
 
 export interface KotPrintData {
@@ -165,7 +169,10 @@ export function buildKotEscposBuffer(data: KotPrintData): Buffer {
 
   let totalQty = 0;
   for (const item of data.items) {
-    const itemName = (item.product_name || item.name || 'Item').trim();
+    let itemName = (item.product_name || item.name || 'Item').trim();
+    if (item.selected_variant?.name) {
+      itemName += ` (${item.selected_variant.name})`;
+    }
     const qty = Number(item.quantity) || 1;
     totalQty += qty;
 
@@ -173,8 +180,13 @@ export function buildKotEscposBuffer(data: KotPrintData): Buffer {
     addLine(padTwoCols(itemName, `x ${qty}`));
     addRaw(ESCPOS.BOLD_OFF);
 
-    if (item.notes) {
-      addLine(`  * Note: ${item.notes}`);
+    if (item.customization_summary) {
+      addLine(`  + ${item.customization_summary}`);
+    }
+
+    const note = item.notes || item.item_note;
+    if (note) {
+      addLine(`  * Note: ${note}`);
     }
   }
 
@@ -213,6 +225,10 @@ export interface BillPrintItem {
   price?: number;
   price_at_purchase?: number;
   notes?: string;
+  item_note?: string;
+  selected_variant?: { id: string; name: string; price?: number };
+  selected_customizations?: Array<{ id: string; name: string; price?: number }>;
+  customization_summary?: string;
 }
 
 export interface BillPrintData {
@@ -351,7 +367,10 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
     const qty = Number(item.quantity) || 1;
     const price = Number(item.price_at_purchase ?? item.price ?? 0);
     const isFree = price === 0;
-    const name = (item.product_name || item.name || 'Item').trim().toUpperCase() + (isFree ? ' [FREE]' : '');
+    let name = (item.product_name || item.name || 'Item').trim().toUpperCase() + (isFree ? ' [FREE]' : '');
+    if (item.selected_variant?.name) {
+      name += ` (${item.selected_variant.name.toUpperCase()})`;
+    }
     const itemTotal = qty * price;
     calcSubtotal += itemTotal;
 
@@ -369,8 +388,13 @@ export function buildBillEscposBuffer(data: BillPrintData): Buffer {
     }
     addRaw(ESCPOS.BOLD_OFF);
 
-    if (item.notes) {
-      addLine(`  * Note: ${item.notes.trim()}`);
+    if (item.customization_summary) {
+      addLine(`  + ${item.customization_summary}`);
+    }
+
+    const note = item.notes || item.item_note;
+    if (note) {
+      addLine(`  * Note: ${note.trim()}`);
     }
   }
 

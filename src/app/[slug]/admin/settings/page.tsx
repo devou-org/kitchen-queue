@@ -5,7 +5,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { useRestaurant, invalidateRestaurantCache } from '@/hooks/useRestaurant';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { Store, Eye, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power, ChefHat, Monitor, CheckCircle2 } from 'lucide-react';
+import { Store, Eye, Tag, Sparkles, Receipt, MapPin, Navigation, Compass, Loader2, KeyRound, Mail, Lock, ShieldCheck, EyeOff, Save, Printer, ChevronDown, ChevronRight, ChevronsUpDown, UtensilsCrossed, QrCode, Power, ChefHat, Monitor, CheckCircle2 } from 'lucide-react';
 import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
@@ -13,6 +13,8 @@ import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { ServiceToggle, checkOperatingHours } from '@/components/ServiceToggle';
 import { CounterHardwareSettings } from '@/components/CounterHardwareSettings';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
+import { UpdatesAndPatchesCard } from '@/components/modules/settings/UpdatesAndPatchesCard';
+import { RestaurantLogoUploader } from '@/components/modules/settings/RestaurantLogoUploader';
 
 interface CollapsibleCardProps {
   id: string;
@@ -102,12 +104,30 @@ export default function AdminSettings() {
   const { restaurant, loading, refresh } = useRestaurant();
   const [saving, setSaving] = useState(false);
 
+  // Standalone plans (Digital Menu & Queue Management) do not need kitchen workflows or hardware auto-printing
+  const isStandalone = restaurant?.selected_product === 'DIGITAL_MENU' ||
+                       restaurant?.selected_product === 'QUEUE_MANAGEMENT' ||
+                       restaurant?.billing_tier === 'STANDALONE';
+  const showKitchenAndHardware = !isStandalone && restaurant?.modules?.ONLINE_ORDERING !== false;
+
   // Auto-Print State (synced with orders and pos)
   const [autoPrintKot, setAutoPrintKot] = useState(false);
   const [isPrintStation, setIsPrintStation] = useState(false);
   const [isServiceOnline, setIsServiceOnline] = useState(true);
+  const [latestVersion, setLatestVersion] = useState<string>('');
 
-  const SECTION_KEYS = ['service_status', 'profile', 'menu', 'kitchen_workflow', 'hours', 'autoprint', 'gst', 'preview', 'qrcode'];
+  const SECTION_KEYS = [
+    'service_status',
+    'profile',
+    'menu',
+    ...(showKitchenAndHardware ? ['kitchen_workflow'] : []),
+    'hours',
+    ...(showKitchenAndHardware ? ['autoprint'] : []),
+    'gst',
+    'preview',
+    'qrcode',
+    'updates_patches',
+  ];
 
   // Collapsible Sections State (all collapsed by default)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -472,15 +492,18 @@ export default function AdminSettings() {
           display: flex !important;
           flex-wrap: nowrap !important;
           align-items: center !important;
+          justify-content: flex-end !important;
           gap: 10px !important;
           width: 100% !important;
           min-width: 0 !important;
+          margin-left: auto !important;
         }
 
         .settings-actions {
           display: flex !important;
           flex-wrap: nowrap !important;
           align-items: center !important;
+          justify-content: flex-end !important;
           gap: 8px !important;
           margin-left: auto !important;
           flex-shrink: 0 !important;
@@ -490,26 +513,38 @@ export default function AdminSettings() {
           .settings-page-header {
             height: auto !important;
             min-height: auto !important;
-            padding: 12px 16px !important;
+            padding: 10px 14px !important;
           }
 
           .settings-toolbar {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 10px !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            margin-left: auto !important;
           }
 
           .settings-actions {
             width: 100% !important;
-            margin-left: 0 !important;
-            justify-content: space-between !important;
-            flex-wrap: wrap !important;
+            margin-left: auto !important;
+            justify-content: flex-end !important;
+            flex-wrap: nowrap !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .settings-actions {
+            gap: 6px !important;
+            justify-content: flex-end !important;
+            margin-left: auto !important;
+          }
+
+          .settings-maximize-toggle {
+            display: none !important;
           }
         }
       `}</style>
       <AdminPageHeader
         className="settings-page-header"
-        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        style={{ paddingTop: 0, minHeight: '60px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="settings-toolbar">
@@ -519,8 +554,8 @@ export default function AdminSettings() {
                 type="button"
                 onClick={toggleAllSections}
                 style={{
-                  height: '38px',
-                  padding: '0 12px',
+                  height: '36px',
+                  padding: '0 10px',
                   borderRadius: '8px',
                   background: '#F8FAFC',
                   color: '#475569',
@@ -530,9 +565,10 @@ export default function AdminSettings() {
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '5px',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
               >
                 <ChevronsUpDown size={14} />
@@ -544,8 +580,8 @@ export default function AdminSettings() {
                 onClick={() => handleSaveProfile()}
                 disabled={saving}
                 style={{
-                  height: '38px',
-                  padding: '0 16px',
+                  height: '36px',
+                  padding: '0 14px',
                   borderRadius: '8px',
                   background: 'var(--primary, #971345)',
                   color: '#FFFFFF',
@@ -560,6 +596,7 @@ export default function AdminSettings() {
                   whiteSpace: 'nowrap',
                   opacity: saving ? 0.7 : 1,
                   transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
@@ -567,7 +604,7 @@ export default function AdminSettings() {
               </button>
 
               {/* Left Border Separator */}
-              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+              <div className="settings-maximize-toggle" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
                 <LayoutMaximizeToggle />
               </div>
             </div>
@@ -644,40 +681,41 @@ export default function AdminSettings() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                  <div>
-                    <label style={S.label}>Phone Number</label>
-                    <PhoneInput
-                      international
-                      countryCallingCodeEditable={false}
-                      placeholder="Enter phone number"
-                      value={phone as any}
-                      onChange={val => setPhone(val ? String(val) : '')}
-                      defaultCountry="IN"
-                      style={{ ...S.input, display: 'flex', alignItems: 'center' }}
-                    />
-                    <style>{`
-                      .PhoneInputInput {
-                        border: none;
-                        outline: none;
-                        flex: 1;
-                        font-size: 14px;
-                        background: transparent;
-                        color: #0f172a;
-                        padding-left: 8px;
-                      }
-                      .PhoneInputCountry {
-                        margin-right: 8px;
-                      }
-                    `}</style>
-                  </div>
-                  <div>
-                    <label style={S.label}>Logo URL</label>
-                    <input
-                      type="url" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}
-                      style={S.input} placeholder="https://..."
-                    />
-                  </div>
+                <div>
+                  <label style={S.label}>Phone Number</label>
+                  <PhoneInput
+                    international
+                    countryCallingCodeEditable={false}
+                    placeholder="Enter phone number"
+                    value={phone as any}
+                    onChange={val => setPhone(val ? String(val) : '')}
+                    defaultCountry="IN"
+                    style={{ ...S.input, display: 'flex', alignItems: 'center' }}
+                  />
+                  <style>{`
+                    .PhoneInputInput {
+                      border: none;
+                      outline: none;
+                      flex: 1;
+                      font-size: 14px;
+                      background: transparent;
+                      color: #0f172a;
+                      padding-left: 8px;
+                    }
+                    .PhoneInputCountry {
+                      margin-right: 8px;
+                    }
+                  `}</style>
+                </div>
+
+                <div>
+                  <RestaurantLogoUploader
+                    value={logoUrl}
+                    onChange={setLogoUrl}
+                    restaurantName={name}
+                    primaryColor={primaryColor}
+                    disabled={saving}
+                  />
                 </div>
 
                 <div>
@@ -835,7 +873,8 @@ export default function AdminSettings() {
               </div>
             </CollapsibleCard>
 
-            {/* Kitchen Operations & Workflow Card */}
+            {/* Kitchen Operations & Workflow Card (Only for POS / Online Ordering) */}
+            {showKitchenAndHardware && (
             <CollapsibleCard
               id="kitchen_workflow"
               title="Kitchen Workflow"
@@ -961,6 +1000,7 @@ export default function AdminSettings() {
                 </button>
               </div>
             </CollapsibleCard>
+            )}
 
             {/* 4. Location & Operating Hours Card */}
             <CollapsibleCard
@@ -1108,7 +1148,8 @@ export default function AdminSettings() {
           {/* Right Column: Auto-Print, GST, Live Preview, QR Code */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-            {/* 4. Auto-Print & Hardware Card */}
+            {/* 4. Auto-Print & Hardware Card (Only for POS / Online Ordering) */}
+            {showKitchenAndHardware && (
             <CollapsibleCard
               id="autoprint"
               title="Auto-Print & Hardware"
@@ -1259,6 +1300,7 @@ export default function AdminSettings() {
                 )}
               </div>
             </CollapsibleCard>
+            )}
 
             {/* 5. GST Information Card (Read-Only) */}
             <CollapsibleCard
@@ -1317,6 +1359,34 @@ export default function AdminSettings() {
                 />
               </CollapsibleCard>
             )}
+
+            {/* 7. Updates and Patches Card */}
+            <CollapsibleCard
+              id="updates_patches"
+              title="Updates and Patches"
+              icon={<Tag size={18} style={{ color: primaryColor || 'var(--primary, #971345)' }} />}
+              badge={
+                latestVersion ? (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      backgroundColor: '#EFF6FF',
+                      color: '#1D4ED8',
+                      border: '1px solid #BFDBFE',
+                    }}
+                  >
+                    {latestVersion}
+                  </span>
+                ) : null
+              }
+              isCollapsed={!!collapsedSections['updates_patches']}
+              onToggle={() => toggleSection('updates_patches')}
+            >
+              <UpdatesAndPatchesCard primaryColor={primaryColor} onLatestVersion={setLatestVersion} />
+            </CollapsibleCard>
 
           </div>
         </div>

@@ -32,12 +32,18 @@ export type RestaurantContext = {
   latitude?: number | null;
   longitude?: number | null;
   kitchen_mode?: 'KOT' | 'KDS';
+  selected_product?: 'POS' | 'DIGITAL_MENU' | 'QUEUE_MANAGEMENT';
+  billing_tier?: string;
 };
 
 let cached: RestaurantContext | null = null;
 let lastFetchTime = 0;
 let fetchPromise: Promise<RestaurantContext | null> | null = null;
 const listeners = new Set<(data: RestaurantContext | null) => void>();
+
+export function getCachedRestaurant(): RestaurantContext | null {
+  return cached;
+}
 
 export function invalidateRestaurantCache() {
   cached = null;

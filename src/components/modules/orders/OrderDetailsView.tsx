@@ -36,6 +36,7 @@ import { printKotFromBrowser, printBillFromBrowser } from '@/lib/client-print';
 import { printBillTemplateDirectly } from '@/components/BillTemplate';
 import { useRestaurant } from '@/hooks/useRestaurant';
 import { orderService } from '@/app/services/orders.api';
+import { tableService } from '@/app/services/tables.api';
 import { EditOrderModal } from './EditOrderModal';
 
 interface OrderDetailsViewProps {
@@ -69,6 +70,7 @@ export function OrderDetailsView({
 }: OrderDetailsViewProps) {
   const { restaurant } = useRestaurant();
   const primaryColor = restaurant?.primary_color || '#4F46E5';
+  const isKot = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
 
   const primarySoftBg = React.useMemo(() => {
     if (!primaryColor || typeof primaryColor !== 'string') return 'rgba(79, 70, 229, 0.08)';
@@ -107,10 +109,6 @@ export function OrderDetailsView({
 
   const isAnyActionBusy = isStatusUpdating || isCancelUpdating || loading;
 
-  React.useEffect(() => {
-    setOrder(initialOrder);
-    setSplitAmounts(normalizeSplitAmounts(initialOrder.payment_split, initialOrder.payment_method));
-  }, [initialOrder]);
 
   React.useEffect(() => {
     setMounted(true);
@@ -145,14 +143,15 @@ export function OrderDetailsView({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isClosing]);
 
-  // Sync state if order prop changes
+  // Sync state only if the initialOrder prop from parent changes
   React.useEffect(() => {
-    setTempStatus(order.status);
-    setTempTableNumber(order.table_number || '');
-    setPaymentMethod(order.payment_method || 'UPI');
-    setSplitAmounts(normalizeSplitAmounts(order.payment_split, order.payment_method));
+    setOrder(initialOrder);
+    setTempStatus(initialOrder.status);
+    setTempTableNumber(initialOrder.table_number || '');
+    setPaymentMethod(initialOrder.payment_method || 'UPI');
+    setSplitAmounts(normalizeSplitAmounts(initialOrder.payment_split, initialOrder.payment_method));
     setIsClosing(false);
-  }, [order.id, order.status, order.table_number, order.payment_method, order.payment_split]);
+  }, [initialOrder.id, initialOrder.status, initialOrder.table_number, initialOrder.payment_method, initialOrder.payment_split]);
 
   const handleUpdateStatus = async (statusToApply: string) => {
     setIsStatusUpdating(true);
@@ -172,6 +171,36 @@ export function OrderDetailsView({
       }
 
       await onStatusChange(order.id, statusToApply, tempTableNumber, pMethod, pSplit);
+
+      // If order closed on a merged table, unmerge the table
+      if (statusToApply === 'CLOSED') {
+        const effectiveTableNum = (tempTableNumber || order.table_number || '').trim();
+        const parts = effectiveTableNum.split('+').map(p => p.trim()).filter(Boolean);
+        const targetTable = (tables || []).find((t: any) => {
+          if (t.id && (order as any).table_id && t.id === (order as any).table_id) return true;
+          if (t.table_number === effectiveTableNum) return true;
+          if (parts.length > 0 && parts.includes(t.table_number)) return true;
+          if (t.merged_table_numbers && t.merged_table_numbers.some((m: string) => parts.includes(m) || m === effectiveTableNum)) return true;
+          return false;
+        });
+
+        const isMerged = targetTable && (
+          Boolean(targetTable.merged_into_table_id) ||
+          (Array.isArray(targetTable.merged_table_ids) && targetTable.merged_table_ids.length > 0) ||
+          (Array.isArray(targetTable.merged_table_numbers) && targetTable.merged_table_numbers.length > 0) ||
+          (targetTable.table_number && targetTable.table_number.includes('+')) ||
+          effectiveTableNum.includes('+')
+        );
+
+        if (isMerged && targetTable) {
+          try {
+            const tableIdToUnmerge = targetTable.merged_into_table_id || targetTable.id;
+            await tableService.unmergeTable(tableIdToUnmerge);
+          } catch (unmergeErr) {
+            console.error('Failed to unmerge table after closing order:', unmergeErr);
+          }
+        }
+      }
       setTempStatus(statusToApply as any);
       setOrder((prev) => ({
         ...prev,
@@ -200,7 +229,7 @@ export function OrderDetailsView({
     }
   };
 
-  const handleSelectPaymentMethod = async (methodId: string, customSplit?: SplitAmounts) => {
+  const handleSelectPaymentMethod = (methodId: string, customSplit?: SplitAmounts) => {
     let nextMethod = methodId;
     let nextSplit: any = null;
 
@@ -222,23 +251,11 @@ export function OrderDetailsView({
     setPaymentMethod(nextMethod);
     if (nextSplit) setSplitAmounts(nextSplit);
 
-    try {
-      const res = await orderService.updateOrder(order.id, {
-        payment_method: nextMethod,
-        payment_split: nextSplit,
-        table_number: tempTableNumber || order.table_number,
-      });
-      if (res.success && res.data) {
-        setOrder((prev) => ({
-          ...prev,
-          payment_method: nextMethod,
-          payment_split: nextSplit || prev.payment_split,
-        }));
-        if (onOrderUpdated) onOrderUpdated(res.data);
-      }
-    } catch (e) {
-      console.error('Error auto-saving payment method:', e);
-    }
+    setOrder((prev) => ({
+      ...prev,
+      payment_method: nextMethod,
+      payment_split: nextSplit || prev.payment_split,
+    }));
   };
 
   const editUrl = isStaff
@@ -721,7 +738,7 @@ export function OrderDetailsView({
                 #{String(order.ticket_number).padStart(3, '0')}
               </span>
               <OrderTypeBadge type={order.order_type} variant="minimal" />
-              <OrderStatusBadge status={order.status} />
+              <OrderStatusBadge status={order.status} hideDot />
               {order.order_type !== 'TAKEAWAY' && order.order_type !== 'DELIVERY' && order.table_number && (
                 <span
                   style={{
@@ -851,14 +868,15 @@ export function OrderDetailsView({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateColumns: isKot ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
               gap: '8px',
               marginTop: '14px',
             }}
           >
-            {/* Print KOT Button */}
-            <div ref={printMenuRef} style={{ position: 'relative' }}>
-              <button
+            {/* Print KOT Button (only shown in KOT workflow, hidden in KDS) */}
+            {isKot && (
+              <div ref={printMenuRef} style={{ position: 'relative' }}>
+                <button
                 type="button"
                 onClick={() => {
                   if (uniqueCounters.length <= 1) {
@@ -1016,6 +1034,7 @@ export function OrderDetailsView({
                 </div>
               )}
             </div>
+            )}
 
             {/* Print Bill Button */}
             <button
@@ -1104,7 +1123,6 @@ export function OrderDetailsView({
 
           {/* SECTION: KITCHEN WORKFLOW LIFECYCLE CONTROLS */}
           {(() => {
-            const isKot = (restaurant?.kitchen_mode || 'KOT').toUpperCase() !== 'KDS';
             const currentSt = (order.status || 'PENDING').toUpperCase();
 
             let nextTargetStatus: string | null = null;
@@ -1170,7 +1188,7 @@ export function OrderDetailsView({
                     {isStatusUpdating ? (
                       <Loader2 size={13} className="animate-spin" />
                     ) : (
-                      <CheckCircle2 size={14} />
+                      <Check size={14} />
                     )}
                     <span>{isStatusUpdating ? 'Updating Status...' : nextButtonLabel}</span>
                   </button>
@@ -1304,7 +1322,7 @@ export function OrderDetailsView({
                               {isCounterUpdating ? (
                                 <Loader2 size={12} className="animate-spin" />
                               ) : (
-                                <CheckCircle2 size={12} />
+                                <Check size={12} />
                               )}
                               Mark {cName} {completionLabel}
                             </button>
@@ -1323,13 +1341,13 @@ export function OrderDetailsView({
                               style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
-                                alignItems: 'center',
+                                alignItems: 'flex-start',
                                 padding: '9px 12px',
                                 borderBottom: idx < itemsInCounter.length - 1 ? '1px solid #F1F5F9' : 'none',
                                 background: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', minWidth: 0, flex: 1 }}>
                                 <span
                                   style={{
                                     display: 'inline-flex',
@@ -1346,6 +1364,7 @@ export function OrderDetailsView({
                                     fontSize: '14px',
                                     letterSpacing: '-0.2px',
                                     flexShrink: 0,
+                                    marginTop: '1px',
                                   }}
                                 >
                                   {item.quantity}×
@@ -1356,14 +1375,58 @@ export function OrderDetailsView({
                                       fontSize: '14px',
                                       fontWeight: 600,
                                       color: '#0F172A',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap',
+                                      whiteSpace: 'normal',
+                                      wordBreak: 'break-word',
+                                      overflowWrap: 'break-word',
+                                      lineHeight: 1.35,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      flexWrap: 'wrap',
                                     }}
                                   >
-                                    {item.product_name}
+                                    <span>{item.product_name}</span>
+                                    {item.selected_variant && (
+                                      <span style={{
+                                        fontSize: '10px',
+                                        fontWeight: 700,
+                                        padding: '1px 6px',
+                                        borderRadius: '4px',
+                                        background: '#EEF2FF',
+                                        color: '#4338CA',
+                                        textTransform: 'uppercase',
+                                      }}>
+                                        {item.selected_variant.name}
+                                      </span>
+                                    )}
                                   </div>
-                                  {item.notes && (
+                                  {(() => {
+                                    if (!item.customization_summary) return null;
+                                    let summaryText = item.customization_summary.trim();
+                                    if (item.selected_variant?.name) {
+                                      const varName = item.selected_variant.name.trim().toLowerCase();
+                                      if (summaryText.toLowerCase() === varName) return null;
+                                      const prefix = `${item.selected_variant.name.trim()} • `;
+                                      if (summaryText.toLowerCase().startsWith(prefix.toLowerCase())) {
+                                        summaryText = summaryText.slice(prefix.length).trim();
+                                      }
+                                    }
+                                    if (!summaryText) return null;
+                                    return (
+                                      <div
+                                        style={{
+                                          fontSize: '12px',
+                                          color: '#475569',
+                                          fontWeight: 600,
+                                          marginTop: '2px',
+                                          lineHeight: 1.3,
+                                        }}
+                                      >
+                                        +{summaryText}
+                                      </div>
+                                    );
+                                  })()}
+                                  {(item.notes || item.item_note) && (
                                     <div
                                       style={{
                                         fontSize: '11.5px',
@@ -1376,10 +1439,10 @@ export function OrderDetailsView({
                                       }}
                                     >
                                       <Utensils size={11} color="#D97706" style={{ flexShrink: 0 }} />
-                                      <span>Note: {item.notes}</span>
+                                      <span>Note: {item.notes || item.item_note}</span>
                                     </div>
                                   )}
-                                  <div style={{ fontSize: '11px', color: '#64748B' }}>
+                                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
                                     {Number(item.price_at_purchase || 0) === 0 ? (
                                       <span style={{ color: '#16A34A', fontWeight: 700 }}>₹0.00 (FREE)</span>
                                     ) : (
@@ -1390,7 +1453,7 @@ export function OrderDetailsView({
                               </div>
 
                               {/* Item Status (Static Badge) & Price */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '8px', paddingTop: '3px' }}>
                                 <span
                                   style={{
                                     display: 'inline-flex',
@@ -1406,14 +1469,6 @@ export function OrderDetailsView({
                                     userSelect: 'none',
                                   }}
                                 >
-                                  <span
-                                    style={{
-                                      width: '6px',
-                                      height: '6px',
-                                      borderRadius: '50%',
-                                      backgroundColor: statusConfig.text,
-                                    }}
-                                  />
                                   {statusConfig.label}
                                 </span>
 

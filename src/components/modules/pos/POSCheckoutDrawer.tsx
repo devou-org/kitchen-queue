@@ -1088,9 +1088,11 @@ export function POSCheckoutDrawer({
                     overflowY: 'auto',
                   }}
                 >
-                  {Array.from(cart.values()).map((item) => (
+                  {Array.from(cart.entries()).map(([cartKey, item]) => {
+                    const itemKey = cartKey || item.cart_item_key || item.product_id;
+                    return (
                     <div
-                      key={item.product_id}
+                      key={itemKey}
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -1129,7 +1131,9 @@ export function POSCheckoutDrawer({
                               color: '#0F172A',
                               lineHeight: 1.25,
                               display: 'flex',
-                              alignItems: 'flex-start',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '6px',
                               minWidth: 0,
                             }}
                           >
@@ -1145,7 +1149,43 @@ export function POSCheckoutDrawer({
                             >
                               {item.name}
                             </span>
+                            {item.selected_variant && (
+                              <span
+                                style={{
+                                  fontSize: '10.5px',
+                                  fontWeight: 700,
+                                  color: restaurant?.primary_color || 'var(--primary, #059669)',
+                                  backgroundColor: restaurant?.primary_color ? `${restaurant.primary_color}18` : 'rgba(5, 150, 105, 0.1)',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {item.selected_variant.name}
+                              </span>
+                            )}
                           </div>
+
+                          {(() => {
+                            if (!item.customization_summary) return null;
+                            let summaryText = item.customization_summary.trim();
+                            if (item.selected_variant?.name) {
+                              const varName = item.selected_variant.name.trim().toLowerCase();
+                              if (summaryText.toLowerCase() === varName) {
+                                return null;
+                              }
+                              const prefix = `${item.selected_variant.name.trim()} • `;
+                              if (summaryText.toLowerCase().startsWith(prefix.toLowerCase())) {
+                                summaryText = summaryText.slice(prefix.length).trim();
+                              }
+                            }
+                            if (!summaryText) return null;
+                            return (
+                              <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px', lineHeight: 1.3 }}>
+                                {summaryText}
+                              </div>
+                            );
+                          })()}
 
                           <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px', whiteSpace: 'nowrap' }}>
                             {formatPrice(item.price)} each
@@ -1165,7 +1205,7 @@ export function POSCheckoutDrawer({
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
                               type="button"
-                              onClick={() => onUpdateCart(item.product_id, -1)}
+                              onClick={() => onUpdateCart(itemKey, -1)}
                               style={{
                                 width: '26px',
                                 height: '26px',
@@ -1207,7 +1247,7 @@ export function POSCheckoutDrawer({
 
                             <button
                               type="button"
-                              onClick={() => onUpdateCart(item.product_id, 1)}
+                              onClick={() => onUpdateCart(itemKey, 1)}
                               style={{
                                 width: '26px',
                                 height: '26px',
@@ -1253,7 +1293,7 @@ export function POSCheckoutDrawer({
                           {/* Red Delete Button */}
                           <button
                             type="button"
-                            onClick={() => onUpdateCart(item.product_id, -item.quantity)}
+                            onClick={() => onUpdateCart(itemKey, -item.quantity)}
                             style={{
                               width: '26px',
                               height: '26px',
@@ -1301,7 +1341,7 @@ export function POSCheckoutDrawer({
                           type="text"
                           placeholder="Kitchen note (e.g. less spicy, no onions)..."
                           value={item.notes || ''}
-                          onChange={(e) => onUpdateCartNotes?.(item.product_id, e.target.value)}
+                          onChange={(e) => onUpdateCartNotes?.(itemKey, e.target.value)}
                           style={{
                             width: '100%',
                             border: 'none',
@@ -1316,7 +1356,7 @@ export function POSCheckoutDrawer({
                         {item.notes && (
                           <button
                             type="button"
-                            onClick={() => onUpdateCartNotes?.(item.product_id, '')}
+                            onClick={() => onUpdateCartNotes?.(itemKey, '')}
                             style={{
                               background: 'none',
                               border: 'none',
@@ -1334,7 +1374,8 @@ export function POSCheckoutDrawer({
                         )}
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
 
                   {/* Free Reward line item */}
                   {selectedReward?.reward_type === 'FREE_ITEM' && freeRewardProductId && (() => {

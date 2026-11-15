@@ -29,6 +29,9 @@ interface BillingData {
     billing_status: string;
     billing_start_date: string | null;
     billing_end_date: string | null;
+    is_trial?: boolean;
+    trial_ends_at?: string | null;
+    selected_product?: string;
   };
   transactions: Array<{
     id: string;
@@ -53,6 +56,7 @@ interface BillingData {
   pricingConfig: {
     name: string;
     subscriptionPrice: number;
+    billingPeriod?: string;
     features: string[];
     perOrderCommission?: {
       threshold: number;
@@ -60,6 +64,9 @@ interface BillingData {
       aboveFlat: number;
     };
     otpCharge?: number;
+    effectiveEndDate?: string | null;
+    isTrial?: boolean;
+    trialEndsAt?: string | null;
   } | null;
   todayOtpUsage?: {
     count: number;
@@ -231,12 +238,12 @@ export default function BillingPage() {
         }
 
         .billing-page-header .admin-page-header-container {
-          height: 68px !important;
-          min-height: 68px !important;
+          height: auto !important;
+          min-height: 44px !important;
           display: flex !important;
           align-items: center !important;
           margin: 0 !important;
-          padding: 0 !important;
+          padding: 4px 0 !important;
           gap: 12px !important;
           width: 100% !important;
         }
@@ -245,15 +252,18 @@ export default function BillingPage() {
           display: flex !important;
           flex-wrap: nowrap !important;
           align-items: center !important;
+          justify-content: flex-end !important;
           gap: 10px !important;
           width: 100% !important;
           min-width: 0 !important;
+          margin-left: auto !important;
         }
 
         .billing-actions {
           display: flex !important;
           flex-wrap: nowrap !important;
           align-items: center !important;
+          justify-content: flex-end !important;
           gap: 8px !important;
           margin-left: auto !important;
           flex-shrink: 0 !important;
@@ -262,37 +272,47 @@ export default function BillingPage() {
         @media (max-width: 768px) {
           .billing-page-header {
             height: auto !important;
-            min-height: auto !important;
-            padding: 12px 16px !important;
+            min-height: 40px !important;
+            padding: 6px 14px !important;
           }
 
           .billing-toolbar {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 10px !important;
+            flex-direction: row !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            margin-left: auto !important;
+            gap: 6px !important;
           }
 
           .billing-actions {
-            width: 100% !important;
-            margin-left: 0 !important;
-            justify-content: space-between !important;
-            flex-wrap: wrap !important;
+            width: auto !important;
+            margin-left: auto !important;
+            justify-content: flex-end !important;
+            flex-wrap: nowrap !important;
+          }
+
+          .billing-maximize-toggle {
+            display: none !important;
+          }
+
+          .billing-overview-container {
+            padding: 12px 14px !important;
           }
         }
       `}</style>
       <AdminPageHeader
         className="billing-page-header"
-        style={{ paddingTop: 0, minHeight: '68px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
+        style={{ paddingTop: 0, minHeight: '44px', display: 'flex', alignItems: 'center', marginBottom: 0 }}
         hideMaximize={true}
         search={
           <div className="billing-toolbar">
-            {/* Left: Status Control */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            {/* Right: Status Badge & Maximize Toggle */}
+            <div className="billing-actions">
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                height: '38px',
+                height: '34px',
                 padding: '0 12px',
                 borderRadius: '8px',
                 backgroundColor: statusStyle.bg,
@@ -302,16 +322,14 @@ export default function BillingPage() {
                 fontSize: '11px',
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}>
                 {restaurant.billing_status === 'ACTIVE' ? <ShieldCheck size={14} /> : <AlertCircle size={14} />}
                 <span>{restaurant.billing_status || 'ACTIVE'} STATUS</span>
               </div>
-            </div>
 
-            {/* Right: Maximize Toggle */}
-            <div className="billing-actions">
-              <div style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '32px' }}>
+              <div className="billing-maximize-toggle" style={{ borderLeft: '1px solid #E2E8F0', paddingLeft: '8px', display: 'flex', alignItems: 'center', height: '30px' }}>
                 <LayoutMaximizeToggle />
               </div>
             </div>
@@ -321,7 +339,7 @@ export default function BillingPage() {
 
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0, padding: 0 }}>
         {/* Pricing and Tier Overview Cards */}
-        <div style={{ padding: '20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+        <div className="billing-overview-container" style={{ padding: '16px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
             {/* Active Plan Card */}
             <div style={{ 
@@ -333,8 +351,28 @@ export default function BillingPage() {
             }}>
               <h2 style={{ fontSize: '12px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Current Plan</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '12px' }}>
-                <span style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>{restaurant.billing_tier || 'BASIC'}</span>
-                <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{restaurant.billing_model || 'SUBSCRIPTION'} MODEL</span>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>
+                  {pricingConfig?.name || restaurant.billing_tier || 'STANDALONE'}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {restaurant.billing_period ? `${restaurant.billing_period} ` : ''}
+                    {restaurant.billing_model || 'SUBSCRIPTION'} MODEL
+                  </span>
+                  {restaurant.billing_status === 'TRIAL' && (
+                    <span style={{ 
+                      fontSize: '10px', 
+                      backgroundColor: '#fef3c7', 
+                      color: '#92400e', 
+                      fontWeight: 700, 
+                      padding: '2px 6px', 
+                      borderRadius: '4px',
+                      textTransform: 'uppercase'
+                    }}>
+                      Free Trial
+                    </span>
+                  )}
+                </div>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px', fontSize: '13px', color: '#4b5563' }}>
@@ -342,15 +380,20 @@ export default function BillingPage() {
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
                       <span>Base Subscription:</span>
-                      <strong style={{ color: '#111827' }}>₹{pricingConfig?.subscriptionPrice || 0}/month</strong>
+                      <strong style={{ color: '#111827' }}>
+                        ₹{Number(pricingConfig?.subscriptionPrice || 0).toLocaleString('en-IN')}
+                        {restaurant.billing_period === 'ANNUALLY' ? '/year' : '/month'}
+                      </strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f3f4f6', paddingBottom: '6px' }}>
                       <span>Cycle Start Date:</span>
                       <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_start_date)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Renewal/End Date:</span>
-                      <strong style={{ color: '#111827' }}>{formatDate(restaurant.billing_end_date)}</strong>
+                      <span>{restaurant.billing_status === 'TRIAL' ? 'Trial Ends:' : 'Renewal/End Date:'}</span>
+                      <strong style={{ color: '#111827' }}>
+                        {formatDate(restaurant.billing_end_date || pricingConfig?.effectiveEndDate || null)}
+                      </strong>
                     </div>
                   </>
                 ) : restaurant.billing_model === 'PER_ORDER' ? (

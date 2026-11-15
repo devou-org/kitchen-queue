@@ -50,7 +50,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   // Controlled via Super Admin Subscription Modules
   const showInventory = restaurant?.modules?.INVENTORY === true;
   const showFinance = restaurant?.modules?.FINANCE_MANAGEMENT === true;
-  const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM !== false;
+  const showLoyalty = restaurant?.modules?.LOYALTY_PROGRAM === true;
+  const showTables = showOrdering && restaurant?.modules?.TABLE_MANAGEMENT !== false;
 
   useEffect(() => {
     // Check if token exists in cookie or localStorage
@@ -94,12 +95,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     ...(showOrdering ? [{ key: 'pos', name: 'POS', href: `/${slug}/admin/pos`, icon: <Store size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'orders', name: 'Orders', href: `/${slug}/admin/orders`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
     ...(!showOrdering && showQueue ? [{ key: 'queue', name: 'Queue', href: `/${slug}/admin/queue`, icon: <ClipboardList size={20} strokeWidth={2.5} /> }] : []),
-    { key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> },
+    ...(showTables ? [{ key: 'tables', name: 'Tables', href: `/${slug}/admin/tables`, icon: <LayoutGrid size={20} strokeWidth={2.5} /> }] : []),
     { key: 'products', name: 'Menu', href: `/${slug}/admin/products`, icon: <UtensilsCrossed size={20} strokeWidth={2.5} /> },
     ...(showInventory ? [{ key: 'inventory', name: 'Inventory', href: `/${slug}/admin/inventory`, icon: <Boxes size={20} strokeWidth={2.5} /> }] : []),
     ...(showFinance ? [{ key: 'finance', name: 'Finance', href: `/${slug}/admin/finance`, icon: <Landmark size={20} strokeWidth={2.5} /> }] : []),
     ...(showLoyalty ? [{ key: 'loyalty', name: 'Loyalty', href: `/${slug}/admin/loyalty`, icon: <Gift size={20} strokeWidth={2.5} /> }] : []),
-    ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
+    ...(showOrdering ? [{ key: 'analytics', name: 'Analytics', href: `/${slug}/admin/analytics/sales`, icon: <BarChart3 size={20} strokeWidth={2.5} /> }] : []),
     ...(showOrdering ? [{ key: 'staff', name: 'Staff', href: `/${slug}/admin/staff`, icon: <Users size={20} strokeWidth={2.5} /> }] : []),
     { key: 'billing', name: 'Billing', href: `/${slug}/admin/billing`, icon: <Receipt size={20} strokeWidth={2.5} /> },
     { key: 'settings', name: 'Settings', href: `/${slug}/admin/settings`, icon: <Settings size={20} strokeWidth={2.5} /> },
@@ -130,7 +131,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     }
 
     const currentModule = allNavLinks.find(link => pathname.startsWith(link.href) || 
-      (link.key === 'analytics' && (pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)))
+      (link.key === 'analytics' && (pathname.startsWith(`/${slug}/admin/analytics`) || pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)))
     );
 
     if (currentModule) {
@@ -150,6 +151,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
       const isUnauthorizedPath = 
         pathname.startsWith(`/${slug}/admin/pos`) || 
         pathname.startsWith(`/${slug}/admin/orders`) || 
+        pathname.startsWith(`/${slug}/admin/tables`) || 
         pathname.startsWith(`/${slug}/admin/statements`) || 
         pathname.startsWith(`/${slug}/admin/sales`) ||
         pathname.startsWith(`/${slug}/admin/analytics`);
@@ -157,6 +159,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         const target = showQueue ? 'queue' : 'products';
         router.replace(`/${slug}/admin/${target}`);
       }
+    } else if (!resLoading && restaurant && !showTables && pathname.startsWith(`/${slug}/admin/tables`)) {
+      router.replace(`/${slug}/admin/products`);
     }
 
     if (!resLoading && restaurant && restaurant.modules?.INVENTORY !== true) {
@@ -447,7 +451,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         <nav className="sidebar-nav">
           {navLinks.map((link) => {
             const isActive = pathname.startsWith(link.href) ||
-              (link.name === 'Analytics' && (pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)));
+              (link.name === 'Analytics' && (pathname.startsWith(`/${slug}/admin/analytics`) || pathname.startsWith(`/${slug}/admin/sales`) || pathname.startsWith(`/${slug}/admin/statements`)));
             return (
               <Link key={link.name} 
                 href={link.href} 

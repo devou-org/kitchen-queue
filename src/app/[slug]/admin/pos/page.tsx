@@ -18,6 +18,8 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { POSCheckoutDrawer, POSOrderFormData } from '@/components/modules/pos/POSCheckoutDrawer';
 import { PrinterIllustration } from '@/components/ui/PrinterIllustration';
+import { ProductCustomizationModal, ProductCustomizationResult } from '@/components/modules/products/ProductCustomizationModal';
+import { sortCategoriesByConfig, ConfiguredCategory } from '@/lib/category-order';
 
 const STATUS_BADGE: Record<ProductStatus, { label: string; class: string }> = {
   AVAILABLE: { label: 'AVAILABLE', class: 'badge badge-available' },
@@ -31,19 +33,33 @@ const STATUS_ORDER: Record<ProductStatus, number> = {
   OUT_OF_STOCK: 3,
 };
 
-function ProductCard({ product, quantity, onUpdate }: {
+function ProductCard({ product, quantity, onUpdate, onCustomize }: {
   product: Product;
   quantity: number;
   onUpdate: (id: string, delta: number) => void;
+  onCustomize: (product: Product) => void;
 }) {
   const isOut = product.status === 'OUT_OF_STOCK';
+  const isCustomizable = Boolean(
+    product.has_customizations ||
+    (Array.isArray(product.variants) && product.variants.length > 0) ||
+    (Array.isArray(product.customization_groups) && product.customization_groups.length > 0)
+  );
 
   return (
     <div className="card animate-fade-in" style={{
       padding: 0, overflow: 'hidden', opacity: isOut ? 0.75 : 1,
       transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-      cursor: 'pointer'
-    }} onClick={() => { if (!isOut) onUpdate(product.id, 1) }}>
+      cursor: 'pointer',
+      position: 'relative',
+    }} onClick={() => {
+      if (isOut) return;
+      if (isCustomizable) {
+        onCustomize(product);
+      } else {
+        onUpdate(product.id, 1);
+      }
+    }}>
       {/* Image */}
       <div style={{
         position: 'relative',
@@ -76,7 +92,7 @@ function ProductCard({ product, quantity, onUpdate }: {
       <div style={{ padding: '12px' }}>
         <h3 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</h3>
         <p style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '14px', marginBottom: '10px' }}>
-          {formatPrice(product.price)}
+          {isCustomizable ? `From ${formatPrice(product.price)}` : formatPrice(product.price)}
         </p>
 
         {/* Quantity Controls */}
@@ -92,7 +108,13 @@ function ProductCard({ product, quantity, onUpdate }: {
             }}>{quantity}</span>
             <button
               className="qty-btn"
-              onClick={() => onUpdate(product.id, 1)}
+              onClick={() => {
+                if (isCustomizable) {
+                  onCustomize(product);
+                } else {
+                  onUpdate(product.id, 1);
+                }
+              }}
               disabled={isOut}
             >+</button>
           </div>
@@ -112,10 +134,12 @@ export default function AdminPosPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
+  const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState<string[]>(['All']);
+  const configuredCategoriesRef = useRef<ConfiguredCategory[]>([]);
 
   const [mounted, setMounted] = useState(false);
   const isPrintStation = typeof window !== 'undefined' ? (localStorage.getItem('qdine_is_print_station') === '1') : false;
@@ -183,7 +207,7 @@ export default function AdminPosPage() {
   }, [tableParam, mergedParam, tables]);
 
   useEffect(() => {
-    if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM !== false) {
+    if (orderForm.phone && orderForm.phone.trim().length >= 10 && restaurant?.modules?.LOYALTY_PROGRAM === true) {
       const slugStr = Array.isArray(slug) ? slug[0] : slug;
       fetch(`/api/admin/loyalty/customers?slug=${slugStr}&search=${encodeURIComponent(orderForm.phone.trim())}`)
         .then(res => res.json())
@@ -217,7 +241,12 @@ export default function AdminPosPage() {
   useEffect(() => {
     const initPage = async () => {
       try {
-        const res = await productService.getProducts();
+        const currentSlug = Array.isArray(slug) ? slug[0] : (slug || '');
+        const [res, catRes] = await Promise.all([
+          productService.getProducts(),
+          productService.getCategories(currentSlug).catch(() => ({ success: false, data: [] }))
+        ]);
+
         if (res.success && res.data) {
           const parsedData = res.data.map(p => ({
             ...p,
@@ -226,12 +255,12 @@ export default function AdminPosPage() {
             buffer_quantity: Number(p.buffer_quantity)
           }));
           setProducts(parsedData);
-          const uniqueCats = Array.from(new Set(
-            parsedData
-              .map((p: Product) => p.category?.trim())
-              .filter((cat: string) => cat && cat !== 'All')
-          ));
-          setCategories(['All', ...uniqueCats]);
+
+          const configured = (catRes.success && Array.isArray(catRes.data)) ? (catRes.data as ConfiguredCategory[]) : [];
+          configuredCategoriesRef.current = configured;
+          const productCats = parsedData.map((p: Product) => p.category?.trim()).filter((cat): cat is string => Boolean(cat));
+          const sortedCats = sortCategoriesByConfig(productCats, configured);
+          setCategories(['All', ...sortedCats]);
         }
 
         await fetchTables();
@@ -242,7 +271,7 @@ export default function AdminPosPage() {
       }
     };
     initPage();
-  }, [fetchTables]);
+  }, [fetchTables, slug]);
 
   // Pusher for real-time updates
   useEffect(() => {
@@ -259,15 +288,26 @@ export default function AdminPosPage() {
       };
       setProducts(prev => {
         const exists = prev.find(p => p.id === parsedProduct.id);
-        if (exists) {
-          return prev.map(p => p.id === parsedProduct.id ? { ...p, ...parsedProduct } : p);
-        }
-        return [...prev, parsedProduct];
+        const nextProducts = exists
+          ? prev.map(p => p.id === parsedProduct.id ? { ...p, ...parsedProduct } : p)
+          : [...prev, parsedProduct];
+
+        const productCats = nextProducts.map((p: Product) => p.category?.trim()).filter((cat): cat is string => Boolean(cat));
+        const sortedCats = sortCategoriesByConfig(productCats, configuredCategoriesRef.current);
+        setCategories(['All', ...sortedCats]);
+
+        return nextProducts;
       });
     });
 
     channel.bind('product_deleted', (data: { id: string }) => {
-      setProducts(prev => prev.filter(p => p.id !== data.id));
+      setProducts(prev => {
+        const nextProducts = prev.filter(p => p.id !== data.id);
+        const productCats = nextProducts.map((p: Product) => p.category?.trim()).filter((cat): cat is string => Boolean(cat));
+        const sortedCats = sortCategoriesByConfig(productCats, configuredCategoriesRef.current);
+        setCategories(['All', ...sortedCats]);
+        return nextProducts;
+      });
     });
 
     channel.bind('new_order', () => {
@@ -296,26 +336,33 @@ export default function AdminPosPage() {
     const removedNames: string[] = [];
     let changed = false;
 
-    for (const [id, item] of cart.entries()) {
-      const product = byId.get(id);
+    for (const [key, item] of cart.entries()) {
+      const productId = item.product_id || key;
+      const product = byId.get(productId);
 
       if (!product || product.status === 'OUT_OF_STOCK') {
-        newCart.delete(id);
+        newCart.delete(key);
         removedNames.push(item.name);
         changed = true;
         continue;
       }
 
+      const hasCustomizations = Boolean(
+        item.selected_variant ||
+        (Array.isArray(item.selected_customizations) && item.selected_customizations.length > 0)
+      );
+      const expectedPrice = hasCustomizations ? item.price : product.price;
+
       if (
         item.status !== product.status ||
-        item.price !== product.price ||
+        item.price !== expectedPrice ||
         item.name !== product.name ||
         item.image_url !== product.image_url
       ) {
-        newCart.set(id, {
+        newCart.set(key, {
           ...item,
           status: product.status,
-          price: product.price,
+          price: expectedPrice,
           name: product.name,
           image_url: product.image_url,
         });
@@ -332,48 +379,157 @@ export default function AdminPosPage() {
     }
   }, [products, cart]);
 
-  const handleUpdate = (id: string, delta: number) => {
-    const product = products.find(p => p.id === id);
-    if (!product) return;
+  const handleCustomizationConfirm = (res: ProductCustomizationResult) => {
+    const variantId = res.selected_variant?.id || 'base';
+    const custIds = res.selected_customizations.map(c => c.option_id).sort().join('_');
+    const noteSuffix = res.notes ? `:::${res.notes.trim()}` : '';
+    const cartKey = `${res.product.id}:::${variantId}:::${custIds}${noteSuffix}`;
 
-    const currentStock = typeof product.stock_quantity === 'number' ? product.stock_quantity : null;
+    setCart(prev => {
+      const next = new Map(prev);
+      const existing = next.get(cartKey);
+      const newQty = (existing?.quantity || 0) + res.quantity;
 
-    if (delta > 0 && (product.status === 'OUT_OF_STOCK' || (currentStock !== null && currentStock <= 0))) {
+      next.set(cartKey, {
+        product_id: res.product.id,
+        name: res.product.name,
+        price: res.total_unit_price,
+        quantity: Math.min(newQty, 50),
+        image_url: res.product.image_url,
+        status: res.product.status,
+        notes: res.notes || existing?.notes,
+        selected_variant: res.selected_variant,
+        selected_customizations: res.selected_customizations,
+        customization_summary: res.customization_summary,
+        cart_item_key: cartKey,
+      });
+      return next;
+    });
+    toast.success(`Added ${res.product.name} to cart`);
+  };
+
+  const handleUpdate = (idOrKey: string, delta: number) => {
+    let targetKey = idOrKey;
+    let existing = cart.get(idOrKey);
+
+    // 1. If not found by direct Map key, try matching by cart_item_key
+    if (!existing) {
+      for (const [k, v] of cart.entries()) {
+        if (v.cart_item_key === idOrKey || k === idOrKey) {
+          targetKey = k;
+          existing = v;
+          break;
+        }
+      }
+    }
+
+    // 2. If still not found and idOrKey matches product_id (e.g. from ProductCard grid)
+    if (!existing) {
+      for (const [k, v] of cart.entries()) {
+        if (v.product_id === idOrKey || k.startsWith(`${idOrKey}:::`)) {
+          targetKey = k;
+          existing = v;
+          break;
+        }
+      }
+    }
+
+    // If decreasing an existing cart item (customized or standard)
+    if (delta < 0 && existing) {
+      const newCart = new Map(cart);
+      const currentQty = existing.quantity || 0;
+      const newQty = currentQty + delta;
+      if (newQty <= 0) {
+        newCart.delete(targetKey);
+      } else {
+        newCart.set(targetKey, {
+          ...existing,
+          quantity: Math.min(newQty, 50),
+          cart_item_key: targetKey,
+        });
+      }
+      setCart(newCart);
+      return;
+    }
+
+    const productId = existing?.product_id || idOrKey;
+    const product = products.find(p => String(p.id) === String(productId));
+    if (!product && !existing) return;
+
+    const isCustomizable = Boolean(
+      product?.has_customizations ||
+      (Array.isArray(product?.variants) && product.variants.length > 0) ||
+      (Array.isArray(product?.customization_groups) && product.customization_groups.length > 0)
+    );
+
+    // If clicking "+" from product card on a customizable item and not in cart yet, open customization modal
+    if (!existing && isCustomizable && delta > 0 && product) {
+      setCustomizingProduct(product);
+      return;
+    }
+
+    const currentStock = typeof product?.stock_quantity === 'number' ? product.stock_quantity : null;
+
+    if (delta > 0 && product && (product.status === 'OUT_OF_STOCK' || (currentStock !== null && currentStock <= 0))) {
       toast.error(`"${product.name}" is out of stock (0 available)`);
       return;
     }
 
     const newCart = new Map(cart);
-    const existing = newCart.get(id);
-    const newQty = (existing?.quantity || 0) + delta;
+    const currentQty = existing?.quantity || 0;
+    const newQty = currentQty + delta;
 
     if (delta > 0 && currentStock !== null && newQty > currentStock) {
-      toast.error(`"${product.name}" only has ${currentStock} available`);
+      toast.error(`"${existing?.name || product?.name}" only has ${currentStock} available`);
       return;
     }
 
+    // Check variant-level stock if tracked
+    if (delta > 0 && existing?.selected_variant && Array.isArray(product?.variants)) {
+      const vObj = product.variants.find(v => v.id === existing.selected_variant?.id);
+      if (typeof vObj?.stock_quantity === 'number' && newQty > vObj.stock_quantity) {
+        toast.error(`"${vObj.name}" only has ${vObj.stock_quantity} available`);
+        return;
+      }
+    }
+
     if (newQty <= 0) {
-      newCart.delete(id);
+      newCart.delete(targetKey);
     } else {
-      newCart.set(id, {
-        product_id: id,
-        name: product.name,
-        price: product.price,
-        quantity: Math.min(newQty, 50), // allow staff/admin to order more
-        image_url: product.image_url,
-        status: product.status,
+      newCart.set(targetKey, {
+        ...(existing || {}),
+        product_id: product?.id || existing?.product_id || productId,
+        name: existing?.name || product?.name || '',
+        price: existing?.price ?? product?.price ?? 0,
+        quantity: Math.min(newQty, 50),
+        image_url: existing?.image_url || product?.image_url || '',
+        status: existing?.status || product?.status || 'AVAILABLE',
         notes: existing?.notes,
+        selected_variant: existing?.selected_variant,
+        selected_customizations: existing?.selected_customizations,
+        customization_summary: existing?.customization_summary,
+        cart_item_key: targetKey,
       });
     }
     setCart(newCart);
   };
 
-  const handleUpdateNotes = (id: string, notes: string) => {
+  const handleUpdateNotes = (idOrKey: string, notes: string) => {
     setCart(prev => {
       const newCart = new Map(prev);
-      const existing = newCart.get(id);
+      let targetKey = idOrKey;
+      let existing = newCart.get(idOrKey);
+      if (!existing) {
+        for (const [k, v] of newCart.entries()) {
+          if (v.cart_item_key === idOrKey || k === idOrKey || v.product_id === idOrKey || k.startsWith(`${idOrKey}:::`)) {
+            targetKey = k;
+            existing = v;
+            break;
+          }
+        }
+      }
       if (existing) {
-        newCart.set(id, { ...existing, notes });
+        newCart.set(targetKey, { ...existing, notes });
       }
       return newCart;
     });
@@ -461,8 +617,9 @@ export default function AdminPosPage() {
 
     // Pre-validate cart items against current product stock
     const stockErrors: string[] = [];
-    for (const [productId, cartItem] of cart.entries()) {
-      const prod = products.find(p => p.id === productId);
+    for (const [key, cartItem] of cart.entries()) {
+      const prodId = cartItem.product_id || key;
+      const prod = products.find(p => p.id === prodId);
       if (prod) {
         const avail = typeof prod.stock_quantity === 'number' ? prod.stock_quantity : null;
         if (prod.status === 'OUT_OF_STOCK' || (avail !== null && avail <= 0)) {
@@ -507,6 +664,9 @@ export default function AdminPosPage() {
           quantity: item.quantity,
           price_at_purchase: item.price,
           notes: item.notes?.trim() || undefined,
+          selected_variant: item.selected_variant || undefined,
+          selected_customizations: item.selected_customizations || undefined,
+          customization_summary: item.customization_summary || undefined,
         });
       }
 
@@ -648,6 +808,15 @@ export default function AdminPosPage() {
     .sort((a, b) => {
       const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
       if (statusDiff !== 0) return statusDiff;
+      if (category === 'All') {
+        const catIndexA = categories.indexOf(a.category || '');
+        const catIndexB = categories.indexOf(b.category || '');
+        if (catIndexA !== -1 && catIndexB !== -1 && catIndexA !== catIndexB) {
+          return catIndexA - catIndexB;
+        }
+        if (catIndexA !== -1) return -1;
+        if (catIndexB !== -1) return 1;
+      }
       return a.name.localeCompare(b.name);
     });
 
@@ -861,14 +1030,21 @@ export default function AdminPosPage() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', paddingBottom: totalItems > 0 ? '90px' : '24px' }}>
-              {filtered.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  quantity={cart.get(product.id)?.quantity || 0}
-                  onUpdate={handleUpdate}
-                />
-              ))}
+              {filtered.map(product => {
+                const totalQty = Array.from(cart.values())
+                  .filter((item) => item.product_id === product.id)
+                  .reduce((sum, item) => sum + item.quantity, 0);
+
+                return (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    quantity={totalQty}
+                    onUpdate={handleUpdate}
+                    onCustomize={(p) => setCustomizingProduct(p)}
+                  />
+                );
+              })}
             </div>
           </>
         )}
@@ -965,6 +1141,13 @@ export default function AdminPosPage() {
           onSubmitOrder={submitOrder}
           submitting={submitting}
           hideOrderType={Boolean(tableParam)}
+        />
+
+        <ProductCustomizationModal
+          isOpen={Boolean(customizingProduct)}
+          product={customizingProduct}
+          onClose={() => setCustomizingProduct(null)}
+          onConfirm={handleCustomizationConfirm}
         />
       </div>
     </AdminContentWrapper>

@@ -89,12 +89,22 @@ export class QueueService {
       }
 
       // 2. Get the default first status id for this restaurant
-      const statusRes = await client.query(`
+      let statusRes = await client.query(`
         SELECT id FROM queue_status 
         WHERE restaurant_id = $1
         ORDER BY priority ASC, id ASC
         LIMIT 1
       `, [restaurantId]);
+
+      if (statusRes.rowCount === 0) {
+        await QueueService.seedDefaultQueueStatuses(restaurantId);
+        statusRes = await client.query(`
+          SELECT id FROM queue_status 
+          WHERE restaurant_id = $1
+          ORDER BY priority ASC, id ASC
+          LIMIT 1
+        `, [restaurantId]);
+      }
 
       if (statusRes.rowCount === 0) {
         throw new Error('No queue statuses configured for this restaurant');
@@ -249,12 +259,46 @@ export class QueueService {
   }
 
   /**
-   * Admin: List all configured statuses
+   * Seed default queue statuses: Pending, Seated, Cancelled
+   */
+  static async seedDefaultQueueStatuses(restaurantId: string) {
+    try {
+      await pool.query(`ALTER TABLE queue_status ALTER COLUMN possible_queue_status TYPE VARCHAR(50) USING possible_queue_status::text`);
+      await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '#cbd5e1'`);
+      await pool.query(`ALTER TABLE queue_status ADD COLUMN IF NOT EXISTS priority INT DEFAULT 0`);
+    } catch { }
+
+    const defaultStatuses = [
+      { status: 'PENDING', color: '#f59e0b', priority: 1 },
+      { status: 'SEATED', color: '#10b981', priority: 2 },
+      { status: 'CANCELLED', color: '#ef4444', priority: 3 },
+    ];
+
+    for (const s of defaultStatuses) {
+      await pool.query(
+        `INSERT INTO queue_status (restaurant_id, possible_queue_status, color, priority)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (restaurant_id, possible_queue_status) DO NOTHING`,
+        [restaurantId, s.status, s.color, s.priority]
+      );
+    }
+  }
+
+  /**
+   * Admin: List all configured statuses (auto-seeds defaults if none exist)
    */
   static async getQueueStatuses(restaurantId: string) {
-    const res = await pool.query(`
+    let res = await pool.query(`
       SELECT * FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC
     `, [restaurantId]);
+
+    if (res.rows.length === 0) {
+      await this.seedDefaultQueueStatuses(restaurantId);
+      res = await pool.query(`
+        SELECT * FROM queue_status WHERE restaurant_id = $1 ORDER BY priority ASC, id ASC
+      `, [restaurantId]);
+    }
+
     return res.rows;
   }
 
@@ -289,7 +333,7 @@ export class QueueService {
         FROM queues q2
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
-          AND qs2.possible_queue_status = 'WAITING'
+          AND qs2.possible_queue_status IN ('PENDING', 'WAITING')
           AND q2.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position
@@ -321,7 +365,7 @@ export class QueueService {
         FROM queues q2
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
-          AND qs2.possible_queue_status = 'WAITING'
+          AND qs2.possible_queue_status IN ('PENDING', 'WAITING')
           AND q2.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position
@@ -352,7 +396,7 @@ export class QueueService {
         FROM queues q2
         JOIN queue_status qs2 ON q2.queue_status_id = qs2.id
         WHERE q2.restaurant_id = $1
-          AND qs2.possible_queue_status = 'WAITING'
+          AND qs2.possible_queue_status IN ('PENDING', 'WAITING')
           AND q2.business_date = DATE((CURRENT_TIMESTAMP AT TIME ZONE (SELECT timezone FROM restaurants WHERE id = q2.restaurant_id)) - (SELECT rollover_time FROM restaurants WHERE id = q2.restaurant_id)::interval)
           AND q2.token_number < q.token_number
       ) as wait_position

@@ -32,6 +32,50 @@ export interface User {
   created_at: string;
 }
 
+export interface ProductVariant {
+  id: string;
+  name: string;
+  price: number;
+  stock_quantity?: number | null;
+  recipe_multiplier?: number | null;
+  inventory_item_id?: string | null;
+  inventory_deduct_qty?: number | null;
+  is_default?: boolean;
+}
+
+export interface CustomizationOption {
+  id: string;
+  name: string;
+  price: number;
+  stock_quantity?: number | null;
+  inventory_item_id?: string | null;
+  inventory_deduct_qty?: number | null;
+  inventory_unit?: string | null;
+  is_default?: boolean;
+}
+
+export interface CustomizationGroup {
+  id: string;
+  name: string;
+  min_selection: number;
+  max_selection: number;
+  options: CustomizationOption[];
+}
+
+export interface SelectedVariantSnapshot {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface SelectedCustomizationSnapshot {
+  group_id: string;
+  group_name: string;
+  option_id: string;
+  option_name: string;
+  price: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -45,6 +89,9 @@ export interface Product {
   is_active: boolean;
   dietary_preference?: string;
   counter?: string;
+  has_customizations?: boolean;
+  variants?: ProductVariant[];
+  customization_groups?: CustomizationGroup[];
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +110,9 @@ export interface OrderItem {
   ready_at?: string;
   served_at?: string;
   notes?: string;
+  selected_variant?: SelectedVariantSnapshot | null;
+  selected_customizations?: SelectedCustomizationSnapshot[];
+  customization_summary?: string | null;
 }
 
 export interface Order {
@@ -136,6 +186,11 @@ export interface CartItem {
   original_price?: number;
   is_free_reward?: boolean;
   notes?: string;
+  item_note?: string;
+  selected_variant?: SelectedVariantSnapshot | null;
+  selected_customizations?: SelectedCustomizationSnapshot[];
+  customization_summary?: string | null;
+  cart_item_key?: string;
 }
 
 // API Response types

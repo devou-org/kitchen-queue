@@ -2,13 +2,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { ClipboardList, ShoppingCart, Ticket, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare, Receipt, Boxes, Gift, Landmark } from 'lucide-react';
+import { ClipboardList, ShoppingCart, Ticket, Hourglass, Store, Phone, MapPin, Palette, X, Check, MessageSquare, Receipt, Boxes, Gift, Landmark, LayoutGrid } from 'lucide-react';
 import 'react-phone-number-input/style.css';
 import PhoneInput from 'react-phone-number-input';
+import { RestaurantLogoUploader } from '@/components/modules/settings/RestaurantLogoUploader';
 
 const ALL_MODULES = [
   { key: 'DIGITAL_MENU', label: 'Digital Menu', icon: <ClipboardList size={16} />, desc: 'QR code menu, categories, pricing' },
   { key: 'ONLINE_ORDERING', label: 'Online Ordering', icon: <ShoppingCart size={16} />, desc: 'Cart, checkout, OTP verification' },
+  { key: 'TABLE_MANAGEMENT', label: 'Table Management', icon: <LayoutGrid size={16} />, desc: 'Floor plans, table merge, and table QR codes' },
   { key: 'QUEUE_MANAGEMENT', label: 'Queue Management', icon: <Ticket size={16} />, desc: 'Token generation, live queue display' },
   { key: 'INVENTORY', label: 'Inventory Management', icon: <Boxes size={16} />, desc: 'Raw ingredients, recipes/BOM, purchases, wastage' },
   { key: 'LOYALTY_PROGRAM', label: 'Loyalty & Rewards', icon: <Gift size={16} />, desc: 'CRM points, punch cards, rewards' },
@@ -161,6 +163,12 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button onClick={() => router.push('/super-admin/pricing')} style={{ ...S.createBtn, background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 14px rgba(5,150,105,0.25)' }}>
+            💳 Plans & Pricing
+          </button>
+          <button onClick={() => router.push('/super-admin/updates')} style={{ ...S.createBtn, background: 'linear-gradient(135deg, #0284c7, #0369a1)', boxShadow: '0 4px 14px rgba(2,132,199,0.25)' }}>
+            🚀 Updates & Patches
+          </button>
           <button onClick={() => router.push('/super-admin/ai-quota')} style={{ ...S.createBtn, background: 'linear-gradient(135deg, #6366f1, #4f46e5)', boxShadow: '0 4px 14px rgba(99,102,241,0.25)' }}>
             🤖 AI Quotas & Limits
           </button>
@@ -319,8 +327,13 @@ export default function SuperAdminDashboard() {
               </div>
 
               <div>
-                <label style={S.fieldLabel}>Logo URL</label>
-                <input type="url" value={form.logo_url} onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))} placeholder="https://..." style={S.input} />
+                <RestaurantLogoUploader
+                  value={form.logo_url}
+                  onChange={url => setForm(f => ({ ...f, logo_url: url }))}
+                  restaurantName={form.name}
+                  primaryColor={form.primary_color}
+                  disabled={saving}
+                />
               </div>
 
               {/* Business Hours Configuration */}

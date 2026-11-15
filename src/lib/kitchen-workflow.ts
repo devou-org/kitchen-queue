@@ -247,6 +247,10 @@ export function resolveOrderStatusFromItems(
 
   // All active items are still pending
   if (counts.PENDING === totalActive) {
+    // Never automatically demote an order that has already progressed to PREPARING, READY, or SERVED
+    if (['PREPARING', 'READY', 'SERVED'].includes(cur)) {
+      return cur;
+    }
     return 'PENDING';
   }
 

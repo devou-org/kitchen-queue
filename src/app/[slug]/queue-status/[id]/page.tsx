@@ -147,10 +147,10 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
     const channelName = restaurant.pusher_channel;
     const channel = pusherClient.subscribe(channelName);
 
-    channel.bind('pusher:subscription_succeeded', () => setIsLive(true));
-    channel.bind('pusher:subscription_error', () => setIsLive(false));
+    const handleSubSucceeded = () => setIsLive(true);
+    const handleSubError = () => setIsLive(false);
 
-    channel.bind('queue_updated', (data: any) => {
+    const handleQueueUpdated = (data: any) => {
       if (data.type === 'UPDATE' && data.queue) {
         const currentTicket = ticketRef.current;
         const isOurTicket = data.queue.id === id;
@@ -172,12 +172,16 @@ export default function QueueStatusTicketPage({ params }: { params: Promise<{ sl
       } else if (data.type === 'JOIN') {
          fetchTicketAndStatuses(true);
       }
-    });
+    };
 
-
+    channel.bind('pusher:subscription_succeeded', handleSubSucceeded);
+    channel.bind('pusher:subscription_error', handleSubError);
+    channel.bind('queue_updated', handleQueueUpdated);
 
     return () => {
-      channel.unbind_all();
+      channel.unbind('pusher:subscription_succeeded', handleSubSucceeded);
+      channel.unbind('pusher:subscription_error', handleSubError);
+      channel.unbind('queue_updated', handleQueueUpdated);
       pusherClient?.unsubscribe(channelName);
     };
   }, [id, restaurant]);

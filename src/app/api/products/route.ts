@@ -69,7 +69,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, price, image_url, stock_quantity, buffer_quantity, category, dietary_preference, counter } = body;
+    const {
+      name, description, price, image_url, stock_quantity, buffer_quantity,
+      category, dietary_preference, counter, has_customizations, variants, customization_groups
+    } = body;
 
     if (!name || !price || !category) {
       return NextResponse.json({ success: false, error: 'Name, price, and category are required' }, { status: 400 });
@@ -106,6 +109,9 @@ export async function POST(request: NextRequest) {
       category: category.trim(),
       dietary_preference: dietary_preference?.trim(),
       counter: counter?.trim() || null,
+      has_customizations: Boolean(has_customizations),
+      variants: Array.isArray(variants) ? variants : [],
+      customization_groups: Array.isArray(customization_groups) ? customization_groups : [],
     });
 
     return NextResponse.json({

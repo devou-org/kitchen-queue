@@ -57,15 +57,20 @@ export function generateThermalReceiptHtml(data: KotPrintData): string {
   let totalQty = 0;
   const itemsHtml = data.items
     .map((item) => {
-      const name = (item.product_name || item.name || 'Item').trim();
+      let name = (item.product_name || item.name || 'Item').trim();
+      if (item.selected_variant?.name) {
+        name += ` (${item.selected_variant.name})`;
+      }
       const qty = Number(item.quantity) || 1;
       totalQty += qty;
+      const note = item.notes || item.item_note;
       return `
         <div class="item-row">
           <div class="item-name">${escapeHtml(name)}</div>
           <div class="item-qty">&times;&nbsp;${qty}</div>
         </div>
-        ${item.notes ? `<div class="item-note">* Note: ${escapeHtml(item.notes)}</div>` : ''}
+        ${item.customization_summary ? `<div class="item-note" style="font-weight:700;">+ ${escapeHtml(item.customization_summary)}</div>` : ''}
+        ${note ? `<div class="item-note">* Note: ${escapeHtml(note)}</div>` : ''}
       `;
     })
     .join('');

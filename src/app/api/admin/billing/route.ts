@@ -34,31 +34,91 @@ export async function GET(request: NextRequest) {
       ORDER BY year DESC, month DESC
     `;
 
-    // 3. Get pricing config for current tier (respecting custom overrides if set)
-    const tier = (restaurant.billing_tier || 'BASIC') as BillingTier;
-    const rawConfig = BILLING_PRICING[tier] || null;
+    // 3. Get pricing config for current plan / tier (respecting dynamic SaaS catalog & custom overrides)
+    const billingPeriod = (restaurant.billing_period || 'MONTHLY').toUpperCase();
+    const product = restaurant.selected_product || 'POS';
+    const tier = restaurant.billing_tier || 'BASIC';
+
     let pricingConfig = null;
-    if (rawConfig) {
-      const subPrice = restaurant.custom_subscription_charge !== null && restaurant.custom_subscription_charge !== undefined
-        ? Number(restaurant.custom_subscription_charge)
-        : rawConfig.subscriptionMonthly;
+    let subscriptionPrice = 0;
+    let planName = tier;
+    let features: string[] = [];
 
-      const otpCharge = restaurant.custom_otp_charge !== null && restaurant.custom_otp_charge !== undefined
-        ? Number(restaurant.custom_otp_charge)
-        : rawConfig.otpCharge;
+    // Query relational SaaS catalog first
+    const saasPlanRes = await sql`
+      SELECT 
+        p.id as plan_id, 
+        p.name as plan_name, 
+        p.tier, 
+        p.monthly_ai_credits,
+        pr.price, 
+        pr.billing_cycle, 
+        pr.currency
+      FROM saas_plans p
+      LEFT JOIN saas_plan_pricing pr ON p.id = pr.plan_id AND pr.billing_cycle = ${billingPeriod}
+      WHERE (p.product_id = ${product} OR p.product_id = 'POS')
+        AND (p.tier = ${tier} OR p.id = ${tier})
+      ORDER BY (p.product_id = ${product}) DESC
+      LIMIT 1
+    `;
 
-      pricingConfig = {
-        name: rawConfig.name,
-        subscriptionPrice: subPrice,
-        features: rawConfig.features,
-        otpCharge: otpCharge,
-        perOrderCommission: rawConfig.perOrder ? {
-          threshold: rawConfig.perOrder.flatLimit,
-          belowPercent: rawConfig.perOrder.commissionPercent * 100,
-          aboveFlat: rawConfig.perOrder.flatCharge
-        } : undefined
-      };
+    if (saasPlanRes.length > 0 && saasPlanRes[0].price !== null) {
+      subscriptionPrice = Number(saasPlanRes[0].price);
+      planName = saasPlanRes[0].plan_name;
+
+      // Also get features
+      const featRes = await sql`
+        SELECT feature_code, feature_name 
+        FROM saas_plan_features 
+        WHERE plan_id = ${saasPlanRes[0].plan_id} AND is_included = true
+      `;
+      features = featRes.map((f: any) => f.feature_code || f.feature_name);
+    } else {
+      // Fallback to static pricing map
+      const rawConfig = BILLING_PRICING[tier as BillingTier] || null;
+      if (rawConfig) {
+        subscriptionPrice = billingPeriod === 'ANNUALLY' && rawConfig.subscriptionAnnual
+          ? rawConfig.subscriptionAnnual
+          : rawConfig.subscriptionMonthly;
+        planName = rawConfig.name;
+        features = rawConfig.features;
+      }
     }
+
+    // Custom price override if set on restaurant
+    if (restaurant.custom_subscription_charge !== null && restaurant.custom_subscription_charge !== undefined) {
+      subscriptionPrice = Number(restaurant.custom_subscription_charge);
+    } else if (restaurant.custom_plan_price !== null && restaurant.custom_plan_price !== undefined) {
+      subscriptionPrice = Number(restaurant.custom_plan_price);
+    }
+
+    const otpCharge = restaurant.custom_otp_charge !== null && restaurant.custom_otp_charge !== undefined
+      ? Number(restaurant.custom_otp_charge)
+      : 0.50;
+
+    // Calculate effective renewal / end date if not explicitly in DB
+    let effectiveEndDate = restaurant.billing_end_date;
+    if (!effectiveEndDate && restaurant.billing_start_date) {
+      const startDate = new Date(restaurant.billing_start_date);
+      const computedDate = new Date(startDate);
+      if (billingPeriod === 'ANNUALLY') {
+        computedDate.setFullYear(computedDate.getFullYear() + 1);
+      } else {
+        computedDate.setMonth(computedDate.getMonth() + 1);
+      }
+      effectiveEndDate = computedDate.toISOString();
+    }
+
+    pricingConfig = {
+      name: planName,
+      subscriptionPrice,
+      billingPeriod,
+      features,
+      otpCharge,
+      effectiveEndDate,
+      isTrial: Boolean(restaurant.is_trial),
+      trialEndsAt: restaurant.trial_ends_at,
+    };
 
     const { searchParams } = new URL(request.url);
     const todayParam = searchParams.get('today');
@@ -106,7 +166,10 @@ export async function GET(request: NextRequest) {
           billing_period: restaurant.billing_period,
           billing_status: restaurant.billing_status,
           billing_start_date: restaurant.billing_start_date,
-          billing_end_date: restaurant.billing_end_date,
+          billing_end_date: effectiveEndDate,
+          is_trial: restaurant.is_trial,
+          trial_ends_at: restaurant.trial_ends_at,
+          selected_product: restaurant.selected_product,
         },
         transactions,
         summaries,

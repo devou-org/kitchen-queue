@@ -10,12 +10,17 @@ import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { AnalyticsNav } from '@/components/modules/analytics/AnalyticsNav';
 import { Download, Clock, Receipt, Search, X, MoveHorizontal } from 'lucide-react';
 import { orderService } from '@/app/services/orders.api';
-import { useRestaurant } from '@/hooks/useRestaurant';
+import { useRestaurant, getCachedRestaurant } from '@/hooks/useRestaurant';
 import BillTemplate from '@/components/BillTemplate';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { Pagination } from '@/components/ui/Pagination';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { getKitchenWorkflow } from '@/lib/kitchen-workflow';
+
+const getInitialBusinessDate = () => {
+  const cachedRest = getCachedRestaurant();
+  return getCurrentBusinessDate(cachedRest?.timezone, cachedRest?.rollover_time);
+};
 
 export default function AdminAnalyticsStatementsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -23,12 +28,8 @@ export default function AdminAnalyticsStatementsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState(() =>
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
-  );
-  const [dateTo, setDateTo] = useState(() =>
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
-  );
+  const [dateFrom, setDateFrom] = useState(getInitialBusinessDate);
+  const [dateTo, setDateTo] = useState(getInitialBusinessDate);
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showBill, setShowBill] = useState(false);

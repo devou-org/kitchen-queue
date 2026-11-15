@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
         bill_printer_name: restaurant.bill_printer_name || 'POS-80C',
         bill_printer_type: restaurant.bill_printer_type || 'DEFAULT',
         bill_printer_address: restaurant.bill_printer_address || null,
+        selected_product: restaurant.selected_product,
+        billing_tier: restaurant.billing_tier,
         // Derived channel name so clients don't have to construct it themselves
         pusher_channel: `queue-channel-${restaurant.id}`,
         modules,

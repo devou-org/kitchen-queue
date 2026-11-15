@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     // 1. Fetch all restaurants with basic billing info & custom charge overrides
     let restQuery = `
-      SELECT id, name, slug, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, custom_subscription_charge, custom_otp_charge
+      SELECT id, name, slug, billing_tier, billing_model, billing_status, billing_start_date, billing_end_date, billing_period, custom_subscription_charge, custom_otp_charge, selected_product
       FROM restaurants
     `;
     const restParams: any[] = [];

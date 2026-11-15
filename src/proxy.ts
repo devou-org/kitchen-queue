@@ -22,6 +22,9 @@ const MODULE_RULES = [
   { pathPrefix: '/order-status', module: 'ONLINE_ORDERING' },
   { pathPrefix: '/menu', module: 'DIGITAL_MENU' },
   { pathPrefix: '/admin/inventory', module: 'INVENTORY' },
+  { pathPrefix: '/admin/pos', module: 'ONLINE_ORDERING' },
+  { pathPrefix: '/admin/orders', module: 'ONLINE_ORDERING' },
+  { pathPrefix: '/admin/tables', module: 'ONLINE_ORDERING' },
 ];
 
 // ==========================================

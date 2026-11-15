@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Order } from '@/types';
 import { formatPrice } from '@/lib/format';
@@ -29,6 +29,8 @@ export default function OrderStatusPage() {
       }
     }
   }, [restaurant, resLoading, router, slug]);
+
+  const fetchOrderSeqRef = useRef(0);
 
   const fetchOrders = async (pageNum = 1, silent = false) => {
     try {
@@ -63,7 +65,9 @@ export default function OrderStatusPage() {
         return;
       }
 
+      const seq = ++fetchOrderSeqRef.current;
       const res = await orderService.getHistory(userPhone, pageNum, 20);
+      if (seq !== fetchOrderSeqRef.current) return;
 
       if (res.success && res.data) {
         if (pageNum === 1) {
@@ -109,6 +113,7 @@ export default function OrderStatusPage() {
       channel.unbind('new_order', handleNewOrder);
       channel.unbind('pusher:subscription_succeeded', handleSubSuccess);
       channel.unbind('pusher:subscription_error', handleSubError);
+      pusherClient?.unsubscribe(channelName);
     };
   }, [restaurant]);
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRestaurantBySlug } from '@/lib/db';
+import { getRestaurantBySlug, getRestaurantModules } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { TablesService } from '@/modules/tables/tables.service';
 
@@ -26,6 +26,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: `Restaurant not found for slug: ${slug}` }, { status: 404 });
     }
 
+    const moduleRows = await getRestaurantModules(restaurant.id);
+    const modules = (moduleRows || []).reduce((acc: Record<string, boolean>, row: any) => {
+      acc[row.module_name] = !!row.is_enabled;
+      return acc;
+    }, {} as Record<string, boolean>);
+
+    if (modules.ONLINE_ORDERING === false || modules.TABLE_MANAGEMENT === false) {
+      return NextResponse.json({
+        success: false,
+        error: 'Table management is not enabled for your subscription plan.'
+      }, { status: 403 });
+    }
+
     const tables = await TablesService.getTables(restaurant.id);
 
     return NextResponse.json({
@@ -45,6 +58,19 @@ export async function POST(request: NextRequest) {
 
     if (!restaurant) {
       return NextResponse.json({ success: false, error: 'Restaurant not found' }, { status: 404 });
+    }
+
+    const moduleRows = await getRestaurantModules(restaurant.id);
+    const modules = (moduleRows || []).reduce((acc: Record<string, boolean>, row: any) => {
+      acc[row.module_name] = !!row.is_enabled;
+      return acc;
+    }, {} as Record<string, boolean>);
+
+    if (modules.ONLINE_ORDERING === false || modules.TABLE_MANAGEMENT === false) {
+      return NextResponse.json({
+        success: false,
+        error: 'Table management is not enabled for your subscription plan.'
+      }, { status: 403 });
     }
 
     const admin = await requireAdmin(request);

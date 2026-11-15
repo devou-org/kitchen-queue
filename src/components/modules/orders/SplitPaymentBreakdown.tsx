@@ -302,7 +302,6 @@ export default function SplitPaymentBreakdown({
                   whiteSpace: 'nowrap',
                 }}
               >
-                {isSelected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#059669' }} />}
                 <span>{cfg.label}</span>
               </button>
             );

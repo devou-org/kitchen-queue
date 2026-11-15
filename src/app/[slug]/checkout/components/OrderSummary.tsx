@@ -47,15 +47,59 @@ export default function OrderSummary({
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Your cart is empty. Go back to the menu to add items.</p>
       ) : (
         <>
-          {items.map(item => (
-            <div key={item.product_id} style={{
-              display: 'flex', justifyContent: 'space-between',
-              padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '14px',
-            }}>
-              <span>{item.name} × {item.quantity}</span>
-              <span style={{ fontWeight: 600 }}>{formatPrice(item.price * item.quantity)}</span>
-            </div>
-          ))}
+          {items.map(item => {
+            const itemKey = item.cart_item_key || item.product_id;
+            return (
+              <div key={itemKey} style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: '14px',
+                alignItems: 'flex-start',
+              }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 500 }}>{item.name} × {item.quantity}</span>
+                    {item.selected_variant && (
+                      <span style={{
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        padding: '1px 5px',
+                        borderRadius: '4px',
+                        background: '#f1f5f9',
+                        color: '#475569',
+                        textTransform: 'uppercase'
+                      }}>
+                        {item.selected_variant.name}
+                      </span>
+                    )}
+                  </div>
+                  {(() => {
+                    if (!item.customization_summary) return null;
+                    let summaryText = item.customization_summary.trim();
+                    if (item.selected_variant?.name) {
+                      const varName = item.selected_variant.name.trim().toLowerCase();
+                      if (summaryText.toLowerCase() === varName) return null;
+                      const prefix = `${item.selected_variant.name.trim()} • `;
+                      if (summaryText.toLowerCase().startsWith(prefix.toLowerCase())) {
+                        summaryText = summaryText.slice(prefix.length).trim();
+                      }
+                    }
+                    if (!summaryText) return null;
+                    return (
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                        +{summaryText}
+                      </div>
+                    );
+                  })()}
+                  {item.item_note && (
+                    <div style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic', marginTop: '1px' }}>
+                      Note: {item.item_note}
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontWeight: 600, flexShrink: 0 }}>{formatPrice(item.price * item.quantity)}</span>
+              </div>
+            );
+          })}
           {freeRewardName && (
             <div style={{
               display: 'flex', justifyContent: 'space-between',

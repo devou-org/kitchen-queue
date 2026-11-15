@@ -10,13 +10,14 @@ import { AdminContentWrapper } from '@/components/AdminContentWrapper';
 import { AdminPageHeader } from '@/components/AdminPageHeader';
 import { useParams } from 'next/navigation';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes, Layers, ArrowUpDown, Search, Utensils } from 'lucide-react';
+import { UploadCloud, X, Loader2, Plus, Sparkles, Trash2, Store, ChefHat, Boxes, Layers, ArrowUpDown, Search, Utensils, MoreVertical } from 'lucide-react';
 import AdminProductForm from '@/components/AdminProductForm';
 import { CounterDrawer } from '@/components/CounterDrawer';
 import { DietaryFilter, DietaryPreferenceFilter } from '@/components/ui/DietaryFilter';
 import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 import { LayoutMaximizeToggle } from '@/components/LayoutMaximizeToggle';
 import { Loading } from '@/components/ui/Loading';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 interface ExtractedProduct {
   id: string;
@@ -79,6 +80,10 @@ function ProductImageThumbnail({ src, alt, size = 40 }: { src?: string; alt: str
 
 export default function AdminProducts() {
   const { restaurant } = useRestaurant();
+  const isStandalone = restaurant?.selected_product === 'DIGITAL_MENU' ||
+                       restaurant?.selected_product === 'QUEUE_MANAGEMENT' ||
+                       restaurant?.billing_tier === 'STANDALONE';
+  const showCounters = !isStandalone;
   const showOnlineOrdering = restaurant?.modules?.ONLINE_ORDERING !== false;
   const showInventory = restaurant?.modules?.INVENTORY === true;
   const { slug } = useParams();
@@ -112,6 +117,31 @@ export default function AdminProducts() {
 
   // Category Reorder Modal state
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+
+  const mobileToolbarOptions = [
+    { value: 'add_item', label: 'Add Item', icon: Plus },
+    { value: 'counters', label: 'Counters', icon: Store },
+    { value: 'upload_menu', label: 'Upload Menu', icon: Sparkles },
+    { value: 'reorder', label: 'Reorder Categories', icon: ArrowUpDown },
+  ];
+
+  const handleMobileToolbarAction = (actionKey: string) => {
+    if (actionKey === 'add_item') {
+      setEditingProduct(null);
+      setFormModalOpen(true);
+    } else if (actionKey === 'counters') {
+      setCounterDrawerOpen(true);
+    } else if (actionKey === 'upload_menu') {
+      if (!aiEnabled) {
+        toast.error(aiDisabledReason || 'AI Menu Scanner is currently disabled by administrator.');
+        return;
+      }
+      setExtractedProducts([]);
+      setAiModalOpen(true);
+    } else if (actionKey === 'reorder') {
+      setCategoryModalOpen(true);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -437,6 +467,10 @@ export default function AdminProducts() {
           flex-shrink: 0 !important;
         }
 
+        .products-mobile-more-wrapper {
+          display: none;
+        }
+
         .products-table-scroll-hint {
           display: none;
         }
@@ -507,33 +541,18 @@ export default function AdminProducts() {
           }
 
           .products-reorder-btn-wrapper {
-            border-left: none !important;
-            padding-left: 0 !important;
-            height: auto !important;
+            display: none !important;
+          }
+
+          .products-mobile-more-wrapper {
+            display: flex !important;
+            align-items: center !important;
             flex-shrink: 0 !important;
           }
 
+          /* Hide action buttons on mobile screens - accessed via more dropdown */
           .products-actions {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 8px !important;
-            width: 100% !important;
-            margin-left: 0 !important;
-          }
-
-          .products-upload-btn,
-          .products-counters-btn {
-            width: 100% !important;
-            height: 38px !important;
-            justify-content: center !important;
-          }
-
-          .products-add-btn {
-            grid-column: 1 / -1 !important;
-            width: 100% !important;
-            height: 40px !important;
-            justify-content: center !important;
-            font-size: 13px !important;
+            display: none !important;
           }
 
           .products-maximize-wrapper {
@@ -652,12 +671,13 @@ export default function AdminProducts() {
               )}
             </div>
 
-            {/* Filters Row: Dietary & Reorder */}
+            {/* Filters Row: Dietary, Desktop Reorder & Mobile More Dropdown */}
             <div className="products-filters-row">
               <div className="products-dietary-wrapper">
                 <DietaryFilter value={dietaryFilter} onChange={setDietaryFilter} />
               </div>
 
+              {/* Desktop Reorder Categories Button */}
               <div className="products-reorder-btn-wrapper">
                 <button
                   type="button"
@@ -667,6 +687,47 @@ export default function AdminProducts() {
                 >
                   <ArrowUpDown size={15} style={{ color: 'var(--primary, #0f172a)' }} />
                 </button>
+              </div>
+
+              {/* Mobile More Actions CustomSelect Dropdown */}
+              <div className="products-mobile-more-wrapper">
+                <CustomSelect
+                  options={mobileToolbarOptions}
+                  value=""
+                  onChange={handleMobileToolbarAction}
+                  hideCheck={true}
+                  style={{ width: 'auto' }}
+                  dropdownStyle={{
+                    left: 'auto',
+                    right: 0,
+                    minWidth: '190px',
+                    width: 'max-content',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+                  }}
+                  renderTrigger={(isOpen) => (
+                    <button
+                      type="button"
+                      title="More actions"
+                      className="products-mobile-more-btn"
+                      style={{
+                        height: '38px',
+                        width: '38px',
+                        borderRadius: '8px',
+                        background: isOpen ? '#f1f5f9' : '#ffffff',
+                        border: '1px solid var(--border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                        color: 'var(--text-primary)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <MoreVertical size={17} style={{ color: 'var(--primary, #0f172a)' }} />
+                    </button>
+                  )}
+                />
               </div>
             </div>
 
@@ -709,31 +770,33 @@ export default function AdminProducts() {
               </button>
 
               {/* Counters Drawer */}
-              <button
-                type="button"
-                className="products-counters-btn"
-                onClick={() => setCounterDrawerOpen(true)}
-                style={{
-                  height: '38px',
-                  padding: '0 12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--primary, #0f172a)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: aiEnabled ? '0 1px 2px rgba(0, 0, 0, 0.08)' : 'none',
-                  transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <Store size={15} style={{ color: '#ffffff' }} />
-                <span>Counters</span>
-              </button>
+              {showCounters && (
+                <button
+                  type="button"
+                  className="products-counters-btn"
+                  onClick={() => setCounterDrawerOpen(true)}
+                  style={{
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--primary, #0f172a)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: aiEnabled ? '0 1px 2px rgba(0, 0, 0, 0.08)' : 'none',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Store size={15} style={{ color: '#ffffff' }} />
+                  <span>Counters</span>
+                </button>
+              )}
 
               {/* Add Item */}
               <button
@@ -801,7 +864,7 @@ export default function AdminProducts() {
                 <tr>
                   <th>Item</th>
                   <th>Category</th>
-                  <th>Counter</th>
+                  {showCounters && <th>Counter</th>}
                   <th>Price</th>
                   {showOnlineOrdering && <th>Stock / Buffer</th>}
                   <th>Status</th>
@@ -823,15 +886,17 @@ export default function AdminProducts() {
                       </div>
                     </td>
                     <td>{p.category}</td>
-                    <td>
-                      {p.counter ? (
-                        <span style={{ padding: '4px 8px', backgroundColor: '#f1f5f9', borderRadius: '4px', fontSize: '12px', fontWeight: 600, color: '#334155' }}>
-                          {p.counter}
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Unassigned</span>
-                      )}
-                    </td>
+                    {showCounters && (
+                      <td>
+                        {p.counter ? (
+                          <span style={{ padding: '4px 8px', backgroundColor: '#f1f5f9', borderRadius: '4px', fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                            {p.counter}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>Unassigned</span>
+                        )}
+                      </td>
+                    )}
                     <td style={{ fontWeight: 600 }}>{formatPrice(p.price)}</td>
                     {showOnlineOrdering && (
                       <td>
@@ -906,7 +971,7 @@ export default function AdminProducts() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={showOnlineOrdering ? 7 : 6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No products found</td></tr>
+                  <tr><td colSpan={5 + (showCounters ? 1 : 0) + (showOnlineOrdering ? 1 : 0)} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No products found</td></tr>
                 )}
               </tbody>
             </table>
@@ -960,7 +1025,7 @@ export default function AdminProducts() {
                       <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569', background: '#F1F5F9', padding: '2px 7px', borderRadius: '4px' }}>
                         {p.category}
                       </span>
-                      {p.counter && (
+                      {showCounters && p.counter && (
                         <span style={{ fontSize: '11px', fontWeight: 600, color: '#0369A1', background: '#E0F2FE', padding: '2px 7px', borderRadius: '4px' }}>
                           {p.counter}
                         </span>
@@ -1417,7 +1482,7 @@ export default function AdminProducts() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 'clamp(8px, 2.5vw, 20px)',
+          padding: 'clamp(4px, 1.5vw, 16px)',
           overflowY: 'auto'
         }}>
           <div style={{
@@ -1425,11 +1490,12 @@ export default function AdminProducts() {
             borderRadius: '8px',
             maxWidth: '1050px',
             width: '100%',
-            maxHeight: '92vh',
+            maxHeight: '94vh',
             overflowY: 'auto',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            padding: 'clamp(14px, 3.5vw, 28px)',
-            position: 'relative'
+            padding: 'clamp(10px, 2.5vw, 24px)',
+            position: 'relative',
+            boxSizing: 'border-box'
           }}>
             <AdminProductForm
               initialData={editingProduct || undefined}
@@ -1603,12 +1669,14 @@ export default function AdminProducts() {
       )}
 
       {/* Slide-over Counters Management Drawer */}
-      <CounterDrawer
-        isOpen={counterDrawerOpen}
-        onClose={() => setCounterDrawerOpen(false)}
-        slug={Array.isArray(slug) ? slug[0] : (slug || '')}
-        onCountersChange={fetchProducts}
-      />
+      {showCounters && (
+        <CounterDrawer
+          isOpen={counterDrawerOpen}
+          onClose={() => setCounterDrawerOpen(false)}
+          slug={Array.isArray(slug) ? slug[0] : (slug || '')}
+          onCountersChange={fetchProducts}
+        />
+      )}
 
       {/* Reorder Food Categories Modal */}
       <CategoryReorderModal
