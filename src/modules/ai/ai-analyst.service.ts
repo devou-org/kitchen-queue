@@ -2,8 +2,6 @@ import { pool } from '@/lib/db';
 import { AIRepository } from './ai.repository';
 import { AIService, GeminiContent } from './ai.service';
 import { executeAnalystToolCall } from './ai-analyst.tools';
-import { AIModuleRegistry, createDefaultAIModuleRegistry } from './registry/ai-module.registry';
-import { AIModuleRouter } from './router/ai-module.router';
 
 export const ANALYST_REQUEST_TYPE = 'BUSINESS_ANALYST_CHAT';
 
@@ -314,32 +312,6 @@ Core Rules:
    - Format currency in INR (₹). Short 2-4 bullet points max.`;
 
 export class AIAnalystService {
-  private static registry: AIModuleRegistry = createDefaultAIModuleRegistry();
-  private static router: AIModuleRouter = new AIModuleRouter(AIAnalystService.registry);
-
-  /**
-   * Dependency Injection setter for custom module registry
-   */
-  static setRegistry(registry: AIModuleRegistry): void {
-    this.registry = registry;
-    this.router = new AIModuleRouter(registry);
-  }
-
-  /**
-   * Dependency Injection setter for custom module router
-   */
-  static setRouter(router: AIModuleRouter): void {
-    this.router = router;
-  }
-
-  static getRegistry(): AIModuleRegistry {
-    return this.registry;
-  }
-
-  static getRouter(): AIModuleRouter {
-    return this.router;
-  }
-
   /**
    * Creates or fetches an active session for a restaurant
    */
@@ -452,13 +424,6 @@ export class AIAnalystService {
 
     const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${formattedModel}:generateContent?key=${apiKey}`;
 
-    // 5.5. Intent-Based Module Routing (Identify relevant module and prune tools)
-    const routingResult = await this.router.resolveModules(message, historyRes.rows);
-    const activeModuleDeclarations = this.registry.getDeclarationsForModules(routingResult.selectedModules);
-    const dynamicTools = activeModuleDeclarations.length > 0
-      ? activeModuleDeclarations
-      : this.registry.getDeclarationsForModules(['sales', 'tables']);
-
     let currentContents = [...contents];
     let finalAnswer = '';
     const executedToolCalls: Array<{ name: string; args: any; result: any }> = [];
@@ -479,7 +444,7 @@ export class AIAnalystService {
           systemInstruction: {
             parts: [{ text: dynamicSystemInstruction }]
           },
-          tools: dynamicTools,
+          tools: ANALYST_TOOLS_DECLARATIONS,
           generationConfig: {
             maxOutputTokens,
             temperature: 0.2
@@ -488,7 +453,7 @@ export class AIAnalystService {
 
         let response: Response | null = null;
         let retries = 0;
-        const maxRetries = 3;
+        const maxRetries = 2;
 
         while (retries <= maxRetries) {
           response = await fetch(generateUrl, {
@@ -539,29 +504,18 @@ export class AIAnalystService {
               const toolStartTime = Date.now();
               try {
                const timeoutPromise = new Promise((_, reject) =>
-                  setTimeout(() => reject(new Error(`Tool ${name} execution timed out`)), 4000)
+                  setTimeout(() => reject(new Error(`Tool ${name} execution timed out`)), 10000)
                 );
 
-                let rawResult: any;
-                try {
-                  rawResult = await Promise.race([
-                    this.registry.executeTool(name, args || {}, { restaurantId }),
-                    timeoutPromise
-                  ]);
-                } catch (registryErr: any) {
-                  // Fallback to direct tool call handler if needed
-                  rawResult = await executeAnalystToolCall(restaurantId, name, args || {});
-                } 
+                const rawResult = await Promise.race([
+                  executeAnalystToolCall(restaurantId, name, args || {}),
+                  timeoutPromise
+                ]); 
 
                 const duration = Date.now() - toolStartTime;
                 console.log(`✅ Tool ${name} completed successfully in ${duration}ms`);
 
-                // Gemini API protobuf specification requires 'functionResponse.response' to be a JSON Object (Struct).
-                // Raw Arrays (e.g. table rows, top product lists) MUST be wrapped in an object like { result: [...] }
-                const formattedResult = (typeof rawResult === 'object' && rawResult !== null && !Array.isArray(rawResult))
-                  ? rawResult
-                  : { result: rawResult };
-
+                const formattedResult = typeof rawResult === 'object' && rawResult !== null ? rawResult : { result: rawResult };
                 return { name, args, success: true, result: formattedResult, durationMs: duration };
               } catch (toolErr: any) {
                 const duration = Date.now() - toolStartTime;
@@ -590,19 +544,13 @@ export class AIAnalystService {
           // Append Gemini's function call turn to conversation
           currentContents.push(candidate.content);
 
-          // Build single turn containing ALL function response parts for Gemini (must be JSON Object Struct)
-          const functionResponseParts = toolResults.map(tr => {
-            const safeResponse = (typeof tr.result === 'object' && tr.result !== null && !Array.isArray(tr.result))
-              ? tr.result
-              : { result: tr.result };
-
-            return {
-              functionResponse: {
-                name: tr.name,
-                response: safeResponse
-              }
-            };
-          });
+          // Build single turn containing ALL function response parts for Gemini
+          const functionResponseParts = toolResults.map(tr => ({
+            functionResponse: {
+              name: tr.name,
+              response: tr.result
+            }
+          }));
 
           // Append tool response turn to conversation
           currentContents.push({
@@ -692,22 +640,11 @@ export class AIAnalystService {
         responseTimeMs
       });
 
-      console.log(
-        `⏱️ [Qdine Performance] Message completed in ${responseTimeMs}ms | Modules: [${routingResult.selectedModules.join(', ')}] | Tools: ${executedToolCalls.length}`
-      );
-
       return {
         success: true,
         sessionId,
         message: finalAnswer,
         toolCalls: executedToolCalls,
-        routing: {
-          modules: routingResult.selectedModules,
-          primaryModule: routingResult.primaryModule,
-          confidence: routingResult.confidence,
-          routingDurationMs: routingResult.routingDurationMs,
-          isFallback: routingResult.isFallback
-        },
         tokens: {
           input: finalInputTokens,
           output: totalOutputTokens,
