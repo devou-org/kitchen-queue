@@ -2045,7 +2045,11 @@ export function POSCheckoutDrawer({
                                     transition: 'all 0.15s ease',
                                   }}
                                 >
-                                  {isSelected ? '✓ Redeemed' : isEligible ? 'Redeem Free Item' : 'Locked'}
+                                  {isSelected
+                                    ? '✓ Redeemed'
+                                    : isEligible
+                                      ? (reward.points_required > 0 || !isPunchReward || reward.reward_type !== 'FREE_ITEM' ? 'Redeem' : 'Redeem Free Item')
+                                      : 'Locked'}
                                 </button>
                               </div>
                             );
