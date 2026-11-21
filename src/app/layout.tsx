@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import Script from 'next/script';
 import { GlobalLoadingScreen } from '@/components/ui/Loading';
 import { MicrosoftClarity } from '@/components/MicrosoftClarity';
+import { NetworkDetector } from '@/components/NetworkDetector';
 
 export const metadata: Metadata = {
   title: "Renjz Kitchen | Taste of Home in every bite",
@@ -40,6 +41,7 @@ export default function RootLayout({
           {`try { localStorage.removeItem('user_mobile'); localStorage.removeItem('user_data'); } catch(e) {}`}
         </Script>
         <MicrosoftClarity />
+        <NetworkDetector />
         {children}
         <Toaster
           position="top-right"

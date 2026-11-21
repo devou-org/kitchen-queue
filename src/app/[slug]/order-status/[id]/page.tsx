@@ -294,7 +294,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               right: '0',
               background: '#33322F',
               color: 'white',
-              padding: '6px 10px',
               borderRadius: '8px',
               fontSize: '11px',
               fontWeight: 600,
@@ -303,7 +302,6 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
               zIndex: 50,
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
             }}>
               <div style={{
                 position: 'absolute',
@@ -312,9 +310,25 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
                 width: '8px',
                 height: '8px',
                 background: '#33322F',
-                transform: 'rotate(45deg)'
+                transform: 'rotate(45deg)',
+                pointerEvents: 'none'
               }} />
-              <span>Help us get better! 🚀</span>
+              <a
+                href="https://tally.so/r/kdK8Jd"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleSurveyClick}
+                style={{
+                  color: 'white',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  padding: '6px 4px 6px 10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                Help us get better! 🚀
+              </a>
               <button
                 type="button"
                 onClick={(e) => {
@@ -327,13 +341,14 @@ export default function OrderStatusTicketPage({ params }: { params: Promise<{ sl
                   border: 'none',
                   color: '#9CA3AF',
                   cursor: 'pointer',
-                  padding: '2px',
+                  padding: '6px 8px 6px 2px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '14px',
                   lineHeight: 1
                 }}
+                title="Dismiss"
               >
                 &times;
               </button>

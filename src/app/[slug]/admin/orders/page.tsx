@@ -82,6 +82,7 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState('PREPARING');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
   const [counterFilter, setCounterFilter] = useState('');
+  const [timeSortOrder, setTimeSortOrder] = useState<'DESC' | 'ASC'>('DESC');
   const [readySearch, setReadySearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -106,6 +107,8 @@ export default function AdminOrders() {
     if (typeof window !== 'undefined') {
       const savedCounter = localStorage.getItem('qdine_orders_counter_filter');
       if (savedCounter !== null) setCounterFilter(savedCounter);
+      const savedTimeSort = localStorage.getItem('qdine_orders_time_sort');
+      if (savedTimeSort === 'ASC' || savedTimeSort === 'DESC') setTimeSortOrder(savedTimeSort);
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
       if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint === 'true');
 
@@ -132,6 +135,14 @@ export default function AdminOrders() {
     setCounterFilter(val);
     if (typeof window !== 'undefined') {
       localStorage.setItem('qdine_orders_counter_filter', val);
+    }
+  };
+
+  const handleTimeSortChange = (val: 'DESC' | 'ASC') => {
+    setTimeSortOrder(val);
+    setPage(1);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qdine_orders_time_sort', val);
     }
   };
 
@@ -241,7 +252,7 @@ export default function AdminOrders() {
       const data = await orderService.getOrders({
         page,
         per_page: 200,
-        sort: 'ASC',
+        sort: timeSortOrder,
         date_from: bDate,
         date_to: bDate,
         status: (statusFilter && statusFilter !== 'ALL') ? statusFilter : undefined,
@@ -292,7 +303,7 @@ export default function AdminOrders() {
         setLoading(false);
       }
     }
-  }, [page, statusFilter, orderTypeFilter, restaurant?.timezone, restaurant?.rollover_time]);
+  }, [page, statusFilter, orderTypeFilter, timeSortOrder, restaurant?.timezone, restaurant?.rollover_time]);
 
   const fetchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -536,7 +547,7 @@ export default function AdminOrders() {
   }
 
   const queryTerm = readySearch.trim().toLowerCase();
-  const displayedOrders = queryTerm
+  const rawDisplayedOrders = queryTerm
     ? filteredOrders.filter(order => {
       const ticket = String(order.ticket_number).padStart(3, '0').toLowerCase();
       const rawTicket = String(order.ticket_number).toLowerCase();
@@ -552,6 +563,18 @@ export default function AdminOrders() {
         || hasItem;
     })
     : filteredOrders;
+
+  const displayedOrders = [...rawDisplayedOrders].sort((a, b) => {
+    const timeA = new Date(a.created_at).getTime();
+    const timeB = new Date(b.created_at).getTime();
+    if (timeSortOrder === 'DESC') {
+      if (timeB !== timeA) return timeB - timeA;
+      return (b.ticket_number || 0) - (a.ticket_number || 0);
+    } else {
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.ticket_number || 0) - (b.ticket_number || 0);
+    }
+  });
 
   const openOrderModal = (order: Order) => {
     setSelectedOrder(order);
@@ -1077,7 +1100,10 @@ export default function AdminOrders() {
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', height: displayedOrders.length === 0 ? '100%' : 'auto' }}>
-              <OrderTableHeader />
+              <OrderTableHeader
+                sortOrder={timeSortOrder}
+                onToggleSort={() => handleTimeSortChange(timeSortOrder === 'DESC' ? 'ASC' : 'DESC')}
+              />
               <tbody>
                 {displayedOrders.map(order => (
                   <OrderTableRow
