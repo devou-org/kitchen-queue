@@ -2,11 +2,16 @@
 import React from 'react';
 import { Order } from '@/types';
 import { formatPrice, formatTime } from '@/lib/format';
-import { Users } from 'lucide-react';
+import { Users, ArrowDown, ArrowUp } from 'lucide-react';
 import OrderTypeBadge from './OrderTypeBadge';
 import OrderStatusBadge from './OrderStatusBadge';
 
-export function OrderTableHeader() {
+interface OrderTableHeaderProps {
+  sortOrder?: 'DESC' | 'ASC';
+  onToggleSort?: () => void;
+}
+
+export function OrderTableHeader({ sortOrder = 'DESC', onToggleSort }: OrderTableHeaderProps = {}) {
   return (
     <thead>
       <style>{`
@@ -18,7 +23,46 @@ export function OrderTableHeader() {
       `}</style>
       <tr style={{ borderBottom: '1px solid var(--border)', background: '#F8FAFC' }}>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Customer</th>
-        <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Ticket</th>
+        <th
+          onClick={onToggleSort}
+          style={{
+            padding: '14px 20px',
+            fontSize: '12px',
+            fontWeight: 700,
+            color: '#64748b',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            whiteSpace: 'nowrap',
+            cursor: onToggleSort ? 'pointer' : 'default',
+            userSelect: 'none',
+          }}
+          title={sortOrder === 'DESC' ? 'Sorted: Newest First (Click to sort Oldest First)' : 'Sorted: Oldest First (Click to sort Newest First)'}
+        >
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span>Ticket</span>
+            {onToggleSort && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '5px',
+                  backgroundColor: sortOrder === 'DESC' ? '#E2E8F0' : '#FEF3C7',
+                  color: sortOrder === 'DESC' ? '#0F172A' : '#D97706',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {sortOrder === 'DESC' ? (
+                  <ArrowDown size={13} strokeWidth={2.5} />
+                ) : (
+                  <ArrowUp size={13} strokeWidth={2.5} />
+                )}
+              </span>
+            )}
+          </div>
+        </th>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Order Type</th>
         <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Table</th>
         <th className="orders-col-persons" style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Persons</th>
@@ -114,7 +158,7 @@ export function OrderTableRow({ order, onClick, showCustomerPhone = false, isSel
         <OrderStatusBadge status={order.status} />
       </td>
 
-      {/* 6. Subtotal */}
+      {/* 7. Subtotal */}
       <td style={{ padding: '18px 20px', verticalAlign: 'middle' }}>
         <span style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
           {formatPrice(order.total_price)}
