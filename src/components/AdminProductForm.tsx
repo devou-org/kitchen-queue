@@ -7,7 +7,7 @@ import { Product, ProductVariant, CustomizationGroup, CustomizationOption } from
 import { InventoryItem } from '@/types/inventory';
 import { inventoryService } from '@/app/services/inventory.api';
 import { useRestaurant } from '@/hooks/useRestaurant';
-import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Layers, ArrowLeft, ArrowUpDown, Loader2, Sliders, Trash2, Boxes, Copy } from 'lucide-react';
+import { X, UtensilsCrossed, ChefHat, Tag, Plus, Check, ImageIcon, Layers, ArrowLeft, ArrowUpDown, Loader2, Sliders, Trash2, Boxes, Copy, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { CategoryReorderModal } from '@/components/modules/products/CategoryReorderModal';
 import { ProductImageUploader } from '@/components/modules/products/ProductImageUploader';
@@ -509,20 +509,32 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
 
   return (
   <>
-    <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <style>{`
         .product-form-container {
           display: flex;
           flex-direction: column;
           gap: 20px;
         }
-        .form-col-left, .form-col-right {
-          display: contents;
+        .form-col-left {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          order: 1 !important;
+          width: 100%;
         }
-        .form-card-basic { order: 1; }
-        .form-card-customizations { order: 2; }
-        .form-card-pricing { order: 3; }
-        .form-card-inventory { order: 4; }
+        .form-col-right {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          order: 2 !important;
+          width: 100%;
+        }
+        .form-col-full {
+          width: 100%;
+          display: block;
+          order: 3 !important;
+        }
 
         /* Desktop grid columns */
         .variant-table-header {
@@ -572,7 +584,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
           flex-wrap: wrap;
         }
 
-        @media (min-width: 820px) {
+        @media (min-width: 768px) {
           .product-form-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -583,19 +595,34 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             display: flex;
             flex-direction: column;
             gap: 24px;
+            grid-column: 1;
+            order: 1 !important;
           }
           .form-col-right {
             display: flex;
             flex-direction: column;
             gap: 24px;
+            grid-column: 2;
+            order: 2 !important;
           }
-          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-customizations {
+          .form-col-full {
+            display: block !important;
+            grid-column: 1 / -1 !important;
+            width: 100% !important;
+            order: 3 !important;
+          }
+          .form-card-customizations {
+            display: block !important;
+            grid-column: 1 / -1 !important;
+            width: 100% !important;
+          }
+          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-description {
             order: unset;
           }
         }
 
         @media (max-width: 640px) {
-          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-customizations {
+          .form-card-basic, .form-card-inventory, .form-card-pricing, .form-card-description, .form-card-customizations {
             padding: 14px 12px !important;
           }
           .variant-section-container, .cust-section-container {
@@ -982,7 +1009,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                Description <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
+                Description <span style={{ fontSize: '12px', fontWeight: 400, color: '#64748b' }}>(Optional)</span>
               </label>
               <textarea
                 value={form.description}
@@ -999,15 +1026,193 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
                   backgroundColor: '#ffffff',
                   resize: 'vertical',
                   minHeight: '80px',
-                  outline: 'none'
+                  outline: 'none',
+                  boxSizing: 'border-box'
                 }}
               />
             </div>
           </div>
         </div>
+      </div>
 
+      {/* Right Column: Pricing & Inventory */}
+      <div className="form-col-right">
+        {/* Card 2: Pricing & Dietary Classification */}
+        <div className="form-card-pricing" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Tag size={18} />
+            </div>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Price & Dietary Type</h2>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                Product Price (₹) <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '15px', fontWeight: 700, color: '#64748b' }}>₹</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.price}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
+                  placeholder="0.00"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px 10px 32px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    backgroundColor: '#ffffff',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
+                Dietary Preference Classification
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                
+                {/* VEG Card */}
+                <div
+                  onClick={() => setForm(f => ({ ...f, dietary_preference: 'VEG' }))}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: form.dietary_preference === 'VEG' ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                    backgroundColor: form.dietary_preference === 'VEG' ? '#f0fdf4' : '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    transition: 'all 0.15s ease',
+                    userSelect: 'none',
+                    minWidth: 0,
+                  }}
+                >
+                  <div style={{ width: '18px', height: '18px', minWidth: '18px', flexShrink: 0, borderRadius: '4px', border: '1.5px solid #16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#16a34a' }} />
+                  </div>
+                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: form.dietary_preference === 'VEG' ? '#15803d' : '#334155', whiteSpace: 'nowrap' }}>
+                      Vegetarian
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
+                      Plant-based & Dairy
+                    </div>
+                  </div>
+                </div>
+
+                {/* NON-VEG Card */}
+                <div
+                  onClick={() => setForm(f => ({ ...f, dietary_preference: 'NON_VEG' }))}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: form.dietary_preference === 'NON_VEG' ? '2px solid #dc2626' : '1px solid #cbd5e1',
+                    backgroundColor: form.dietary_preference === 'NON_VEG' ? '#fef2f2' : '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    transition: 'all 0.15s ease',
+                    userSelect: 'none',
+                    minWidth: 0,
+                  }}
+                >
+                  <div style={{ width: '18px', height: '18px', minWidth: '18px', flexShrink: 0, borderRadius: '4px', border: '1.5px solid #dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#dc2626' }} />
+                  </div>
+                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: form.dietary_preference === 'NON_VEG' ? '#b91c1c' : '#334155', whiteSpace: 'nowrap' }}>
+                      Non-Veg
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
+                      Meat, Poultry, Egg
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Inventory & Stock Control */}
+        {showOnlineOrdering && (
+          <div className="form-card-inventory" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Layers size={18} />
+                </div>
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Inventory Control</h2>
+              </div>
+
+              {/* Real-time Status Badge */}
+              <span
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  backgroundColor: calculatedStatus === 'AVAILABLE' ? '#dcfce7' : calculatedStatus === 'LOW_STOCK' ? '#fef9c3' : '#fee2e2',
+                  color: calculatedStatus === 'AVAILABLE' ? '#15803d' : calculatedStatus === 'LOW_STOCK' ? '#a16207' : '#b91c1c'
+                }}
+              >
+                {calculatedStatus.replace('_', ' ')}
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Stock Quantity
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.stock_quantity}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))}
+                  placeholder="0"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Buffer Threshold
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.buffer_quantity}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))}
+                  placeholder="0"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Full-width Row: Variants & Customizations */}
+      <div className="form-col-full" style={{ display: 'block', gridColumn: '1 / -1', width: '100%', boxSizing: 'border-box' }}>
         {/* Card 4: Variants & Customizations */}
-        <div className="form-card-customizations" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div className="form-card-customizations" style={{ display: 'block', gridColumn: '1 / -1', width: '100%', boxSizing: 'border-box', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1758,180 +1963,6 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             </div>
           )}
         </div>
-      </div>
-
-      {/* Right Column: Pricing & Inventory */}
-      <div className="form-col-right">
-        {/* Card 2: Pricing & Dietary Classification */}
-        <div className="form-card-pricing" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Tag size={18} />
-            </div>
-            <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Price & Dietary Type</h2>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                Product Price (₹) <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '15px', fontWeight: 700, color: '#64748b' }}>₹</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.price}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-                  placeholder="0.00"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px 10px 32px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    color: '#0f172a',
-                    backgroundColor: '#ffffff',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
-                Dietary Preference Classification
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                
-                {/* VEG Card */}
-                <div
-                  onClick={() => setForm(f => ({ ...f, dietary_preference: 'VEG' }))}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: form.dietary_preference === 'VEG' ? '2px solid #16a34a' : '1px solid #cbd5e1',
-                    backgroundColor: form.dietary_preference === 'VEG' ? '#f0fdf4' : '#ffffff',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    transition: 'all 0.15s ease',
-                    userSelect: 'none',
-                    minWidth: 0,
-                  }}
-                >
-                  <div style={{ width: '18px', height: '18px', minWidth: '18px', flexShrink: 0, borderRadius: '4px', border: '1.5px solid #16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#16a34a' }} />
-                  </div>
-                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: form.dietary_preference === 'VEG' ? '#15803d' : '#334155', whiteSpace: 'nowrap' }}>
-                      Vegetarian
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
-                      Plant-based & Dairy
-                    </div>
-                  </div>
-                </div>
-
-                {/* NON-VEG Card */}
-                <div
-                  onClick={() => setForm(f => ({ ...f, dietary_preference: 'NON_VEG' }))}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: form.dietary_preference === 'NON_VEG' ? '2px solid #dc2626' : '1px solid #cbd5e1',
-                    backgroundColor: form.dietary_preference === 'NON_VEG' ? '#fef2f2' : '#ffffff',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    transition: 'all 0.15s ease',
-                    userSelect: 'none',
-                    minWidth: 0,
-                  }}
-                >
-                  <div style={{ width: '18px', height: '18px', minWidth: '18px', flexShrink: 0, borderRadius: '4px', border: '1.5px solid #dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#dc2626' }} />
-                  </div>
-                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: form.dietary_preference === 'NON_VEG' ? '#b91c1c' : '#334155', whiteSpace: 'nowrap' }}>
-                      Non-Veg
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px' }}>
-                      Meat, Poultry, Egg
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Inventory & Stock Control */}
-        {showOnlineOrdering && (
-          <div className="form-card-inventory" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Layers size={18} />
-                </div>
-                <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Inventory Control</h2>
-              </div>
-
-              {/* Real-time Status Badge */}
-              <span
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '8px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  backgroundColor: calculatedStatus === 'AVAILABLE' ? '#dcfce7' : calculatedStatus === 'LOW_STOCK' ? '#fef9c3' : '#fee2e2',
-                  color: calculatedStatus === 'AVAILABLE' ? '#15803d' : calculatedStatus === 'LOW_STOCK' ? '#a16207' : '#b91c1c'
-                }}
-              >
-                {calculatedStatus.replace('_', ' ')}
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Stock Quantity
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={form.stock_quantity}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  onChange={e => setForm(f => ({ ...f, stock_quantity: e.target.value }))}
-                  placeholder="0"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Buffer Threshold
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={form.buffer_quantity}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  onChange={e => setForm(f => ({ ...f, buffer_quantity: e.target.value }))}
-                  placeholder="0"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   </form>

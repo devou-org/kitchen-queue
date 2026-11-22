@@ -259,7 +259,7 @@ export function KitchenSnapshotModal({ isOpen, onClose, businessDate }: KitchenS
                   textOverflow: 'ellipsis',
                 }}
               >
-                Kitchen Demand Snapshot
+                Kitchen Snapshot
               </h2>
             </div>
           </div>

@@ -19,7 +19,7 @@ export default function AIAnalystPage() {
         Qdine AI Business Analyst
       </h1>
       <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '500px', margin: '0 auto 24px' }}>
-        Click the floating button on the bottom-right of your screen to open the AI Analyst widget from any admin page!
+        Open the AI Analyst widget directly or find the floating AI button inside the Analytics section.
       </p>
 
       {/* Render AI widget open by default */}

@@ -60,9 +60,11 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
   showOrdering?: boolean;
   layout?: 'LIST' | 'GRID';
 }) {
-  const computedStatus = showOrdering
-    ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
-    : product.status;
+  const computedStatus = (product.status === 'OUT_OF_STOCK')
+    ? 'OUT_OF_STOCK'
+    : showOrdering
+      ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+      : (product.status || 'AVAILABLE');
   const isOut = computedStatus === 'OUT_OF_STOCK';
   const isCustomizable = Boolean(
     product.has_customizations ||
@@ -70,12 +72,21 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
     (Array.isArray(product.customization_groups) && product.customization_groups.length > 0)
   );
 
+  const handleAddOrCustomize = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (isOut || !showOrdering) return;
+    if (isCustomizable && onCustomize) {
+      onCustomize(product);
+    } else {
+      onUpdate(product.id, 1);
+    }
+  };
+
   if (layout === 'GRID') {
     return (
       <div className="card animate-fade-in" style={{
         padding: 0,
         overflow: 'hidden',
-        opacity: isOut ? 0.75 : 1,
         transition: 'transform 0.2s ease, box-shadow 0.2s ease',
         backgroundColor: '#ffffff',
         borderRadius: '12px',
@@ -85,15 +96,26 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
         boxSizing: 'border-box'
       }}>
         {/* Image */}
-        <div style={{
-          position: 'relative',
-          height: '140px',
-          background: '#f8fafc',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '8px',
-        }}>
+        <div
+          onClick={() => {
+            if (quantity === 0) {
+              handleAddOrCustomize();
+            } else if (isCustomizable && onCustomize && !isOut && showOrdering) {
+              onCustomize(product);
+            }
+          }}
+          style={{
+            position: 'relative',
+            height: '140px',
+            background: '#f8fafc',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px',
+            cursor: isOut ? 'not-allowed' : (showOrdering ? 'pointer' : 'default'),
+            userSelect: 'none',
+          }}
+        >
           <img
             src={product.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
             alt={product.name}
@@ -102,6 +124,9 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
               maxHeight: '100%',
               objectFit: 'contain',
               borderRadius: '8px',
+              filter: isOut ? 'grayscale(100%)' : 'none',
+              opacity: isOut ? 0.6 : 1,
+              transition: 'filter 0.2s ease, opacity 0.2s ease',
             }}
             onError={(e) => {
               (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
@@ -119,13 +144,23 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
             textTransform: 'uppercase',
             backgroundColor: computedStatus === 'AVAILABLE' ? '#ecfdf5' : computedStatus === 'LOW_STOCK' ? '#fffbeb' : '#fef2f2',
             color: computedStatus === 'AVAILABLE' ? '#059669' : computedStatus === 'LOW_STOCK' ? '#d97706' : '#dc2626',
+            zIndex: 2,
           }}>
             {STATUS_BADGE[computedStatus].label}
           </span>
         </div>
 
         {/* Info */}
-        <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div style={{
+          padding: '10px',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+          filter: isOut ? 'grayscale(100%)' : 'none',
+          opacity: isOut ? 0.7 : 1,
+          transition: 'filter 0.2s ease, opacity 0.2s ease',
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
             <h3 style={{
               fontWeight: 800,
@@ -170,31 +205,25 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
                   <div style={{ width: '100%', textAlign: 'center' }}>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (isCustomizable && onCustomize) {
-                          onCustomize(product);
-                        } else {
-                          onUpdate(product.id, 1);
-                        }
-                      }}
+                      onClick={handleAddOrCustomize}
                       disabled={isOut}
                       style={{
                         width: '100%',
                         padding: '5px 12px',
                         borderRadius: '6px',
-                        backgroundColor: '#ffffff',
-                        border: '1.5px solid var(--primary)',
-                        color: 'var(--primary)',
+                        backgroundColor: isOut ? '#f1f5f9' : '#ffffff',
+                        border: isOut ? '1.5px solid #cbd5e1' : '1.5px solid var(--primary)',
+                        color: isOut ? '#94a3b8' : 'var(--primary)',
                         fontWeight: 800,
                         fontSize: '11.5px',
                         cursor: isOut ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                        boxShadow: isOut ? 'none' : '0 2px 6px rgba(0,0,0,0.04)',
                       }}
                     >
                       ADD
                     </button>
                     {isCustomizable && (
-                      <span style={{ fontSize: '9px', color: '#64748b', display: 'block', marginTop: '2px', fontWeight: 600 }}>
+                      <span style={{ fontSize: '9px', color: isOut ? '#94a3b8' : '#64748b', display: 'block', marginTop: '2px', fontWeight: 600 }}>
                         customisable
                       </span>
                     )}
@@ -203,29 +232,27 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
                   <>
                     <button
                       className="qty-btn"
-                      onClick={() => onUpdate(product.id, -1)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUpdate(product.id, -1);
+                      }}
                       style={{
-                        width: '24px', height: '24px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: '1px solid #e2e8f0', background: 'white', color: 'var(--primary)', fontWeight: 'bold'
+                        width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1px solid #e2e8f0', background: 'white', color: 'var(--primary)', fontWeight: 'bold', fontSize: '15px'
                       }}
                     >−</button>
                     <span style={{
-                      flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '13px',
+                      flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '14px',
                       color: 'var(--primary)',
                     }}>{quantity}</span>
                     <button
                       className="qty-btn"
-                      onClick={() => {
-                        if (isCustomizable && onCustomize) {
-                          onCustomize(product);
-                        } else {
-                          onUpdate(product.id, 1);
-                        }
-                      }}
+                      onClick={handleAddOrCustomize}
                       disabled={isOut || quantity >= 10}
                       style={{
-                        width: '24px', height: '24px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: '1px solid #e2e8f0', background: 'white', color: isOut ? '#cbd5e1' : 'var(--primary)', fontWeight: 'bold'
+                        width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1px solid #e2e8f0', background: 'white', color: isOut ? '#cbd5e1' : 'var(--primary)', fontWeight: 'bold', fontSize: '15px',
+                        cursor: isOut ? 'not-allowed' : 'pointer',
                       }}
                     >+</button>
                   </>
@@ -250,13 +277,21 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
       borderRadius: '16px',
       border: '1px solid #f1f5f9',
       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
-      opacity: isOut ? 0.7 : 1,
       position: 'relative',
       minHeight: '120px',
       boxSizing: 'border-box'
     }}>
       {/* Left Details */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '3px',
+        minWidth: 0,
+        filter: isOut ? 'grayscale(100%)' : 'none',
+        opacity: isOut ? 0.7 : 1,
+        transition: 'filter 0.2s ease, opacity 0.2s ease',
+      }}>
         {/* Availability Badge */}
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <span style={{
@@ -317,19 +352,30 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
       </div>
 
       {/* Right Image + Quantity Pill Selector */}
-      <div style={{
-        position: 'relative',
-        width: '92px',
-        height: '92px',
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: '12px',
-        backgroundColor: '#f8fafc',
-        border: '1px solid #f1f5f9',
-        boxSizing: 'border-box'
-      }}>
+      <div
+        onClick={() => {
+          if (quantity === 0) {
+            handleAddOrCustomize();
+          } else if (isCustomizable && onCustomize && !isOut && showOrdering) {
+            onCustomize(product);
+          }
+        }}
+        style={{
+          position: 'relative',
+          width: '92px',
+          height: '92px',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '12px',
+          backgroundColor: '#f8fafc',
+          border: '1px solid #f1f5f9',
+          boxSizing: 'border-box',
+          cursor: isOut ? 'not-allowed' : (showOrdering ? 'pointer' : 'default'),
+          userSelect: 'none',
+        }}
+      >
         <img
           src={product.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'}
           alt={product.name}
@@ -338,6 +384,9 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
             height: '100%',
             objectFit: 'cover',
             borderRadius: '12px',
+            filter: isOut ? 'grayscale(100%)' : 'none',
+            opacity: isOut ? 0.6 : 1,
+            transition: 'filter 0.2s ease, opacity 0.2s ease',
           }}
           onError={(e) => {
             (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop';
@@ -346,34 +395,41 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
 
         {/* Floating Add/Qty Pill */}
         {showOrdering && (
-          <div style={{
-            position: 'absolute',
-            bottom: isCustomizable && quantity === 0 ? '-18px' : '-12px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 10,
-          }}>
+          <div
+            onClick={(e) => {
+              if (quantity === 0) {
+                handleAddOrCustomize(e);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: isCustomizable && quantity === 0 ? '-18px' : '-14px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 10,
+              cursor: isOut ? 'not-allowed' : (quantity === 0 ? 'pointer' : 'default'),
+            }}
+          >
             {quantity === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (isCustomizable && onCustomize) {
-                      onCustomize(product);
-                    } else {
-                      onUpdate(product.id, 1);
-                    }
-                  }}
+                  onClick={handleAddOrCustomize}
                   disabled={isOut}
                   style={{
-                    padding: '5px 16px',
-                    borderRadius: '6px',
-                    backgroundColor: '#ffffff',
-                    border: '1.5px solid var(--primary)',
-                    color: 'var(--primary)',
+                    padding: '6px 18px',
+                    borderRadius: '7px',
+                    backgroundColor: isOut ? '#f1f5f9' : '#ffffff',
+                    border: isOut ? '1.5px solid #cbd5e1' : '1.5px solid var(--primary)',
+                    color: isOut ? '#94a3b8' : 'var(--primary)',
                     fontWeight: 800,
-                    fontSize: '11px',
-                    boxShadow: '0 3px 8px rgba(0,0,0,0.06)',
+                    fontSize: '11.5px',
+                    minWidth: '78px',
+                    height: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: isOut ? 'none' : '0 3px 8px rgba(0,0,0,0.06)',
                     cursor: isOut ? 'not-allowed' : 'pointer',
                     whiteSpace: 'nowrap',
                     transition: 'all 0.2s',
@@ -383,35 +439,42 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
                   ADD
                 </button>
                 {isCustomizable && (
-                  <span style={{ fontSize: '9px', color: '#64748b', marginTop: '2px', fontWeight: 600, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '9px', color: isOut ? '#94a3b8' : '#64748b', marginTop: '2px', fontWeight: 600, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
                     customisable
                   </span>
                 )}
               </div>
             ) : (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: '#ffffff',
-                border: '1.5px solid var(--primary)',
-                borderRadius: '6px',
-                padding: '2px',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
-                boxSizing: 'border-box',
-                minWidth: '70px',
-                justifyContent: 'space-between'
-              }}>
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: '#ffffff',
+                  border: '1.5px solid var(--primary)',
+                  borderRadius: '7px',
+                  padding: '2px 4px',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                  boxSizing: 'border-box',
+                  minWidth: '78px',
+                  height: '28px',
+                  justifyContent: 'space-between'
+                }}
+              >
                 <button
                   type="button"
-                  onClick={() => onUpdate(product.id, -1)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdate(product.id, -1);
+                  }}
                   style={{
                     border: 'none',
                     background: 'transparent',
                     color: 'var(--primary)',
                     fontWeight: 900,
-                    fontSize: '13px',
-                    width: '20px',
-                    height: '20px',
+                    fontSize: '15px',
+                    width: '24px',
+                    height: '24px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -422,33 +485,27 @@ function ProductCard({ product, quantity, onUpdate, onCustomize, showOrdering = 
                   −
                 </button>
                 <span style={{
-                  fontSize: '12px',
+                  fontSize: '13px',
                   fontWeight: 800,
                   color: 'var(--primary)',
-                  minWidth: '14px',
+                  minWidth: '18px',
                   textAlign: 'center',
                 }}>
                   {quantity}
                 </span>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (isCustomizable && onCustomize) {
-                      onCustomize(product);
-                    } else {
-                      onUpdate(product.id, 1);
-                    }
-                  }}
+                  onClick={handleAddOrCustomize}
                   disabled={isOut || quantity >= 10}
                   style={{
                     border: 'none',
                     background: 'transparent',
-                    color: 'var(--primary)',
+                    color: isOut ? '#cbd5e1' : 'var(--primary)',
                     fontWeight: 900,
-                    fontSize: '13px',
-                    width: '20px',
-                    height: '20px',
-                    cursor: 'pointer',
+                    fontSize: '15px',
+                    width: '24px',
+                    height: '24px',
+                    cursor: isOut ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -667,6 +724,19 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     const product = products.find(p => p.id === id);
     if (!product) return;
 
+    const pStatus = (product.status === 'OUT_OF_STOCK')
+      ? 'OUT_OF_STOCK'
+      : showOrdering
+        ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+        : (product.status || 'AVAILABLE');
+
+    const currentStock = typeof product.stock_quantity === 'number' ? product.stock_quantity : null;
+
+    if (delta > 0 && (pStatus === 'OUT_OF_STOCK' || product.status === 'OUT_OF_STOCK' || (currentStock !== null && currentStock <= 0))) {
+      toast.error(`"${product.name}" is out of stock`);
+      return;
+    }
+
     const isCustomizable = Boolean(
       product.has_customizations ||
       (Array.isArray(product.variants) && product.variants.length > 0) ||
@@ -675,17 +745,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
     if (isCustomizable && delta > 0) {
       setCustomizingProduct(product);
-      return;
-    }
-
-    const pStatus = showOrdering
-      ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
-      : product.status;
-
-    const currentStock = typeof product.stock_quantity === 'number' ? product.stock_quantity : null;
-
-    if (delta > 0 && (pStatus === 'OUT_OF_STOCK' || (currentStock !== null && currentStock <= 0))) {
-      toast.error(`"${product.name}" is out of stock (0 available)`);
       return;
     }
 
@@ -732,6 +791,18 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
   const handleCustomizationConfirm = (result: ProductCustomizationResult) => {
     const { product, selected_variant, selected_customizations, customization_summary, quantity, notes, total_unit_price } = result;
+
+    const pStatus = (product.status === 'OUT_OF_STOCK')
+      ? 'OUT_OF_STOCK'
+      : showOrdering
+        ? ((product.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (product.stock_quantity ?? 0) <= (product.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+        : (product.status || 'AVAILABLE');
+
+    if (pStatus === 'OUT_OF_STOCK' || product.status === 'OUT_OF_STOCK') {
+      toast.error(`"${product.name}" is out of stock`);
+      setCustomizingProduct(null);
+      return;
+    }
 
     const variantId = selected_variant ? selected_variant.id : 'base';
     const custKeys = (selected_customizations || []).map((c: SelectedCustomizationSnapshot) => c.option_id).sort().join('_');
@@ -783,7 +854,17 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       return matchCat && matchSearch && matchDietary;
     })
     .sort((a, b) => {
-      const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+      const aComputed = (a.status === 'OUT_OF_STOCK')
+        ? 'OUT_OF_STOCK'
+        : showOrdering
+          ? ((a.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (a.stock_quantity ?? 0) <= (a.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+          : (a.status || 'AVAILABLE');
+      const bComputed = (b.status === 'OUT_OF_STOCK')
+        ? 'OUT_OF_STOCK'
+        : showOrdering
+          ? ((b.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (b.stock_quantity ?? 0) <= (b.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+          : (b.status || 'AVAILABLE');
+      const statusDiff = STATUS_ORDER[aComputed] - STATUS_ORDER[bComputed];
       if (statusDiff !== 0) return statusDiff;
       return a.name.localeCompare(b.name);
     });
@@ -985,7 +1066,18 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
                   product={product}
                   quantity={getProductQuantity(product.id)}
                   onUpdate={isServiceActive ? handleUpdate : () => toast.error('Service is not started')}
-                  onCustomize={isServiceActive ? setCustomizingProduct : () => toast.error('Service is not started')}
+                  onCustomize={isServiceActive ? (prod: Product) => {
+                    const pStatus = (prod.status === 'OUT_OF_STOCK')
+                      ? 'OUT_OF_STOCK'
+                      : showOrdering
+                        ? ((prod.stock_quantity ?? 0) <= 0 ? 'OUT_OF_STOCK' : (prod.stock_quantity ?? 0) <= (prod.buffer_quantity ?? 0) ? 'LOW_STOCK' : 'AVAILABLE')
+                        : (prod.status || 'AVAILABLE');
+                    if (pStatus === 'OUT_OF_STOCK' || prod.status === 'OUT_OF_STOCK') {
+                      toast.error(`"${prod.name}" is out of stock`);
+                      return;
+                    }
+                    setCustomizingProduct(prod);
+                  } : () => toast.error('Service is not started')}
                   showOrdering={showOrdering}
                   layout={menuLayout}
                 />
