@@ -82,7 +82,7 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState('PREPARING');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
   const [counterFilter, setCounterFilter] = useState('');
-  const [timeSortOrder, setTimeSortOrder] = useState<'DESC' | 'ASC'>('DESC');
+  const [timeSortOrder, setTimeSortOrder] = useState<'DESC' | 'ASC'>('ASC');
   const [readySearch, setReadySearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -105,10 +105,9 @@ export default function AdminOrders() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('qdine_orders_time_sort');
       const savedCounter = localStorage.getItem('qdine_orders_counter_filter');
       if (savedCounter !== null) setCounterFilter(savedCounter);
-      const savedTimeSort = localStorage.getItem('qdine_orders_time_sort');
-      if (savedTimeSort === 'ASC' || savedTimeSort === 'DESC') setTimeSortOrder(savedTimeSort);
       const savedAutoPrint = localStorage.getItem('qdine_auto_print_kot');
       if (savedAutoPrint !== null) setAutoPrintKot(savedAutoPrint === 'true');
 
@@ -141,9 +140,6 @@ export default function AdminOrders() {
   const handleTimeSortChange = (val: 'DESC' | 'ASC') => {
     setTimeSortOrder(val);
     setPage(1);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('qdine_orders_time_sort', val);
-    }
   };
 
   const toggleAutoPrint = () => {

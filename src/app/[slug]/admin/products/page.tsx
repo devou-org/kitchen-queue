@@ -1488,7 +1488,7 @@ export default function AdminProducts() {
           <div style={{
             backgroundColor: '#f8fafc',
             borderRadius: '8px',
-            maxWidth: '1050px',
+            maxWidth: 'min(1240px, 98vw)',
             width: '100%',
             maxHeight: '94vh',
             overflowY: 'auto',

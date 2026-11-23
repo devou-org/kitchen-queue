@@ -668,7 +668,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
         {children}
         <PrintStationListener />
-        {!isMaximized && isSuperAdminOrOwner && !pathname.includes('/admin/orders') && !pathname.includes('/admin/tables') && <AIAnalystWidget />}
+        {!isMaximized && isSuperAdminOrOwner && pathname.includes('/admin/analytics') && !pathname.includes('/admin/ai-analyst') && <AIAnalystWidget />}
       </main>
     </div>
 
