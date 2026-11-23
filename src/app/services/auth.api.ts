@@ -146,7 +146,7 @@ class AuthService {
       }
       return data;
     } catch (error) {
-      this.logout();
+      // this.logout();
       return { success: false, error: 'Network error. Please try again.' };
     }
   }
