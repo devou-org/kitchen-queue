@@ -589,7 +589,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 24px;
-            align-items: start;
+            align-items: stretch;
           }
           .form-col-left {
             display: flex;
@@ -597,6 +597,7 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             gap: 24px;
             grid-column: 1;
             order: 1 !important;
+            height: 100%;
           }
           .form-col-right {
             display: flex;
@@ -604,6 +605,13 @@ export default function AdminProductForm({ initialData, onSuccess, onCancel, isM
             gap: 24px;
             grid-column: 2;
             order: 2 !important;
+            height: 100%;
+          }
+          .form-col-right > div:last-child {
+            flex: 1;
+          }
+          .form-card-basic {
+            height: 100%;
           }
           .form-col-full {
             display: block !important;
