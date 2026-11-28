@@ -1,20 +1,37 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { WifiOff, Wifi, RefreshCw, X, AlertTriangle, Minimize2, Maximize2 } from 'lucide-react';
+import { WifiOff, RefreshCw, Minimize2, Maximize2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useRestaurant } from '@/hooks/useRestaurant';
 
 export function NetworkDetector() {
+  const { restaurant } = useRestaurant();
   const [mounted, setMounted] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
-  const [wasOffline, setWasOffline] = useState<boolean>(false);
-  const [showRestored, setShowRestored] = useState<boolean>(false);
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [offlineSince, setOfflineSince] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
-  const restoredTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const wasOfflineRef = useRef<boolean>(false);
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const primaryColor = restaurant?.primary_color || 'var(--primary, #971345)';
+  const secondaryColor = restaurant?.secondary_color || 'var(--secondary, #EC7951)';
+
+  const notifyConnectionRestored = useCallback(() => {
+    setIsOnline(true);
+    setOfflineSince(null);
+    setIsMinimized(false);
+    if (wasOfflineRef.current) {
+      wasOfflineRef.current = false;
+      toast.success('Back Online! Your internet connection has been restored.', {
+        id: 'network-restored',
+        duration: 3000,
+      });
+    }
+  }, []);
 
   // Active ping verification using the lightweight health endpoint
   const verifyConnection = useCallback(async (): Promise<boolean> => {
@@ -44,26 +61,24 @@ export function NetworkDetector() {
     setIsChecking(false);
 
     if (reachable) {
-      setIsOnline(true);
-      setShowRestored(true);
-      if (restoredTimerRef.current) clearTimeout(restoredTimerRef.current);
-      restoredTimerRef.current = setTimeout(() => {
-        setShowRestored(false);
-        setWasOffline(false);
-      }, 4000);
+      notifyConnectionRestored();
     }
   };
 
   useEffect(() => {
     setMounted(true);
     if (typeof navigator !== 'undefined') {
-      setIsOnline(navigator.onLine);
+      const online = navigator.onLine;
+      setIsOnline(online);
+      if (!online) {
+        wasOfflineRef.current = true;
+        setOfflineSince(Date.now());
+      }
     }
 
     const onOffline = () => {
       setIsOnline(false);
-      setWasOffline(true);
-      setShowRestored(false);
+      wasOfflineRef.current = true;
       setOfflineSince(Date.now());
       setElapsedSeconds(0);
       try {
@@ -77,18 +92,10 @@ export function NetworkDetector() {
       setIsChecking(false);
 
       if (reachable) {
-        setIsOnline(true);
-        setShowRestored(true);
-        setOfflineSince(null);
         try {
           if ('vibrate' in navigator) navigator.vibrate([50]);
         } catch {}
-
-        if (restoredTimerRef.current) clearTimeout(restoredTimerRef.current);
-        restoredTimerRef.current = setTimeout(() => {
-          setShowRestored(false);
-          setWasOffline(false);
-        }, 4000);
+        notifyConnectionRestored();
       } else {
         // navigator says online, but ping failed
         setIsOnline(false);
@@ -101,10 +108,9 @@ export function NetworkDetector() {
     return () => {
       window.removeEventListener('offline', onOffline);
       window.removeEventListener('online', onOnline);
-      if (restoredTimerRef.current) clearTimeout(restoredTimerRef.current);
       if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
     };
-  }, [verifyConnection]);
+  }, [verifyConnection, notifyConnectionRestored]);
 
   // Periodic polling when offline to auto-recover immediately when connection returns
   useEffect(() => {
@@ -112,18 +118,10 @@ export function NetworkDetector() {
       checkIntervalRef.current = setInterval(async () => {
         const reachable = await verifyConnection();
         if (reachable) {
-          setIsOnline(true);
-          setShowRestored(true);
-          setOfflineSince(null);
           try {
             if ('vibrate' in navigator) navigator.vibrate([50]);
           } catch {}
-
-          if (restoredTimerRef.current) clearTimeout(restoredTimerRef.current);
-          restoredTimerRef.current = setTimeout(() => {
-            setShowRestored(false);
-            setWasOffline(false);
-          }, 4000);
+          notifyConnectionRestored();
         }
       }, 4000);
     } else {
@@ -133,7 +131,7 @@ export function NetworkDetector() {
     return () => {
       if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
     };
-  }, [isOnline, verifyConnection]);
+  }, [isOnline, verifyConnection, notifyConnectionRestored]);
 
   // Elapsed seconds timer while offline
   useEffect(() => {
@@ -154,97 +152,14 @@ export function NetworkDetector() {
     return `${mins}m ${rem}s`;
   };
 
-  // 1. Connection Restored Notification Banner
-  if (isOnline && showRestored && wasOffline) {
-    return (
-      <>
-        <style>{`
-          @keyframes networkSlideDown {
-            from { opacity: 0; transform: translate(-50%, -20px); }
-            to { opacity: 1; transform: translate(-50%, 0); }
-          }
-        `}</style>
-        <aside
-          aria-label="Internet Connection Restored"
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 99999999,
-            maxWidth: '92vw',
-            width: '420px',
-            backgroundColor: '#065F46',
-            color: '#ECFDF5',
-            borderRadius: '14px',
-            padding: '12px 16px',
-            boxShadow: '0 20px 35px -5px rgba(6, 95, 70, 0.4), 0 0 0 1px rgba(16, 185, 129, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            animation: 'networkSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Wifi size={20} color="#34D399" />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#FFFFFF', letterSpacing: '-0.01em' }}>
-                Back Online!
-              </div>
-              <div style={{ fontSize: '12px', color: '#A7F3D0', marginTop: '1px' }}>
-                Your internet connection has been restored.
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setShowRestored(false);
-              setWasOffline(false);
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#A7F3D0',
-              cursor: 'pointer',
-              padding: '4px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            title="Dismiss"
-          >
-            <X size={16} />
-          </button>
-        </aside>
-      </>
-    );
-  }
-
-  // 2. Offline State: Minimized Floating Badge
+  // 1. Offline State: Minimized Floating Badge
   if (!isOnline && isMinimized) {
     return (
       <>
         <style>{`
           @keyframes networkPulse {
-            0%, 100% { transform: scale(1); box-shadow: 0 10px 25px rgba(153, 27, 27, 0.5); }
-            50% { transform: scale(1.03); box-shadow: 0 14px 30px rgba(220, 38, 38, 0.6); }
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
           }
         `}</style>
         <div
@@ -263,11 +178,11 @@ export function NetworkDetector() {
             bottom: '24px',
             right: '24px',
             zIndex: 99999999,
-            backgroundColor: '#991B1B',
+            backgroundColor: primaryColor,
             color: '#FFFFFF',
             padding: '10px 16px',
-            borderRadius: '9999px',
-            boxShadow: '0 10px 25px rgba(153, 27, 27, 0.5), 0 0 0 2px rgba(239, 68, 68, 0.4)',
+            borderRadius: 'var(--radius-full, 9999px)',
+            boxShadow: `0 10px 25px color-mix(in srgb, ${primaryColor} 45%, transparent), 0 0 0 2px color-mix(in srgb, ${secondaryColor} 45%, transparent)`,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -282,19 +197,19 @@ export function NetworkDetector() {
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              backgroundColor: '#EF4444',
+              backgroundColor: secondaryColor,
               display: 'inline-block',
             }}
           />
           <WifiOff size={15} />
           <span>No Internet ({formatElapsed(elapsedSeconds)})</span>
-          <Maximize2 size={13} style={{ opacity: 0.8, marginLeft: '4px' }} />
+          <Maximize2 size={13} style={{ opacity: 0.85, marginLeft: '4px' }} />
         </div>
       </>
     );
   }
 
-  // 3. Offline State: Prominent Popup Modal / Alert Dialog
+  // 2. Offline State: Prominent Popup Modal / Alert Dialog
   if (!isOnline) {
     return (
       <>
@@ -338,10 +253,10 @@ export function NetworkDetector() {
             zIndex: 99999999,
             width: '92vw',
             maxWidth: '430px',
-            backgroundColor: '#FFFFFF',
-            borderRadius: '20px',
+            backgroundColor: 'var(--card, #FFFFFF)',
+            borderRadius: 'var(--radius-lg, 16px)',
             padding: '24px 22px',
-            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+            boxShadow: 'var(--shadow-lg, 0 25px 60px -15px rgba(0, 0, 0, 0.35)), 0 0 0 1px var(--border, #EFE9EB)',
             animation: 'networkPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
           }}
@@ -352,9 +267,9 @@ export function NetworkDetector() {
               style={{
                 width: '52px',
                 height: '52px',
-                borderRadius: '14px',
-                backgroundColor: '#FEE2E2',
-                color: '#DC2626',
+                borderRadius: 'var(--radius, 12px)',
+                backgroundColor: `color-mix(in srgb, ${primaryColor} 12%, transparent)`,
+                color: primaryColor,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -369,10 +284,10 @@ export function NetworkDetector() {
                 onClick={() => setIsMinimized(true)}
                 title="Minimize popup"
                 style={{
-                  background: '#F1F5F9',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#64748B',
+                  background: 'var(--bg, #FDF9FA)',
+                  border: '1px solid var(--border, #EFE9EB)',
+                  borderRadius: 'var(--radius-sm, 8px)',
+                  color: 'var(--text-secondary, #6B6667)',
                   width: '32px',
                   height: '32px',
                   display: 'flex',
@@ -393,7 +308,7 @@ export function NetworkDetector() {
             style={{
               fontSize: '18px',
               fontWeight: 800,
-              color: '#0F172A',
+              color: 'var(--text-primary, #33322F)',
               marginBottom: '6px',
               letterSpacing: '-0.02em',
             }}
@@ -404,7 +319,7 @@ export function NetworkDetector() {
           <p
             style={{
               fontSize: '13.5px',
-              color: '#475569',
+              color: 'var(--text-secondary, #6B6667)',
               lineHeight: 1.5,
               marginBottom: '18px',
             }}
@@ -415,9 +330,9 @@ export function NetworkDetector() {
           {/* Status Capsule */}
           <div
             style={{
-              backgroundColor: '#FEF2F2',
-              border: '1px solid #FECACA',
-              borderRadius: '10px',
+              backgroundColor: `color-mix(in srgb, ${primaryColor} 8%, var(--card, #FFFFFF))`,
+              border: `1px solid color-mix(in srgb, ${primaryColor} 22%, transparent)`,
+              borderRadius: 'var(--radius-sm, 8px)',
               padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
@@ -431,15 +346,15 @@ export function NetworkDetector() {
                   width: '8px',
                   height: '8px',
                   borderRadius: '50%',
-                  backgroundColor: '#DC2626',
+                  backgroundColor: primaryColor,
                   display: 'inline-block',
                 }}
               />
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#991B1B' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: primaryColor }}>
                 Offline for {formatElapsed(elapsedSeconds)}
               </span>
             </div>
-            <span style={{ fontSize: '11px', color: '#B91C1C', fontWeight: 500 }}>
+            <span style={{ fontSize: '11px', color: secondaryColor, fontWeight: 600 }}>
               Auto-retrying...
             </span>
           </div>
@@ -453,8 +368,8 @@ export function NetworkDetector() {
               style={{
                 width: '100%',
                 padding: '12px 18px',
-                borderRadius: '12px',
-                backgroundColor: '#DC2626',
+                borderRadius: 'var(--radius, 12px)',
+                backgroundColor: primaryColor,
                 color: '#FFFFFF',
                 border: 'none',
                 fontWeight: 700,
@@ -464,7 +379,7 @@ export function NetworkDetector() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)',
+                boxShadow: `0 4px 14px color-mix(in srgb, ${primaryColor} 35%, transparent)`,
                 transition: 'all 0.15s ease',
                 opacity: isChecking ? 0.75 : 1,
               }}
@@ -484,9 +399,9 @@ export function NetworkDetector() {
               style={{
                 width: '100%',
                 padding: '10px 16px',
-                borderRadius: '10px',
+                borderRadius: 'var(--radius-sm, 8px)',
                 backgroundColor: 'transparent',
-                color: '#64748B',
+                color: 'var(--text-secondary, #6B6667)',
                 border: 'none',
                 fontWeight: 600,
                 fontSize: '13px',
