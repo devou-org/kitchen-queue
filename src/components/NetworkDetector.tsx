@@ -251,22 +251,22 @@ export function NetworkDetector() {
             left: '50%',
             transform: 'translate(-50%, -50%)',
             zIndex: 99999999,
-            width: '92vw',
-            maxWidth: '430px',
+            width: '90vw',
+            maxWidth: '350px',
             backgroundColor: 'var(--card, #FFFFFF)',
             borderRadius: 'var(--radius-lg, 16px)',
-            padding: '24px 22px',
+            padding: '18px 18px',
             boxShadow: 'var(--shadow-lg, 0 25px 60px -15px rgba(0, 0, 0, 0.35)), 0 0 0 1px var(--border, #EFE9EB)',
             animation: 'networkPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
           }}
         >
           {/* Header Row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
             <div
               style={{
-                width: '52px',
-                height: '52px',
+                width: '42px',
+                height: '42px',
                 borderRadius: 'var(--radius, 12px)',
                 backgroundColor: `color-mix(in srgb, ${primaryColor} 12%, transparent)`,
                 color: primaryColor,
@@ -275,7 +275,7 @@ export function NetworkDetector() {
                 justifyContent: 'center',
               }}
             >
-              <WifiOff size={28} strokeWidth={2.2} />
+              <WifiOff size={22} strokeWidth={2.2} />
             </div>
 
             <div style={{ display: 'flex', gap: '6px' }}>
@@ -288,8 +288,8 @@ export function NetworkDetector() {
                   border: '1px solid var(--border, #EFE9EB)',
                   borderRadius: 'var(--radius-sm, 8px)',
                   color: 'var(--text-secondary, #6B6667)',
-                  width: '32px',
-                  height: '32px',
+                  width: '28px',
+                  height: '28px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -297,7 +297,7 @@ export function NetworkDetector() {
                   transition: 'background 0.15s ease',
                 }}
               >
-                <Minimize2 size={16} />
+                <Minimize2 size={14} />
               </button>
             </div>
           </div>
@@ -306,10 +306,10 @@ export function NetworkDetector() {
           <h2
             id="network-offline-title"
             style={{
-              fontSize: '18px',
+              fontSize: '16px',
               fontWeight: 800,
               color: 'var(--text-primary, #33322F)',
-              marginBottom: '6px',
+              marginBottom: '4px',
               letterSpacing: '-0.02em',
             }}
           >
@@ -318,10 +318,10 @@ export function NetworkDetector() {
 
           <p
             style={{
-              fontSize: '13.5px',
+              fontSize: '12.5px',
               color: 'var(--text-secondary, #6B6667)',
-              lineHeight: 1.5,
-              marginBottom: '18px',
+              lineHeight: 1.45,
+              marginBottom: '14px',
             }}
           >
             We detected that your device is disconnected from the internet. Real-time orders, updates, and cloud sync are temporarily paused.
@@ -333,18 +333,18 @@ export function NetworkDetector() {
               backgroundColor: `color-mix(in srgb, ${primaryColor} 8%, var(--card, #FFFFFF))`,
               border: `1px solid color-mix(in srgb, ${primaryColor} 22%, transparent)`,
               borderRadius: 'var(--radius-sm, 8px)',
-              padding: '10px 14px',
+              padding: '8px 12px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '20px',
+              marginBottom: '14px',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span
                 style={{
-                  width: '8px',
-                  height: '8px',
+                  width: '7px',
+                  height: '7px',
                   borderRadius: '50%',
                   backgroundColor: primaryColor,
                   display: 'inline-block',
@@ -354,26 +354,26 @@ export function NetworkDetector() {
                 Offline for {formatElapsed(elapsedSeconds)}
               </span>
             </div>
-            <span style={{ fontSize: '11px', color: secondaryColor, fontWeight: 600 }}>
+            <span style={{ fontSize: '11px', color: '#000000', fontWeight: 600 }}>
               Auto-retrying...
             </span>
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <button
               type="button"
               onClick={handleManualRetry}
               disabled={isChecking}
               style={{
                 width: '100%',
-                padding: '12px 18px',
+                padding: '10px 14px',
                 borderRadius: 'var(--radius, 12px)',
                 backgroundColor: primaryColor,
                 color: '#FFFFFF',
                 border: 'none',
                 fontWeight: 700,
-                fontSize: '14px',
+                fontSize: '13px',
                 cursor: isChecking ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -385,7 +385,7 @@ export function NetworkDetector() {
               }}
             >
               <RefreshCw
-                size={16}
+                size={15}
                 style={{
                   animation: isChecking ? 'networkSpin 0.9s linear infinite' : 'none',
                 }}
@@ -398,13 +398,13 @@ export function NetworkDetector() {
               onClick={() => setIsMinimized(true)}
               style={{
                 width: '100%',
-                padding: '10px 16px',
+                padding: '6px 12px',
                 borderRadius: 'var(--radius-sm, 8px)',
                 backgroundColor: 'transparent',
                 color: 'var(--text-secondary, #6B6667)',
                 border: 'none',
                 fontWeight: 600,
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 textAlign: 'center',
               }}
